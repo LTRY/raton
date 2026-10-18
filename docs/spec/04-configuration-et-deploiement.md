@@ -119,6 +119,10 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
 
 - `DATABASE_URL` : URL SQLAlchemy.
 - `MEDIA_ROOT` : racine media vue par l'application.
+- `POSTGRES_PASSWORD` : mot de passe du role PostgreSQL du service `db`
+  (defaut `raton`), lu uniquement par Docker Compose, qui l'injecte aussi dans
+  le `DATABASE_URL` de l'application. Il n'est applique qu'a la creation du
+  volume `postgres_data` ; caracteres sans danger dans une URL uniquement.
 - `MEDIA_ROOT_REMOTE_PREFIX` / `MEDIA_ROOT_LOCAL_PREFIX` : remapping de chemin
   cote lecture seule (`app/core/config.py:local_media_path()`), utilise quand
   une autre machine accede par un point de montage local different a la meme

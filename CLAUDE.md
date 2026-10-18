@@ -6,24 +6,24 @@ This is the single LLM instruction file for this repo — it applies no matter w
 
 ## Specification first
 
-Before changing PersonalTube, read the relevant files under `docs/spec/`. Every behavior change must update the code and the spec in the same change. If the code and spec disagree, treat the work as incomplete. Use the vocabulary of `docs/spec/20-glossaire.md` (cloche, fiche, Nouveautés, Vu, purge, DB...) in code names, specs, UI strings, PR text and replies to the user — no synonyms — and update it in the same change when a term's meaning moves. Spec files need a frontmatter `title:` equal to their first `# ` heading (`tests/test_docs_spec.py` checks it).
+Before changing Raton, read the relevant files under `docs/spec/`. Every behavior change must update the code and the spec in the same change. If the code and spec disagree, treat the work as incomplete. Use the vocabulary of `docs/spec/20-glossaire.md` (cloche, fiche, Nouveautés, Vu, purge, DB...) in code names, specs, UI strings, PR text and replies to the user — no synonyms — and update it in the same change when a term's meaning moves. Spec files need a frontmatter `title:` equal to their first `# ` heading (`tests/test_docs_spec.py` checks it).
 
 ## Workflow: branch, `make ci`, pull request
 
-Changes reach `main` only through pull requests on the GitHub repo (`LTRY/PersonalTube`). Agents do not deploy: merging a PR deploys it (the self-hosted runner runs `.github/workflows/deploy.yml`), and every open PR that changes code gets a throwaway preview, on port `9000 + <PR number>`, built only as far as the PR needs: nothing for docs/tests, the app alone for code (previews share one database, so they coexist), database + app when migrations change (that PR waits until no other preview is left) (`.github/workflows/preview.yml`). Spec: `docs/spec/04-configuration-et-deploiement.md`.
+Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`); `.github/workflows/ci.yml` runs `make ci`, the docs image build and a secret scan on each one. Agents do not deploy: merging a PR deploys nothing, the user deploys by hand with `make up`. Spec: `docs/spec/04-configuration-et-deploiement.md`.
 
 1. Work on a dedicated branch, never directly on `main`. Start every new task from an up-to-date `origin/main`: `git fetch origin main` first, then branch from (or fast-forward to) `origin/main`. The `SessionStart` hook in `.claude/settings.json` (`.claude/hooks/sync-origin-main.sh`) does this automatically at session start when the branch has no commits of its own and no modified tracked files; when a new task starts mid-session, do it by hand.
 2. Do the task: implement it and commit on the branch.
 3. Run `make ci` before opening the PR. If it fails, fix the issue and re-run it — never open a PR on a red `make ci`.
 4. Push the branch and open a pull request against `main` (`gh pr create`), without waiting to be asked. Don't merge the branch into `main` locally.
 
-Do **not** run `make up` as part of a task: deployment happens on merge, through the runner, or by the user by hand. Never run the CI-only `scripts/` (`deploy.sh`, `preview.sh`, `runners.sh`, `docs.sh`, `status.sh`, `public_export/export.sh`) either.
+Do **not** run `make up`, `make uninstall` or `scripts/docs.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
 
-Migrations: write the revision by hand in `alembic/versions/`, named `NNNN_short_slug` (`down_revision` = the previous id, working `downgrade()`), id of 32 characters at most (`tests/test_migration_revisions.py`). The PR title takes `[DB]` and its preview rebuilds the database.
+Migrations: write the revision by hand in `alembic/versions/`, named `NNNN_short_slug` (`down_revision` = the previous id, working `downgrade()`), id of 32 characters at most (`tests/test_migration_revisions.py`). The PR title takes `[DB]`.
 
 ### Pull request titles
 
-Prefix the title with scope tags, then an imperative English summary: `[FRONT] Stats: link channel names to their channel page`. Tags: `[FRONT]` (templates, CSS, JS, visible UI), `[BACK]` (routes, services, models, scheduler, API), `[DB]` (migration/schema), `[CI]` (workflows, `scripts/`, Makefile, Docker), `[DOCS]` (spec/CLAUDE.md/comments only, no behavior change). Front and back together: `[FRONT][BACK]`, no space. A fix starts its summary with `Fix`; no `feat:`/`fix:` prefixes; 72 characters max, no trailing period. For a `[FRONT]` PR, the description includes the screenshots (see "Show screenshots"). Full rules: `docs/spec/04-configuration-et-deploiement.md`, section "Conventions de nommage des PR".
+Prefix the title with scope tags, then an imperative English summary: `[FRONT] Stats: link channel names to their channel page`. Tags: `[FRONT]` (templates, CSS, JS, visible UI), `[BACK]` (routes, services, models, scheduler, API), `[DB]` (migration/schema), `[CI]` (workflows, `scripts/`, Makefile, Docker), `[DOCS]` (spec/CLAUDE.md/comments only, no behavior change). Front and back together: `[FRONT][BACK]`, no space. A fix starts its summary with `Fix`; no `feat:`/`fix:` prefixes; 72 characters max, no trailing period. For a `[FRONT]` PR, the description includes the screenshots (see "Show screenshots"). Fill in `.github/pull_request_template.md`. Full rules: `docs/spec/04-configuration-et-deploiement.md`, section "Conventions de nommage des PR".
 
 ## Show screenshots
 
@@ -95,6 +95,6 @@ Traps:
 
 ### Security model (see `docs/spec/15-securite.md`)
 
-- PersonalTube runs on a trusted LAN. The HTML and API routes are **intentionally unauthenticated** — not an accidental vulnerability. A change that exposes the app beyond the LAN makes authentication, CSRF, CORS/cookie review and Postgres hardening required.
+- Raton runs on a trusted LAN. The HTML and API routes are **intentionally unauthenticated** — not an accidental vulnerability. A change that exposes the app beyond the LAN makes authentication, CSRF, CORS/cookie review and Postgres hardening required.
 - Never commit `.env`, Claude Code auth (`~/.claude/`), or `ANTHROPIC_API_KEY`.
 - Redirects built from a form `next`/`return_to` go through `internal_return_path` (`app/web/shared.py`).

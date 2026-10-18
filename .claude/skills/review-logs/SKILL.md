@@ -1,6 +1,6 @@
 ---
 name: review-logs
-description: Revue du journal applicatif de PersonalTube sur les dernières 24 h (ou N heures) : conclut "fonctionnement nominal" ou liste les problèmes par gravité avec leur cause probable. À utiliser quand l'utilisateur tape /review-logs ou demande de relire les logs, de vérifier que l'application tourne bien ou de chercher un dysfonctionnement. Lecture seule : ne modifie ni code ni données.
+description: Revue du journal applicatif de Raton sur les dernières 24 h (ou N heures) : conclut "fonctionnement nominal" ou liste les problèmes par gravité avec leur cause probable. À utiliser quand l'utilisateur tape /review-logs ou demande de relire les logs, de vérifier que l'application tourne bien ou de chercher un dysfonctionnement. Lecture seule : ne modifie ni code ni données.
 ---
 
 # Revue du journal applicatif
@@ -11,7 +11,7 @@ Argument optionnel : un nombre d'heures (`/review-logs 48`), 24 par défaut.
 
 ## 1. Trouver le journal
 
-Le journal de la prod est dans le checkout principal, pas dans un worktree :
+Le journal de l'instance qui tourne est dans le checkout principal, pas dans un worktree :
 
 ```bash
 MAIN="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
@@ -20,7 +20,7 @@ LOG_DIR="${LOG_DIR:-$MAIN/.local/logs}"
 ls -la "$LOG_DIR"
 ```
 
-Si le dossier n'existe pas ou `app.jsonl` est vide : dis-le, c'est déjà un constat (l'application n'a pas démarré avec le volume de journal, ou le déploiement de la PR « journal applicatif » n'a pas eu lieu). Vérifie alors `docker ps` et `docker compose logs --since 24h app | tail -200` comme repli, et signale que ce repli est moins fiable.
+Si le dossier n'existe pas ou `app.jsonl` est vide : dis-le, c'est déjà un constat (l'application n'a pas démarré avec le volume de journal, ou l'application n'a pas été relancée avec `make up` depuis l'ajout de ce volume). Vérifie alors `docker ps` et `docker compose logs --since 24h app | tail -200` comme repli, et signale que ce repli est moins fiable.
 
 ## 2. Lire le digest
 

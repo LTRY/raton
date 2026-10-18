@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "httpx2>=2.14.0",
     "pytest>=8.3.3",
     "ruff>=0.17.1",
 ]
@@ -52,6 +53,10 @@ extend-immutable-calls = [
     "fastapi.File",
     "fastapi.Path",
 ]
+
+[tool.setuptools.packages.find]
+# Flat layout: without this, setuptools refuses to pick between app/, alembic/, docs-site/...
+include = ["app*"]
 
 [build-system]
 requires = ["setuptools>=69"]
