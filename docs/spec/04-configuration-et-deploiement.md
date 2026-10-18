@@ -39,6 +39,10 @@ Services :
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
 - `app` : FastAPI + Uvicorn + Alembic + ffmpeg.
 
+Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app` et
+`raton-db` pour `db`, au lieu de `raton-app-1` / `raton-db-1`. Une seule
+instance de la pile peut donc tourner par machine.
+
 Port publie : `8000` (app), sur `127.0.0.1` par defaut ; `APP_BIND=0.0.0.0` l'ouvre au LAN. Le service `db` ne publie aucun port : seul
 le conteneur `app` joint PostgreSQL, par le reseau interne de Compose.
 
