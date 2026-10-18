@@ -1,0 +1,58 @@
+[project]
+name = "raton"
+version = "0.1.0"
+description = "Local YouTube exploration catalog and selective downloader"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "LTRY" }]
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "alembic>=1.13.3",
+    "anthropic>=0.40.0",
+    "apscheduler>=3.10.4",
+    "fastapi>=0.115.0",
+    "httpx>=0.27.0",
+    "jinja2>=3.1.4",
+    "pgvector>=0.3.6",
+    "psycopg[binary]>=3.2.1",
+    "pydantic-settings>=2.5.2",
+    "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0.35",
+    "uvicorn[standard]>=0.30.6",
+    "webvtt-py>=0.5.1",
+    "yt-dlp>=2026.8.19",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.3",
+    "ruff>=0.17.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Line length is the formatter's job; E501 would only flag comments and strings it cannot wrap.
+ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI parameter declarations are evaluated once at import time by design.
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.Path",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"

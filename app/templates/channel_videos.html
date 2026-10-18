@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{# No Turbo preview: it would paint the cached cards mid entrance animation, then the fresh page would replace them
+   and restart that animation from zero (the cards show up twice). #}
+{% block head_extra %}<meta name="turbo-cache-control" content="no-preview">{% endblock %}
+{% block content %}
+{% set channel = selected_channel %}
+{% set asset_version = channel.metadata_fetched_at.timestamp()|int if channel.metadata_fetched_at else 0 %}
+{% set sort_labels = {"imported": "Import récent", "published": "Publication récente", "views": "Les plus vues", "rated": "Les mieux notées"} %}
+{% set shorts_grid = selected_channel_section == "shorts" %}
+{% set active_filter_count = active_filter_pills|length %}
+<section class="channel-page">
+  <header class="channel-hero">
+    {% if channel.banner_path %}
+    <img class="channel-banner" src="/channels/{{ channel.id }}/banner?v={{ asset_version }}" alt="">
+    {% else %}
+    <div class="channel-banner channel-banner-fallback" aria-hidden="true"></div>
+    {% endif %}
+    <div class="channel-identity">
+      {% if channel.avatar_path %}
+      <img class="channel-avatar channel-avatar-large" src="/channels/{{ channel.id }}/avatar?v={{ asset_version }}" alt="">
+      {% else %}
+      <span class="channel-avatar channel-avatar-large channel-avatar-initial" aria-hidden="true">{{ channel.name[:1]|upper }}</span>
+      {% endif %}
+      <h1 class="channel-name">
+        <a class="channel-youtube-link" href="{{ channel.url }}" target="_blank" rel="noopener noreferrer" title="Ouvrir la chaîne sur YouTube">{{ channel.name }}<svg class="channel-youtube-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></a>
+      </h1>
+      <div class="channel-actions">
+        {% for bell_section, bell_label, bell_on in [('videos', 'vidéos', channel.auto_metadata_enabled), ('shorts', 'shorts', channel.auto_shorts_enabled)] %}
+        <form class="channel-bell-form" action="/channels/{{ channel.id }}/auto-metadata" method="post" data-bell-form>
+          <input type="hidden" name="next" value="{{ current_videos_path }}">
+          <input type="hidden" name="section" value="{{ bell_section }}">
+          {# The pressed state is also the visual one: the badge tells videos from shorts. #}
+          <button class="channel-bell-btn{{ ' active' if bell_on else '' }}" type="submit" aria-pressed="{{ 'true' if bell_on else 'false' }}" aria-label="{{ 'Désactiver' if bell_on else 'Activer' }} le suivi quotidien des {{ bell_label }} de {{ channel.name }}" title="{{ 'Suivi quotidien des ' ~ bell_label ~ ' activé' if bell_on else 'Activer le suivi quotidien des ' ~ bell_label }}">
+            <span class="channel-bell-ripple" aria-hidden="true"></span>
+            <svg class="channel-bell-icon" viewBox="0 0 24 24" fill="{{ 'currentColor' if bell_on else 'none' }}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0" fill="none"/>{% if not bell_on %}<path class="channel-bell-slash" d="M4 4l16 16" stroke-dasharray="24"/>{% endif %}</svg>
+            <span class="channel-bell-badge" aria-hidden="true">
+              {% if bell_section == 'videos' %}<svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>{% else %}<svg width="9" height="11" viewBox="0 0 16 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="2" y="1.5" width="12" height="21" rx="3"/></svg>{% endif %}
+            </span>
+          </button>
+        </form>
+        {% endfor %}
+        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
+          <input type="hidden" name="next" value="{{ current_videos_path }}">
+          {% for value in range(1, 6) %}
+          <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if channel.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
+            <span aria-hidden="true">★</span>
+          </button>
+          {% endfor %}
+          <button class="rating-star rating-star-empty" name="rating" value="0" type="submit" aria-label="Retirer la note" title="0 / 5">
+            <span aria-hidden="true">×</span>
+          </button>
+        </form>
+        <details class="channel-pop channel-menu" data-pop>
+          <summary class="channel-icon-btn" aria-label="Plus d'actions" title="Plus d'actions"><span aria-hidden="true">⋯</span></summary>
+          <div class="channel-pop-panel channel-menu-panel">
+            <dl class="channel-stats">
+              <div><dt>Vidéos téléchargées</dt><dd>{{ downloaded_regular_video_count }}</dd></div>
+              <div><dt>Shorts téléchargés</dt><dd>{{ downloaded_short_count }}</dd></div>
+              <div><dt>Fiches</dt><dd>{{ local_video_count }}</dd></div>
+              <div><dt>Périodicité</dt><dd>{{ channel_periodicity or "Pas assez de données" }}</dd></div>
+            </dl>
+            {% set channel_categories = channel_category_labels(channel) %}
+            <details class="channel-menu-section">
+              <summary class="channel-menu-item">Labels catégories <span class="channel-menu-hint">{{ channel_categories|length }}</span></summary>
+              <form class="channel-inline-category-form" action="/channels/{{ channel.id }}/categories" method="post">
+                <input type="hidden" name="next" value="{{ current_videos_path }}">
+                <div class="category-editor channel-category-editor">
+                  <span class="category-filter-options" aria-label="Catégories prédéfinies">
+                    {% for category in category_filter_options %}
+                    <label class="asset-filter-chip">
+                      <input name="preset_categories" type="checkbox" value="{{ category.label }}" {% if category.label in channel_categories %}checked{% endif %}>
+                      <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
+                    </label>
+                    {% endfor %}
+                  </span>
+                  <label class="custom-category-field">
+                    <span>Custom</span>
+                    <input name="custom_categories" type="text" placeholder="ex. histoire, interview">
+                  </label>
+                </div>
+                <button type="submit">Enregistrer les labels</button>
+              </form>
+            </details>
+            <form action="/channels/{{ channel.id }}/refresh-profile" method="post">
+              <input type="hidden" name="next" value="{{ current_videos_path }}">
+              <button class="channel-menu-item" type="submit" aria-label="Rafraîchir le profil de {{ channel.name }}" title="Rafraîchir l'avatar, la bannière, la description et les mots-clés">Rafraîchir le profil <span class="channel-menu-hint">avatar, bannière…</span></button>
+            </form>
+            <details class="channel-delete">
+              <summary>Supprimer la chaîne</summary>
+              <form class="channel-delete-panel" action="/channels/{{ channel.id }}/delete" method="post" data-turbo="false">
+                <input type="hidden" name="next" value="/channels">
+                <p class="channel-delete-title">Supprimer « {{ channel.name }} » ? Cette action est définitive.</p>
+                <ul>
+                  <li>la chaîne et ses réglages (note, catégories, cloches de suivi) ;</li>
+                  <li>{{ local_video_count }} fiche{{ 's' if local_video_count != 1 else '' }} vidéo/short de la bibliothèque{% if downloaded_video_count %}, dont {{ downloaded_video_count }} avec un média téléchargé{% endif %} ;</li>
+                  <li>pour chacune : note, notes IA, discussions, transcription indexée, segments sponsor et présence dans les playlists.</li>
+                </ul>
+                <p>Les fichiers déjà téléchargés (média, miniature, transcription) ne sont pas effacés du disque : ils ne seront simplement plus référencés. Les journaux et l'historique de lecture sont conservés.</p>
+                <p>Si la chaîne est réajoutée plus tard, tout sera à reconstruire.</p>
+                <button class="danger" type="submit">Oui, supprimer définitivement</button>
+              </form>
+            </details>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    {% if channel.description %}
+    <div class="channel-about">
+      {% set long_description = channel.description|length > 200 %}
+      {% if long_description %}<input class="channel-description-toggle visually-hidden" id="channel-description-toggle" type="checkbox" aria-label="Afficher toute la description">{% endif %}
+      <p class="channel-description">{{ channel.description }}</p>
+      {% if long_description %}
+      <label class="channel-description-more" for="channel-description-toggle"><span class="more-label">Voir plus</span><span class="less-label">Voir moins</span></label>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if channel.keyword_list %}
+    {% set keywords_visible = 5 %}
+    {# Past five keywords the rest hides behind a "+N" chip (CSS-only: the checkbox precedes the chips it controls). #}
+    {% if channel.keyword_list|length > keywords_visible %}<input class="channel-keywords-toggle visually-hidden" id="channel-keywords-toggle" type="checkbox" aria-label="Afficher tous les mots-clés">{% endif %}
+    <div class="video-metadata-tags channel-keywords" aria-label="Mots-clés">
+      {% for keyword in channel.keyword_list %}
+      <span class="category-label{{ ' channel-keyword-extra' if loop.index > keywords_visible else '' }}">{{ keyword }}</span>
+      {% endfor %}
+      {% if channel.keyword_list|length > keywords_visible %}
+      <label class="channel-keywords-more" for="channel-keywords-toggle"><span class="more-label">+{{ channel.keyword_list|length - keywords_visible }}</span><span class="less-label">Moins</span></label>
+      {% endif %}
+    </div>
+    {% endif %}
+  </header>
+
+  <div class="channel-toolbar">
+    <form class="channel-toolbar-form" action="/videos" method="get" data-auto-submit-filter data-live-search="library-results">
+      <input type="hidden" name="channel_id" value="{{ channel.id }}">
+      <input type="hidden" name="asset_filters" value="1">
+      <span class="channel-segmented" role="group" aria-label="Sections de la chaîne">
+        <label>
+          <input name="section" type="radio" value="videos" {% if not shorts_grid %}checked{% endif %}>
+          <span>Vidéos</span>
+        </label>
+        <label>
+          <input name="section" type="radio" value="shorts" {% if shorts_grid %}checked{% endif %}>
+          <span>Shorts</span>
+        </label>
+      </span>
+      <label class="channel-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+        <input name="q" type="search" value="{{ search_query|default('') }}" placeholder="Rechercher dans la chaîne" aria-label="Rechercher dans la chaîne" autocomplete="off">
+      </label>
+      <details class="channel-pop channel-sort" data-pop>
+        <summary class="channel-pill-btn">{{ sort_labels[selected_sort] }} <span aria-hidden="true">▾</span></summary>
+        <div class="channel-pop-panel channel-sort-panel" role="radiogroup" aria-label="Trier la chaîne">
+          {% for sort_key, sort_label in sort_labels.items() %}
+          <label class="channel-sort-option">
+            <input name="sort" type="radio" value="{{ sort_key }}" {% if selected_sort == sort_key %}checked{% endif %}>
+            <span><span class="channel-sort-check" aria-hidden="true">✓</span>{{ sort_label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </details>
+      <details class="channel-pop channel-filters" data-pop data-pop-persist="filters">
+        <summary class="channel-pill-btn{{ ' has-filters' if active_filter_count else '' }}">Filtres{% if active_filter_count %} <span class="channel-count-badge">{{ active_filter_count }}</span>{% endif %}</summary>
+        <div class="channel-pop-panel channel-filters-panel" role="dialog" aria-label="Filtres">
+          <div class="channel-panel-head">
+            <h2>Filtres</h2>
+            {% if active_filter_pills %}<a href="{{ filters_clear_href }}">Tout effacer</a>{% endif %}
+          </div>
+          <div class="facet">
+            <div class="facet-head">
+              <h3>Type de fichier</h3>
+              <span class="filter-mode-toggle" aria-label="Mode des types de fichier">
+                <label>
+                  <input name="asset_filter_mode" type="radio" value="or" {% if selected_asset_filter_mode == "or" %}checked{% endif %}>
+                  <span>Au moins un</span>
+                </label>
+                <label>
+                  <input name="asset_filter_mode" type="radio" value="and" {% if selected_asset_filter_mode == "and" %}checked{% endif %}>
+                  <span>Tous</span>
+                </label>
+              </span>
+            </div>
+            <div class="chip-cloud">
+              {% for filter in asset_filter_options %}
+              {{ macros.filter_chip3(filter.kind, filter.text, "asset-label asset-label-" ~ filter.kind, selected_asset_filters, selected_excluded_asset_filters, "asset", "exclude_asset") }}
+              {% endfor %}
+              <label class="asset-filter-chip">
+                <input name="rated" type="checkbox" value="1" {% if selected_rated_only %}checked{% endif %}>
+                <span class="asset-label asset-label-rating">★ Notées</span>
+              </label>
+              <label class="asset-filter-chip">
+                <input name="hide_hidden" type="checkbox" value="1" {% if selected_hide_hidden %}checked{% endif %}>
+                <span class="asset-label asset-label-hidden">Masquer les écartées</span>
+              </label>
+            </div>
+          </div>
+          <div class="facet">
+            <div class="facet-head">
+              <h3>Catégories</h3>
+              <span class="filter-mode-toggle" aria-label="Mode des catégories">
+                <label>
+                  <input name="category_filter_mode" type="radio" value="or" {% if selected_category_filter_mode == "or" %}checked{% endif %}>
+                  <span>Au moins une</span>
+                </label>
+                <label>
+                  <input name="category_filter_mode" type="radio" value="and" {% if selected_category_filter_mode == "and" %}checked{% endif %}>
+                  <span>Toutes</span>
+                </label>
+              </span>
+            </div>
+            <div class="chip-cloud">
+              {% for category in category_filter_options %}
+              {{ macros.filter_chip3(category.label, category.label, "category-label", selected_category_filters, selected_excluded_category_filters, "category", "exclude_category", category) }}
+              {% endfor %}
+              <label class="asset-filter-chip">
+                <input name="uncategorized" type="checkbox" value="1" {% if selected_uncategorized_only %}checked{% endif %}>
+                <span class="category-label">Sans catégorie</span>
+              </label>
+            </div>
+          </div>
+          <p class="channel-panel-hint">Un clic inclut, un deuxième clic exclut, un troisième retire.</p>
+          <div class="channel-panel-foot">
+            <span></span>
+            <button type="button" class="channel-panel-close" data-pop-close>Fermer</button>
+          </div>
+        </div>
+      </details>
+      <button class="visually-hidden" type="submit">Filtrer</button>
+    </form>
+    <form class="channel-refresh-form" action="/channels/{{ channel.id }}/import-metadata" method="post" data-async-job data-turbo="false" data-pending-message="Recherche des nouveautés en file d'attente...">
+      <input type="hidden" name="page" value="1">
+      <input type="hidden" name="section" value="{{ selected_channel_section }}">
+      <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">
+      <button class="channel-refresh-btn" type="submit" aria-label="{{ 'Chercher les nouveaux shorts' if shorts_grid else 'Chercher les nouvelles vidéos' }}" title="{{ 'Chercher les nouveaux shorts' if shorts_grid else 'Chercher les nouvelles vidéos' }}">
+        <svg class="channel-refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v5h-5"/></svg>
+      </button>
+    </form>
+  </div>
+
+  {# Everything that depends on `q` lives in this frame: live search swaps it
+     alone, so the search field keeps focus while typing. #}
+  <turbo-frame id="library-results" class="live-results" target="_top">
+  {% if active_filter_pills %}
+  <div class="active-filters-row">
+    {% for pill in active_filter_pills %}
+    <a class="active-filter-pill {{ 'exclude' if pill.kind == 'exclude' else '' }}" href="{{ pill.href }}">
+      <span>{{ ("≠ " if pill.kind == "exclude" else "") ~ pill.label }}</span>
+      <span class="active-filter-pill-remove" aria-hidden="true">×</span>
+    </a>
+    {% endfor %}
+    <a class="clear-all-link" href="{{ filters_clear_href }}">Tout effacer</a>
+  </div>
+  {% endif %}
+  {% if channel_entries_error %}
+  <p class="notice error">Impossible de récupérer les fiches de la chaîne : {{ channel_entries_error }}</p>
+  {% endif %}
+  <p class="channel-result-count"><strong data-explore-count="{{ filtered_video_count }}">{{ filtered_video_count }} fiche{{ "s" if filtered_video_count != 1 else "" }}</strong></p>
+  <div class="channel-results">
+    <div class="video-row-list channel-video-grid{{ ' channel-video-grid-shorts' if shorts_grid else '' }}" data-explore-grid data-channel-id="{{ channel.id }}" data-section="{{ selected_channel_section }}">
+      {% for card in video_cards %}
+      {% set feature = shorts_grid and shorts_feature_flags[loop.index0] %}
+      {{ macros.video_card(card, current_videos_path, category_style_map, no_progress_categories, channel_mode=True, feature=feature, index=loop.index0, short_tile=shorts_grid) }}
+      {% else %}
+      {% if search_query %}
+      <p class="empty-state">Aucun résultat pour « {{ search_query }} ».</p>
+      {% else %}
+      <div class="channel-empty">
+        <img class="channel-empty-image" src="/static/img/raccoon-empty.png?v={{ static_asset_version('img/raccoon-empty.png') }}" alt="" width="189" height="254">
+        <p class="channel-empty-message">{{ random_channel_empty_message() }}</p>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {{ macros.numbered_pagination(page|default(1), total_pages|default(1), page_href) }}
+  </turbo-frame>
+
+  {% set channel_is_empty = not video_cards and not search_query %}
+  <form class="channel-explore" action="/channels/{{ channel.id }}/import-metadata" method="post" data-explore data-turbo="false" data-channel-id="{{ channel.id }}" data-channel-name="{{ channel.name }}" data-section="{{ selected_channel_section }}" data-expected="{{ channel_page_size }}">
+    <input type="hidden" name="page" value="{{ next_import_page }}">
+    <input type="hidden" name="section" value="{{ selected_channel_section }}">
+    <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">
+    <button class="channel-explore-btn" type="submit">{{ "Commencer l’exploration" if channel_is_empty else "Explorer la suite" }} <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M6 13l6 6 6-6"/></svg></button>
+    <p data-explore-hint>{% if channel_is_empty %}Récupère les {{ channel_page_size }} premières fiches depuis YouTube{% else %}Récupère les {{ channel_page_size }} fiches suivantes depuis YouTube{% endif %}</p>
+  </form>
+</section>
+{% endblock %}

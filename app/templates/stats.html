@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="stats-page">
+  <div class="section-heading">
+    <h1>Statistiques</h1>
+    <div class="section-heading-actions">
+      <a class="button-link secondary lg" href="/">Retour au dashboard</a>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <article class="stats-card stats-card-wide">
+      <h2>Stockage utilisé</h2>
+      <p class="stats-figure"><strong>{{ format_storage_bytes(total_bytes) }}</strong>
+        {% if quota_bytes > 0 %}<span>sur {{ format_storage_bytes(quota_bytes) }} ({{ quota_percent }} %)</span>{% endif %}
+        <span>· {{ total_cards }} fiches</span></p>
+      {% if quota_bytes > 0 %}
+      <div class="media-progress-track" aria-label="Stockage utilisé"><span style="width: {{ quota_percent }}%"></span></div>
+      {% endif %}
+      <div class="stats-stack" role="img" aria-label="Répartition vidéos / shorts">
+        {% for kind in storage_by_kind %}{% if kind.bytes > 0 %}
+        <span class="stats-seg stats-seg-{{ loop.index }}" style="width: {{ kind.percent }}%"></span>
+        {% endif %}{% endfor %}
+      </div>
+      <ul class="stats-legend">
+        {% for kind in storage_by_kind %}
+        <li><i class="stats-seg-{{ loop.index }}"></i>{{ kind.label }} <strong>{{ format_storage_bytes(kind.bytes) }}</strong></li>
+        {% endfor %}
+      </ul>
+    </article>
+
+    <article class="stats-card">
+      <h2>Stockage par chaîne</h2>
+      {% for row in storage_by_channel %}
+      <div class="stats-bar-row">
+        {% if row.channel_id %}<a class="stats-bar-label stats-bar-link" href="/videos?channel_id={{ row.channel_id }}" title="{{ row.name }}">{{ row.name }}</a>
+        {% else %}<span class="stats-bar-label" title="{{ row.name }}">{{ row.name }}</span>{% endif %}
+        <span class="stats-bar-track"><span style="width: {{ row.percent }}%"></span></span>
+        <strong>{{ format_storage_bytes(row.bytes) }}</strong>
+      </div>
+      {% else %}<p class="muted">Aucun média stocké.</p>{% endfor %}
+    </article>
+
+    <article class="stats-card">
+      <h2>Fiches par chaîne</h2>
+      {% for row in cards_by_channel %}
+      <div class="stats-bar-row">
+        {% if row.channel_id %}<a class="stats-bar-label stats-bar-link" href="/videos?channel_id={{ row.channel_id }}" title="{{ row.name }}">{{ row.name }}</a>
+        {% else %}<span class="stats-bar-label" title="{{ row.name }}">{{ row.name }}</span>{% endif %}
+        <span class="stats-bar-track"><span style="width: {{ row.percent }}%"></span></span>
+        <strong>{{ row.cards }}</strong>
+      </div>
+      {% else %}<p class="muted">Aucune fiche.</p>{% endfor %}
+    </article>
+
+    <article class="stats-card">
+      <h2>Fiches par format</h2>
+      <div class="stats-stack" role="img" aria-label="Répartition des fiches par format">
+        {% for item in cards_by_format %}{% if item.count > 0 %}
+        <span class="stats-seg stats-seg-{{ loop.index }}" style="width: {{ item.percent }}%"></span>
+        {% endif %}{% endfor %}
+      </div>
+      <ul class="stats-legend">
+        {% for item in cards_by_format %}
+        <li><i class="stats-seg-{{ loop.index }}"></i>{{ item.label }} <strong>{{ item.count }}</strong></li>
+        {% endfor %}
+      </ul>
+    </article>
+
+    <article class="stats-card stats-card-wide">
+      <h2>Fiches ajoutées par mois</h2>
+      {% if chart.story %}<p class="stats-story">{{ chart.story }}</p>{% endif %}
+      <div class="stats-kpis">
+        <div><span>{{ chart.current_month_name|capitalize }}</span><strong>{{ chart.current_cards }}</strong>
+          <small>{% if chart.delta_percent is not none %}{{ "%+d"|format(chart.delta_percent) }} % vs mois précédent{% else %}fiches ajoutées{% endif %}</small></div>
+        <div><span>Rythme moyen</span><strong>{{ chart.average_cards }}</strong><small>fiches par mois</small></div>
+        <div><span>Ajouté en {{ chart.current_month_name }}</span><strong>{{ format_storage_bytes(chart.current_bytes) }}</strong><small>de médias</small></div>
+      </div>
+      <div class="stats-columns" style="--cols: {{ chart.months|length }}">
+        {% for month in chart.months %}
+        <div class="stats-column{% if loop.last %} is-current{% endif %}" title="{{ month.month_name|capitalize }} {{ month.year }} : {{ month.cards_added }} fiches">
+          <em>{{ month.cards_added or "" }}</em>
+          <span class="stats-column-bar"><span style="height: {{ month.cards_percent }}%"></span></span>
+          <small>{{ month.short_label }}</small>
+        </div>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="stats-card stats-card-wide">
+      <h2>Stockage cumulé</h2>
+      <p class="stats-figure"><strong>{{ format_storage_bytes(chart.peak_bytes) }}</strong>
+        <span>de médias présents, depuis {{ chart.range_start }}</span></p>
+      <div class="stats-curve">
+        <span class="stats-curve-max">{{ format_storage_bytes(chart.peak_bytes) }}</span>
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="Stockage cumulé par mois">
+          <polygon class="stats-curve-area" points="{{ chart.curve_area }}"/>
+          <polyline class="stats-curve-line" points="{{ chart.curve_line }}"/>
+        </svg>
+        <span class="stats-curve-axis"><span>{{ chart.months[0].short_label }}</span><span>{{ chart.months[-1].short_label }}</span></span>
+      </div>
+      <p class="muted stats-note">Médias présents aujourd'hui, classés par date d'ajout (les médias purgés ne comptent plus).</p>
+    </article>
+
+    {% if purged.months %}
+    <article class="stats-card stats-card-wide">
+      <h2>Médias supprimés automatiquement</h2>
+      <p class="stats-figure"><strong>{{ purged.total }}</strong>
+        <span>vidéos purgées sur {{ purged.months|length }} mois · {{ purged.current }} ce mois-ci · moyenne {{ purged.average }} par mois</span></p>
+      <div class="stats-columns" style="--cols: {{ purged.months|length }}">
+        {% for month in purged.months %}
+        <div class="stats-column{% if loop.last %} is-current{% endif %}" title="{{ month.month_name|capitalize }} {{ month.year }} : {{ month.count }} purgées">
+          <em>{{ month.count or "" }}</em>
+          <span class="stats-column-bar"><span style="height: {{ month.percent }}%"></span></span>
+          <small>{{ month.short_label }}</small>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="muted stats-note">Vidéos vues à plus de 90 % dont les fichiers ont été supprimés du stockage après 7 jours (sauf notées 4+). Les fiches, notes et transcripts restent.</p>
+    </article>
+    {% endif %}
+
+    {% if spend.months %}
+    <article class="stats-card stats-card-wide">
+      <h2>Dépenses en modèle</h2>
+      <p class="stats-figure"><strong>${{ "%.2f"|format(spend.total) }}</strong>
+        <span>sur {{ spend.months|length }} mois · ${{ "%.2f"|format(spend.current) }} ce mois-ci · moyenne ${{ "%.2f"|format(spend.average) }} par mois</span></p>
+      <div class="stats-columns" style="--cols: {{ spend.months|length }}">
+        {% for month in spend.months %}
+        <div class="stats-column{% if loop.last %} is-current{% endif %}" title="{{ month.short_label }} {{ month.year }} : ${{ '%.2f'|format(month.total) }}">
+          <em>{% if month.total %}${{ "%.2f"|format(month.total) }}{% endif %}</em>
+          <span class="stats-column-bar stats-spend-bar"><span class="stats-spend-stack" style="height: {{ month.height }}%">
+            {% for part in month.parts|reverse %}{% if part.cost %}<i class="stats-seg-{{ 4 - loop.index0 }}" style="height: {{ part.percent }}%" title="{{ part.label }} : ${{ '%.2f'|format(part.cost) }}"></i>{% endif %}{% endfor %}
+          </span></span>
+          <small>{{ month.short_label }}</small>
+        </div>
+        {% endfor %}
+      </div>
+      <ul class="stats-legend">
+        {% for label in spend.legend %}<li><i class="stats-seg-{{ loop.index }}"></i>{{ label }}</li>{% endfor %}
+      </ul>
+      <p class="muted stats-note">Coût réel facturé par l'API, mois de création du job. Détail par type et par modèle dans les paramètres.</p>
+    </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

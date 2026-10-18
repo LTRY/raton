@@ -1,0 +1,11 @@
+# LAN documentation site (the specs rendered by Starlight), driven by scripts/docs.sh. Its own compose
+# project so that `make up` / `make down` never touch it. Spec: docs/spec/04-configuration-et-deploiement.md.
+services:
+  docs:
+    build:
+      context: .
+      dockerfile: docs-site/Dockerfile
+    image: raton-docs:latest
+    ports:
+      - "${DOCS_PORT:-8091}:80"
+    restart: unless-stopped

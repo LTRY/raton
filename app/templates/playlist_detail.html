@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{# No Turbo preview: it would paint the cached cards mid entrance animation, then the fresh page would replace them
+   and restart that animation from zero (the page looks like it loads twice). #}
+{% block head_extra %}<meta name="turbo-cache-control" content="no-preview">{% endblock %}
+{% block content %}
+{% set source_label = "Importée depuis une URL YouTube" if playlist.source == "url" else ("Importée depuis un CSV Google Takeout" if playlist.source == "csv" else "Playlist manuelle") %}
+<section class="pld" data-playlist-player data-playlist-id="{{ playlist.id }}" data-free="{{ '1' if playlist.free_listening else '0' }}">
+  <p class="back-link"><a href="/playlists">‹ Playlists</a></p>
+
+  <div class="pld-layout">
+    <aside class="pld-panel">
+      <div class="pld-seg" role="group" aria-label="Format de lecture">
+        <button type="button" data-mode="video" data-tip="Les vidéos non téléchargées seront ignorées" aria-pressed="false">Vidéo</button>
+        <button type="button" data-mode="audio" data-tip="Les audios non téléchargés seront ignorés" aria-pressed="true">Audio</button>
+      </div>
+
+      <div class="pld-stage" data-stage>
+        <video data-media playsinline preload="metadata" hidden></video>
+        <button type="button" class="pld-fullscreen" data-fullscreen aria-label="Plein écran" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+        <div class="pld-art" data-art>
+          <img data-art-img alt="" hidden>
+          <span class="pld-art-tag">Audio</span>
+        </div>
+      </div>
+      <div class="pld-now">
+        <div class="pld-now-title" data-now-title>Aucune piste lisible</div>
+        <div class="pld-now-sub" data-now-sub></div>
+      </div>
+      <div class="pld-progress">
+        <input type="range" min="0" max="100" step="0.1" value="0" data-seek aria-label="Progression de la lecture">
+        <div class="pld-times"><span data-time-current>0:00</span><span data-time-total>0:00</span></div>
+      </div>
+      <div class="pld-controls">
+        <button type="button" class="pld-ctl pld-ctl-toggle" data-shuffle data-tip="Lecture aléatoire" aria-label="Aléatoire" aria-pressed="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+        </button>
+        <button type="button" class="pld-ctl pld-ctl-ghost" data-prev data-tip="Vidéo précédente" aria-label="Précédente">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19 20 9 12l10-8zM5 4h2v16H5z"/></svg>
+        </button>
+        <button type="button" class="pld-play" data-playpause aria-label="Lecture">
+          <svg data-icon-play width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>
+          <svg data-icon-pause width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>
+        </button>
+        <button type="button" class="pld-ctl pld-ctl-ghost" data-next data-tip="Vidéo suivante" aria-label="Suivante">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m5 4 10 8-10 8zM17 4h2v16h-2z"/></svg>
+        </button>
+        <button type="button" class="pld-ctl pld-ctl-toggle" data-loop data-tip="Répéter la playlist" data-tip-end aria-label="Boucle" aria-pressed="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 2 4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/></svg>
+        </button>
+      </div>
+
+      <div class="pld-info">
+        <h1>{{ playlist.title }}</h1>
+        {% if playlist_categories %}
+        <span class="category-labels" aria-label="Catégories">
+          {% for category in playlist_categories %}
+          {% set category_style = category_style_map.get(category) %}
+          <span class="category-label" {% if category_style %}style="{{ video_category_css_style(category_style) }}"{% endif %}>{{ category }}</span>
+          {% endfor %}
+        </span>
+        {% endif %}
+        <p>{{ source_label }}<br>
+          {% if stats.total_duration %}{{ stats.total_duration }} · {% endif %}{{ stats.count }} vidéo{{ "s" if stats.count != 1 else "" }}
+          <span data-views-meta>{% if playlist.free_listening %} · écoute libre{% else %} · {{ stats.seen_count }} vue{{ "s" if stats.seen_count != 1 else "" }} sur {{ stats.count }}{% endif %}</span>
+        </p>
+      </div>
+
+      <div class="pld-options">
+        <p class="pld-facet">Médias</p>
+        <form action="/playlists/{{ playlist.id }}/download/audio" method="post">
+          <button class="pld-opt" type="submit" data-tip="Sans fichier audio, une vidéo est ignorée par le lecteur">
+            <i aria-hidden="true">↓</i><span class="pld-opt-text">Télécharger l'audio de tout<small>{{ stats.missing_audio }} manquant{{ "s" if stats.missing_audio != 1 else "" }}</small></span>
+          </button>
+        </form>
+        <form action="/playlists/{{ playlist.id }}/download/video" method="post">
+          <button class="pld-opt" type="submit" data-tip="Sans fichier vidéo, une vidéo est ignorée par le lecteur">
+            <i aria-hidden="true">↓</i><span class="pld-opt-text">Télécharger la vidéo de tout<small>{{ stats.missing_video }} manquant{{ "s" if stats.missing_video != 1 else "" }}</small></span>
+          </button>
+        </form>
+        <p class="pld-facet">Suivi</p>
+        <form action="/playlists/{{ playlist.id }}/free-listening" method="post" data-free-form>
+          <input type="hidden" name="enabled" value="{{ '0' if playlist.free_listening else '1' }}" data-free-input>
+          <button class="pld-opt pld-opt-switch" type="submit" role="switch" aria-checked="{{ 'true' if playlist.free_listening else 'false' }}" data-free-switch data-tip="Pour la musique et les podcasts : réécoute sans compter les vues.">
+            <i aria-hidden="true">♪</i>
+            <span class="pld-opt-text">Mode écoute libre<small data-free-hint>{% if playlist.free_listening %}Les vidéos ne sont jamais marquées comme vues{% else %}{{ stats.seen_count }} vue{{ "s" if stats.seen_count != 1 else "" }} sur {{ stats.count }}{% endif %}</small></span>
+            <span class="pld-switch" aria-hidden="true"></span>
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <div class="pld-queue">
+      <div class="pld-queue-head">
+        <h2>File de lecture</h2>
+        <label class="pl-search pld-filter">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" placeholder="Filtrer" aria-label="Filtrer la playlist" data-filter autocomplete="off">
+        </label>
+        <details class="pl-menu pld-menu">
+          <summary data-tip="Changer l'ordre de la liste" data-tip-end>Ordre ▾</summary>
+          <div class="pl-menu-panel">
+            {% for key, label in [("added", "Date d'ajout"), ("duration", "Durée"), ("title", "Titre"), ("reverse", "Inverser l'ordre")] %}
+            <form action="/playlists/{{ playlist.id }}/sort" method="post">
+              <input type="hidden" name="by" value="{{ key }}">
+              <button class="pl-menu-item" type="submit">{{ label }}</button>
+            </form>
+            {% endfor %}
+          </div>
+        </details>
+        <details class="pl-menu pld-menu">
+          <summary data-tip="Renommer, exporter, supprimer…" data-tip-end>Gérer ▾</summary>
+          <div class="pl-menu-panel pl-menu-wide">
+            <form class="pld-rename" action="/playlists/{{ playlist.id }}/rename" method="post">
+              <input name="title" type="text" value="{{ playlist.title }}" aria-label="Nouveau titre" required>
+              <button type="submit">Renommer</button>
+            </form>
+            <details class="pld-categories">
+              <summary class="pl-menu-item">Labels catégories <span class="pld-categories-count">{{ playlist_categories|length }}</span></summary>
+              <form action="/playlists/{{ playlist.id }}/categories" method="post">
+                <div class="category-editor">
+                  <span class="category-filter-options" aria-label="Catégories prédéfinies">
+                    {% for category in category_filter_options %}
+                    <label class="asset-filter-chip">
+                      <input name="preset_categories" type="checkbox" value="{{ category.label }}" {% if category.label in playlist_categories %}checked{% endif %}>
+                      <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
+                    </label>
+                    {% endfor %}
+                  </span>
+                  <label class="custom-category-field">
+                    <span>Custom</span>
+                    <input name="custom_categories" type="text" placeholder="ex. musique, podcast">
+                  </label>
+                </div>
+                <p class="pld-categories-hint">Les vidéos de la playlist sans label reçoivent ceux-ci, comme pour une chaîne.</p>
+                <button type="submit">Enregistrer les labels</button>
+              </form>
+            </details>
+            {% if playlist.source == "url" %}
+            <form action="/playlists/{{ playlist.id }}/refresh" method="post">
+              <button class="pl-menu-item" type="submit">Rafraîchir depuis YouTube</button>
+            </form>
+            {% endif %}
+            <form action="/playlists/{{ playlist.id }}/duplicate" method="post">
+              <button class="pl-menu-item" type="submit">Dupliquer</button>
+            </form>
+            <a class="pl-menu-item" href="/playlists/{{ playlist.id }}/export.csv">Exporter en CSV</a>
+            <form action="/playlists/{{ playlist.id }}/delete" method="post" data-turbo-confirm="Supprimer la playlist « {{ playlist.title }} » ? Les vidéos sont conservées.">
+              <button class="pl-menu-item pl-menu-danger" type="submit">Supprimer la playlist</button>
+            </form>
+          </div>
+        </details>
+      </div>
+
+      <ol class="pld-list" data-list>
+        {% for row in rows %}
+        <li class="pld-row" data-row data-item-id="{{ row.item.id }}" data-video-id="{{ row.video.id }}" data-has-audio="{{ '1' if row.has_audio else '0' }}" data-has-video="{{ '1' if row.has_video else '0' }}" data-seen="{{ '1' if row.seen else '0' }}" data-title="{{ row.title }}" data-channel="{{ row.channel_name or '' }}" data-thumb="{{ '1' if row.video.thumbnail_path else '0' }}">
+          <button type="button" class="pld-grip" data-grip data-tip="Glisser pour réordonner" aria-label="Réordonner « {{ row.title }} » (flèches haut et bas)">⋮⋮</button>
+          <button type="button" class="pld-thumb" data-play-row aria-label="Lire « {{ row.title }} »">
+            {% if row.video.thumbnail_path %}<img src="/videos/{{ row.video.id }}/thumbnail?w=320" alt="" loading="lazy" decoding="async">{% endif %}
+            {% if row.duration %}<span class="pld-dur">{{ row.duration }}</span>{% endif %}
+            <span class="pld-skip" data-skip-badge>Ignorée</span>
+            <span class="pld-seen" aria-hidden="true">✓</span>
+          </button>
+          <div class="pld-row-text">
+            <a class="pld-row-title" href="/videos/{{ row.video.id }}">{{ row.title }}</a>
+            <div class="pld-row-meta">{% if row.channel_name %}{{ row.channel_name }}{% endif %}<a class="pld-youtube-link" href="{{ row.video.url }}" target="_blank" rel="noopener noreferrer" data-tip="Ouvrir la vidéo sur YouTube" aria-label="Ouvrir « {{ row.title }} » sur YouTube"><svg class="channel-youtube-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></a><span data-skip-note></span></div>
+          </div>
+          <button type="button" class="pld-more" data-more aria-haspopup="true" aria-expanded="false" aria-label="Actions de « {{ row.title }} »">⋯</button>
+          <div class="pld-row-actions" data-row-actions>
+            <a class="pld-fiche" href="/videos/{{ row.video.id }}">Fiche de la vidéo</a>
+            <button type="button" class="pld-move" data-move="up">Monter</button>
+            <button type="button" class="pld-move" data-move="down">Descendre</button>
+            <button type="button" class="pld-dl" data-dl="audio" data-url="/videos/{{ row.video.id }}/media/audio/download" aria-label="Audio">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              <span class="pld-act-label">Audio</span>
+            </button>
+            <button type="button" class="pld-dl" data-dl="video" data-url="/videos/{{ row.video.id }}/media/video/download" aria-label="Vidéo">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-2v8l-4-2z"/></svg>
+              <span class="pld-act-label">Vidéo</span>
+            </button>
+            <button type="button" class="pld-remove" data-ask-remove data-tip="Retirer de la playlist" data-tip-end aria-label="Retirer « {{ row.title }} » de la playlist">✕<span class="pld-act-label">Retirer de la playlist</span></button>
+          </div>
+          <form class="pld-confirm" action="/playlists/{{ playlist.id }}/items/{{ row.item.id }}/remove" method="post" hidden>
+            <div class="pld-confirm-text"><strong>Retirer « {{ row.title }} » de la playlist ?</strong><span>La vidéo reste dans la bibliothèque.</span></div>
+            <button type="button" class="pld-confirm-cancel" data-cancel-remove>Annuler</button>
+            <button type="submit" class="pld-confirm-ok">Retirer</button>
+          </form>
+        </li>
+        {% else %}
+        <li class="empty-state">Cette playlist ne contient aucune vidéo. Ajoute-en depuis la page d'une vidéo (« + Playlists »).</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</section>
+<script src="/static/js/playlist-player.js?v={{ static_asset_version('js/playlist-player.js') }}"></script>
+{% endblock %}

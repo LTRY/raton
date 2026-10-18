@@ -1,0 +1,41 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: raton
+      POSTGRES_USER: raton
+      POSTGRES_PASSWORD: raton
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raton -d raton"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ${RATON_IMAGE:-raton:local}
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # Loopback only: the app has no authentication. Set APP_BIND=0.0.0.0 to open it to a trusted LAN.
+      - "${APP_BIND:-127.0.0.1}:8000:8000"
+    volumes:
+      - ${MEDIA_HOST_ROOT:-./.local/media/YouTube}:/media/youtube
+      # The journal survives the container recreation of every deploy (spec 13, "Journal applicatif").
+      - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton
+    environment:
+      LOG_DIR: /var/log/raton
+      DATABASE_URL: postgresql+psycopg://raton:raton@db:5432/raton
+      MEDIA_ROOT: /media/youtube
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-voyage-3.5}
+      RERANK_MODEL: ${RERANK_MODEL:-rerank-2.5}
+
+volumes:
+  postgres_data:

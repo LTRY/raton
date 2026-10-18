@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+{# Home: Raton and the line of this page load (app/web/raton.py), then the library chat bar. Nothing else. #}
+<section class="dashboard-home">
+  {{ macros.raton_stage(raton.scenario) }}
+
+  {{ macros.chat_widget("dashboard-chat", "", chat_widget_config, "chat-bar") }}
+</section>
+{% endblock %}

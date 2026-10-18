@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+<section>
+  <h1>Bibliothèque</h1>
+  {{ macros.library_subnav("nouveautes") }}
+  <div class="video-stack-list">
+    {{ macros.video_stack_list(video_stacks, current_new_videos_path, category_style_map, no_progress_categories) }}
+  </div>
+  {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
+</section>
+{% endblock %}

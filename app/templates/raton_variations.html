@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+{# Test page: app/web/raton.py `all_variations`, no condition applied. Spec: docs/spec/18-raton-scenarios.md. #}
+<section class="raton-variations">
+  <div>
+    <h1>Toutes les phrases de Raton</h1>
+    <p>{{ line_count }} phrases dans {{ variations | length }} scénarios, dans l’ordre du déroulé d’une visite. Cette page ne change rien aux phrases déjà vues de la visite en cours.</p>
+  </div>
+  {% for group in variations %}
+  <section class="raton-variations-group" aria-labelledby="variation-{{ group.id }}">
+    <h2 id="variation-{{ group.id }}">{{ loop.index }}. {{ group.id }} <small>{{ group.stage }}</small></h2>
+    <p>{{ group.trigger }}{% if group.art_brief %} · dessin à faire : {{ group.art_brief }}{% endif %}</p>
+    {% for view in group.lines %}
+    {{ macros.raton_stage(view, heading=False) }}
+    {% endfor %}
+  </section>
+  {% endfor %}
+</section>
+{% endblock %}

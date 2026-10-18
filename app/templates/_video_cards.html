@@ -1,0 +1,5 @@
+{# Fragment: the cards of videos imported while a channel page is open (GET /videos/cards). #}
+{% import "_macros.html" as macros %}
+{% for card in video_cards %}
+{{ macros.video_card(card, current_videos_path, category_style_map, no_progress_categories, channel_mode=True, index=loop.index0, short_tile=shorts_grid) }}
+{% endfor %}

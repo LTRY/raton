@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+<section class="logs-page">
+  <div class="logs-head">
+    <h1>Logs</h1>
+    <span>{{ total_jobs }} job{{ "s" if total_jobs != 1 else "" }}</span>
+  </div>
+
+  <dl class="logs-stats">
+    <div><dt>Erreurs (24 h)</dt><dd>{{ errors_24h }}</dd></div>
+    <div><dt>Avertissements (24 h)</dt><dd>{{ warnings_24h }}</dd></div>
+    <div><dt>En cours ou en file</dt><dd>{{ running_jobs }}</dd></div>
+  </dl>
+
+  <form class="logs-toolbar" action="/logs" method="get" data-auto-submit-filter data-live-search="logs-results">
+    <span class="channel-segmented logs-segmented" role="group" aria-label="Filtrer par statut">
+      {% for filter in filters %}
+      <label>
+        <input name="status" type="radio" value="{{ filter.key }}" {% if filter.active %}checked{% endif %}>
+        <span>{{ filter.label }}<em>{{ filter.count }}</em></span>
+      </label>
+      {% endfor %}
+    </span>
+    <label class="channel-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      <input name="q" type="search" value="{{ search_query }}" placeholder="Chaîne, vidéo, message" aria-label="Rechercher dans les logs" autocomplete="off">
+    </label>
+    <button class="visually-hidden" type="submit">Filtrer</button>
+  </form>
+
+  {# Everything that depends on `q` lives in this frame: live search swaps it
+     alone, so the search field keeps focus while typing. #}
+  <turbo-frame id="logs-results" class="live-results" target="_top">
+  <div class="logs-results">
+    {% for day in days %}
+    <section class="log-day">
+      <h2>{{ day.label }}</h2>
+      <div class="log-list">
+        {% for row in day.rows %}
+        <article class="log-row log-row-{{ row.status }}">
+          <span class="log-time">{{ row.time }}</span>
+          {{ macros.log_badge(row.badge, row.status) }}
+          <div class="log-main">
+            {% if row.href %}<a class="log-title" href="{{ row.href }}">{{ row.title }}</a>{% else %}<span class="log-title">{{ row.title }}</span>{% endif %}
+            {% if row.sub %}<p class="log-sub">{{ row.sub }}</p>{% endif %}
+            <p class="log-message">{{ row.message }}</p>
+            {% if row.detail %}
+            <details class="log-detail">
+              <summary>Voir le détail</summary>
+              <pre>{{ row.detail }}</pre>
+            </details>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% else %}
+    <p class="empty-state">{% if search_query or selected_filter != "all" %}Aucun log ne correspond à ces filtres.{% else %}Aucun log.{% endif %}</p>
+    {% endfor %}
+  </div>
+  {{ macros.numbered_pagination(page, total_pages, page_href) }}
+  </turbo-frame>
+</section>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+<section>
+  <h1>Bibliothèque</h1>
+  {{ macros.library_subnav("exploration") }}
+
+  {% if library_views %}
+  <nav class="library-subnav" aria-label="Sous-bibliothèques">
+    {% for view in library_views %}
+    <a class="lg{{ ' active' if view.active else '' }}" href="{{ view.href }}">{{ view.name }}</a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+
+  <div class="filters-toolbar">
+    <form class="filters-form" action="/videos" method="get" data-auto-submit-filter data-live-search="library-results">
+      <input type="hidden" name="asset_filters" value="1">
+      <div class="filters-main-row">
+        <label class="search-field">
+          <span>Recherche</span>
+          <input name="q" type="search" value="{{ search_query|default('') }}" placeholder="Titre, chaîne, label, note" autocomplete="off">
+        </label>
+        <select name="channel_id">
+          <option value="">Toutes les chaînes</option>
+          {% for channel in channels %}
+          <option value="{{ channel.id }}" {% if selected_channel_id == channel.id %}selected{% endif %}>{{ channel.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="sort" aria-label="Trier la bibliothèque">
+          <option value="imported" {% if selected_sort == "imported" %}selected{% endif %}>Import récent</option>
+          <option value="published" {% if selected_sort == "published" %}selected{% endif %}>Publication récente</option>
+          <option value="views" {% if selected_sort == "views" %}selected{% endif %}>Les plus vues</option>
+          <option value="rated" {% if selected_sort == "rated" %}selected{% endif %}>Les mieux notées</option>
+        </select>
+      </div>
+      <div class="facet">
+        <div class="facet-head">
+          <h3>Type de fichier</h3>
+          <span class="filter-mode-toggle" aria-label="Mode des types de fichier">
+            <label>
+              <input name="asset_filter_mode" type="radio" value="or" {% if selected_asset_filter_mode == "or" %}checked{% endif %}>
+              <span>Au moins un</span>
+            </label>
+            <label>
+              <input name="asset_filter_mode" type="radio" value="and" {% if selected_asset_filter_mode == "and" %}checked{% endif %}>
+              <span>Tous</span>
+            </label>
+          </span>
+        </div>
+        <div class="chip-cloud">
+          {% for filter in asset_filter_options %}
+          {{ macros.filter_chip3(filter.kind, filter.text, "asset-label asset-label-" ~ filter.kind, selected_asset_filters, selected_excluded_asset_filters, "asset", "exclude_asset") }}
+          {% endfor %}
+          <label class="asset-filter-chip">
+            <input name="rated" type="checkbox" value="1" {% if selected_rated_only %}checked{% endif %}>
+            <span class="asset-label asset-label-rating">★ Notées</span>
+          </label>
+          <label class="asset-filter-chip">
+            <input name="hide_hidden" type="checkbox" value="1" {% if selected_hide_hidden %}checked{% endif %}>
+            <span class="asset-label asset-label-hidden">Masquer les écartées</span>
+          </label>
+        </div>
+      </div>
+      <details class="facet filter-collapse" {% if category_filter_count %}open{% endif %}>
+        <summary class="adv-filters-summary">
+          <span>Catégories</span>
+          {% if category_filter_count %}<span class="adv-filters-count">{{ category_filter_count }}</span>{% endif %}
+        </summary>
+        <div class="facet-head">
+          <span class="filter-mode-toggle" aria-label="Mode des catégories">
+            <label>
+              <input name="category_filter_mode" type="radio" value="or" {% if selected_category_filter_mode == "or" %}checked{% endif %}>
+              <span>Au moins une</span>
+            </label>
+            <label>
+              <input name="category_filter_mode" type="radio" value="and" {% if selected_category_filter_mode == "and" %}checked{% endif %}>
+              <span>Toutes</span>
+            </label>
+          </span>
+        </div>
+        <div class="chip-cloud">
+          {% for category in category_filter_options %}
+          {{ macros.filter_chip3(category.label, category.label, "category-label", selected_category_filters, selected_excluded_category_filters, "category", "exclude_category", category) }}
+          {% endfor %}
+          <label class="asset-filter-chip">
+            <input name="uncategorized" type="checkbox" value="1" {% if selected_uncategorized_only %}checked{% endif %}>
+            <span class="category-label">Sans catégorie</span>
+          </label>
+        </div>
+      </details>
+      <button class="visually-hidden" type="submit">Filtrer</button>
+    </form>
+  </div>
+
+  {# Everything that depends on `q` lives in this frame: live search swaps it
+     alone, so the search field keeps focus while typing. #}
+  <turbo-frame id="library-results" class="live-results" target="_top">
+  {% if active_filter_pills %}
+  <div class="active-filters-row">
+    {% for pill in active_filter_pills %}
+    <a class="active-filter-pill {{ 'exclude' if pill.kind == 'exclude' else '' }}" href="{{ pill.href }}">
+      <span>{{ ("≠ " if pill.kind == "exclude" else "") ~ pill.label }}</span>
+      <span class="active-filter-pill-remove" aria-hidden="true">×</span>
+    </a>
+    {% endfor %}
+    <a class="clear-all-link" href="{{ filters_clear_href }}">Tout effacer</a>
+  </div>
+  {% endif %}
+  <div class="section-heading">
+    <h2>Bibliothèque</h2>
+    <div class="section-heading-actions">
+      <span>{{ filtered_video_count }} fiche{{ "s" if filtered_video_count != 1 else "" }}</span>
+    </div>
+  </div>
+  <div class="video-row-list">
+    {% for card in video_cards %}
+    {{ macros.video_card(card, current_videos_path, category_style_map, no_progress_categories) }}
+    {% else %}
+    {% if search_query %}
+    <p class="empty-state">Aucun résultat pour « {{ search_query }} ».</p>
+    {% else %}
+    <p class="empty-state">Aucune fiche dans la bibliothèque.</p>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
+  </turbo-frame>
+</section>
+{% endblock %}

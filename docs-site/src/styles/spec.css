@@ -1,0 +1,5 @@
+/* Starlight's default h3 is as loud as the section headings; spec pages use h3 for list-like entries (the glossary's terms). */
+.sl-markdown-content h3 {
+  font-size: var(--sl-text-lg);
+  margin-top: 1.75rem;
+}
