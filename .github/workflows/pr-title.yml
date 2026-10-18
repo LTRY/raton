@@ -1,0 +1,24 @@
+# Checks the pull request title against the naming rules of
+# docs/spec/04-configuration-et-deploiement.md ("Conventions de nommage des PR").
+name: pr-title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    # Dependabot titles ("Bump ...") follow their own convention.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      # The title goes through an environment variable, never interpolated into the script.
+      - name: Check the title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 scripts/check_pr_title.py "$PR_TITLE"
