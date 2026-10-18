@@ -4,7 +4,8 @@ services:
     environment:
       POSTGRES_DB: raton
       POSTGRES_USER: raton
-      POSTGRES_PASSWORD: raton
+      # Only read when the volume is first initialised; changing it later does not rename the role's password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-raton}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +29,7 @@ services:
       - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton
     environment:
       LOG_DIR: /var/log/raton
-      DATABASE_URL: postgresql+psycopg://raton:raton@db:5432/raton
+      DATABASE_URL: postgresql+psycopg://raton:${POSTGRES_PASSWORD:-raton}@db:5432/raton
       MEDIA_ROOT: /media/youtube
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
