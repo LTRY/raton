@@ -119,6 +119,10 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
 
 - `DATABASE_URL` : URL SQLAlchemy.
 - `MEDIA_ROOT` : racine media vue par l'application.
+- `POSTGRES_PASSWORD` : mot de passe du role PostgreSQL du service `db`
+  (defaut `raton`), lu uniquement par Docker Compose, qui l'injecte aussi dans
+  le `DATABASE_URL` de l'application. Il n'est applique qu'a la creation du
+  volume `postgres_data` ; caracteres sans danger dans une URL uniquement.
 - `MEDIA_ROOT_REMOTE_PREFIX` / `MEDIA_ROOT_LOCAL_PREFIX` : remapping de chemin
   cote lecture seule (`app/core/config.py:local_media_path()`), utilise quand
   une autre machine accede par un point de montage local different a la meme
@@ -184,7 +188,13 @@ cible Make pour lancer l'application hors Docker sur une base PostgreSQL ;
 A chaque pull request et a chaque push sur `main`, `make ci` tourne sur un
 runner GitHub (`ubuntu-latest`) : CSS, lint `ruff`, tests et validation
 Compose. Un second job construit l'image du site de documentation
-(`make docs-build`). Le deploiement se fait a la main avec `make up`.
+(`make docs-build`), un troisieme scanne l'historique a la recherche de
+secrets (gitleaks). Le deploiement se fait a la main avec `make up`.
+
+Un workflow separe, `pr-title.yml`, valide le titre de chaque PR avec
+`scripts/check_pr_title.py` (regles de « Conventions de nommage des PR »
+ci-dessous ; les PR de Dependabot sont ignorees). Les regles sont testees dans
+`tests/test_pr_title.py`.
 
 ### Site de documentation (`docker-compose.docs.yml`, `scripts/docs.sh`)
 
@@ -219,14 +229,17 @@ crochets, puis un resume court a l'imperatif, en anglais :
 Regles :
 
 - une PR qui touche le front **et** le back porte les deux etiquettes, dans
-  l'ordre `[FRONT][BACK]`, sans espace entre elles ; au-dela de deux
-  etiquettes la PR est probablement trop large : la couper ;
+  l'ordre `[FRONT][BACK]`, sans espace entre elles ; il n'y a pas de limite
+  de nombre, mais une PR qui en cumule beaucoup est probablement trop large :
+  la couper ;
 - l'etiquette decrit ce que la PR change, pas ce qu'elle lit : un correctif de
   spec accompagnant du code ne justifie pas `[DOCS]` ;
 - un correctif commence le resume par `Fix` (`[BACK] Fix scan skipping
   shorts`) ; pas d'autre prefixe de type (`feat:`, `fix:`) ;
 - resume : 72 caracteres maximum, majuscule initiale, pas de point final, pas
   de numero de PR ni d'identifiant de session ;
+- ces regles sont verifiees par `scripts/check_pr_title.py` (workflow
+  `pr-title.yml`) ;
 - le commit principal de la branche reprend le meme resume sans etiquette ;
 - la description contient : un resume du changement et de sa raison, les
   fichiers de spec mis a jour, les captures d'ecran pour tout `[FRONT]`

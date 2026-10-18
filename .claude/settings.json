@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/sync-origin-main.sh\"",
+            "timeout": 30,
+            "statusMessage": "Synchronisation avec origin/main…"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.claude/hooks/ruff-format.sh\"",
+            "timeout": 30,
+            "statusMessage": "ruff format…"
+          }
+        ]
+      }
+    ]
+  }
+}
