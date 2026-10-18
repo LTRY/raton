@@ -1301,7 +1301,7 @@ Contenu ordonne :
    [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;
 8. faits ;
 9. actions formats manquants — meme ligne (`.video-detail-action-bar`) que le
-    bouton robot IA qui declenche la generation notes/résumé/analyse (icone
+    bouton robot IA qui declenche la generation notes/résumé (icone
     seule, infobulle au survol decrivant ce qu'il produit ; voir
     [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
     section "Bouton robot (generation IA)") ; un bouton texte "Recuperer la
@@ -1314,11 +1314,7 @@ Contenu ordonne :
     [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
     section « Section transcript ». A l'arrivee sur la page aucun onglet n'est
     ouvert sauf si l'URL porte une ancre ; l'onglet **Segments** est decrit
-    dans [08 Medias et lecteurs](08-medias-et-lecteurs.md). Dans l'onglet
-    Analyse IA, le sous-panneau Suggestions propose jusqu'a 3 titres
-    alternatifs plus une option manuelle (« Autre ») en boutons radio, avec un
-    seul bouton « Appliquer » (suffixe et regles dans
-    [09](09-transcript-et-discussion-llm.md), `POST /videos/{id}/apply-title`) ;
+    dans [08 Medias et lecteurs](08-medias-et-lecteurs.md).;
 11. discussion (widget de chat partage, portee "cette video" par defaut,
     bascule possible vers "toute la bibliotheque" — voir "Widget de chat"
     ci-dessus).

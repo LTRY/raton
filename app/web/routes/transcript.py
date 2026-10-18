@@ -1,5 +1,3 @@
-import json
-from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -11,9 +9,8 @@ from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.background_jobs import _video_analysis_has_image, enqueue_llm_job, run_llm_job
+from app.services.background_jobs import enqueue_llm_job, run_llm_job
 from app.services.llm import (
-    ANALYSIS_CLICKBAIT_HEADER,
     build_chat_prompt,
     build_generation_prompt,
     load_chat,
@@ -115,20 +112,6 @@ def documents_payload(video: Video) -> dict:
     }
 
 
-def video_analysis_payload(video: Video) -> dict:
-    analysis = json.loads(video.ai_analysis_json) if video.ai_analysis_json else {}
-    return {
-        "has_analysis": bool(analysis),
-        "clickbait_score": analysis.get("clickbait_score"),
-        "clickbait_rationale": analysis.get("clickbait_rationale"),
-        "relevance_percent": analysis.get("relevance_percent"),
-        "relevance_rationale": analysis.get("relevance_rationale"),
-        "suggested_titles": analysis.get("suggested_titles") or [],
-        "suggested_categories": analysis.get("suggested_categories") or [],
-        "generated_at": analysis.get("generated_at"),
-    }
-
-
 def chat_payload(video: Video, message: str | None = None) -> dict:
     context = transcript_context(video)
     return {
@@ -143,19 +126,17 @@ def generate_video_transcript_documents(
     request: Request,
     video_id: int,
     background_tasks: BackgroundTasks,
-    include_image: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Notes + résumé + analyse in one LLM call (see build_generation_prompt)."""
+    """Notes + résumé in one LLM call (see build_generation_prompt)."""
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
     provider = get_llm_provider_name()
     try:
         transcript_path, _, _ = get_transcript_paths(video)
-        has_image = bool(include_image) and _video_analysis_has_image(video, provider)
         prompt = build_generation_prompt(
-            transcript_path.read_text(encoding="utf-8", errors="replace"), video.title, has_image
+            transcript_path.read_text(encoding="utf-8", errors="replace")
         )
         job = enqueue_llm_job(
             db, kind="generate", provider=provider, video_id=video.id, prompt=prompt
@@ -270,8 +251,7 @@ def transcript_job_status(
     try:
         if job.kind == "generate":
             if job.status == "done":
-                has_image = ANALYSIS_CLICKBAIT_HEADER in job.prompt
-                generated = split_generation_result(job.result or "", has_image)
+                generated = split_generation_result(job.result or "")
                 transcript_path, _, notes_path = get_transcript_paths(video)
                 notes_path.write_text(generated["notes_text"], encoding="utf-8")
                 background_tasks.add_task(
@@ -286,17 +266,13 @@ def transcript_job_status(
                 transcript_path.with_name("transcript.questions.txt").write_text(
                     "\n".join(generated["summary_questions"]), encoding="utf-8"
                 )
-                analysis = generated["analysis"]
-                analysis["generated_at"] = datetime.now(UTC).isoformat()
-                video.ai_analysis_json = json.dumps(analysis, ensure_ascii=False)
                 job.status = "applied"
                 db.commit()
             return JSONResponse(
                 {
                     "status": "generated",
-                    "message": "Notes, résumé et analyse générés par l'IA.",
+                    "message": "Notes et résumé générés par l'IA.",
                     **documents_payload(video),
-                    **video_analysis_payload(video),
                 }
             )
 

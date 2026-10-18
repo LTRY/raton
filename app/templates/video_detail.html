@@ -173,7 +173,7 @@
       {% if transcript %}
       <div class="ai-generate">
         <form action="/videos/{{ video.id }}/transcript/generate" method="post" data-turbo="false" id="generate-form">
-          <button type="submit" class="ai-generate-button" aria-describedby="ai-generate-tooltip" aria-label="Générer notes, résumé et analyse">
+          <button type="submit" class="ai-generate-button" aria-describedby="ai-generate-tooltip" aria-label="Générer notes, résumé">
             <span class="ai-generate-spinner" aria-hidden="true"></span>
             <svg class="ai-generate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <circle cx="12" cy="2.8" r="1.2"/>
@@ -189,12 +189,7 @@
             <ul class="ai-generate-tooltip-list">
               <li>Notes structurées</li>
               <li>Résumé (+ résumé court et questions suggérées)</li>
-              <li>Analyse de pertinence (clickbait, contenu utile, titres et catégories suggérés)</li>
             </ul>
-            <label class="ai-generate-tooltip-option" {% if not can_include_image %}hidden{% endif %}>
-              <input type="checkbox" name="include_image">
-              Inclure la miniature
-            </label>
           </div>
         </form>
         <p id="generate-status" class="ai-generate-status async-form-status" aria-live="polite" hidden></p>
@@ -334,7 +329,6 @@
         <button type="button" class="transcript-tab" data-tab="summary" role="tab" aria-selected="false" {% if not summary_transcript %}hidden{% endif %}>Résumé</button>
         <button type="button" class="transcript-tab" data-tab="vtt" role="tab" aria-selected="false" {% if not vtt_content %}hidden{% endif %}>.vtt</button>
         <button type="button" class="transcript-tab" data-tab="personal-notes" role="tab" aria-selected="false">Commentaire</button>
-        <button type="button" class="transcript-tab" data-tab="analysis" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Analyse IA</button>
       </div>
 
       <p id="transcript-action-status" class="async-form-status" aria-live="polite" hidden></p>
@@ -470,67 +464,6 @@
       </div>
 
       {% if transcript %}
-      <div class="transcript-panel analysis-panel" data-tab-panel="analysis" {% if default_tab != 'analysis' %}hidden{% endif %}>
-        {% if not video_analysis.has_analysis %}
-        <p class="notice">Utilisez le bouton robot 🤖 « Générer avec l'IA », en haut de la page à côté des boutons Audio/Vidéo.</p>
-        {% endif %}
-        <div id="analysis-results" {% if not video_analysis.has_analysis %}hidden{% endif %}>
-          {% if video_analysis.generated_at %}
-          <p id="analysis-generated-at">Généré le {{ video_analysis.generated_at }}</p>
-          {% endif %}
-          <div id="analysis-clickbait" class="analysis-section" {% if video_analysis.clickbait_score is none %}hidden{% endif %}>
-            <h3>Score clickbait</h3>
-            <p id="analysis-clickbait-score">{{ video_analysis.clickbait_score }}/10</p>
-            <p id="analysis-clickbait-rationale">{{ video_analysis.clickbait_rationale or "" }}</p>
-          </div>
-          <div id="analysis-relevance" class="analysis-section" {% if video_analysis.relevance_percent is none %}hidden{% endif %}>
-            <h3>Pertinence du contenu</h3>
-            <p id="analysis-relevance-percent">{{ video_analysis.relevance_percent }}% contenu utile</p>
-            <p id="analysis-relevance-rationale">{{ video_analysis.relevance_rationale or "" }}</p>
-          </div>
-          <div id="analysis-suggestions" class="analysis-section">
-            <h3>Suggestions</h3>
-            {% if video_analysis.suggested_titles %}
-            <form class="analysis-title-picker-form" id="analysis-title-picker-form" action="/videos/{{ video.id }}/apply-title" method="post">
-              <input type="hidden" name="next" value="/videos/{{ video.id }}#transcript-analysis">
-              <fieldset class="analysis-title-picker">
-                <legend>Titre suggéré</legend>
-                <div class="analysis-title-options">
-                  {% for suggested_title in video_analysis.suggested_titles %}
-                  <label class="analysis-title-option">
-                    <input type="radio" name="title_choice" value="{{ loop.index }}">
-                    <span>{{ suggested_title }}</span>
-                  </label>
-                  {% endfor %}
-                  <label class="analysis-title-option analysis-title-custom">
-                    <input type="radio" name="title_choice" value="__custom__" id="analysis-title-custom-radio">
-                    <span>Autre :</span>
-                    <input type="text" name="title_custom" id="analysis-title-custom-input" placeholder="Écrire un autre titre...">
-                  </label>
-                </div>
-              </fieldset>
-              <button class="secondary" type="submit">Appliquer</button>
-            </form>
-            {% endif %}
-            {% if video_analysis.suggested_categories %}
-            {% set current_categories = video_category_labels(video) %}
-            <div class="analysis-suggested-categories">
-              {% for suggested_category in video_analysis.suggested_categories %}
-              <form class="analysis-suggested-category-form" action="/videos/{{ video.id }}/categories" method="post">
-                <input type="hidden" name="next" value="/videos/{{ video.id }}#transcript-analysis">
-                <input type="hidden" name="preset_categories" value="{{ suggested_category }}">
-                {% for existing_category in current_categories %}
-                <input type="hidden" name="preset_categories" value="{{ existing_category }}">
-                {% endfor %}
-                <button class="category-label category-label-add" type="submit">+ {{ suggested_category }}</button>
-              </form>
-              {% endfor %}
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
       <section id="discussion">
         {{ macros.chat_widget("video-chat", "", chat_widget_config, "chat-bar") }}
       </section>
@@ -650,35 +583,6 @@
 </script>
 
 <script>
-  (function () {
-    // Delegated from the panel: its content is replaced after an AI generation
-    // (see refreshAnalysisPanel), which would drop listeners bound to the form.
-    const analysisPanel = document.querySelector('[data-tab-panel="analysis"]');
-    if (!analysisPanel) return;
-    analysisPanel.addEventListener("input", (event) => {
-      if (event.target.id !== "analysis-title-custom-input") return;
-      const titleCustomRadio = document.getElementById("analysis-title-custom-radio");
-      if (titleCustomRadio) titleCustomRadio.checked = true;
-    });
-    analysisPanel.addEventListener("submit", (event) => {
-      const titlePickerForm = event.target;
-      if (titlePickerForm.id !== "analysis-title-picker-form") return;
-      const titleCustomRadio = document.getElementById("analysis-title-custom-radio");
-      const titleCustomInput = document.getElementById("analysis-title-custom-input");
-      if (titleCustomRadio && titleCustomRadio.checked && titleCustomInput && !titleCustomInput.value.trim()) {
-        event.preventDefault();
-        titleCustomInput.focus();
-        return;
-      }
-      const anyChecked = titlePickerForm.querySelector('input[name="title_choice"]:checked');
-      if (!anyChecked) {
-        event.preventDefault();
-      }
-    });
-  })();
-</script>
-
-<script>
 (function () {
   const videoId = {{ video.id }};
   const llmProviderLabel = {{ (llm_provider_label or "") | tojson }};
@@ -777,7 +681,6 @@
   const textDefaultTab = documents.raw.available ? "raw" : "";
   const HASH_TABS = {
     "#transcript": textDefaultTab,
-    "#transcript-analysis": "analysis",
     "#personal-notes": "personal-notes",
     "#segments-sponsors": "segments",
   };
@@ -990,19 +893,6 @@
     };
   }
 
-  // The analysis panel is taken from a fresh server render rather than rebuilt
-  // here: its per-suggested-category "Apply" forms carry hidden inputs that
-  // must reflect the video's current categories.
-  async function refreshAnalysisPanel() {
-    const panel = document.querySelector('[data-tab-panel="analysis"]');
-    if (!panel) return;
-    const response = await fetch(`/videos/${videoId}`, { headers: { Accept: "text/html" }, cache: "no-store" });
-    if (!response.ok) throw new Error("Analyse IA non rafraîchie : rechargez la page pour la voir.");
-    const page = new DOMParser().parseFromString(await response.text(), "text/html");
-    const fresh = page.querySelector('[data-tab-panel="analysis"]');
-    if (fresh) panel.innerHTML = fresh.innerHTML;
-  }
-
   const generateForm = document.getElementById("generate-form");
   const generateStatus = document.getElementById("generate-status");
 
@@ -1023,7 +913,7 @@
       // Icon button: its text cannot be swapped like the other LLM actions
       // (that would wipe the SVG), so the loading state is a class that trades
       // the icon for a spinner. It keeps spinning after the résumé is written,
-      // while the notes and the analysis are still being generated.
+      // while the notes are still being generated.
       const button = generateForm.querySelector("button");
       button.disabled = true;
       button.classList.add("ai-generate-loading");
@@ -1076,8 +966,7 @@
         shortStream = null;
         updateDocuments(payload);
         renderActiveTab();
-        await refreshAnalysisPanel();
-        window.showToast(payload.message || "Notes, résumé et analyse générés par l'IA.");
+        window.showToast(payload.message || "Notes et résumé générés par l'IA.");
       } catch (error) {
         if (summaryStream) {
           summaryStream = null;

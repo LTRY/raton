@@ -2729,18 +2729,6 @@ button.secondary {
   padding-left: 18px;
 }
 
-.ai-generate-tooltip-option {
-  align-items: center;
-  color: var(--color-text-muted);
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.ai-generate-tooltip-option[hidden] {
-  display: none;
-}
-
 .ai-generate-status {
   font-size: 13px;
 }
@@ -5615,70 +5603,6 @@ turbo-frame {
 
 .transcript-panel[hidden] {
   display: none;
-}
-
-.analysis-section h3 {
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.analysis-title-picker-form {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.analysis-title-picker {
-  border: none;
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-}
-
-.analysis-title-picker legend {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 0;
-}
-
-.analysis-title-options {
-  display: grid;
-  gap: 6px;
-}
-
-.analysis-title-option {
-  align-items: baseline;
-  display: flex;
-  gap: 8px;
-}
-
-.analysis-title-custom input[type="text"] {
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-xs);
-  flex: 1;
-  font: inherit;
-  padding: 6px 8px;
-}
-
-.analysis-title-picker-form button {
-  justify-self: start;
-}
-
-.analysis-suggested-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.analysis-suggested-category-form {
-  margin: 0;
-}
-
-.analysis-suggested-category-form button {
-  border: none;
-  cursor: pointer;
 }
 
 .video-player-panel {

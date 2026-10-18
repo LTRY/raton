@@ -235,7 +235,7 @@ Fonctionnalites :
 - compter les caracteres du document affiche ;
 - copier le document affiche ;
 - lancer la generation (bouton robot en haut de la fiche) : notes structurees,
-  resume et analyse de pertinence ;
+  resume ;
 - les notes structurees (faits, dates, lieux, acteurs, relations
   causales) sont produites a partir du transcript ;
   un label technique **Notes** s'affiche sur la carte video et sur la page

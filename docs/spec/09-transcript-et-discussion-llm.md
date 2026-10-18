@@ -63,8 +63,6 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
 - `Commentaire` (`data-tab="personal-notes"`, `id="personal-notes"`) :
   toujours present ; le formulaire renvoie vers `/videos/{id}#personal-notes`
   pour rouvrir l'onglet apres enregistrement ;
-- `Analyse IA` (`data-tab="analysis"`) : onglet masque si aucun
-  `transcript.txt` n'existe (l'analyse depend du transcript).
 
 Les trois onglets `Transcript`/`Notes structurees`/`Résumé`
 partagent un seul `pre#transcript-content.transcript-content` (le contenu
@@ -84,7 +82,6 @@ ouvre l'onglet correspondant cote client au chargement :
 | ancre | onglet ouvert |
 | --- | --- |
 | `#transcript` | `Transcript` (aucun si pas de transcript) |
-| `#transcript-analysis` | `Analyse IA` |
 | `#personal-notes` | `Commentaire` |
 | `#segments-sponsors` | `Segments` |
 
@@ -97,7 +94,7 @@ Affichage additionnel dans le panneau `text` :
 
 ### Bouton robot (generation IA)
 
-Le declencheur de la generation (notes + résumé + analyse) ne vit pas dans la
+Le declencheur de la generation (notes + résumé) ne vit pas dans la
 barre d'outils du transcript mais **en haut de la page**, sur la meme ligne
 que les actions formats Audio/Vidéo (`.video-detail-action-bar`), pour rester
 visible sans defiler jusqu'a la section transcript :
@@ -108,15 +105,7 @@ visible sans defiler jusqu'a la section transcript :
 - au survol (ou au focus clavier, via `:hover`/`:focus-within` sur
   `.ai-generate`), une infobulle `#ai-generate-tooltip` resume ce que le
   bouton produit : notes structurees, résumé (+ résumé court et questions
-  suggerees), analyse de pertinence (clickbait, contenu utile, titres et
-  categories suggeres) ;
-- l'infobulle contient aussi la case a cocher `Inclure la miniature` (decochee
-  par defaut : sans action de l'utilisateur, la miniature n'est pas envoyee
-  au LLM et le score clickbait n'est pas calcule ; visible uniquement si une
-  miniature locale est disponible pour le fournisseur actif, voir section
-  Génération) — elle fait partie du
-  formulaire, d'ou l'infobulle interactive (une passerelle CSS comble l'ecart
-  bouton/infobulle pour que la souris puisse y entrer) ;
+  suggerees) ; une passerelle CSS comble l'ecart bouton/infobulle ;
 - pendant la generation, le bouton est desactive et son icone est remplacee
   par un spinner (`.ai-generate-loading`) : le libelle ne peut pas etre
   echange comme sur les autres actions LLM, ce qui effacerait le SVG ;
@@ -135,15 +124,12 @@ visible sans defiler jusqu'a la section transcript :
     marque l'endroit ou le texte s'ecrit ; avec `prefers-reduced-motion`, les
     mots apparaissent sans fondu ;
   - le spinner du bouton continue de tourner une fois le résumé ecrit, tant
-    que les notes et l'analyse (generees ensuite) ne sont pas terminees ;
+    que les notes (generees ensuite) ne sont pas terminees ;
 - a la fin du job, les onglets textuels, le résumé court et les questions
   suggerees sont mis a jour sur place a partir de la reponse
-  (`documents_payload`), sans changer l'onglet affiche ; le panneau `Analyse
-  IA` est remplace par celui d'un rendu frais de `/videos/{id}` recupere en
-  arriere-plan (ses formulaires `Appliquer` dependent des categories
-  courantes de la video, d'ou le rendu serveur) ;
+  (`documents_payload`), sans changer l'onglet affiche ;
 - une notification `.toast` (`window.showToast`, voir
-  `11-interface-html.md`) annonce la fin : succes (`Notes, résumé et analyse
+  `11-interface-html.md`) annonce la fin : succes (`Notes et résumé
   générés par l'IA.`) ou erreur ; en cas d'erreur, l'onglet `Résumé` et le
   résumé court retrouvent leur contenu d'avant, et le message est aussi
   affiche dans `#generate-status`, sous le bouton, et dans
@@ -162,45 +148,32 @@ Les jobs `generate` n'ont pas d'estimation fiable de duree ni de cout (voir
 indeterminee (`<progress>` sans attribut `value`, animation native du
 navigateur).
 
-## Génération : notes, résumé et analyse
+## Génération : notes et résumé
 
-Notes structurées, résumé (+ résumé court + questions suggérées) et analyse
-IA sont les onglets `Notes structurees`, `Résumé` et `Analyse IA` de
+Notes structurées et résumé (+ résumé court + questions suggérées)
+sont les onglets `Notes structurees` et `Résumé` de
 `/videos/{id}` (pas de page dédiée). Un résumé court complémentaire (3 lignes) s'affiche en plus,
 toujours visible sous le titre de la vidéo (`#video-short-summary`, hors des
 onglets), pour donner une idée du contenu sans avoir à ouvrir l'onglet
 Résumé. Un seul bouton (le bouton robot en haut de la page, voir "Bouton robot
-(generation IA)" ci-dessus) déclenche les trois documents à la fois, en un
+(generation IA)" ci-dessus) déclenche les deux documents à la fois, en un
 seul appel LLM — il n'y a pas de route ni de bouton pour en régénérer un seul
 en isolation.
 
 `POST /videos/{id}/transcript/generate` :
 
 - source : `transcript.txt` ;
-- champ de formulaire `include_image` (case à cocher `Inclure la miniature`
-  côté client, dans l'infobulle du bouton robot) : quand cochée, une miniature locale est jointe à l'appel —
-  mais seulement si le fournisseur actif est `anthropic` **et** qu'un fichier
-  de miniature existe localement (`app/services/background_jobs.py:_video_analysis_has_image`) ;
-  la case n'est même affichée côté client que si cette condition est vraie ;
-  côté serveur, `has_image = bool(include_image) and
-  _video_analysis_has_image(video, provider)` — un `include_image` forgé
-  sans miniature réelle ni fournisseur `anthropic` reste donc sans effet ;
-  **la vision est réservée au fournisseur Anthropic**, via
-  `AnthropicProvider.complete_with_image`, un bloc image natif de l'API
-  Anthropic ; sinon la section clickbait n'est ni demandée ni affichée, sans
-  erreur ;
 - crée systématiquement un job dans la DB (`llm_jobs`, `kind="generate"`) et
   répond immédiatement `{"status":"queued", "job_id": ..., "estimated_seconds":
   null, "estimated_cost_usd": null}` (pas d'estimation fiable, la sortie
   combinée n'est pas corrélée 1:1 à la longueur d'entrée) — planification
   asynchrone par `BackgroundTasks` ;
-- **un seul appel LLM produit les trois documents**, pour n'envoyer le
+- **un seul appel LLM produit les deux documents**, pour n'envoyer le
   transcript qu'une seule fois (`app/services/llm.py:build_generation_prompt`) :
-  le prompt combine les instructions des trois anciens prompts à usage unique
-  (`build_notes_prompt`/`build_summary_prompt`/`build_video_analysis_prompt`,
-  conservés et toujours utilisables individuellement) sous trois titres
-  Markdown de **niveau 1** exacts et dans cet ordre — `# Résumé`, `# Notes`,
-  `# Analyse` (le résumé d'abord : c'est lui qui s'affiche pendant que la
+  le prompt combine les instructions des deux anciens prompts à usage unique
+  (`build_notes_prompt`/`build_summary_prompt`, conservés et toujours
+  utilisables individuellement) sous deux titres Markdown de **niveau 1**
+  exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
   réponse arrive) — chacun suivi des mêmes sous-sections de niveau 2 qu'avant :
   - Notes (apres le résumé dans la réponse) : exactement 6 sections (`NOTES_SECTION_NAMES`) — `## Faits`,
     `## Dates`, `## Lieux`, `## Acteurs`, `## Concepts`, `## Relations
@@ -212,29 +185,20 @@ en isolation.
     restitue sujet/argumentation/conclusions dans un ordre logique, termine
     par 2 à 4 puces de points clés), `## Questions suggérées` (3 à 5
     questions concrètes en puces, pas génériques) ;
-  - Analyse : `## Score clickbait` (uniquement si une image est jointe —
-    compare miniature/titre au contenu réel), `## Pertinence du contenu`
-    (part du contenu qui traite réellement le sujet annoncé, par opposition
-    au remplissage), `## Suggestions` (3 titres alternatifs + 1 à 3
-    catégories suggérées) ; n'invente rien dans les trois blocs ;
-- `app/services/llm.py:split_generation_result(text, has_image)` découpe
-  d'abord la réponse sur les trois titres de niveau 1, puis délègue chaque
+- `app/services/llm.py:split_generation_result(text)` découpe
+  d'abord la réponse sur les deux titres de niveau 1, puis délègue chaque
   bloc au split_* à usage unique correspondant (`split_notes_sections` en
-  interne via l'indexation RAG ci-dessous, `split_summary_result`,
-  `split_video_analysis_result`) ; un titre de niveau 1 absent (modèle
+  interne via l'indexation RAG ci-dessous, `split_summary_result`) ; un titre de niveau 1 absent (modèle
   n'ayant pas suivi le format) dégrade proprement vers un résultat vide pour
   ce seul document, sans deviner, comme chaque split_* individuel ;
 - le client interroge `GET /videos/{id}/transcript/jobs/{job_id}` jusqu'à
   résolution, qui applique le résultat complet en une fois : écrit
   `transcript.notes.txt`, `transcript.summary.txt` (complet),
   `transcript.summary_short.txt` (court), `transcript.questions.txt` (une
-  question par ligne), et sérialise l'analyse dans `video.ai_analysis_json`
-  (voir [05 Modèle de données](05-modele-de-donnees.md)) avec un champ
-  `generated_at` ajouté à l'application ; répond avec
-  `app/web/routes/transcript.py:documents_payload` **et** `app/web/routes/transcript.py:video_analysis_payload`
-  fusionnés (`{"status": "generated", "message": "...", ...}`) ; peut être
-  régénéré à volonté, ce qui écrase les quatre fichiers et le JSON précédent
-  en entier ;
+  question par ligne) ; répond avec
+  `app/web/routes/transcript.py:documents_payload`
+  (`{"status": "generated", "message": "...", ...}`) ; peut être
+  régénéré à volonté, ce qui écrase les quatre fichiers ;
 - redirige vers `/videos/{id}?message=...#transcript` (requêtes non-fetch) ;
 - en cas d'erreur, redirige avec `level=error`.
 
@@ -243,12 +207,11 @@ des notes. Un lot nocturne (`auto_notes`, voir
 [13 Jobs, logs et planification](13-jobs-logs-planification.md)) produit, pour
 les vidéos qui n'en ont pas, **les notes structurées et le résumé court
 seulement** (`app/services/llm.py:build_auto_notes_prompt`, mêmes instructions
-de notes et de résumé court que ci-dessus, sans résumé complet, questions ni
-analyse) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
+de notes et de résumé court que ci-dessus, sans résumé complet ni questions) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
 (jamais écrasé s'il existe déjà : un résumé généré à la main prévaut). Le
 résultat est appliqué par le service lui-même, pas par le polling de cette
 route. Le résumé court s'affiche donc sous le titre sans clic ; le bouton robot
-reste le seul moyen d'obtenir le résumé complet et l'analyse, et il regénère
+reste le seul moyen d'obtenir le résumé complet et les questions, et il regénère
 tout, y compris ces deux fichiers.
 
 **Indexation RAG cross-video** : dès que le job `generate` est appliqué, une
@@ -271,22 +234,7 @@ no-op, et la première panne de l'API interrompt le passage (réessayé au
 démarrage suivant). Une vidéo ne devient
 recherchable depuis le chat cross-video que lorsqu'elle a au moins un chunk
 ici — regénérer des notes déjà au format libre (anciennes notes) ne les
-indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé et
-analyse". Voir [05 Modèle de données](05-modele-de-donnees.md).
-
-`POST /videos/{id}/apply-title` : écrit `video.title` à partir d'un des 3
-titres de `ai_analysis_json.suggested_titles` ou d'un titre tapé à la main
-(`title_choice`/`title_custom`, un bouton radio par titre suggéré plus une option libre) ; ajoute un suffixe ` ✨` (choix
-IA) ou ` ✏️` (choix manuel), en remplaçant un suffixe existant plutôt que de
-l'empiler ; rejette une soumission vide (aucune écriture, redirection
-`level=error`) ;
-formulaire simple (pas de fetch/AJAX), comme le commentaire. Les catégories suggérées n'ont pas de route
-dédiée : chaque catégorie suggérée est un bouton qui soumet le formulaire
-existant `POST /videos/{id}/categories` avec la catégorie suggérée ajoutée à
-la liste des catégories déjà cochées (union, jamais de remplacement). Le
-panneau Analyse IA (voir « Section transcript » ci-dessus)
-affiche un message d'invite à utiliser le bouton robot 🤖 en haut de la page
-tant qu'aucune analyse n'a encore été générée pour cette vidéo.
+indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". Voir [05 Modèle de données](05-modele-de-donnees.md).
 
 ## Jobs LLM asynchrones
 
@@ -309,11 +257,11 @@ tant qu'aucune analyse n'a encore été générée pour cette vidéo.
   (`Génération` ou `Réponse` selon `kind`) ;
 - des que le job est termine (`done`), applique le resultat une seule fois
   (ecrit `transcript.notes.txt`/`transcript.summary.txt`+`transcript.summary_short.txt`/
-  `transcript.questions.txt` et serialise `video.ai_analysis_json` pour
+  `transcript.questions.txt` pour
   `generate` ; ajoute question/reponse a `transcript.chat.json` pour `chat` —
   voir sections Génération/Discussion ci-dessus), passe le job a
-  `applied`, puis repond avec `documents_payload` **et** `video_analysis_payload`
-  fusionnés (`generate`), ou `chat_payload` (`chat`). Un nouveau poll sur un
+  `applied`, puis repond avec `documents_payload`
+  (`generate`), ou `chat_payload` (`chat`). Un nouveau poll sur un
   job deja `applied` renvoie l'etat courant sans ré-appliquer (idempotent).
 
 `documents_payload(video)` renvoie l'etat complet des 3 onglets textuels de

@@ -1,4 +1,3 @@
-import json
 from urllib.parse import urlencode, urlparse
 
 from fastapi import (
@@ -24,7 +23,6 @@ from app.models.video import Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.services.background_jobs import (
     CHANNEL_VIDEO_PAGE_SIZE,
-    _video_analysis_has_image,
     run_manual_download_job,
     run_transcript_retry_job,
 )
@@ -41,7 +39,6 @@ from app.services.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
     add_video_category_labels,
     get_llm_provider_display_label,
-    get_llm_provider_name,
     get_no_progress_category_labels,
     get_sponsor_segment_categories,
     get_sponsor_skip_enabled,
@@ -52,7 +49,7 @@ from app.services.sponsor_segments import normalize_skip_segments, replace_video
 from app.services.sponsorblock import fetch_sponsorblock_segments
 from app.web.formatting import estimate_channel_periodicity, format_duration, format_views
 from app.web.playback import latest_playback_positions, playback_activity_view
-from app.web.routes.transcript import transcript_context, video_analysis_payload
+from app.web.routes.transcript import transcript_context
 from app.web.shared import (
     LIBRARY_PAGE_SIZE,
     append_query,
@@ -404,50 +401,6 @@ def update_video_comment_form(
     return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
 
 
-_TITLE_STATUS_SUFFIXES = (" ✨", " ✏️")
-
-
-@router.post("/videos/{video_id}/apply-title")
-def apply_video_title_form(
-    video_id: int,
-    title_choice: str = Form(""),
-    title_custom: str = Form(""),
-    return_to: str = Form("/videos", alias="next"),
-    db: Session = Depends(get_db),
-):
-    video = db.get(Video, video_id)
-    if video is None:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    analysis = json.loads(video.ai_analysis_json) if video.ai_analysis_json else {}
-    suggested_titles = analysis.get("suggested_titles") or []
-
-    choice = form_text_value(title_choice).strip()
-    chosen_title = ""
-    is_ai_choice = False
-    if choice in {"1", "2", "3"}:
-        index = int(choice) - 1
-        if index < len(suggested_titles):
-            chosen_title = suggested_titles[index].strip()
-            is_ai_choice = True
-    if not chosen_title:
-        chosen_title = form_text_value(title_custom).strip()
-        is_ai_choice = False
-
-    if not chosen_title:
-        query = urlencode({"level": "error", "message": "Le titre ne peut pas être vide."})
-        return redirect(f"/videos/{video_id}?{query}#transcript-analysis")
-
-    for suffix in _TITLE_STATUS_SUFFIXES:
-        if chosen_title.endswith(suffix):
-            chosen_title = chosen_title[: -len(suffix)]
-            break
-    chosen_title = f"{chosen_title} {'✨' if is_ai_choice else '✏️'}"
-
-    video.title = chosen_title
-    db.commit()
-    return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
-
-
 @router.post("/videos/{video_id}/sponsors/fetch")
 def fetch_video_sponsorblock_segments(
     request: Request, video_id: int, db: Session = Depends(get_db)
@@ -631,8 +584,6 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
             "category_style_map": category_style_map(category_label_styles),
             "extended_metadata": extended_metadata,
             "vtt_content": vtt_content,
-            "video_analysis": video_analysis_payload(video),
-            "can_include_image": _video_analysis_has_image(video, get_llm_provider_name()),
             "sponsor_segments": sponsor_segments,
             "resume_positions": latest_playback_positions(db, video.id),
             "sponsor_skip_payload": {

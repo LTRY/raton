@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import local_media_path
 from app.core.logging import logged_job
 from app.db.session import SessionLocal
 from app.models.channel import Channel
@@ -21,9 +20,6 @@ from app.services.channel_profile import (
 )
 from app.services.library_chat_tools import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS, LibraryChatToolbox
 from app.services.llm import (
-    ANALYSIS_CLICKBAIT_HEADER,
-    THUMBNAIL_MEDIA_TYPES,
-    AnthropicProvider,
     CompletionFailed,
     get_llm_provider,
 )
@@ -359,24 +355,6 @@ def run_llm_job(job_id: int) -> None:
                 )
                 completion.text, sources = toolbox.extract_sources(completion.text)
                 job.sources = json.dumps(sources)
-            elif (
-                job.kind == "generate"
-                # The clickbait section is only ever requested in the prompt when the
-                # user opted into attaching the thumbnail (see the include_image form
-                # field on /transcript/generate) — checking for it here, rather than
-                # recomputing _video_analysis_has_image blindly, is what makes that
-                # opt-out actually take effect instead of always attaching the image
-                # whenever one happens to be available.
-                and ANALYSIS_CLICKBAIT_HEADER in job.prompt
-                and isinstance(provider_instance, AnthropicProvider)
-                and job.video is not None
-                and _video_analysis_has_image(job.video, job.provider)
-            ):
-                image_path = local_media_path(job.video.thumbnail_path).resolve()
-                media_type = THUMBNAIL_MEDIA_TYPES.get(image_path.suffix.lower(), "image/jpeg")
-                completion = provider_instance.complete_with_image(
-                    job.prompt, image_path.read_bytes(), media_type, on_text=save_partial_result
-                )
             elif job.kind == "generate":
                 completion = provider_instance.complete(job.prompt, on_text=save_partial_result)
             else:
@@ -417,14 +395,6 @@ def run_llm_job(job_id: int) -> None:
             run_channel_profile_backfill_job()
         except Exception:
             logger.exception("Récupération des profils de chaînes échouée après le chat")
-
-
-def _video_analysis_has_image(video: Video, provider: str) -> bool:
-    if provider != "anthropic" or not video.thumbnail_path or not video.folder_path:
-        return False
-    folder = local_media_path(video.folder_path).resolve()
-    thumbnail = local_media_path(video.thumbnail_path).resolve()
-    return thumbnail.is_file() and thumbnail.is_relative_to(folder)
 
 
 def enqueue_llm_job(

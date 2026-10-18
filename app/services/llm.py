@@ -346,40 +346,6 @@ class AnthropicProvider:
                 )
         return entries
 
-    def complete_with_image(
-        self,
-        prompt: str,
-        image_bytes: bytes,
-        media_type: str,
-        on_text: Callable[[str], None] | None = None,
-    ) -> CompletionResult:
-        import base64
-
-        import anthropic
-
-        client = anthropic.Anthropic(
-            api_key=self.api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES
-        )
-        image_block = {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media_type,
-                "data": base64.standard_b64encode(image_bytes).decode("ascii"),
-            },
-        }
-        with client.messages.stream(
-            model=self.model,
-            max_tokens=max_output_tokens(self.model),
-            messages=[{"role": "user", "content": [image_block, {"type": "text", "text": prompt}]}],
-        ) as stream:
-            _forward_text(stream, on_text)
-            response = stream.get_final_message()
-        _log_single_call(self.model, prompt, response)
-        tally = UsageTally(self.model)
-        tally.add(response.usage)
-        return tally.result(_response_text(response, tally))
-
 
 def get_llm_provider() -> LLMProvider:
     settings = get_settings()
@@ -525,146 +491,26 @@ def split_summary_result(text: str) -> tuple[str, str, list[str]]:
     return short.strip(), full, questions
 
 
-THUMBNAIL_MEDIA_TYPES = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-}
-
-ANALYSIS_CLICKBAIT_HEADER = "## Score clickbait"
-ANALYSIS_RELEVANCE_HEADER = "## Pertinence du contenu"
-ANALYSIS_SUGGESTIONS_HEADER = "## Suggestions"
-
-_ANALYSIS_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-_ANALYSIS_SCORE_RE = re.compile(r"Score\s*:\s*(\d{1,2})\s*/\s*10")
-_ANALYSIS_PERCENT_RE = re.compile(r"Contenu utile\s*:\s*(\d{1,3})\s*%")
-_ANALYSIS_JUSTIFICATION_RE = re.compile(r"Justification\s*:\s*(.+)", re.DOTALL)
-_ANALYSIS_TITLE_RE = re.compile(r"^Titre\s*\d\s*:\s*(.+)$", re.MULTILINE)
-_ANALYSIS_CATEGORIES_RE = re.compile(r"^Catégories\s*:\s*(.+)$", re.MULTILINE)
-
-
-def _video_analysis_instructions(title: str, has_image: bool) -> str:
-    clickbait_section = ""
-    if has_image:
-        clickbait_section = f"""{ANALYSIS_CLICKBAIT_HEADER}
-Compare la miniature jointe et le titre ci-dessus au contenu réel du
-transcript. Réponds sur exactement deux lignes, sans rien ajouter :
-Score : <un nombre entier de 1 à 10, où 10 signifie parfaitement fidèle et 1 signifie clickbait extrême>/10
-Justification : <une phrase expliquant l'écart ou l'absence d'écart>
-
-"""
-    image_mention = " et la miniature jointe" if has_image else ""
-    return f"""Tu es un analyste qui évalue une vidéo à partir de son transcript{image_mention}.
-
-Titre actuel de la vidéo : {title}
-
-Produis les sections suivantes, dans cet ordre exact, avec ces titres
-Markdown exacts et rien d'autre avant le premier titre :
-
-{clickbait_section}{ANALYSIS_RELEVANCE_HEADER}
-Évalue la part du contenu qui traite réellement le sujet annoncé, par
-opposition au remplissage (introduction longue, sponsors, redites,
-digressions hors sujet). Réponds sur exactement deux lignes, sans rien
-ajouter :
-Contenu utile : <un nombre entier de 0 à 100>%
-Justification : <une phrase expliquant l'estimation>
-
-{ANALYSIS_SUGGESTIONS_HEADER}
-Propose 3 titres alternatifs plus fidèles au contenu réel (du plus au moins
-convaincant), et 1 à 3 catégories qui décrivent ce sujet réel. Réponds sur
-exactement quatre lignes, sans rien ajouter :
-Titre 1 : <premier titre suggéré>
-Titre 2 : <deuxième titre suggéré>
-Titre 3 : <troisième titre suggéré>
-Catégories : <catégorie 1>, <catégorie 2>, <catégorie 3>
-
-Règles communes :
-- N'invente rien : base-toi uniquement sur le transcript ci-dessous{image_mention}.
-- Respecte strictement le format de ligne demandé pour chaque champ, sans
-  texte supplémentaire ni ligne vide au milieu d'une section."""
-
-
-def build_video_analysis_prompt(transcript: str, title: str, has_image: bool) -> str:
-    return f"""{_video_analysis_instructions(title, has_image)}
-
-TRANSCRIPT:
-{transcript}
-"""
-
-
-def split_video_analysis_result(text: str, has_image: bool) -> dict:
-    """Split a build_video_analysis_prompt completion into an analysis dict.
-
-    Keys are present only when their section exists and matches the expected
-    line format — missing/malformed sections are silently omitted rather than
-    guessed, mirroring split_summary_result's fallback. has_image=False means
-    the clickbait section was never requested, so it's never looked for even
-    if the model produced one anyway.
-    """
-    matches = list(_ANALYSIS_SECTION_HEADER_RE.finditer(text))
-    sections: dict[str, str] = {}
-    for index, match in enumerate(matches):
-        start = match.end()
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        sections[match.group(1).strip()] = text[start:end].strip()
-
-    result: dict = {}
-
-    if has_image:
-        clickbait_text = sections.get(ANALYSIS_CLICKBAIT_HEADER.removeprefix("## "))
-        if clickbait_text:
-            score_match = _ANALYSIS_SCORE_RE.search(clickbait_text)
-            justification_match = _ANALYSIS_JUSTIFICATION_RE.search(clickbait_text)
-            if score_match:
-                result["clickbait_score"] = int(score_match.group(1))
-            if justification_match:
-                result["clickbait_rationale"] = justification_match.group(1).strip()
-
-    relevance_text = sections.get(ANALYSIS_RELEVANCE_HEADER.removeprefix("## "))
-    if relevance_text:
-        percent_match = _ANALYSIS_PERCENT_RE.search(relevance_text)
-        justification_match = _ANALYSIS_JUSTIFICATION_RE.search(relevance_text)
-        if percent_match:
-            result["relevance_percent"] = int(percent_match.group(1))
-        if justification_match:
-            result["relevance_rationale"] = justification_match.group(1).strip()
-
-    suggestions_text = sections.get(ANALYSIS_SUGGESTIONS_HEADER.removeprefix("## "))
-    if suggestions_text:
-        title_matches = _ANALYSIS_TITLE_RE.findall(suggestions_text)
-        categories_match = _ANALYSIS_CATEGORIES_RE.search(suggestions_text)
-        if title_matches:
-            result["suggested_titles"] = [t.strip() for t in title_matches][:3]
-        if categories_match:
-            result["suggested_categories"] = [
-                c.strip() for c in categories_match.group(1).split(",") if c.strip()
-            ]
-
-    return result
-
-
 GENERATION_NOTES_HEADER = "# Notes"
 GENERATION_SUMMARY_HEADER = "# Résumé"
-GENERATION_ANALYSIS_HEADER = "# Analyse"
 
-_GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé|Analyse)\s*$", re.MULTILINE)
+_GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé)\s*$", re.MULTILINE)
 
 
-def build_generation_prompt(transcript: str, title: str, has_image: bool) -> str:
-    """Notes + résumé + analyse in a single completion, transcript sent once.
+def build_generation_prompt(transcript: str) -> str:
+    """Notes + résumé in a single completion, transcript sent once.
 
-    Wraps the three existing single-purpose instruction blocks under distinct
-    level-1 Markdown headers (their own `##` sub-headers stay level-2, so the
-    two never collide) so split_generation_result can slice the response back
-    into the same three pieces each single-purpose split_* function expects.
+    Wraps the two single-purpose instruction blocks under distinct level-1
+    Markdown headers (their own `##` sub-headers stay level-2, so the two never
+    collide) so split_generation_result can slice the response back into the
+    pieces each single-purpose split_* function expects.
 
     The résumé comes first because it is the part shown to the user while the
     completion streams (see partial_generation_summary).
     """
-    return f"""Tu produis trois analyses d'une même vidéo à partir de son
+    return f"""Tu produis deux analyses d'une même vidéo à partir de son
 transcript en un seul appel, pour éviter d'envoyer ce transcript plusieurs
-fois. Produis exactement ces trois sections, dans cet ordre, chacune
+fois. Produis exactement ces deux sections, dans cet ordre, chacune
 introduite par son titre Markdown de niveau 1 exact et rien d'autre avant le
 premier titre :
 
@@ -674,18 +520,15 @@ premier titre :
 {GENERATION_NOTES_HEADER}
 {_notes_instructions()}
 
-{GENERATION_ANALYSIS_HEADER}
-{_video_analysis_instructions(title, has_image)}
-
 TRANSCRIPT:
 {transcript}
 """
 
 
-def split_generation_result(text: str, has_image: bool) -> dict:
-    """Split a build_generation_prompt completion into notes/summary/analysis.
+def split_generation_result(text: str) -> dict:
+    """Split a build_generation_prompt completion into notes/summary.
 
-    Slices the response on the three level-1 headers first, then delegates
+    Slices the response on the two level-1 headers first, then delegates
     each slice to the matching single-purpose split_* function. A missing
     top-level section (model didn't follow the format) yields empty/absent
     results for that piece rather than a guess — same philosophy as the
@@ -704,7 +547,6 @@ def split_generation_result(text: str, has_image: bool) -> dict:
         "summary_short": summary_short,
         "summary_full": summary_full,
         "summary_questions": summary_questions,
-        "analysis": split_video_analysis_result(blocks.get("Analyse", ""), has_image),
     }
 
 
@@ -724,7 +566,7 @@ def build_auto_notes_prompt(transcript: str) -> str:
     """Notes + résumé court in one completion: what the nightly batch asks for each video.
 
     The same `# Résumé` / `# Notes` level-1 headers as build_generation_prompt, so the answer is
-    sliced the same way; the long résumé, the questions and the analysis are left to the robot
+    sliced the same way; the long résumé and the questions are left to the robot
     button (they are reading aids, not what the cross-video search indexes).
     """
     return f"""Tu produis deux analyses d'une même vidéo à partir de son transcript en un seul
