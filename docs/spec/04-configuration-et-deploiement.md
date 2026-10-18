@@ -229,8 +229,9 @@ crochets, puis un resume court a l'imperatif, en anglais :
 Regles :
 
 - une PR qui touche le front **et** le back porte les deux etiquettes, dans
-  l'ordre `[FRONT][BACK]`, sans espace entre elles ; au-dela de deux
-  etiquettes la PR est probablement trop large : la couper ;
+  l'ordre `[FRONT][BACK]`, sans espace entre elles ; il n'y a pas de limite
+  de nombre, mais une PR qui en cumule beaucoup est probablement trop large :
+  la couper ;
 - l'etiquette decrit ce que la PR change, pas ce qu'elle lit : un correctif de
   spec accompagnant du code ne justifie pas `[DOCS]` ;
 - un correctif commence le resume par `Fix` (`[BACK] Fix scan skipping

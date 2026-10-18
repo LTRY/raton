@@ -8,7 +8,6 @@ import re
 import sys
 
 TAGS = ("FRONT", "BACK", "DB", "CI", "DOCS")
-MAX_TAGS = 2
 MAX_SUMMARY = 72
 TITLE_RE = re.compile(r"^((?:\[[A-Z]+\])+) (.+)$")
 TYPE_PREFIX_RE = re.compile(r"^(feat|fix|chore|docs|refactor|test|ci|build|perf|style)(\(.+\))?!?:", re.I)
@@ -27,8 +26,6 @@ def check(title: str) -> list[str]:
         errors.append(f"unknown tag(s) {unknown}; allowed: {', '.join(TAGS)}")
     if len(set(tags)) != len(tags):
         errors.append("a tag appears twice")
-    if len(tags) > MAX_TAGS:
-        errors.append(f"more than {MAX_TAGS} tags: the PR is probably too wide, split it")
     if "FRONT" in tags and "BACK" in tags and tags.index("FRONT") > tags.index("BACK"):
         errors.append("front and back together are written `[FRONT][BACK]`, in that order")
     if len(summary) > MAX_SUMMARY:
