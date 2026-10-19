@@ -16,11 +16,8 @@ from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.llm.prompts import ANALYSIS_CLICKBAIT_HEADER, THUMBNAIL_MEDIA_TYPES
 from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
-from app.services.rag.library_chat_tools import (
-    LIBRARY_CHAT_TOOLS,
-    MAX_TOOL_TURNS,
-    LibraryChatToolbox,
-)
+from app.services.rag.library_chat_schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
+from app.services.rag.library_chat_tools import LibraryChatToolbox
 
 # How often a streaming `generate` job saves its text so far: short enough that
 # the page polling it shows the résumé as it is written, long enough not to

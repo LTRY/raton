@@ -27,14 +27,27 @@ def create_channel(
     """
     check_rating(rating)
     info = extract_channel_info(url)
-    resolved_url = info.get("url", url)
-    existing = find_channel(db, resolved_url, info["yt_channel_id"])
+    return add_resolved_channel(
+        db, info.get("url", url), info["name"], info["yt_channel_id"], rating, category_labels
+    )
+
+
+def add_resolved_channel(
+    db: Session,
+    url: str,
+    name: str,
+    yt_channel_id: str,
+    rating: int = 1,
+    category_labels: list[str] | None = None,
+) -> Channel:
+    """Add a channel YouTube already described; raises `ChannelAlreadyInLibraryError`."""
+    existing = find_channel(db, url, yt_channel_id)
     if existing:
         raise ChannelAlreadyInLibraryError(existing)
     channel = Channel(
-        url=resolved_url,
-        name=info["name"],
-        yt_channel_id=info["yt_channel_id"],
+        url=url,
+        name=name,
+        yt_channel_id=yt_channel_id,
         rating=rating,
         category_labels=serialized_category_labels(category_labels or []),
     )
