@@ -24,7 +24,7 @@ from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.settings import SettingsUpdate
 from app.services import background_jobs, search
-from app.services.channels.scanner import channel_values_from_info
+from app.services.channels.identity import channel_values_from_info
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.scheduler import record_scan_result
 from app.services.settings import get_sponsor_skip_enabled

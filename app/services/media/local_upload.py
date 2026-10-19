@@ -1,7 +1,7 @@
 """Import of a media file dropped by the user (no YouTube involved).
 
 The file is streamed to a staging folder next to its final folder, then moved in one step, like a
-download (see `app/services/channels/scanner.py`). Local videos live under a pseudo-channel so that cards,
+download (see `app/services/channels/staging.py`). Local videos live under a pseudo-channel so that cards,
 playback and filters need no special case.
 """
 

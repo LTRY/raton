@@ -12,7 +12,7 @@ from app.db.session import Base
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
-from app.services.channels.scanner import RateLimitedError
+from app.services.channels.throttle import RateLimitedError
 from app.services.job_log import log_job
 from app.services.playlists import imports as playlists_service
 from app.services.playlists.imports import (

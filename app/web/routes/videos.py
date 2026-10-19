@@ -28,12 +28,9 @@ from app.services.background_jobs import (
     run_manual_download_job,
     run_transcript_retry_job,
 )
-from app.services.channels.scanner import (
-    ensure_video_channel,
-    import_video_metadata,
-    record_playback_activity,
-)
-from app.services.job_log import log_job
+from app.services.channels.identity import ensure_video_channel
+from app.services.channels.media_import import import_video_metadata
+from app.services.job_log import log_job, record_playback_activity
 from app.services.media.local_upload import LocalUploadError, import_local_media
 from app.services.media.media_storage import mark_watched_if_complete
 from app.services.search import video_search_rank
