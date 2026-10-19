@@ -1,4 +1,4 @@
-"""Library counters for /settings."""
+"""Library counters for /settings and `GET /api/stats`."""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session

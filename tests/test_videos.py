@@ -5222,14 +5222,17 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     monkeypatch.setattr(
         channel_manage,
         "extract_channel_info",
-        lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
+        lambda channel_input: (_ for _ in ()).throw(
+            ChannelNotFoundError("Chaîne introuvable pour @missing-handle")
+        ),
     )
 
     with pytest.raises(HTTPException) as exc:
         api_routes.create_channel(api_routes.ChannelCreate(url="@missing-handle"), db)
 
     assert exc.value.status_code == 404
-    assert exc.value.detail == "Channel not found"
+    # The service's French message reaches the client, as on the HTML form.
+    assert exc.value.detail == "Chaîne introuvable pour @missing-handle"
 
 
 def test_add_channel_saves_category_labels(monkeypatch):

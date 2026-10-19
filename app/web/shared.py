@@ -1,4 +1,3 @@
-import json
 import os
 import random
 from datetime import datetime
@@ -14,10 +13,9 @@ from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, video_category_css_style
 from app.services.videos.documents import NOTES_FILE
 from app.services.videos.filters import video_category_labels
+from app.services.videos.library_view import LIBRARY_PAGE_SIZE
 
 templates = Jinja2Templates(directory="app/templates")
-
-LIBRARY_PAGE_SIZE = 50
 
 FRENCH_WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 FRENCH_MONTHS_ABBR = [
@@ -113,19 +111,6 @@ def form_text_value(value: str | None) -> str:
 
 def channel_category_labels(channel: Channel) -> list[str]:
     return parse_video_category_labels(getattr(channel, "category_labels", None))
-
-
-def video_metadata(video: Video) -> dict:
-    if not video.metadata_path:
-        return {}
-    path = local_media_path(video.metadata_path)
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError, OSError:
-        return {}
-    return data if isinstance(data, dict) else {}
 
 
 def video_has_notes(video: Video) -> bool:

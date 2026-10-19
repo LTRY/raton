@@ -2,16 +2,13 @@ from urllib.parse import urlencode
 
 from fastapi import Request
 
-from app.models.channel import Channel
 from app.models.video import Video
 from app.services.common.categories import normalize_video_category_label
-from app.services.common.durations import format_duration
+from app.services.videos.documents import read_video_metadata as video_metadata
+from app.services.videos.library_view import LibraryFilters
 from app.services.videos.list_state import video_auto_list_state, video_list_state
 from app.services.youtube.channel_info import normalized_channel_section
-from app.web.shared import (
-    templates,
-    video_metadata,
-)
+from app.web.shared import templates
 
 templates.env.globals["video_auto_list_state"] = video_auto_list_state
 templates.env.globals["video_list_state"] = video_list_state
@@ -222,69 +219,43 @@ def video_library_view_path(view: dict, request: Request) -> str:
     return f"/videos?{urlencode(params)}"
 
 
-def video_library_view_is_active(
-    view: dict,
-    selected_asset_filters: set[str],
-    selected_category_filters: set[str],
-    selected_excluded_asset_filters: set[str],
-    selected_excluded_category_filters: set[str],
-    selected_rated_only: bool,
-    selected_asset_filter_mode: str,
-    selected_category_filter_mode: str,
-) -> bool:
-    return (
-        set(view.get("assets", [])) == selected_asset_filters
-        and set(view.get("categories", [])) == selected_category_filters
-        and set(view.get("excluded_assets", [])) == selected_excluded_asset_filters
-        and set(view.get("excluded_categories", [])) == selected_excluded_category_filters
-        and bool(view.get("rated")) == selected_rated_only
-        and str(view.get("asset_filter_mode") or "or") == selected_asset_filter_mode
-        and str(view.get("category_filter_mode") or "or") == selected_category_filter_mode
-    )
-
-
 def normalized_channel_id(channel_id: int | str | None) -> int | None:
     if channel_id in (None, ""):
         return None
     return int(channel_id)
 
 
-def default_channel_section(channel: Channel | None) -> str:
-    """Section a channel page opens on when the URL names none."""
-    if channel and channel.auto_shorts_enabled and not channel.auto_metadata_enabled:
-        return "shorts"
-    return "videos"
-
-
-def selected_channel_section(
-    request: Request, selected_channel_id: int | None = None, default: str = "videos"
-) -> str:
-    if not selected_channel_id:
-        return "videos"
+def requested_channel_section(request: Request) -> str | None:
+    """The section named in the URL, or None (absent or unknown) for the channel's default one."""
+    section = request.query_params.get("section")
+    if section is None:
+        return None
     try:
-        return normalized_channel_section(request.query_params.get("section", default))
+        return normalized_channel_section(section)
     except ValueError:
-        return default
+        return None
 
 
-def downloaded_video_card(video: Video) -> dict:
-    # No file read here: a list holds up to a hundred cards and metadata.json is a ~140 KB dump.
-    return {
-        "downloaded": True,
-        "video": video,
-        "title": video.title,
-        "channel_id": video.channel.id if video.channel else None,
-        "channel_name": video.channel.name if video.channel else None,
-        "published_at": video.published_at,
-        "media_type": video.media_type,
-        "file_size_bytes": video.file_size_bytes,
-        "duration": format_duration(video.duration_seconds),
-        "transcript_path": video.transcript_path,
-        "transcript_status": video.transcript_status,
-        "video_path": video.video_path,
-        "audio_path": video.audio_path,
-        "thumbnail_path": video.thumbnail_path,
-    }
+def library_filters_from_request(
+    request: Request, channel_id: int | str | None, page: int
+) -> LibraryFilters:
+    selected_channel_id = normalized_channel_id(channel_id)
+    return LibraryFilters(
+        channel_id=selected_channel_id,
+        section=requested_channel_section(request),
+        sort=selected_video_sort(request, selected_channel_id),
+        assets=frozenset(selected_video_asset_filters(request, selected_channel_id)),
+        categories=frozenset(selected_video_category_filters(request)),
+        excluded_assets=frozenset(selected_video_excluded_asset_filters(request)),
+        excluded_categories=frozenset(selected_video_excluded_category_filters(request)),
+        rated_only=request.query_params.get("rated") == "1",
+        hide_hidden=request.query_params.get("hide_hidden") == "1",
+        uncategorized_only=request.query_params.get("uncategorized") == "1",
+        asset_filter_mode=selected_video_filter_mode(request, "asset_filter_mode"),
+        category_filter_mode=selected_video_filter_mode(request, "category_filter_mode"),
+        search_query=normalized_search_query(request.query_params.get("q")),
+        page=page,
+    )
 
 
 def shorts_feature_flags(cards: list[dict]) -> list[bool]:

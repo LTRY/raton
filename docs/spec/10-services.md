@@ -26,7 +26,7 @@ que des paquets situés plus haut dans ce tableau.
 | `channels/` | Les chaînes : ajout, suppression, liste, profil, import des abonnements | `common`, `youtube` |
 | `ingest/` | Ingestion : tout ce qui fait entrer une fiche ou un fichier dans la bibliothèque | `common`, `media`, `youtube` |
 | `playlists/` | Playlists : aperçu et import, édition d'une playlist et de ses éléments | `common`, `ingest`, `youtube` |
-| `videos/` | Les fiches : filtres, Vu/Écartée, lecture, statistiques, modifications, documents | `common`, `media` |
+| `videos/` | Les fiches : filtres, Vu/Écartée, lecture, statistiques, modifications, documents, données des pages bibliothèque et fiche | `common`, `media`, `youtube` |
 | `raton/` | La mascotte de l'accueil : scénarios, choix de la réplique, visites | `common`, `videos` |
 | `rag/` | Notes structurées et recherche sémantique, page `/rag` | `common`, `llm`, `videos` |
 | `library_chat/` | Chat bibliothèque : outils du modèle et conversation enregistrée | `channels`, `common`, `rag`, `videos`, `youtube` |
@@ -64,7 +64,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
 | `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
-| `job_log` | Une ligne du journal des jobs (`log_job`) et les statuts après lesquels un job ne change plus |
+| `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/errors`) et les statuts après lesquels un job ne change plus |
 
 ### `youtube/`
 
@@ -133,13 +133,15 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | Module | Responsabilité |
 |---|---|
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
-| `library_query` | Liste paginée de `/videos` et de la page d'une chaîne, calculée en SQL |
+| `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
+| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives |
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
-| `documents` | Fichiers écrits à côté du transcript : notes, résumés, questions, discussion par vidéo |
+| `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
+| `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; l'ouverture la sort des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
-| `stats` | Compteurs de la bibliothèque pour `/settings` |
+| `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` |
 
 ### `raton/`

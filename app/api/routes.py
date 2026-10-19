@@ -1,25 +1,18 @@
-import json
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import desc, func, select
+from sqlalchemy import select, true
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.channel import Channel
-from app.models.job import DownloadJob
 from app.models.video import Video
 from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
-from app.schemas.video import VideoRead
+from app.schemas.video import VideoPage, VideoRead
 from app.services.channels import manage as channel_manage
 from app.services.channels.manage import ChannelAlreadyInLibraryError
-from app.services.common.categories import (
-    parse_video_category_label_styles,
-)
-from app.services.common.library_views import (
-    parse_video_library_views,
-)
+from app.services.common.job_log import recent_jobs
 from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.common.settings import (
     get_global_quota_bytes,
@@ -31,12 +24,18 @@ from app.services.common.settings import (
     save_settings,
 )
 from app.services.jobs.backfills import run_channel_profile_backfill_job
-from app.services.media.storage import get_total_used_bytes
 from app.services.videos.charts import library_chart_data
+from app.services.videos.library_query import library_page
+from app.services.videos.library_view import LIBRARY_PAGE_SIZE
+from app.services.videos.stats import library_counts
 from app.services.youtube.channel_info import ChannelNotFoundError
 from app.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 
 router = APIRouter(prefix="/api")
+
+# Error details are French, like the messages of the HTML pages and of the service exceptions.
+CHANNEL_NOT_FOUND = "Chaîne introuvable"
+VIDEO_NOT_FOUND = "Vidéo introuvable"
 
 
 @router.get("/channels", response_model=list[ChannelRead])
@@ -51,11 +50,11 @@ def create_channel(
     try:
         channel = channel_manage.create_channel(db, payload.url, rating=payload.rating)
     except InvalidRatingError as exc:
-        raise HTTPException(status_code=400, detail="Rating must be between 0 and 5") from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ChannelNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Channel not found") from exc
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ChannelAlreadyInLibraryError as exc:
-        raise HTTPException(status_code=409, detail="Channel already exists") from exc
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
     return channel
@@ -69,7 +68,7 @@ def rate_channel(
 ) -> Channel:
     channel = db.get(Channel, channel_id)
     if channel is None:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise HTTPException(status_code=404, detail=CHANNEL_NOT_FOUND)
     set_rating(db, channel, rating)
     db.refresh(channel)
     return channel
@@ -79,16 +78,26 @@ def rate_channel(
 def delete_channel(channel_id: int, db: Session = Depends(get_db)) -> None:
     channel = db.get(Channel, channel_id)
     if channel is None:
-        raise HTTPException(status_code=404, detail="Channel not found")
+        raise HTTPException(status_code=404, detail=CHANNEL_NOT_FOUND)
     channel_manage.delete_channel(db, channel)
 
 
-@router.get("/videos", response_model=list[VideoRead])
-def list_videos(channel_id: int | None = None, db: Session = Depends(get_db)) -> list[Video]:
-    query = select(Video).order_by(desc(Video.downloaded_at), desc(Video.id))
-    if channel_id:
-        query = query.where(Video.channel_id == channel_id)
-    return list(db.scalars(query))
+@router.get("/videos", response_model=VideoPage)
+def list_videos(
+    channel_id: int | None = None,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+) -> VideoPage:
+    where = Video.channel_id == channel_id if channel_id else true()
+    videos, page, total_pages, total = library_page(
+        db, where, "imported", "", page, LIBRARY_PAGE_SIZE
+    )
+    return VideoPage(
+        items=[VideoRead.model_validate(video) for video in videos],
+        page=page,
+        total_pages=total_pages,
+        total=total,
+    )
 
 
 @router.post("/videos/{video_id}/rating", response_model=VideoRead)
@@ -99,7 +108,7 @@ def rate_video(
 ) -> Video:
     video = db.get(Video, video_id)
     if video is None:
-        raise HTTPException(status_code=404, detail="Video not found")
+        raise HTTPException(status_code=404, detail=VIDEO_NOT_FOUND)
     set_rating(db, video, rating)
     db.refresh(video)
     return video
@@ -115,18 +124,19 @@ def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> 
     """
     video = db.get(Video, video_id)
     if video is None:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable")
+        raise HTTPException(status_code=404, detail=VIDEO_NOT_FOUND)
     rows = active_sponsor_segments(db, video.id)
     return {"skip_enabled": get_sponsor_skip_enabled(db), "segments": normalize_skip_segments(rows)}
 
 
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)) -> dict[str, int]:
+    counts = library_counts(db)
     return {
-        "channels": db.scalar(select(func.count(Channel.id))) or 0,
-        "videos": db.scalar(select(func.count(Video.id))) or 0,
-        "used_bytes": get_total_used_bytes(db),
-        "quota_bytes": get_global_quota_bytes(db),
+        "channels": counts["channel_count"],
+        "videos": counts["video_count"],
+        "used_bytes": counts["used_bytes"],
+        "quota_bytes": counts["quota_bytes"],
     }
 
 
@@ -148,11 +158,7 @@ def read_settings(db: Session = Depends(get_db)) -> SettingsRead:
 
 @router.put("/settings", response_model=SettingsRead)
 def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> SettingsRead:
-    label_styles = (
-        parse_video_category_label_styles(json.dumps(payload.video_category_label_styles))
-        if payload.video_category_label_styles is not None
-        else None
-    )
+    # save_settings normalizes labels, colours and saved views itself.
     save_settings(
         db,
         media_root=str(Path(payload.media_root).expanduser())
@@ -160,19 +166,14 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> S
         else None,
         global_quota_bytes=payload.global_quota_bytes,
         category_labels=payload.video_category_labels,
-        category_label_styles=label_styles,
-        library_views=(
-            parse_video_library_views(json.dumps(payload.video_library_views))
-            if payload.video_library_views is not None
-            else None
-        ),
+        category_label_styles=payload.video_category_label_styles,
+        library_views=payload.video_library_views,
     )
     return read_settings(db)
 
 
 @router.get("/errors")
 def list_errors(db: Session = Depends(get_db)) -> list[dict[str, str | int | None]]:
-    jobs = db.scalars(select(DownloadJob).order_by(desc(DownloadJob.created_at)).limit(100))
     return [
         {
             "id": job.id,
@@ -182,5 +183,5 @@ def list_errors(db: Session = Depends(get_db)) -> list[dict[str, str | int | Non
             "message": job.message,
             "created_at": job.created_at.isoformat(),
         }
-        for job in jobs
+        for job in recent_jobs(db)
     ]

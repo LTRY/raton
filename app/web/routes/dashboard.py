@@ -17,6 +17,7 @@ from app.services.common.settings import (
 )
 from app.services.raton.visits import home_context as raton_home_context
 from app.services.videos.filters import followed_video_condition
+from app.services.videos.library_view import downloaded_video_card
 from app.services.videos.playback import (
     dashboard_media_activity_logs,
     playback_seconds_by_day,
@@ -32,7 +33,6 @@ from app.web.shared import (
     paginate,
     templates,
 )
-from app.web.video_library import downloaded_video_card
 
 router = APIRouter()
 

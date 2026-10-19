@@ -1,5 +1,6 @@
 import logging
 
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_event
@@ -39,3 +40,8 @@ def log_job(
 
 # Statuses after which a job no longer changes.
 JOB_DONE_STATUSES = {"downloaded", "metadata", "failed", "cancelled"}
+
+
+def recent_jobs(db: Session, limit: int = 100) -> list[DownloadJob]:
+    """The latest `download_jobs` rows, newest first; bounded because the table only grows."""
+    return list(db.scalars(select(DownloadJob).order_by(desc(DownloadJob.created_at)).limit(limit)))

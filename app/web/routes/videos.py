@@ -11,27 +11,19 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import and_, select, true
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.config import local_media_path
 from app.db.session import get_db
-from app.models.channel import Channel
 from app.models.job import DownloadJob
-from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, serialized_category_labels
-from app.services.common.durations import format_duration
 from app.services.common.job_log import JOB_DONE_STATUSES, log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.common.settings import (
-    SPONSOR_SEGMENT_CATEGORY_LABELS,
     add_video_category_labels,
-    get_llm_provider_display_label,
     get_no_progress_category_labels,
-    get_sponsor_skip_enabled,
     get_video_category_label_styles,
-    get_video_library_views,
 )
 from app.services.ingest.channel_exploration import (
     CHANNEL_IMPORT_PROGRESS_LIMIT,
@@ -46,7 +38,7 @@ from app.services.jobs.downloads import (
     run_manual_download_job,
     run_transcript_retry_job,
 )
-from app.services.videos.documents import read_transcript_documents
+from app.services.videos.detail_view import VideoNotFoundError, open_video_detail
 from app.services.videos.download_options import (
     normalize_download_media_types,
     normalize_subtitle_language,
@@ -54,33 +46,25 @@ from app.services.videos.download_options import (
     normalize_video_quality,
 )
 from app.services.videos.editing import (
-    mark_video_opened,
     set_video_categories,
     set_video_comment,
     set_video_list_state,
 )
-from app.services.videos.filters import (
-    video_filters_condition,
-    video_section_condition,
-)
-from app.services.videos.library_query import (
-    library_page,
-    library_section_counts,
-    publication_dates,
+from app.services.videos.library_view import (
+    downloaded_video_card,
+    library_cards,
+    library_channels,
+    library_listing,
+    library_saved_views,
 )
 from app.services.videos.playback import (
-    latest_playback_by_video,
-    latest_playback_positions,
     record_playback_activity,
 )
 from app.services.youtube.sponsor_segments import (
-    active_sponsor_segments,
     fetch_sponsor_segments,
-    normalize_skip_segments,
 )
-from app.web.formatting import estimate_channel_periodicity, format_views
+from app.web.formatting import estimate_channel_periodicity
 from app.web.shared import (
-    LIBRARY_PAGE_SIZE,
     append_query,
     category_style_map,
     current_request_path,
@@ -90,26 +74,15 @@ from app.web.shared import (
     page_href_builder,
     redirect,
     templates,
-    video_metadata,
     wants_json,
 )
+from app.web.video_detail import video_detail_context
 from app.web.video_library import (
     VIDEO_ASSET_FILTER_OPTIONS,
-    default_channel_section,
-    downloaded_video_card,
-    normalized_channel_id,
-    normalized_search_query,
-    selected_channel_section,
-    selected_video_asset_filters,
-    selected_video_category_filters,
-    selected_video_excluded_asset_filters,
-    selected_video_excluded_category_filters,
-    selected_video_filter_mode,
-    selected_video_sort,
+    library_filters_from_request,
     shorts_feature_flags,
     video_active_filter_pills,
     video_filters_clear_href,
-    video_library_view_is_active,
     video_library_view_path,
 )
 
@@ -125,136 +98,75 @@ def videos_page(
     page: int = 1,
     db: Session = Depends(get_db),
 ):
-    page = max(page, 1)
-    selected_channel_id = normalized_channel_id(channel_id)
-    selected_channel = db.get(Channel, selected_channel_id) if selected_channel_id else None
-    current_channel_section = selected_channel_section(
-        request, selected_channel_id, default_channel_section(selected_channel)
-    )
-    selected_sort = selected_video_sort(request, selected_channel_id)
-    selected_asset_filters = selected_video_asset_filters(request, selected_channel_id)
-    selected_category_filters = selected_video_category_filters(request)
-    selected_excluded_asset_filters = selected_video_excluded_asset_filters(request)
-    selected_excluded_category_filters = selected_video_excluded_category_filters(request)
-    selected_rated_only = request.query_params.get("rated") == "1"
-    selected_hide_hidden = request.query_params.get("hide_hidden") == "1"
-    selected_uncategorized_only = request.query_params.get("uncategorized") == "1"
-    selected_asset_filter_mode = selected_video_filter_mode(request, "asset_filter_mode")
-    selected_category_filter_mode = selected_video_filter_mode(request, "category_filter_mode")
-    search_query = normalized_search_query(request.query_params.get("q"))
-
-    # Everything but the displayed page is computed in SQL: the library holds thousands of videos and
-    # this page must not load them all (docs/spec/11-interface-html.md, "Temps de chargement des pages").
-    in_channel = Video.channel_id == selected_channel_id if selected_channel_id else true()
-    in_section = video_section_condition(current_channel_section) if selected_channel_id else true()
-    matches_filters = video_filters_condition(
-        selected_asset_filters,
-        selected_category_filters,
-        selected_excluded_asset_filters,
-        selected_excluded_category_filters,
-        selected_rated_only,
-        selected_asset_filter_mode,
-        selected_category_filter_mode,
-        selected_hide_hidden,
-        selected_uncategorized_only,
-    )
-    videos, page, total_pages, filtered_video_count = library_page(
-        db,
-        and_(in_channel, in_section, matches_filters),
-        selected_sort,
-        search_query,
-        page,
-        LIBRARY_PAGE_SIZE,
-    )
-    for video in videos:
+    filters = library_filters_from_request(request, channel_id, page)
+    listing = library_listing(db, filters)
+    for video in listing.videos:
         ensure_video_channel(db, video)
-    video_cards = [downloaded_video_card(video) for video in videos]
-    latest_playback_by_video_id = latest_playback_by_video(db, [video.id for video in videos])
-    for card in video_cards:
-        card["playback"] = latest_playback_by_video_id.get(card["video"].id)
-
-    section_counts = library_section_counts(db, in_channel, in_section)
-    next_import_page = (section_counts["local_video_count"] // CHANNEL_VIDEO_PAGE_SIZE) + 1
-    channel_periodicity = None
-    if selected_channel_id:
-        channel_periodicity = estimate_channel_periodicity(
-            publication_dates(db, in_channel, in_section)
-        )
-    has_next_page = False
-    total_channel_pages = None
+    video_cards = library_cards(db, listing.videos)
+    next_import_page = (listing.section_counts["local_video_count"] // CHANNEL_VIDEO_PAGE_SIZE) + 1
+    channel_periodicity = (
+        estimate_channel_periodicity(listing.publication_dates)
+        if listing.publication_dates is not None
+        else None
+    )
     category_label_styles = get_video_category_label_styles(db)
     active_filter_pills = video_active_filter_pills(
         request,
-        selected_asset_filters,
-        selected_excluded_asset_filters,
-        selected_category_filters,
-        selected_excluded_category_filters,
-        selected_rated_only,
-        selected_hide_hidden,
-        selected_channel_id,
-        selected_uncategorized_only,
+        set(filters.assets),
+        set(filters.excluded_assets),
+        set(filters.categories),
+        set(filters.excluded_categories),
+        filters.rated_only,
+        filters.hide_hidden,
+        filters.channel_id,
+        filters.uncategorized_only,
     )
     category_filter_count = (
-        len(selected_category_filters)
-        + len(selected_excluded_category_filters)
-        + int(selected_uncategorized_only)
+        len(filters.categories) + len(filters.excluded_categories) + int(filters.uncategorized_only)
     )
     library_views = [
-        {
-            **view,
-            "href": video_library_view_path(view, request),
-            "active": video_library_view_is_active(
-                view,
-                selected_asset_filters,
-                selected_category_filters,
-                selected_excluded_asset_filters,
-                selected_excluded_category_filters,
-                selected_rated_only,
-                selected_asset_filter_mode,
-                selected_category_filter_mode,
-            ),
-        }
-        for view in get_video_library_views(db)
+        {**view, "href": video_library_view_path(view, request)}
+        for view in library_saved_views(db, filters)
     ]
     return templates.TemplateResponse(
         request,
-        "channel_videos.html" if selected_channel else "videos.html",
+        "channel_videos.html" if listing.channel else "videos.html",
         {
-            "videos": videos,
-            "channels": list(db.scalars(select(Channel).order_by(Channel.name))),
-            "selected_channel": selected_channel,
-            "selected_channel_id": selected_channel_id,
-            "selected_channel_section": current_channel_section,
+            "videos": listing.videos,
+            "channels": library_channels(db),
+            "selected_channel": listing.channel,
+            "selected_channel_id": filters.channel_id,
+            "selected_channel_section": listing.section,
             "asset_filter_options": VIDEO_ASSET_FILTER_OPTIONS,
-            "selected_asset_filters": selected_asset_filters,
+            "selected_asset_filters": set(filters.assets),
             "category_filter_options": category_label_styles,
             "category_style_map": category_style_map(category_label_styles),
             "library_views": library_views,
-            "selected_category_filters": selected_category_filters,
-            "selected_excluded_asset_filters": selected_excluded_asset_filters,
-            "selected_excluded_category_filters": selected_excluded_category_filters,
-            "selected_rated_only": selected_rated_only,
-            "selected_hide_hidden": selected_hide_hidden,
-            "selected_uncategorized_only": selected_uncategorized_only,
-            "selected_asset_filter_mode": selected_asset_filter_mode,
-            "selected_category_filter_mode": selected_category_filter_mode,
-            "selected_sort": selected_sort,
-            "search_query": search_query,
+            "selected_category_filters": set(filters.categories),
+            "selected_excluded_asset_filters": set(filters.excluded_assets),
+            "selected_excluded_category_filters": set(filters.excluded_categories),
+            "selected_rated_only": filters.rated_only,
+            "selected_hide_hidden": filters.hide_hidden,
+            "selected_uncategorized_only": filters.uncategorized_only,
+            "selected_asset_filter_mode": filters.asset_filter_mode,
+            "selected_category_filter_mode": filters.category_filter_mode,
+            "selected_sort": filters.sort,
+            "search_query": filters.search_query,
             "active_filter_pills": active_filter_pills,
             "category_filter_count": category_filter_count,
             "filters_clear_href": video_filters_clear_href(request),
             "current_videos_path": current_request_path(request),
-            "channel_page": page,
+            "channel_page": listing.page,
             "channel_page_size": CHANNEL_VIDEO_PAGE_SIZE,
-            "page": page,
-            "total_pages": total_pages,
+            "page": listing.page,
+            "total_pages": listing.total_pages,
             "page_href": page_href_builder(request),
-            "filtered_video_count": filtered_video_count,
-            **section_counts,
+            "filtered_video_count": listing.filtered_video_count,
+            **listing.section_counts,
             "next_import_page": next_import_page,
             "channel_periodicity": channel_periodicity,
-            "total_channel_pages": total_channel_pages,
-            "has_next_channel_page": has_next_page,
+            "total_channel_pages": None,
+            "has_next_channel_page": False,
             "video_cards": video_cards,
             "shorts_feature_flags": shorts_feature_flags(video_cards),
             "no_progress_categories": get_no_progress_category_labels(db),
@@ -332,14 +244,6 @@ def fetch_video_sponsorblock_segments(
     return redirect(f"/videos/{video_id}?{query}#segments-sponsors")
 
 
-def _back_label(back_path: str) -> str:
-    if back_path.startswith("/playlists/"):
-        return "Retour à la playlist"
-    if "channel_id=" in back_path:
-        return "Retour à la chaîne"
-    return "Retour à la bibliothèque"
-
-
 # Declared before `/videos/{video_id}`, which would otherwise capture "import" and answer 422.
 @router.post("/jobs/{job_id}/cancel")
 def cancel_channel_import_job(job_id: int, db: Session = Depends(get_db)):
@@ -398,101 +302,16 @@ def import_video_page(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/videos/{video_id}", response_class=HTMLResponse)
 def video_detail_page(request: Request, video_id: int, db: Session = Depends(get_db)):
-    video = db.get(Video, video_id)
-    if video is None:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    mark_video_opened(db, video)
-
-    category_label_styles = get_video_category_label_styles(db)
+    try:
+        detail = open_video_detail(db, video_id)
+    except VideoNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     query_params = request.query_params if "query_string" in request.scope else {}
     back_path = internal_return_path(query_params.get("next", ""), "/videos")
-    context = read_transcript_documents(video)
-    vtt_content = None
-    if video.subtitle_path:
-        subtitle_file = local_media_path(video.subtitle_path)
-        if subtitle_file.is_file():
-            vtt_content = subtitle_file.read_text(encoding="utf-8", errors="replace")
-    raw_metadata = video_metadata(video)
-    extended_metadata = {
-        "description": raw_metadata.get("description") or None,
-        "tags": [tag for tag in (raw_metadata.get("tags") or []) if tag],
-        "chapters": [
-            {
-                "title": chapter["title"],
-                "start_label": format_duration(chapter.get("start_time")) or "0:00",
-            }
-            for chapter in (raw_metadata.get("chapters") or [])
-            if isinstance(chapter, dict) and chapter.get("title")
-        ],
-        "duration": format_duration(raw_metadata.get("duration")),
-        "view_count": format_views(raw_metadata.get("view_count")),
-        "like_count": format_views(raw_metadata.get("like_count")),
-        "comment_count": format_views(raw_metadata.get("comment_count")),
-        "uploader": raw_metadata.get("uploader") or raw_metadata.get("channel"),
-    }
-    extended_metadata["has_content"] = any(
-        [
-            extended_metadata["description"],
-            extended_metadata["tags"],
-            extended_metadata["chapters"],
-            extended_metadata["view_count"],
-            extended_metadata["like_count"],
-            extended_metadata["comment_count"],
-        ]
-    )
-    sponsor_segment_rows = active_sponsor_segments(db, video.id)
-    sponsor_segments = [
-        {
-            "category_label": SPONSOR_SEGMENT_CATEGORY_LABELS.get(row.category, row.category),
-            "start_seconds": row.start_seconds,
-            "start_label": format_duration(row.start_seconds) or "0:00",
-            "end_label": format_duration(row.end_seconds) or "0:00",
-        }
-        for row in sponsor_segment_rows
-    ]
-    context.update(
-        {
-            "video": video,
-            "category_options": category_label_styles,
-            "category_option_labels": [style["label"] for style in category_label_styles],
-            "category_style_map": category_style_map(category_label_styles),
-            "extended_metadata": extended_metadata,
-            "vtt_content": vtt_content,
-            "sponsor_segments": sponsor_segments,
-            "resume_positions": latest_playback_positions(db, video.id),
-            "sponsor_skip_payload": {
-                "enabled": get_sponsor_skip_enabled(db),
-                "segments": normalize_skip_segments(sponsor_segment_rows),
-            },
-            "back_path": back_path,
-            "back_label": _back_label(back_path),
-            "video_playlist_links": [
-                {"playlist": item.playlist, "item_id": item.id} for item in video.playlist_items
-            ],
-            "all_playlists": list(db.scalars(select(Playlist).order_by(Playlist.title))),
-            "message": query_params.get("message"),
-            "message_level": query_params.get("level", "success"),
-            "llm_provider_label": get_llm_provider_display_label(),
-            "chat_widget_config": {
-                "defaultScope": "video",
-                "llmProviderLabel": get_llm_provider_display_label(),
-                "scopes": {
-                    "video": {
-                        "askUrl": f"/videos/{video.id}/transcript/chat",
-                        "clearUrl": f"/videos/{video.id}/transcript/chat/clear",
-                        "jobUrlTemplate": f"/videos/{video.id}/transcript/jobs/" + "{job_id}",
-                        "placeholder": "Discuter du contenu",
-                        "messages": context["chat_messages"],
-                    },
-                },
-            },
-        }
-    )
-    return templates.TemplateResponse(
-        request,
-        "video_detail.html",
-        context,
-    )
+    context = video_detail_context(detail, back_path)
+    context["message"] = query_params.get("message")
+    context["message_level"] = query_params.get("level", "success")
+    return templates.TemplateResponse(request, "video_detail.html", context)
 
 
 @router.post("/videos/download")

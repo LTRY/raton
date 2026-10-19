@@ -1,4 +1,4 @@
-"""The library list (`/videos` and a channel page) computed in SQL.
+"""The library list (`/videos`, a channel page, `GET /api/videos`) computed in SQL.
 
 The library holds thousands of fiches: only the displayed page is loaded, and counts are SQL
 aggregates (docs/spec/11-interface-html.md, "Temps de chargement des pages").

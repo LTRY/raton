@@ -21,3 +21,12 @@ class VideoRead(BaseModel):
     file_size_bytes: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VideoPage(BaseModel):
+    """One page of `GET /api/videos`; `total_pages` lets a client stop instead of looping."""
+
+    items: list[VideoRead]
+    page: int
+    total_pages: int
+    total: int
