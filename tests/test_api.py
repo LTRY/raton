@@ -1,5 +1,6 @@
-"""`/api` routes: pagination, French error details, stats and recent jobs."""
+"""`/api` routes: pagination, fiche detail, French error details, stats and recent jobs."""
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -13,7 +14,9 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.job import DownloadJob
+from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
+from app.models.video_sponsor_segment import VideoSponsorSegment
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -100,6 +103,7 @@ def test_api_videos_rejects_page_zero(db):
         ("delete", "/api/channels/999", "Chaîne introuvable"),
         ("post", "/api/videos/999/rating?rating=3", "Vidéo introuvable"),
         ("get", "/api/videos/999/sponsor-segments", "Vidéo introuvable"),
+        ("get", "/api/videos/999", "Vidéo introuvable"),
     ],
 )
 def test_api_not_found_details_are_french(db, method, path, detail):
@@ -129,3 +133,109 @@ def test_api_errors_lists_the_hundred_newest_jobs(db):
     assert len(payload) == 100
     assert payload[0]["message"] == "m104"
     assert payload[-1]["message"] == "m5"
+
+
+def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
+    folder = tmp_path / "fiche"
+    folder.mkdir()
+    (folder / "metadata.json").write_text(
+        json.dumps(
+            {
+                "description": "Desc",
+                "tags": ["a", ""],
+                "chapters": [{"title": "Intro", "start_time": 125.5}, {"start_time": 3}],
+                "duration": 3725,
+                "view_count": "1234",
+                "like_count": "beaucoup",
+                "channel": "Chan",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (folder / "transcript.txt").write_text("Le transcript.", encoding="utf-8")
+    (folder / "transcript.notes.txt").write_text("# Notes", encoding="utf-8")
+    (folder / "transcript.chat.json").write_text(
+        json.dumps([{"role": "user", "content": "Salut"}, {"role": "system", "content": "x"}]),
+        encoding="utf-8",
+    )
+    video = Video(
+        yt_video_id="v",
+        title="Fiche",
+        url="https://youtube.com/watch?v=v",
+        folder_path=str(folder),
+        metadata_path=str(folder / "metadata.json"),
+        transcript_path=str(folder / "transcript.txt"),
+        audio_path=str(folder / "a.m4a"),
+        is_new=True,
+    )
+    db.add(video)
+    db.flush()
+    playlist = Playlist(title="Écoute", source="manual")
+    db.add(playlist)
+    db.flush()
+    db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
+    db.add(
+        VideoSponsorSegment(
+            video_id=video.id,
+            category="sponsor",
+            start_seconds=10,
+            end_seconds=40,
+            source="sponsorblock",
+        )
+    )
+    db.commit()
+
+    response = TestClient(app).get(f"/api/videos/{video.id}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "Fiche"
+    assert payload["is_new"] is True
+    assert payload["media_urls"] == {
+        "video": None,
+        "audio": f"/videos/{video.id}/audio",
+        "thumbnail": None,
+        "subtitles": None,
+    }
+    assert payload["metadata"] == {
+        "description": "Desc",
+        "tags": ["a"],
+        "chapters": [{"title": "Intro", "start_seconds": 125.5}],
+        "duration_seconds": 3725.0,
+        "view_count": 1234,
+        "like_count": None,
+        "comment_count": None,
+        "uploader": "Chan",
+    }
+    assert payload["documents"] == {
+        "transcript": "Le transcript.",
+        "notes": "# Notes",
+        "short_summary": None,
+        "suggested_questions": [],
+        "chat_messages": [{"role": "user", "content": "Salut"}],
+    }
+    assert payload["sponsor_segments"] == [
+        {"category": "sponsor", "start_seconds": 10.0, "end_seconds": 40.0}
+    ]
+    assert payload["skip_segments"] == [{"start": 10.0, "end": 40.0}]
+    assert payload["sponsor_skip_enabled"] is True
+    assert payload["resume_positions"] == {}
+    assert payload["playlists"] == [
+        {
+            "playlist_id": playlist.id,
+            "title": "Écoute",
+            "item_id": payload["playlists"][0]["item_id"],
+        }
+    ]
+
+
+def test_api_video_detail_leaves_the_fiche_in_nouveautes(db):
+    add_videos(db, add_channel(db, "Chan"), 1, "v")
+    video = db.query(Video).one()
+    video.is_new = True
+    db.commit()
+
+    TestClient(app).get(f"/api/videos/{video.id}")
+
+    db.refresh(video)
+    assert video.is_new is True

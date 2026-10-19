@@ -9,7 +9,15 @@ from app.models.channel import Channel
 from app.models.video import Video
 from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
-from app.schemas.video import VideoPage, VideoRead
+from app.schemas.video import (
+    VideoDetailRead,
+    VideoDocumentsRead,
+    VideoMediaUrls,
+    VideoMetadataRead,
+    VideoPage,
+    VideoPlaylistRead,
+    VideoRead,
+)
 from app.services.channels import manage as channel_manage
 from app.services.channels.manage import ChannelAlreadyInLibraryError
 from app.services.common.job_log import recent_jobs
@@ -25,6 +33,12 @@ from app.services.common.settings import (
 )
 from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.videos.charts import library_chart_data
+from app.services.videos.detail_view import (
+    VideoDetail,
+    VideoNotFoundError,
+    find_video,
+    video_detail,
+)
 from app.services.videos.library_query import library_page
 from app.services.videos.library_view import LIBRARY_PAGE_SIZE
 from app.services.videos.stats import library_counts
@@ -98,6 +112,64 @@ def list_videos(
         total_pages=total_pages,
         total=total,
     )
+
+
+def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
+    video = detail.video
+    metadata = detail.metadata
+    documents = detail.documents
+    return VideoDetailRead(
+        **VideoRead.model_validate(video).model_dump(),
+        is_new=video.is_new,
+        list_state=video.list_state,
+        comment=video.comment,
+        duration_seconds=video.duration_seconds,
+        watched_at=video.watched_at,
+        # Both paths can be set at once: check each column, never media_type.
+        media_urls=VideoMediaUrls(
+            video=f"/videos/{video.id}/video" if video.video_path else None,
+            audio=f"/videos/{video.id}/audio" if video.audio_path else None,
+            thumbnail=f"/videos/{video.id}/thumbnail" if video.thumbnail_path else None,
+            subtitles=f"/videos/{video.id}/subtitles" if video.subtitle_path else None,
+        ),
+        metadata=VideoMetadataRead(
+            description=metadata["description"],
+            tags=metadata["tags"],
+            chapters=metadata["chapters"],
+            duration_seconds=metadata["duration"],
+            view_count=metadata["view_count"],
+            like_count=metadata["like_count"],
+            comment_count=metadata["comment_count"],
+            uploader=metadata["uploader"],
+        ),
+        documents=VideoDocumentsRead(
+            transcript=documents["transcript"],
+            notes=documents["notes_transcript"],
+            short_summary=documents["short_summary"],
+            suggested_questions=documents["suggested_questions"],
+            chat_messages=documents["chat_messages"],
+        ),
+        sponsor_segments=detail.sponsor_segments,
+        sponsor_skip_enabled=detail.sponsor_skip_enabled,
+        skip_segments=detail.skip_segments,
+        resume_positions=detail.resume_positions,
+        playlists=[
+            VideoPlaylistRead(
+                playlist_id=item.playlist_id, title=item.playlist.title, item_id=item.id
+            )
+            for item in video.playlist_items
+        ],
+    )
+
+
+@router.get("/videos/{video_id}", response_model=VideoDetailRead)
+def get_video(video_id: int, db: Session = Depends(get_db)) -> VideoDetailRead:
+    """Read only: unlike the HTML page, it leaves the fiche in the Nouveautés."""
+    try:
+        video = find_video(db, video_id)
+    except VideoNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return video_detail_read(video_detail(db, video))
 
 
 @router.post("/videos/{video_id}/rating", response_model=VideoRead)

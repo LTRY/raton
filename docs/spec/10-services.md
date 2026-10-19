@@ -139,7 +139,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
-| `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; l'ouverture la sort des Nouveautés |
+| `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` |

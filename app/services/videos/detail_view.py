@@ -68,12 +68,15 @@ def detail_metadata(raw: dict) -> dict:
     }
 
 
-def open_video_detail(db: Session, video_id: int) -> VideoDetail:
-    """Everything the page of a fiche shows; opening it takes the fiche out of the Nouveautés."""
+def find_video(db: Session, video_id: int) -> Video:
     video = db.get(Video, video_id)
     if video is None:
         raise VideoNotFoundError()
-    mark_video_opened(db, video)
+    return video
+
+
+def video_detail(db: Session, video: Video) -> VideoDetail:
+    """Everything the page of a fiche shows, read only."""
     segments = active_sponsor_segments(db, video.id)
     return VideoDetail(
         video=video,
@@ -87,3 +90,10 @@ def open_video_detail(db: Session, video_id: int) -> VideoDetail:
         all_playlists=list(db.scalars(select(Playlist).order_by(Playlist.title))),
         category_label_styles=get_video_category_label_styles(db),
     )
+
+
+def open_video_detail(db: Session, video_id: int) -> VideoDetail:
+    """The page of a fiche being opened: opening it takes the fiche out of the Nouveautés."""
+    video = find_video(db, video_id)
+    mark_video_opened(db, video)
+    return video_detail(db, video)

@@ -222,6 +222,22 @@ scheduler ou par `POST /settings/scan` (voir
   importees d'abord, 50 par page (meme taille et meme requete SQL que la
   liste `/videos`). Repond `{items: [...], page, total_pages, total}` ; une
   `page` au-dela de la derniere renvoie la derniere, `page=0` donne `422`.
+- `GET /api/videos/{id}` : ce que montre la page de la fiche, en valeurs
+  brutes (meme service `detail_view` que `GET /videos/{id}`) : les champs de
+  `GET /api/videos`, plus `is_new`, `list_state` (choix enregistre, pas
+  l'etat deduit de la lecture), `comment`, `duration_seconds`, `watched_at`,
+  `media_urls` (`video`, `audio`, `thumbnail`, `subtitles` : la route qui sert
+  le fichier, `null` si la fiche n'a pas ce fichier), `metadata` (champs de
+  `metadata.json` : `description`, `tags`, `chapters` `{title,
+  start_seconds}`, `duration_seconds`, `view_count`, `like_count`,
+  `comment_count`, `uploader` ; un nombre illisible vaut `null`),
+  `documents` (`transcript`, `notes`, `short_summary`, `suggested_questions`,
+  `chat_messages`), `sponsor_segments` (segments actifs), `skip_segments` et
+  `sponsor_skip_enabled` (comme `GET /api/videos/{id}/sponsor-segments`),
+  `resume_positions` (`{video|audio: {position_seconds, at_ms}}`) et
+  `playlists` (`{playlist_id, title, item_id}`). Lecture seule :
+  contrairement a la page, ne sort pas la fiche des Nouveautes. `404` si la
+  fiche n'existe pas.
 - `POST /api/videos/{id}/rating?rating=0..5`
 - `GET /api/videos/{id}/sponsor-segments` : segments a sauter pour cette video,
   au service du mini-lecteur persistant (qui se lance depuis n'importe quelle
