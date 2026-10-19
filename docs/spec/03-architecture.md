@@ -171,10 +171,10 @@ Les services sont rangés en six paquets, un par sujet :
 |---|---|
 | `youtube/` | Tout ce qui parle à YouTube : `yt`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract`, `local_upload` |
-| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `manage`, `scan_events`, `lookup`, `profile`, `subscriptions` |
-| `playlists/` | Import de playlists : `imports` |
+| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `manage`, `listing`, `scan_events`, `lookup`, `profile`, `subscriptions` |
+| `playlists/` | Import de playlists (`imports`) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
-| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`) |
+| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
 | `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
 
 À la racine de `app/services/` restent : les modules d'orchestration
@@ -208,11 +208,15 @@ l'inverse. `tests/test_code_structure.py` fait respecter ces règles. Les donné
   video ;
 - `identity.py` : chaine d'une video, URL canonique ;
 - `throttle.py` : pauses entre requetes YouTube et `RateLimitedError` ;
-- `manage.py` : ajout et suppression d'une chaine, partages par les pages HTML
-  et `/api`.
+- `manage.py` : ajout et suppression d'une chaine (partages par les pages HTML
+  et `/api`), categories, cloches ;
+- `listing.py` : liste de `/channels` (tri, filtre Notees, recherche, nombre de
+  fiches) ;
+- `subscriptions.py` : apercu et import du CSV d'abonnements YouTube.
 
 Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
-et `/api` l'appellent et ne font que traduire ses erreurs en reponse HTTP. La note
+et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
+reponse HTTP, lancer les taches de fond et rendre la page. La note
 en etoiles d'une chaine ou d'une fiche passe par `app/services/ratings.py`.
 
 L'écriture d'une ligne de journal de jobs (`log_job`) et de l'activite de
