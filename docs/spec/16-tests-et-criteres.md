@@ -33,7 +33,7 @@ chaque spec.
 
 `scripts/screenshot.sh [chemin] [dossier]` sert a verifier une page a la main :
 il lance l'application sur une DB sqlite jetable remplie par
-`app/services/demo_seed.py`, prend une capture a 1280 px (`desktop.png`) et une
+`scripts/demo_seed.py`, prend une capture a 1280 px (`desktop.png`) et une
 a 390 px (`phone.png`) avec Playwright, affiche `scrollWidth` et `clientWidth`
 aux deux largeurs (egaux = pas de defilement horizontal de la page), puis arrete
 le serveur. Il n'est pas lance par la CI ; `tests/test_page_overflow_css.py`

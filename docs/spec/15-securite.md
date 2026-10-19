@@ -19,7 +19,7 @@ exposee hors LAN.
   `Host`. Sans ces en-tetes (curl, scripts) la requete passe. Derriere un
   reverse proxy qui change le `Host`, lister l'hote public dans
   `APP_TRUSTED_ORIGINS` (separes par des virgules).
-- **SSRF** : `app/services/url_guard.py` refuse les URL non http(s) ou visant une
+- **SSRF** : `app/services/youtube/url_guard.py` refuse les URL non http(s) ou visant une
   adresse locale/privee (loopback, 10/8, 172.16/12, 192.168/16, 169.254/16, IPv6
   locale), pour les URL de chaine, de video, de playlist et d'image de profil
   (redirections comprises). Un nom qui ne se resout pas est laisse a l'outil
@@ -63,12 +63,12 @@ segments sponsorises envoie l'identifiant YouTube de la video (`videoID`,
 aucune autre metadonnee) a `sponsor.ajay.app`, a la fois automatiquement a
 la fin de chaque telechargement reussi et via le bouton manuel
 "Rechercher les segments sponsors" de l'onglet Segments de `/videos/{id}`
-(`app/services/sponsorblock.py`). C'est la seule source de segments.
+(`app/services/youtube/sponsorblock.py`). C'est la seule source de segments.
 
 Cet appel peut etre evite entierement en decochant toutes les categories
 dans `/settings` (`sponsor_segment_categories`) : `fetch_sponsorblock_segments`
 retourne `[]` sans requete reseau des que la liste de categories est vide
-(`app/services/sponsorblock.py`).
+(`app/services/youtube/sponsorblock.py`).
 
 SponsorBlock propose une variante de requete par prefixe de hash, plus
 respectueuse de la vie privee (l'API ne voit alors qu'un prefixe partage par

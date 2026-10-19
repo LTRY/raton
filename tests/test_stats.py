@@ -15,14 +15,14 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.library_charts import (
+from app.services.llm.usage import llm_spend_by_month
+from app.services.videos.charts import (
     MONTHS_WINDOW,
     TOP_CHANNELS,
     library_chart_data,
     monthly_view,
     purged_media_by_month,
 )
-from app.services.llm_usage import llm_spend_by_month
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 

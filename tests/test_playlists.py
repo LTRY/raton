@@ -12,14 +12,17 @@ from app.db.session import Base
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
-from app.services import playlists as playlists_service
-from app.services.playlists import (
+from app.services.common.job_log import log_job
+from app.services.ingest.throttle import RateLimitedError
+from app.services.jobs import playlists as playlists_jobs
+from app.services.jobs.playlists import run_playlist_csv_import_job
+from app.services.playlists import imports as playlists_service
+from app.services.playlists.editing import playlist_title_from_filename
+from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
     parse_playlist_csv,
-    run_playlist_csv_import_job,
 )
-from app.services.scanner import RateLimitedError, log_job
 from app.web.routes import playlists as playlists_routes
 
 CSV_SAMPLE = (
@@ -73,7 +76,7 @@ def fake_import_video_metadata(
     subtitle_source="auto",
     is_new=False,
 ):
-    """Stands in for app.services.scanner.import_video_metadata in tests:
+    """Stands in for app.services.ingest.scanner.import_video_metadata in tests:
     same get-or-create-by-yt_video_id idempotency, no yt-dlp/network calls.
     """
     yt_video_id = (preview or {}).get("id") or video_url.rsplit("v=", 1)[-1]
@@ -141,7 +144,7 @@ def test_run_playlist_url_import_job_continues_past_known_videos(monkeypatch):
     db.commit()
     job = log_job(db, "queued", "queued")
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", fake_import_video_metadata)
 
     pages = [
@@ -155,9 +158,9 @@ def test_run_playlist_url_import_job_continues_past_known_videos(monkeypatch):
     def fake_list_playlist_entries(url, page=1, page_size=50):
         return pages[page - 1] if page <= len(pages) else []
 
-    monkeypatch.setattr(playlists_service, "list_playlist_entries", fake_list_playlist_entries)
+    monkeypatch.setattr(playlists_jobs, "list_playlist_entries", fake_list_playlist_entries)
 
-    playlists_service.run_playlist_url_import_job(job.id, playlist.id)
+    playlists_jobs.run_playlist_url_import_job(job.id, playlist.id)
 
     items = db.scalars(
         select(PlaylistItem)
@@ -178,7 +181,7 @@ def test_run_playlist_url_import_job_skips_failing_video_without_aborting(monkey
     db.commit()
     job = log_job(db, "queued", "queued")
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
 
     def flaky_import(db_, video_url, **kwargs):
         if "bad" in video_url:
@@ -187,7 +190,7 @@ def test_run_playlist_url_import_job_skips_failing_video_without_aborting(monkey
 
     monkeypatch.setattr(playlists_service, "import_video_metadata", flaky_import)
     monkeypatch.setattr(
-        playlists_service,
+        playlists_jobs,
         "list_playlist_entries",
         lambda url, page=1, page_size=50: (
             [
@@ -199,7 +202,7 @@ def test_run_playlist_url_import_job_skips_failing_video_without_aborting(monkey
         ),
     )
 
-    playlists_service.run_playlist_url_import_job(job.id, playlist.id)
+    playlists_jobs.run_playlist_url_import_job(job.id, playlist.id)
 
     items = db.scalars(select(PlaylistItem).where(PlaylistItem.playlist_id == playlist.id)).all()
     assert len(items) == 1
@@ -216,7 +219,7 @@ def test_run_playlist_csv_import_job_sets_position_and_added_at_from_rows(monkey
     db.commit()
     job = log_job(db, "queued", "queued")
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", fake_import_video_metadata)
 
     rows = [
@@ -245,7 +248,7 @@ def test_run_playlist_csv_import_job_skips_dead_row_and_logs_warning(monkeypatch
     db.commit()
     job = log_job(db, "queued", "queued")
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
 
     def flaky_import(db_, video_url, **kwargs):
         if "dead" in video_url:
@@ -276,7 +279,7 @@ def test_same_video_reachable_via_two_playlists_creates_one_video_row(monkeypatc
     job_a = log_job(db, "queued", "queued")
     job_b = log_job(db, "queued", "queued")
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", fake_import_video_metadata)
 
     rows = [{"yt_video_id": "shared1", "added_at": None}]
@@ -313,7 +316,7 @@ def test_delete_playlist_leaves_video_intact():
     db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
     db.commit()
 
-    playlists_routes.delete_playlist(playlist.id, db=db)
+    playlists_routes.delete_playlist_route(playlist.id, db=db)
 
     assert db.get(Playlist, playlist.id) is None
     assert db.get(Video, video.id) is not None
@@ -370,14 +373,14 @@ def test_add_video_to_playlist_existing_and_new_branches():
     db.add(playlist)
     db.commit()
 
-    playlists_routes.add_video_to_playlist(
+    playlists_routes.add_video_to_playlist_form(
         video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
     )
     items = db.scalars(select(PlaylistItem).where(PlaylistItem.video_id == video.id)).all()
     assert len(items) == 1
     assert items[0].playlist_id == playlist.id
 
-    playlists_routes.add_video_to_playlist(
+    playlists_routes.add_video_to_playlist_form(
         video.id, playlist_id="", new_playlist_title="Brand New", return_to="", db=db
     )
     new_playlist = db.scalars(select(Playlist).where(Playlist.title == "Brand New")).one()
@@ -418,7 +421,7 @@ def test_import_playlist_url_route_schedules_background_job(monkeypatch):
     assert playlist.yt_playlist_id == "PL123"
     assert response.status_code == 303
     assert len(scheduled) == 1
-    assert scheduled[0][0] is playlists_service.run_playlist_url_import_job
+    assert scheduled[0][0] is playlists_jobs.run_playlist_url_import_job
     assert scheduled[0][1][1] == playlist.id
 
 
@@ -459,7 +462,7 @@ def test_import_playlist_csv_route_schedules_background_job_and_derives_title():
     assert playlist.source == "csv"
     assert response.status_code == 303
     assert len(scheduled) == 1
-    assert scheduled[0][0] is playlists_service.run_playlist_csv_import_job
+    assert scheduled[0][0] is playlists_jobs.run_playlist_csv_import_job
 
 
 def test_import_playlist_csv_route_rejects_bad_csv():
@@ -476,9 +479,9 @@ def test_import_playlist_csv_route_rejects_bad_csv():
 
 
 def test_default_playlist_title_from_filename_strips_takeout_prefix():
-    assert playlists_routes._default_playlist_title_from_filename("Vidéos de Tech.csv") == "Tech"
-    assert playlists_routes._default_playlist_title_from_filename("Videos from Tech.csv") == "Tech"
-    assert playlists_routes._default_playlist_title_from_filename("random.csv") == "random"
+    assert playlist_title_from_filename("Vidéos de Tech.csv") == "Tech"
+    assert playlist_title_from_filename("Videos from Tech.csv") == "Tech"
+    assert playlist_title_from_filename("random.csv") == "random"
 
 
 # --- detail page actions --------------------------------------------------------
@@ -533,14 +536,14 @@ def test_sort_playlist_by_title_and_reverse():
     db = make_session()
     playlist, _ = make_playlist_with_videos(db)
 
-    playlists_routes.sort_playlist(playlist.id, by="title", db=db)
+    playlists_routes.sort_playlist_route(playlist.id, by="title", db=db)
     assert ordered_titles(db, playlist) == ["Video A", "Video B", "Video C"]
 
-    playlists_routes.sort_playlist(playlist.id, by="reverse", db=db)
+    playlists_routes.sort_playlist_route(playlist.id, by="reverse", db=db)
     assert ordered_titles(db, playlist) == ["Video C", "Video B", "Video A"]
 
     with pytest.raises(HTTPException) as excinfo:
-        playlists_routes.sort_playlist(playlist.id, by="nope", db=db)
+        playlists_routes.sort_playlist_route(playlist.id, by="nope", db=db)
     assert excinfo.value.status_code == 400
 
 
@@ -548,7 +551,7 @@ def test_rename_and_free_listening_toggle():
     db = make_session()
     playlist, _ = make_playlist_with_videos(db, count=1)
 
-    playlists_routes.rename_playlist(playlist.id, title="  Chill  ", db=db)
+    playlists_routes.rename_playlist_route(playlist.id, title="  Chill  ", db=db)
     assert db.get(Playlist, playlist.id).title == "Chill"
 
     response = playlists_routes.set_playlist_free_listening(
@@ -733,7 +736,7 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels():
     db.commit()
 
     for video in (plain, labelled):
-        playlists_routes.add_video_to_playlist(
+        playlists_routes.add_video_to_playlist_form(
             video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
         )
 
@@ -752,19 +755,19 @@ def test_url_import_gives_new_videos_the_playlist_labels(monkeypatch):
     db.add(playlist)
     db.commit()
     job = log_job(db, "queued", "queued")
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", fake_import_video_metadata)
     pages = [
         [{"id": "vid9", "url": "https://www.youtube.com/watch?v=vid9", "title": "Nouvelle"}],
         [],
     ]
     monkeypatch.setattr(
-        playlists_service,
+        playlists_jobs,
         "list_playlist_entries",
         lambda url, page=1, page_size=50: pages[page - 1] if page <= 2 else [],
     )
 
-    playlists_service.run_playlist_url_import_job(job.id, playlist.id)
+    playlists_jobs.run_playlist_url_import_job(job.id, playlist.id)
 
     assert db.scalar(select(Video).where(Video.yt_video_id == "vid9")).category_labels == "musique"
 
@@ -798,10 +801,10 @@ def test_run_playlist_url_import_job_stops_at_rate_limit(monkeypatch):
             raise RateLimitedError("HTTP Error 429: Too Many Requests")
         return fake_import_video_metadata(db_, video_url, **kwargs)
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", limited_import)
     monkeypatch.setattr(
-        playlists_service,
+        playlists_jobs,
         "list_playlist_entries",
         lambda url, page=1, page_size=50: (
             [
@@ -813,7 +816,7 @@ def test_run_playlist_url_import_job_stops_at_rate_limit(monkeypatch):
         ),
     )
 
-    playlists_service.run_playlist_url_import_job(job.id, playlist.id)
+    playlists_jobs.run_playlist_url_import_job(job.id, playlist.id)
 
     job = db.get(DownloadJob, job.id)
     assert job.status == "failed"
@@ -837,10 +840,10 @@ def test_run_playlist_url_import_job_does_not_refetch_known_videos(monkeypatch):
         attempted.append(video_url)
         return fake_import_video_metadata(db_, video_url, **kwargs)
 
-    monkeypatch.setattr(playlists_service, "SessionLocal", lambda: db)
+    monkeypatch.setattr(playlists_jobs, "SessionLocal", lambda: db)
     monkeypatch.setattr(playlists_service, "import_video_metadata", counting_import)
     monkeypatch.setattr(
-        playlists_service,
+        playlists_jobs,
         "list_playlist_entries",
         lambda url, page=1, page_size=50: (
             [
@@ -852,7 +855,7 @@ def test_run_playlist_url_import_job_does_not_refetch_known_videos(monkeypatch):
         ),
     )
 
-    playlists_service.run_playlist_url_import_job(job.id, playlist.id)
+    playlists_jobs.run_playlist_url_import_job(job.id, playlist.id)
 
     assert attempted == ["https://www.youtube.com/watch?v=vid2"]
     assert db.query(PlaylistItem).filter_by(playlist_id=playlist.id).count() == 2

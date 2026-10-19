@@ -13,7 +13,7 @@ class VideoSponsorSegment(Base):
     qui écrivait aussi des lignes `"llm"`, a été retirée (une ancienne migration a supprimé ces lignes). La colonne est
     conservée : relancer la récupération d'une source ne remplace que les lignes
     de cette source pour la vidéo
-    (app/services/sponsor_segments.py:replace_video_sponsor_segments), donc une
+    (app/services/youtube/sponsor_segments.py:replace_video_sponsor_segments), donc une
     seconde source pourrait être réintroduite sans migration.
     """
 

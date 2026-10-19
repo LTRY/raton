@@ -12,8 +12,11 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.setting import AppSetting
-from app.services import background_jobs, channel_profile, yt
-from app.services import scheduler as scheduler_module
+from app.services.channels import manage as channel_manage
+from app.services.channels import profile as channel_profile
+from app.services.jobs import backfills
+from app.services.jobs import scheduler as scheduler_module
+from app.services.youtube import channel_info
 
 
 def make_session():
@@ -71,9 +74,9 @@ PROFILE_INFO = {
 
 def test_fetch_channel_profile_picks_uncropped_images_and_cleans_text(monkeypatch):
     FakeYoutubeDL.info = PROFILE_INFO
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    profile = yt.fetch_channel_profile("https://www.youtube.com/@x")
+    profile = channel_info.fetch_channel_profile("https://www.youtube.com/@x")
 
     assert profile == {
         "description": "High-intensity code tutorials.",
@@ -85,9 +88,9 @@ def test_fetch_channel_profile_picks_uncropped_images_and_cleans_text(monkeypatc
 
 def test_fetch_channel_profile_tolerates_missing_fields(monkeypatch):
     FakeYoutubeDL.info = {"thumbnails": None}
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    assert yt.fetch_channel_profile("https://www.youtube.com/@x") == {
+    assert channel_info.fetch_channel_profile("https://www.youtube.com/@x") == {
         "description": None,
         "keywords": [],
         "avatar_url": None,
@@ -117,7 +120,9 @@ def test_refresh_channel_profile_stores_text_and_images(monkeypatch, tmp_path):
     channel = Channel(url="https://example.test/c", name="C", yt_channel_id="UC1")
     db.add(channel)
     db.commit()
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile())
+    monkeypatch.setattr(
+        channel_profile.channel_info, "fetch_channel_profile", lambda url: fake_profile()
+    )
     monkeypatch.setattr(
         channel_profile,
         "fetch_image_bytes",
@@ -142,7 +147,9 @@ def test_refresh_keeps_the_rest_when_one_image_fails(monkeypatch, tmp_path):
     channel = Channel(url="https://example.test/c", name="C", yt_channel_id="UC1")
     db.add(channel)
     db.commit()
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile())
+    monkeypatch.setattr(
+        channel_profile.channel_info, "fetch_channel_profile", lambda url: fake_profile()
+    )
 
     def flaky(url):
         if url.endswith(".png"):
@@ -168,7 +175,7 @@ def test_refresh_leaves_the_channel_pending_when_yt_dlp_fails(monkeypatch, tmp_p
     def fail(url):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", fail)
+    monkeypatch.setattr(channel_profile.channel_info, "fetch_channel_profile", fail)
 
     assert channel_profile.refresh_channel_profile(db, channel) is False
     assert channel.metadata_fetched_at is None
@@ -184,7 +191,9 @@ def test_refresh_replaces_an_image_whose_extension_changed(monkeypatch, tmp_path
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"old")
     monkeypatch.setattr(
-        channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile(banner_url=None)
+        channel_profile.channel_info,
+        "fetch_channel_profile",
+        lambda url: fake_profile(banner_url=None),
     )
     monkeypatch.setattr(channel_profile, "fetch_image_bytes", lambda url: (b"new", "image/jpeg"))
 
@@ -232,18 +241,18 @@ def test_backfill_job_refreshes_each_pending_channel_with_a_pause(monkeypatch, t
     db.add_all([first, second, done])
     db.commit()
     refreshed, pauses = [], []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, channel: refreshed.append(channel.id),
     )
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: pauses.append(seconds))
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: pauses.append(seconds))
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == [first.id, second.id]
-    assert pauses == [background_jobs.PROFILE_FETCH_DELAY_SECONDS]
+    assert pauses == [backfills.PROFILE_FETCH_DELAY_SECONDS]
 
 
 def test_backfill_returns_at_once_when_another_sweep_is_running(monkeypatch, tmp_path):
@@ -251,18 +260,18 @@ def test_backfill_returns_at_once_when_another_sweep_is_running(monkeypatch, tmp
     db.add(Channel(url="u1", name="un", yt_channel_id="UC1"))
     db.commit()
     refreshed = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, channel: refreshed.append(channel.id),
     )
 
-    with background_jobs._profile_backfill_lock:
-        background_jobs.run_channel_profile_backfill_job()
+    with backfills._profile_backfill_lock:
+        backfills.run_channel_profile_backfill_job()
 
     assert refreshed == []
-    assert not background_jobs._profile_backfill_lock.locked()
+    assert not backfills._profile_backfill_lock.locked()
 
 
 def test_backfill_picks_up_a_channel_added_during_the_sweep(monkeypatch, tmp_path):
@@ -280,11 +289,11 @@ def test_backfill_picks_up_a_channel_added_during_the_sweep(monkeypatch, tmp_pat
         session.commit()
         return True
 
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "refresh_channel_profile", refresh)
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "refresh_channel_profile", refresh)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == ["UC1", "UC2"]
 
@@ -294,15 +303,15 @@ def test_backfill_attempts_a_failing_channel_once_per_run(monkeypatch, tmp_path)
     db.add(Channel(url="u1", name="un", yt_channel_id="UC1"))
     db.commit()
     attempts = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, c: attempts.append(c.id) or False,
     )
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert len(attempts) == 1
 
@@ -323,11 +332,11 @@ def test_backfill_continues_after_one_channel_raises(monkeypatch, tmp_path):
             raise RuntimeError("stale data")
         refreshed.append(channel.yt_channel_id)
 
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "refresh_channel_profile", refresh)
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "refresh_channel_profile", refresh)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == ["UC2"]
 
@@ -356,13 +365,13 @@ def test_refresh_job_refreshes_the_given_channel_even_if_already_fetched(monkeyp
     db.add(channel)
     db.commit()
     refreshed = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs, "refresh_channel_profile", lambda session, c: refreshed.append(c.id)
+        backfills, "refresh_channel_profile", lambda session, c: refreshed.append(c.id)
     )
 
-    background_jobs.run_channel_profile_refresh_job(channel.id)
-    background_jobs.run_channel_profile_refresh_job(9999)
+    backfills.run_channel_profile_refresh_job(channel.id)
+    backfills.run_channel_profile_refresh_job(9999)
 
     assert refreshed == [channel.id]
 
@@ -391,7 +400,7 @@ def test_start_scheduler_queues_a_profile_backfill_at_startup(monkeypatch, tmp_p
 
 
 def test_toolbox_remembers_channels_it_added():
-    from app.services.library_chat_tools import LibraryChatToolbox
+    from app.services.library_chat.tools import LibraryChatToolbox
 
     db = make_session()
     toolbox = LibraryChatToolbox(db)
@@ -463,7 +472,9 @@ def test_images_are_written_and_served_through_the_dev_pc_prefix_translation(mon
         ),
     )
     monkeypatch.setattr(
-        channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile(banner_url=None)
+        channel_profile.channel_info,
+        "fetch_channel_profile",
+        lambda url: fake_profile(banner_url=None),
     )
     monkeypatch.setattr(
         channel_profile, "fetch_image_bytes", lambda url: (b"jpg-bytes", "image/jpeg")
@@ -540,7 +551,7 @@ def test_adding_a_channel_queues_the_profile_backfill(tmp_path, monkeypatch):
     client, db, channel = make_client(tmp_path)
     app.dependency_overrides.clear()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"url": "https://example.test/new", "name": "Nouvelle", "yt_channel_id": "UC2"},
     )

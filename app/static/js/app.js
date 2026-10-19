@@ -1739,7 +1739,7 @@ function initChatWidget(root) {
   }
 
   // The model writes `[[chaine:12|Name]]` / `[[video:34|Title]]` inside its
-  // answer (app/services/library_chat_tools.py, which owns the syntax: keep this
+  // answer (app/services/library_chat/tools.py, which owns the syntax: keep this
   // pattern in step with its `_REFERENCE_PATTERN`). Only the ones the server
   // still lists in `channels`/`citations` become links, and the link text is
   // the name stored in the database, not the model's label: a deleted item

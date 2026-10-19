@@ -5,7 +5,7 @@ from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.demo_seed import seed_demo
+from scripts.demo_seed import seed_demo
 
 
 def make_session():

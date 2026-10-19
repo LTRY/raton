@@ -9,7 +9,7 @@ from starlette.requests import Request
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
-from app.services.subscriptions import (
+from app.services.channels.subscriptions import (
     SubscriptionsCsvError,
     decode_import_token,
     encode_import_token,

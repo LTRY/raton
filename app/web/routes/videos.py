@@ -1,4 +1,3 @@
-import json
 from urllib.parse import urlencode, urlparse
 
 from fastapi import (
@@ -12,7 +11,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import and_, case, desc, func, or_, select, true
+from sqlalchemy import and_, select, true
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import local_media_path
@@ -21,38 +20,69 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.services.background_jobs import (
-    CHANNEL_VIDEO_PAGE_SIZE,
-    _video_analysis_has_image,
-    run_manual_download_job,
-    run_transcript_retry_job,
-)
-from app.services.local_upload import LocalUploadError, import_local_media
-from app.services.media_storage import mark_watched_if_complete
-from app.services.scanner import (
-    ensure_video_channel,
-    import_video_metadata,
-    log_job,
-    record_playback_activity,
-)
-from app.services.search import video_search_rank
-from app.services.settings import (
+from app.services.common.categories import parse_video_category_labels, serialized_category_labels
+from app.services.common.durations import format_duration
+from app.services.common.job_log import JOB_DONE_STATUSES, log_job
+from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
+from app.services.common.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
     add_video_category_labels,
     get_llm_provider_display_label,
     get_llm_provider_name,
     get_no_progress_category_labels,
-    get_sponsor_segment_categories,
     get_sponsor_skip_enabled,
     get_video_category_label_styles,
     get_video_library_views,
 )
-from app.services.sponsor_segments import normalize_skip_segments, replace_video_sponsor_segments
-from app.services.sponsorblock import fetch_sponsorblock_segments
-from app.web.formatting import estimate_channel_periodicity, format_duration, format_views
-from app.web.playback import latest_playback_positions, playback_activity_view
-from app.web.routes.transcript import transcript_context, video_analysis_payload
+from app.services.ingest.channel_exploration import (
+    CHANNEL_IMPORT_PROGRESS_LIMIT,
+    cancel_channel_exploration,
+    channel_exploration_videos,
+)
+from app.services.ingest.identity import ensure_video_channel
+from app.services.ingest.local_upload import LocalUploadError, import_local_media
+from app.services.ingest.metadata_import import import_video_metadata
+from app.services.jobs.downloads import (
+    CHANNEL_VIDEO_PAGE_SIZE,
+    run_manual_download_job,
+    run_transcript_retry_job,
+)
+from app.services.jobs.llm_jobs import video_analysis_has_image
+from app.services.videos.documents import read_transcript_documents
+from app.services.videos.download_options import (
+    normalize_download_media_types,
+    normalize_subtitle_language,
+    normalize_subtitle_source,
+    normalize_video_quality,
+)
+from app.services.videos.editing import (
+    apply_video_title,
+    mark_video_opened,
+    set_video_categories,
+    set_video_comment,
+    set_video_list_state,
+)
+from app.services.videos.filters import (
+    video_filters_condition,
+    video_section_condition,
+)
+from app.services.videos.library_query import (
+    library_page,
+    library_section_counts,
+    publication_dates,
+)
+from app.services.videos.playback import (
+    latest_playback_by_video,
+    latest_playback_positions,
+    record_playback_activity,
+)
+from app.services.youtube.sponsor_segments import (
+    active_sponsor_segments,
+    fetch_sponsor_segments,
+    normalize_skip_segments,
+)
+from app.web.formatting import estimate_channel_periodicity, format_views
+from app.web.routes.transcript import video_analysis_payload
 from app.web.shared import (
     LIBRARY_PAGE_SIZE,
     append_query,
@@ -62,17 +92,13 @@ from app.web.shared import (
     form_text_value,
     internal_return_path,
     page_href_builder,
-    paginate,
-    parse_category_labels,
     redirect,
-    serialized_category_labels,
     templates,
     video_metadata,
     wants_json,
 )
 from app.web.video_library import (
     VIDEO_ASSET_FILTER_OPTIONS,
-    VIDEO_LIST_STATES,
     default_channel_section,
     downloaded_video_card,
     normalized_channel_id,
@@ -86,54 +112,14 @@ from app.web.video_library import (
     selected_video_sort,
     shorts_feature_flags,
     video_active_filter_pills,
-    video_asset_kind_condition,
     video_filters_clear_href,
-    video_filters_condition,
     video_library_view_is_active,
     video_library_view_path,
-    video_section_condition,
 )
 
 router = APIRouter()
 
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"}
-
-
-def normalize_download_media_types(media_type: str | list[str]) -> list[str]:
-    media_types = [media_type] if isinstance(media_type, str) else list(media_type)
-    normalized = []
-    for item in media_types:
-        if item not in {"video", "audio", "metadata"}:
-            raise ValueError("Le format doit être vidéo, audio ou métadonnées.")
-        if item not in normalized:
-            normalized.append(item)
-    if not normalized:
-        raise ValueError("Sélectionne au moins un format.")
-    if any(item in normalized for item in ("video", "audio")) and "metadata" not in normalized:
-        normalized.append("metadata")
-    return normalized
-
-
-def normalize_subtitle_language(value: str) -> str | None:
-    """Empty means "no language imposed": the original track is chosen by `choose_subtitle_track`."""
-    normalized = value.strip().lower()
-    if not normalized:
-        return None
-    if not all(char.isalnum() or char in "-_" for char in normalized):
-        raise ValueError("Langue de sous-titres invalide.")
-    return normalized
-
-
-def normalize_subtitle_source(value: str) -> str:
-    if value not in {"auto", "manual", "both", "none"}:
-        raise ValueError("Source de sous-titres invalide.")
-    return value
-
-
-def normalize_video_quality(value: str) -> str:
-    if value not in {"360", "480", "720", "1080", "1440", "2160", "best"}:
-        raise ValueError("Qualité vidéo invalide.")
-    return value
 
 
 @router.get("/videos", response_class=HTMLResponse)
@@ -150,25 +136,6 @@ def videos_page(
         request, selected_channel_id, default_channel_section(selected_channel)
     )
     selected_sort = selected_video_sort(request, selected_channel_id)
-    if selected_sort == "published":
-        order_by = (desc(Video.published_at), desc(Video.downloaded_at), desc(Video.id))
-    elif selected_sort == "rated":
-        order_by = (
-            desc(Video.rating),
-            desc(Video.published_at),
-            desc(Video.downloaded_at),
-            desc(Video.id),
-        )
-    elif selected_sort == "views":
-        # Ties keep the "imported" order, as the former in-Python stable sort did.
-        order_by = (
-            desc(func.coalesce(Video.view_count, 0)),
-            desc(Video.downloaded_at),
-            desc(Video.created_at),
-            desc(Video.id),
-        )
-    else:
-        order_by = (desc(Video.downloaded_at), desc(Video.created_at), desc(Video.id))
     selected_asset_filters = selected_video_asset_filters(request, selected_channel_id)
     selected_category_filters = selected_video_category_filters(request)
     selected_excluded_asset_filters = selected_video_excluded_asset_filters(request)
@@ -195,84 +162,28 @@ def videos_page(
         selected_hide_hidden,
         selected_uncategorized_only,
     )
-    with_channel = Video.channel_id == Channel.id
-    listed = (
-        select(Video)
-        .outerjoin(Channel, with_channel)
-        .where(in_channel, in_section, matches_filters)
-        .options(selectinload(Video.channel))
-        .order_by(*order_by)
+    videos, page, total_pages, filtered_video_count = library_page(
+        db,
+        and_(in_channel, in_section, matches_filters),
+        selected_sort,
+        search_query,
+        page,
+        LIBRARY_PAGE_SIZE,
     )
-    if search_query:
-        # Word-based, accent-insensitive ranking is Python-only: rank the SQL-filtered candidates.
-        ranked = [(video_search_rank(video, search_query), video) for video in db.scalars(listed)]
-        # Stable sort: the selected sort still orders videos inside a relevance tier.
-        matching = [
-            video
-            for rank, video in sorted((r for r in ranked if r[0] is not None), key=lambda r: r[0])
-        ]
-        filtered_video_count = len(matching)
-        videos, page, total_pages = paginate(matching, page)
-    else:
-        filtered_video_count = db.scalar(
-            select(func.count(Video.id))
-            .outerjoin(Channel, with_channel)
-            .where(in_channel, in_section, matches_filters)
-        )
-        total_pages = max(1, -(-filtered_video_count // LIBRARY_PAGE_SIZE))
-        page = min(page, total_pages)
-        videos = list(
-            db.scalars(listed.offset((page - 1) * LIBRARY_PAGE_SIZE).limit(LIBRARY_PAGE_SIZE))
-        )
     for video in videos:
         ensure_video_channel(db, video)
     video_cards = [downloaded_video_card(video) for video in videos]
-    video_ids = [video.id for video in videos]
-    latest_playback_by_video_id = {}
-    if video_ids:
-        playback_jobs = db.scalars(
-            select(DownloadJob)
-            .where(DownloadJob.status == "played", DownloadJob.video_id.in_(video_ids))
-            .order_by(desc(DownloadJob.created_at))
-        )
-        for job in playback_jobs:
-            if job.video_id in latest_playback_by_video_id:
-                continue
-            playback = playback_activity_view(job)
-            if playback:
-                latest_playback_by_video_id[job.video_id] = playback
+    latest_playback_by_video_id = latest_playback_by_video(db, [video.id for video in videos])
     for card in video_cards:
         card["playback"] = latest_playback_by_video_id.get(card["video"].id)
 
-    def count_where(condition):
-        return func.coalesce(func.sum(case((condition, 1), else_=0)), 0)
-
-    is_short = video_section_condition("shorts")
-    has_media = or_(video_asset_kind_condition("video"), video_asset_kind_condition("audio"))
-    (
-        local_video_count,
-        downloaded_video_count,
-        metadata_video_count,
-        downloaded_regular_video_count,
-        downloaded_short_count,
-    ) = db.execute(
-        select(
-            count_where(in_section),
-            count_where(and_(in_section, has_media)),
-            count_where(and_(in_section, video_asset_kind_condition("metadata"))),
-            count_where(and_(has_media, ~is_short)),
-            count_where(and_(has_media, is_short)),
-        ).where(in_channel)
-    ).one()
-    next_import_page = (local_video_count // CHANNEL_VIDEO_PAGE_SIZE) + 1
+    section_counts = library_section_counts(db, in_channel, in_section)
+    next_import_page = (section_counts["local_video_count"] // CHANNEL_VIDEO_PAGE_SIZE) + 1
     channel_periodicity = None
     if selected_channel_id:
-        published_dates = db.scalars(
-            select(Video.published_at).where(
-                in_channel, in_section, Video.published_at.is_not(None)
-            )
+        channel_periodicity = estimate_channel_periodicity(
+            publication_dates(db, in_channel, in_section)
         )
-        channel_periodicity = estimate_channel_periodicity(published_dates)
     has_next_page = False
     total_channel_pages = None
     category_label_styles = get_video_category_label_styles(db)
@@ -343,11 +254,7 @@ def videos_page(
             "total_pages": total_pages,
             "page_href": page_href_builder(request),
             "filtered_video_count": filtered_video_count,
-            "local_video_count": local_video_count,
-            "downloaded_video_count": downloaded_video_count,
-            "downloaded_regular_video_count": downloaded_regular_video_count,
-            "downloaded_short_count": downloaded_short_count,
-            "metadata_video_count": metadata_video_count,
+            **section_counts,
             "next_import_page": next_import_page,
             "channel_periodicity": channel_periodicity,
             "total_channel_pages": total_channel_pages,
@@ -377,11 +284,9 @@ def update_video_categories_form(
 
     submitted_categories = [
         *form_list_values(preset_categories),
-        *parse_category_labels(form_text_value(custom_categories)),
+        *parse_video_category_labels(form_text_value(custom_categories)),
     ]
-    video.category_labels = serialized_category_labels(submitted_categories)
-    add_video_category_labels(db, submitted_categories)
-    db.commit()
+    set_video_categories(db, video, submitted_categories)
     if request.headers.get("x-requested-with") == "fetch":
         return JSONResponse({"status": "ok", "categories": submitted_categories})
     return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
@@ -398,13 +303,8 @@ def update_video_comment_form(
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
 
-    comment_text = form_text_value(comment).strip()
-    video.comment = comment_text or None
-    db.commit()
+    set_video_comment(db, video, form_text_value(comment))
     return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
-
-
-_TITLE_STATUS_SUFFIXES = (" ✨", " ✏️")
 
 
 @router.post("/videos/{video_id}/apply-title")
@@ -418,33 +318,11 @@ def apply_video_title_form(
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    analysis = json.loads(video.ai_analysis_json) if video.ai_analysis_json else {}
-    suggested_titles = analysis.get("suggested_titles") or []
-
-    choice = form_text_value(title_choice).strip()
-    chosen_title = ""
-    is_ai_choice = False
-    if choice in {"1", "2", "3"}:
-        index = int(choice) - 1
-        if index < len(suggested_titles):
-            chosen_title = suggested_titles[index].strip()
-            is_ai_choice = True
-    if not chosen_title:
-        chosen_title = form_text_value(title_custom).strip()
-        is_ai_choice = False
-
-    if not chosen_title:
-        query = urlencode({"level": "error", "message": "Le titre ne peut pas être vide."})
+    try:
+        apply_video_title(db, video, form_text_value(title_choice), form_text_value(title_custom))
+    except ValueError as exc:
+        query = urlencode({"level": "error", "message": str(exc)})
         return redirect(f"/videos/{video_id}?{query}#transcript-analysis")
-
-    for suffix in _TITLE_STATUS_SUFFIXES:
-        if chosen_title.endswith(suffix):
-            chosen_title = chosen_title[: -len(suffix)]
-            break
-    chosen_title = f"{chosen_title} {'✨' if is_ai_choice else '✏️'}"
-
-    video.title = chosen_title
-    db.commit()
     return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
 
 
@@ -457,9 +335,7 @@ def fetch_video_sponsorblock_segments(
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
     is_fetch = request.headers.get("x-requested-with") == "fetch"
     try:
-        categories = get_sponsor_segment_categories(db)
-        segments = fetch_sponsorblock_segments(video.yt_video_id, categories)
-        rows = replace_video_sponsor_segments(db, video.id, "sponsorblock", segments)
+        rows = fetch_sponsor_segments(db, video)
     except Exception as exc:
         db.rollback()
         message = f"Recherche SponsorBlock impossible : {exc}"
@@ -494,15 +370,8 @@ def cancel_channel_import_job(job_id: int, db: Session = Depends(get_db)):
     job = db.get(DownloadJob, job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job introuvable")
-    if job.channel_id is not None and job.video_id is None and job.status in {"queued", "running"}:
-        job.status = "cancelled"
-        job.message = "Exploration arrêtée."
-        db.commit()
-    return {
-        "id": job.id,
-        "status": job.status,
-        "done": job.status in {"downloaded", "metadata", "failed", "cancelled"},
-    }
+    cancel_channel_exploration(db, job)
+    return {"id": job.id, "status": job.status, "done": job.status in JOB_DONE_STATUSES}
 
 
 @router.get("/videos/cards", response_class=HTMLResponse)
@@ -555,14 +424,12 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    if video.is_new:
-        video.is_new = False
-        db.commit()
+    mark_video_opened(db, video)
 
     category_label_styles = get_video_category_label_styles(db)
     query_params = request.query_params if "query_string" in request.scope else {}
     back_path = internal_return_path(query_params.get("next", ""), "/videos")
-    context = transcript_context(video)
+    context = read_transcript_documents(video)
     vtt_content = None
     if video.subtitle_path:
         subtitle_file = local_media_path(video.subtitle_path)
@@ -596,24 +463,7 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
             extended_metadata["comment_count"],
         ]
     )
-    sponsor_categories = get_sponsor_segment_categories(db)
-    # `list(...)` est indispensable : le `ScalarResult` de `db.scalars(...)` ne se
-    # parcourt qu'une fois, or les lignes servent à la fois à la liste affichée et
-    # au payload de saut.
-    sponsor_segment_rows = (
-        list(
-            db.scalars(
-                select(VideoSponsorSegment)
-                .where(
-                    VideoSponsorSegment.video_id == video.id,
-                    VideoSponsorSegment.category.in_(sponsor_categories),
-                )
-                .order_by(VideoSponsorSegment.start_seconds)
-            )
-        )
-        if sponsor_categories
-        else []
-    )
+    sponsor_segment_rows = active_sponsor_segments(db, video.id)
     sponsor_segments = [
         {
             "category_label": SPONSOR_SEGMENT_CATEGORY_LABELS.get(row.category, row.category),
@@ -632,7 +482,7 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
             "extended_metadata": extended_metadata,
             "vtt_content": vtt_content,
             "video_analysis": video_analysis_payload(video),
-            "can_include_image": _video_analysis_has_image(video, get_llm_provider_name()),
+            "can_include_image": video_analysis_has_image(video, get_llm_provider_name()),
             "sponsor_segments": sponsor_segments,
             "resume_positions": latest_playback_positions(db, video.id),
             "sponsor_skip_payload": {
@@ -699,7 +549,7 @@ def download_video_form(
         )
         submitted_categories = [
             *form_list_values(preset_categories),
-            *parse_category_labels(form_text_value(custom_categories)),
+            *parse_video_category_labels(form_text_value(custom_categories)),
         ]
         category_labels = serialized_category_labels(submitted_categories)
         add_video_category_labels(db, submitted_categories)
@@ -891,16 +741,10 @@ def log_video_activity(
     if media_type not in {"video", "audio"}:
         raise HTTPException(status_code=400, detail="Type de média invalide")
 
-    mark_watched_if_complete(video, position_seconds, duration_seconds)
     record_playback_activity(
         db, video, media_type, position_seconds, duration_seconds, watched_seconds
     )
     return {"status": "logged"}
-
-
-# Statuses of the queue row of a channel import job, the only ones that list the videos it brought in.
-CHANNEL_IMPORT_PROGRESS_STATUSES = {"queued", "running", "metadata", "cancelled"}
-CHANNEL_IMPORT_PROGRESS_LIMIT = 200
 
 
 @router.get("/jobs/{job_id}")
@@ -913,27 +757,11 @@ def job_status(job_id: int, db: Session = Depends(get_db)):
         "status": job.status,
         "message": job.message,
         "video_id": job.video_id,
-        "done": job.status in {"downloaded", "metadata", "failed", "cancelled"},
+        "done": job.status in JOB_DONE_STATUSES,
     }
-    if (
-        job.channel_id is not None
-        and job.video_id is None
-        and job.status in CHANNEL_IMPORT_PROGRESS_STATUSES
-    ):
-        # The import logs one "metadata" row per video, after the queue row: ids are monotonic, so
-        # "newer than the queue row" is enough, with no clock comparison.
-        imported = db.execute(
-            select(Video.id, Video.title)
-            .join(DownloadJob, DownloadJob.video_id == Video.id)
-            .where(
-                DownloadJob.status == "metadata",
-                DownloadJob.channel_id == job.channel_id,
-                DownloadJob.id > job.id,
-            )
-            .order_by(DownloadJob.id)
-            .limit(CHANNEL_IMPORT_PROGRESS_LIMIT)
-        ).all()
-        payload["videos"] = [{"id": video_id, "title": title} for video_id, title in imported]
+    imported = channel_exploration_videos(db, job)
+    if imported is not None:
+        payload["videos"] = imported
     return payload
 
 
@@ -960,18 +788,18 @@ def import_video_metadata_form(
 
 
 @router.post("/videos/{video_id}/list-state")
-def set_video_list_state(
+def set_video_list_state_form(
     video_id: int,
     state: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    if state != "clear" and state not in VIDEO_LIST_STATES:
-        raise HTTPException(status_code=400, detail="État de liste inconnu.")
     video = db.get(Video, video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Vidéo introuvable.")
-    video.list_state = None if state == "clear" else state
-    db.commit()
+    try:
+        set_video_list_state(db, video, state)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return JSONResponse({"state": video.list_state})
 
 
@@ -983,12 +811,13 @@ def rate_video_form(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    if rating < 0 or rating > 5:
-        raise HTTPException(status_code=400, detail="La note doit être comprise entre 0 et 5.")
     video = db.get(Video, video_id)
-    if video:
-        video.rating = rating
-        db.commit()
+    try:
+        check_rating(rating)
+        if video:
+            set_rating(db, video, rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if wants_json(request):
         if not video:
             raise HTTPException(status_code=404, detail="Vidéo introuvable.")

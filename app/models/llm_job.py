@@ -10,7 +10,7 @@ class LlmJob(Base):
     """A queued LLM completion (transcript clean/chat), run out of the request path.
 
     Jobs are run in a FastAPI background task in the web process itself (see
-    app/services/background_jobs.py:run_llm_job). The caller gets an immediate `queued` response
+    app/services/jobs/llm_jobs.py:run_llm_job). The caller gets an immediate `queued` response
     and polls `GET /videos/{id}/transcript/jobs/{job_id}` for the result (see
     docs/spec/09-transcript-et-discussion-llm.md).
 
@@ -23,7 +23,7 @@ class LlmJob(Base):
     only the complete answer once the job is `done`.
 
     `model`/`input_tokens`/`output_tokens`/`cost_usd` are only populated for
-    jobs that completed successfully (`app/services/background_jobs.py:run_llm_job`) — real usage
+    jobs that completed successfully (`app/services/jobs/llm_jobs.py:run_llm_job`) — real usage
     reported by the provider itself, not a char-count estimate. Failed/incomplete
     jobs leave these null.
     """
@@ -40,11 +40,11 @@ class LlmJob(Base):
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", index=True)
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # JSON, library_chat only: see app/services/background_jobs.py:run_llm_job.
+    # JSON, library_chat only: see app/services/jobs/llm_jobs.py:run_llm_job.
     sources: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON, library_chat only: the tool calls made so far ([{"label", "result"}]),
     # written while the job runs so the status route can show them live. See
-    # app/services/library_chat_tools.py:LibraryChatToolbox.
+    # app/services/library_chat/tools.py:LibraryChatToolbox.
     tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     model: Mapped[str | None] = mapped_column(String(50), nullable=True)

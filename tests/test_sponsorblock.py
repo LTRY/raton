@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.services.sponsorblock import fetch_sponsorblock_segments
+from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
 
 
 class FakeResponse:

@@ -25,7 +25,7 @@ Si le dossier n'existe pas ou `app.jsonl` est vide : dis-le, c'est déjà un con
 ## 2. Lire le digest
 
 ```bash
-uv run --python 3.14 python -m app.services.logs_digest --dir "$LOG_DIR" --hours 24
+uv run --python 3.14 python -m app.core.logs_digest --dir "$LOG_DIR" --hours 24
 ```
 
 Il résume : niveaux, redémarrages, signaux automatiques, erreurs et avertissements groupés, réponses 5xx, requêtes lentes, jobs, appels externes.

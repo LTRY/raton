@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import pytest
 from fastapi import BackgroundTasks, HTTPException
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
@@ -23,14 +23,18 @@ from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.settings import SettingsUpdate
-from app.services import background_jobs, search
-from app.services import yt as yt_service
-from app.services.llm import CompletionFailed, CompletionResult, UsageTally
-from app.services.scanner import channel_values_from_info
-from app.services.scheduler import record_scan_result
-from app.services.settings import get_sponsor_skip_enabled
-from app.services.yt import ChannelNotFoundError, resolve_channel_url
-from app.web import formatting, playback, shared, video_library
+from app.services.channels import manage as channel_manage
+from app.services.common import search
+from app.services.common.settings import get_sponsor_skip_enabled
+from app.services.ingest.identity import channel_values_from_info
+from app.services.jobs import backfills, downloads, llm_jobs
+from app.services.jobs.scheduler import record_scan_result
+from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
+from app.services.videos import list_state as videos_list_state
+from app.services.videos import playback as videos_playback
+from app.services.youtube import channel_info, sponsor_segments
+from app.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
+from app.web import formatting, playback, shared
 from app.web.routes import channels as channels_routes
 from app.web.routes import dashboard as dashboard_routes
 from app.web.routes import media as media_routes
@@ -540,9 +544,7 @@ def test_videos_page_hides_labels_on_card(tmp_path):
 
 def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
     db = make_session()
-    job = background_jobs.enqueue_llm_job(
-        db, kind="chat", provider="anthropic", video_id=None, prompt="p"
-    )
+    job = llm_jobs.enqueue_llm_job(db, kind="chat", provider="anthropic", video_id=None, prompt="p")
 
     class FakeProvider:
         def complete(self, prompt, on_text=None):
@@ -550,10 +552,11 @@ def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
             tally.add(SimpleNamespace(input_tokens=1_000_000, output_tokens=1_000_000))
             raise CompletionFailed("La réponse a été tronquée", tally)
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
-    background_jobs.run_llm_job(job.id)
+    llm_jobs.run_llm_job(job.id)
 
     failed = db.get(LlmJob, job.id)
     assert failed.status == "failed"
@@ -584,7 +587,7 @@ def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        videos_routes,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: [
             {"category": "sponsor", "start_seconds": 10.0, "end_seconds": 20.0}
@@ -613,7 +616,7 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
     def fail(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(videos_routes, "fetch_sponsorblock_segments", fail)
+    monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
     response = videos_routes.fetch_video_sponsorblock_segments(
         fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
@@ -785,11 +788,12 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
                 output_tokens=80,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "PARTIAL_RESULT_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "PARTIAL_RESULT_INTERVAL_SECONDS", 0)
 
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     assert polled == [
         {
@@ -836,7 +840,7 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
     assert json.loads(response.body)["status"] == "generated"
     assert len(scheduled) == 1
     fn, args, kwargs = scheduled[0]
-    assert fn is transcript_routes.index_video_notes
+    assert fn is transcript_routes.run_notes_indexing_job
     assert args[0] == video.id
     assert "- Fait 1\n- Fait 2" in args[1]
     assert kwargs == {}
@@ -864,7 +868,7 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
     video.thumbnail_path = str(thumbnail)
     db.commit()
 
-    class FakeAnthropicProvider(background_jobs.AnthropicProvider):
+    class FakeAnthropicProvider(llm_jobs.AnthropicProvider):
         def __init__(self):
             pass
 
@@ -891,9 +895,10 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
                 "complete() ne doit pas être appelé quand une image est disponible"
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeAnthropicProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeAnthropicProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     scheduled = []
     background_tasks = BackgroundTasks()
@@ -915,9 +920,9 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
     assert response.status_code == 200
     assert payload["status"] == "queued"
     job_id = payload["job_id"]
-    assert scheduled == [(background_jobs.run_llm_job, (job_id,), {})]
+    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     completed_job = db.get(LlmJob, job_id)
     assert completed_job.status == "done"
@@ -975,15 +980,16 @@ def test_generate_documents_omits_image_when_checkbox_unchecked_even_with_thumbn
                 "complete_with_image() ne doit pas être appelé, la case est décochée"
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
         "add_task",
-        lambda fn, *args, **kwargs: background_jobs.run_llm_job(args[0]),
+        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
     )
 
     response = transcript_routes.generate_video_transcript_documents(
@@ -1016,7 +1022,7 @@ def test_video_analysis_has_image_true_when_thumbnail_inside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs._video_analysis_has_image(video, "anthropic") is True
+    assert llm_jobs.video_analysis_has_image(video, "anthropic") is True
 
 
 def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
@@ -1035,7 +1041,7 @@ def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs._video_analysis_has_image(video, "anthropic") is False
+    assert llm_jobs.video_analysis_has_image(video, "anthropic") is False
 
 
 def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_checkbox_checked(
@@ -1062,15 +1068,16 @@ def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_ch
                 output_tokens=50,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
         "add_task",
-        lambda fn, *args, **kwargs: background_jobs.run_llm_job(args[0]),
+        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
     )
 
     response = transcript_routes.generate_video_transcript_documents(
@@ -1602,8 +1609,9 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
                 output_tokens=10,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     scheduled = []
     background_tasks = BackgroundTasks()
@@ -1632,10 +1640,10 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
     assert response.status_code == 200
     assert payload["status"] == "queued"
     job_id = payload["job_id"]
-    assert scheduled == [(background_jobs.run_llm_job, (job_id,), {})]
+    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     # Simulate the background task the request scheduled.
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
     resolved_payload = json.loads(resolved.body)
@@ -2098,12 +2106,10 @@ def test_run_transcript_retry_job_marks_job_downloaded_on_success(monkeypatch):
         target_video.transcript_status = TranscriptStatus.downloaded
         return target_video
 
-    monkeypatch.setattr(
-        background_jobs, "retry_transcript_download", fake_retry_transcript_download
-    )
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "retry_transcript_download", fake_retry_transcript_download)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
 
-    background_jobs.run_transcript_retry_job(job.id, video.id)
+    downloads.run_transcript_retry_job(job.id, video.id)
 
     completed_job = db.get(DownloadJob, job.id)
     assert completed_job.status == "downloaded"
@@ -2120,12 +2126,10 @@ def test_run_transcript_retry_job_marks_job_failed_when_no_subtitles_found(monke
     def fake_retry_transcript_download(session, target_video, languages=None):
         raise ValueError("Aucun sous-titre disponible (FR ou EN) pour cette vidéo.")
 
-    monkeypatch.setattr(
-        background_jobs, "retry_transcript_download", fake_retry_transcript_download
-    )
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "retry_transcript_download", fake_retry_transcript_download)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
 
-    background_jobs.run_transcript_retry_job(job.id, video.id)
+    downloads.run_transcript_retry_job(job.id, video.id)
 
     completed_job = db.get(DownloadJob, job.id)
     assert completed_job.status == "failed"
@@ -2509,7 +2513,7 @@ def test_download_form_queues_ajax_job(monkeypatch):
     assert f"/videos/download-jobs/{job.id}" in payload
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (
                 job.id,
                 "https://youtube.com/watch?v=abc123",
@@ -2563,7 +2567,7 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     assert job.status == "queued"
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (job.id, "https://youtube.com/watch?v=meta123", ["metadata"], True, None, None, "both"),
             {},
         )
@@ -2606,7 +2610,7 @@ def test_download_form_queues_category_labels(monkeypatch):
     assert response.status_code == 200
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (
                 job.id,
                 "https://youtube.com/watch?v=cat123",
@@ -3473,7 +3477,7 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
     assert f'"job_id":{job.id}' in payload
     assert f"/jobs/{job.id}" in payload
     assert scheduled == [
-        (background_jobs.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
+        (downloads.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
     ]
 
     status = videos_routes.job_status(job.id, db)
@@ -3488,21 +3492,21 @@ def test_channel_metadata_import_job_imports_one_page(monkeypatch):
     db.add(job)
     db.commit()
     calls = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        downloads,
         "scan_channel_section",
         lambda db, channel, **kwargs: calls.append(kwargs) or 25,
     )
 
-    background_jobs.run_channel_metadata_import_job(job.id, channel.id, page=1)
+    downloads.run_channel_metadata_import_job(job.id, channel.id, page=1)
 
     assert len(calls) == 1
     assert callable(calls[0].pop("should_stop"))
     assert calls == [
         {
             "page": 1,
-            "page_size": background_jobs.CHANNEL_VIDEO_PAGE_SIZE,
+            "page_size": downloads.CHANNEL_VIDEO_PAGE_SIZE,
             "max_pages": 1,
             "section": "videos",
         }
@@ -3701,7 +3705,7 @@ def test_content_views_only_link_to_raton_pages():
                 )
             ]
         ),
-        playback_time_stats=playback.empty_playback_stats(),
+        playback_time_stats=videos_playback.empty_playback_stats(),
         category_style_map={},
         chat_widget_config={
             "defaultScope": "library",
@@ -3758,7 +3762,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
         job.created_at = base + timedelta(minutes=offset)
         db.commit()
 
-    positions = playback.latest_playback_positions(db, video.id)
+    positions = videos_playback.latest_playback_positions(db, video.id)
 
     assert positions["video"] == {
         "position_seconds": 252.5,
@@ -3801,7 +3805,7 @@ def test_video_detail_omits_server_resume_position_without_playback():
 
     rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
 
-    assert playback.latest_playback_positions(db, video.id) == {}
+    assert videos_playback.latest_playback_positions(db, video.id) == {}
     assert "data-resume-server-position" not in rendered
 
 
@@ -4227,7 +4231,7 @@ def test_history_day_groups_carries_reading_time_counting_every_playback():
 
     # Two playbacks of the same video today: the list keeps one row, the time keeps both.
     jobs = [played_job(now - timedelta(hours=1), 600), played_job(now - timedelta(hours=2), 300)]
-    seconds_by_day = playback.playback_seconds_by_day(jobs, now)
+    seconds_by_day = videos_playback.playback_seconds_by_day(jobs, now)
 
     groups = playback.history_day_groups(jobs[:1], now, seconds_by_day)
 
@@ -4751,7 +4755,7 @@ def test_playback_time_stats_groups_today_week_and_month_by_media_kind():
     db.add_all([podcast, short, music, old_music, *jobs])
     db.commit()
 
-    stats = playback.playback_time_stats(jobs, now)
+    stats = videos_playback.playback_time_stats(jobs, now)
 
     assert stats["today"]["video"]["duration"] == "2m30"
     assert stats["today"]["video"]["count"] == 1
@@ -4876,8 +4880,8 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
     )
     db.commit()
 
-    all_logs = playback.dashboard_media_activity_logs(db)
-    limited_logs = playback.dashboard_media_activity_logs(db, limit=0)
+    all_logs = videos_playback.dashboard_media_activity_logs(db)
+    limited_logs = videos_playback.dashboard_media_activity_logs(db, limit=0)
 
     assert len(all_logs) == 1
     assert "0:11" in all_logs[0].message
@@ -5292,7 +5296,7 @@ def test_rating_forms_opt_out_of_turbo_navigation():
 def test_new_channels_are_rated_by_default(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )
@@ -5391,7 +5395,7 @@ def test_redirect_messages_are_rendered_by_the_base_layout_only():
 def test_add_channel_with_a_name_shows_youtube_candidates_instead_of_guessing(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda value: pytest.fail("must not resolve a name"),
     )
@@ -5479,7 +5483,7 @@ def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch):
     )
     db.commit()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda value: {
             "url": "https://www.youtube.com/@deja-la",
@@ -5530,9 +5534,9 @@ def test_search_channels_reads_the_channel_filtered_youtube_search(monkeypatch):
                 ]
             }
 
-    monkeypatch.setattr(yt_service, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    results = yt_service.search_channels("Léo Duff", limit=5)
+    results = channel_info.search_channels("Léo Duff", limit=5)
 
     assert (
         requested["url"]
@@ -5559,7 +5563,7 @@ def test_search_channels_reads_the_channel_filtered_youtube_search(monkeypatch):
             "thumbnail_url": None,
         },
     ]
-    assert yt_service.search_channels("   ") == []
+    assert channel_info.search_channels("   ") == []
 
 
 def test_channel_handle_resolves_to_exact_handle_url():
@@ -5587,7 +5591,7 @@ def test_imported_video_channel_name_does_not_fall_back_to_channel_id():
 def test_add_channel_returns_not_found_for_missing_handle(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
     )
@@ -5602,7 +5606,7 @@ def test_add_channel_returns_not_found_for_missing_handle(monkeypatch):
 def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        api_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: {
             "url": "https://www.youtube.com/@api-channel",
@@ -5617,10 +5621,56 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
     assert channel.url == "https://www.youtube.com/@api-channel"
 
 
+def test_api_create_channel_refuses_a_channel_added_under_another_url(monkeypatch):
+    # Same rule as the HTML form: the YouTube id identifies the channel, not the URL.
+    db = make_session()
+    db.add(
+        Channel(
+            url="https://www.youtube.com/channel/UCAPI", name="Chaîne API", yt_channel_id="UCAPI"
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(
+        channel_manage,
+        "extract_channel_info",
+        lambda channel_input: {
+            "url": "https://www.youtube.com/@api-channel",
+            "name": "Chaîne API",
+            "yt_channel_id": "UCAPI",
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        api_routes.create_channel(api_routes.ChannelCreate(url="@api-channel"), db)
+
+    assert exc.value.status_code == 409
+    assert db.scalar(select(func.count(Channel.id))) == 1
+
+
+def test_api_and_form_delete_a_channel_with_its_profile_files(monkeypatch):
+    removed = []
+    monkeypatch.setattr(
+        channel_manage,
+        "remove_channel_profile_files",
+        lambda media_root, yt_channel_id: removed.append(yt_channel_id),
+    )
+    db = make_session()
+    first = Channel(url="https://example.test/a", name="A", yt_channel_id="UCA")
+    second = Channel(url="https://example.test/b", name="B", yt_channel_id="UCB")
+    db.add_all([first, second])
+    db.commit()
+
+    api_routes.delete_channel(first.id, db)
+    channels_routes.delete_channel_form(second.id, "/channels", db)
+
+    assert removed == ["UCA", "UCB"]
+    assert db.scalar(select(func.count(Channel.id))) == 0
+
+
 def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        api_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
     )
@@ -5635,7 +5685,7 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
 def test_add_channel_saves_category_labels(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )
@@ -5826,7 +5876,7 @@ def test_settings_page_renders_no_progress_category_checkboxes(tmp_path):
 
 
 def test_ensure_default_settings_seeds_defaults_without_llm_provider():
-    from app.services.settings import ensure_default_settings
+    from app.services.common.settings import ensure_default_settings
 
     db = make_session()
 
@@ -5883,7 +5933,7 @@ def test_settings_page_renders_sponsor_segment_category_checkboxes(tmp_path):
 
 
 def test_get_sponsor_segment_categories_defaults_to_all():
-    from app.services.settings import (
+    from app.services.common.settings import (
         SPONSOR_SEGMENT_CATEGORY_CHOICES,
         get_sponsor_segment_categories,
     )
@@ -5893,7 +5943,7 @@ def test_get_sponsor_segment_categories_defaults_to_all():
 
 
 def test_get_sponsor_segment_categories_filters_unknown_values():
-    from app.services.settings import get_sponsor_segment_categories
+    from app.services.common.settings import get_sponsor_segment_categories
 
     db = make_session()
     db.add(AppSetting(key="sponsor_segment_categories", value="sponsor,bogus,outro"))
@@ -6146,9 +6196,9 @@ def test_video_list_state_follows_playback_when_unset():
         folder_path="/media/ls-auto",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, False) == "watched"
-    assert video_library.video_list_state(video, {"is_completed": False}, False) == "normal"
-    assert video_library.video_list_state(video, None, False) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "watched"
+    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "normal"
+    assert videos_list_state.video_list_state(video, None, False) == "normal"
 
 
 def test_video_list_state_ignores_playback_for_replay_categories():
@@ -6159,7 +6209,7 @@ def test_video_list_state_ignores_playback_for_replay_categories():
         folder_path="/media/ls-replay",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, True) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, True) == "normal"
 
 
 def test_video_list_state_honours_manual_watched_even_on_replay_category():
@@ -6171,7 +6221,7 @@ def test_video_list_state_honours_manual_watched_even_on_replay_category():
         list_state="watched",
     )
 
-    assert video_library.video_list_state(video, None, True) == "watched"
+    assert videos_list_state.video_list_state(video, None, True) == "watched"
 
 
 def test_video_list_state_unwatched_cancels_completed_playback():
@@ -6183,7 +6233,7 @@ def test_video_list_state_unwatched_cancels_completed_playback():
         list_state="unwatched",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, False) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "normal"
 
 
 def test_video_list_state_hidden_wins_over_playback():
@@ -6195,7 +6245,7 @@ def test_video_list_state_hidden_wins_over_playback():
         list_state="hidden",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": False}, False) == "hidden"
+    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "hidden"
 
 
 def test_set_video_list_state_persists_each_value():
@@ -6203,16 +6253,16 @@ def test_set_video_list_state_persists_each_value():
     video = add_video(db)
 
     for state in ("watched", "unwatched", "hidden"):
-        videos_routes.set_video_list_state(video.id, state, db)
+        videos_routes.set_video_list_state_form(video.id, state, db)
         assert db.get(Video, video.id).list_state == state
 
 
 def test_set_video_list_state_clear_resets_to_null():
     db = make_session()
     video = add_video(db)
-    videos_routes.set_video_list_state(video.id, "hidden", db)
+    videos_routes.set_video_list_state_form(video.id, "hidden", db)
 
-    response = videos_routes.set_video_list_state(video.id, "clear", db)
+    response = videos_routes.set_video_list_state_form(video.id, "clear", db)
 
     assert db.get(Video, video.id).list_state is None
     assert json.loads(response.body.decode()) == {"state": None}
@@ -6223,7 +6273,7 @@ def test_set_video_list_state_rejects_unknown_value():
     video = add_video(db)
 
     with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state(video.id, "bogus", db)
+        videos_routes.set_video_list_state_form(video.id, "bogus", db)
 
     assert excinfo.value.status_code == 400
 
@@ -6232,7 +6282,7 @@ def test_set_video_list_state_rejects_unknown_video():
     db = make_session()
 
     with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state(9999, "hidden", db)
+        videos_routes.set_video_list_state_form(9999, "hidden", db)
 
     assert excinfo.value.status_code == 404
 
@@ -6345,10 +6395,10 @@ def test_video_card_renders_list_state_buttons():
 
 
 def test_video_auto_list_state_reflects_playback_only():
-    assert video_library.video_auto_list_state({"is_completed": True}, False) == "watched"
-    assert video_library.video_auto_list_state({"is_completed": True}, True) == "normal"
-    assert video_library.video_auto_list_state({"is_completed": False}, False) == "normal"
-    assert video_library.video_auto_list_state(None, False) == "normal"
+    assert videos_list_state.video_auto_list_state({"is_completed": True}, False) == "watched"
+    assert videos_list_state.video_auto_list_state({"is_completed": True}, True) == "normal"
+    assert videos_list_state.video_auto_list_state({"is_completed": False}, False) == "normal"
+    assert videos_list_state.video_auto_list_state(None, False) == "normal"
 
 
 def test_video_card_exposes_auto_list_state_for_unhiding():

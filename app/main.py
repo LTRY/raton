@@ -22,8 +22,8 @@ from app.api.routes import router as api_router
 from app.core.config import get_settings
 from app.core.logging import configure_app_logging, log_event
 from app.db.session import Base, engine, get_db
-from app.services.scheduler import start_scheduler, stop_scheduler
-from app.services.settings import ensure_default_settings
+from app.services.common.settings import ensure_default_settings
+from app.services.jobs.scheduler import start_scheduler, stop_scheduler
 from app.web.compression import TextGZipMiddleware
 from app.web.request_timing import RequestTimingMiddleware, event_loop_lag_probe, install_sql_timing
 from app.web.routes.channels import router as channels_router

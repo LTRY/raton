@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from app.web.raton import all_variations
+from app.services.raton.picker import all_variations
 from app.web.shared import templates
 
 router = APIRouter()

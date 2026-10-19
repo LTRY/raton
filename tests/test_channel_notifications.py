@@ -6,7 +6,7 @@ from starlette.requests import Request
 from app.db.session import Base
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
-from app.services import scanner
+from app.services.ingest import scanner
 from app.web.routes import channels as channels_routes
 from app.web.routes import videos as videos_routes
 

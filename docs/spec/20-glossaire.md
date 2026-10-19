@@ -155,6 +155,17 @@ Telechargement video ou audio demande par la personne.
 - **Code** : `download_source = "manual"`
 - **A ne pas confondre avec** : Un import manuel par formulaire (`imported_via_form`), filtre « Import manuel ».
 
+### Ingestion
+
+Tout ce qui fait entrer une fiche dans la bibliotheque : le scan, l'import de
+metadonnees, le telechargement manuel, l'import d'un fichier local et le
+rattrapage des transcripts.
+
+- **Code** : paquet `app/services/ingest/`
+- **A ne pas confondre avec** : L'import d'une playlist, qui range des fiches
+  dans une playlist (`app/services/playlists/`) ; l'import du CSV
+  d'abonnements, qui ajoute des chaines (`app/services/channels/`).
+
 Specs : [02 Fonctionnalites](02-fonctionnalites.md),
 [13 Jobs, logs et planification](13-jobs-logs-planification.md),
 [07 YouTube et telechargements](07-youtube-et-telechargements.md).
@@ -245,7 +256,7 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 Assistant de la page d'accueil `/` : choisit une replique et un dessin a chaque chargement.
 
-- **Code** : `app/web/raton.py`
+- **Code** : paquet `app/services/raton/` (catalogue `scenarios.py`, tirage `picker.py`, visites `visits.py`)
 - **A ne pas confondre avec** : Un composant de chat.
 
 ### Dashboard
@@ -266,7 +277,7 @@ Liste des fiches, avec filtres, tri et recherche.
 
 Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.
 
-- **Code** : `saved_views` (cf. `video_library.py`)
+- **Code** : reglage `video_library_views` (`app/services/common/library_views.py`)
 - **A ne pas confondre avec** : Une playlist.
 
 ### Carte

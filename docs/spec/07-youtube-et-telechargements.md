@@ -11,20 +11,20 @@ Pour ajouter une chaine :
 - extraire `channel`, `uploader`, `title` ou l'URL comme nom ;
 - extraire `channel_id`, `uploader_id` ou `id` comme identifiant.
 
-`app/services/yt.py:extract_channel_info` n'accepte qu'une reference a une
+`app/services/youtube/channel_info.py:extract_channel_info` n'accepte qu'une reference a une
 chaine precise : URL, `@handle`, ou mot seul traite comme un handle. Un nom
 libre (avec espaces) leve `ChannelNotFoundError` : il n'est jamais resolu en
 devinant, il passe par la recherche ci-dessous.
 
 ## Profil de chaine
 
-`app/services/yt.py:fetch_channel_profile(channel_url)` refait la meme
+`app/services/youtube/channel_info.py:fetch_channel_profile(channel_url)` refait la meme
 extraction plate (`extract_flat`, `skip_download`) que l'ajout et en tire
 `description`, `keywords` (les `tags` de yt-dlp, vides ecartes) et les URL
 d'image : les entrees `avatar_uncropped` et `banner_uncropped` de
 `thumbnails` (les originaux, pas les recadrages numerotes).
 
-`app/services/channel_profile.py:refresh_channel_profile` enregistre le texte,
+`app/services/channels/profile.py:refresh_channel_profile` enregistre le texte,
 puis telecharge chaque image vers `_channels/<yt_channel_id>/` (voir
 [06 Stockage fichiers](06-stockage-fichiers.md)) : ecriture dans un fichier
 temporaire `.part` au nom unique a chaque ecriture (un rafraichissement manuel
@@ -41,7 +41,7 @@ relatif.
 
 ## Recherche de chaine
 
-`app/services/yt.py:search_channels(query, limit=8)` cherche des chaines par
+`app/services/youtube/channel_info.py:search_channels(query, limit=8)` cherche des chaines par
 nom, sans cle d'API : `yt-dlp` (`extract_flat`) lit la page de resultats
 YouTube `results?search_query=...` avec le filtre "Type : chaine"
 (`sp=EgIQAg%3D%3D`). Les candidates sont renvoyees dans l'ordre de pertinence
@@ -52,7 +52,7 @@ YouTube). Les entrees dont l'identifiant ne commence pas par `UC` (pas une
 chaine) sont ignorees.
 
 Une meme chaine est joignable par plusieurs URL : la detection de doublon
-(`app/services/channels.py:find_channel`) compare donc d'abord
+(`app/services/channels/lookup.py:find_channel`) compare donc d'abord
 `yt_channel_id`, puis l'URL.
 
 ## Listing de chaine
@@ -131,7 +131,7 @@ impose plus (ni langue ni source) ; une langue passee explicitement a
 Un echec de sous-titres n'est qu'un `warning` : la fiche est importee sans
 transcript et le scan continue.
 
-**Rattrapage ponctuel** (`app/services/transcript_backfill.py`, job de
+**Rattrapage ponctuel** (`app/services/ingest/transcript_backfill.py`, job de
 demarrage `backfill_original_transcripts`) : les videos `missing` dont
 `metadata.json` liste une piste exploitable recuperent leur transcript (aucune
 requete pour les autres). Il s'arrete apres 5 echecs consecutifs et n'est
@@ -164,20 +164,20 @@ Une playlist se remplit de deux facons, toutes deux **metadonnees seules**
 (pas de re-synchronisation periodique, contrairement a la cloche des
 chaines) :
 
-- **Import par URL** (`app/services/playlists.py:extract_playlist_info`,
+- **Import par URL** (`app/services/playlists/imports.py:extract_playlist_info`,
   `list_playlist_entries`) : `yt-dlp` avec `skip_download`/`extract_flat`,
   directement sur l'URL de playlist (pas de reecriture d'URL "section" comme
   pour une chaine, l'URL de playlist est deja la ressource de listing) ;
   `playliststart`/`playlistend` paginent la lecture (fenetre de 50), la tache
   de fond parcourt toutes les pages jusqu'a une page vide (plafonne a 40
   pages/2000 videos).
-- **Apercu avant import** (`app/services/playlists.py:preview_playlist`) :
+- **Apercu avant import** (`app/services/playlists/imports.py:preview_playlist`) :
   meme lecture `extract_flat`, sans `playlistend: 1`, plafonnee a
   40 x 50 entrees (`truncated` si le plafond est atteint). Calcule nombre de
   videos, entrees indisponibles (`[Private video]`, `[Deleted video]`), duree
   cumulee des entrees qui en ont une, videos deja connues par `yt_video_id`
   et premiers titres. Ne cree ni playlist ni video.
-- **Import CSV Google Takeout** (`app/services/playlists.py:parse_playlist_csv`) :
+- **Import CSV Google Takeout** (`app/services/playlists/imports.py:parse_playlist_csv`) :
   un fichier `Vidéos de <Titre>.csv` par playlist (deux colonnes : identifiant
   video, horodatage ISO8601 d'ajout a la playlist). Le parsing est
   **positionnel, pas base sur le nom des colonnes** — l'entete est
@@ -247,7 +247,7 @@ Postprocessor :
 
 Quand l'utilisateur demande l'audio d'une video dont `video_path` existe,
 Raton copie la piste audio du fichier video (`ffmpeg -vn -c:a copy`,
-`app/services/audio_extract.py`) au lieu d'appeler yt-dlp : ni reseau, ni
+`app/services/media/audio_extract.py`) au lieu d'appeler yt-dlp : ni reseau, ni
 reencodage, le `.m4a` est ecrit en quelques secondes dans le dossier de la
 video (staging puis fusion, comme tout ajout de format).
 
@@ -291,7 +291,7 @@ ou indisponibles au moment du telechargement initial), la fiche video
 uniquement quand `video.transcript_path` est vide) :
 
 - `POST /videos/{id}/transcript/download` cree un `DownloadJob` et lance
-  `retry_transcript_download` (`app/services/scanner.py`) en tache de fond ;
+  `retry_transcript_download` (`app/services/ingest/transcript_retry.py`) en tache de fond ;
 - une seule tentative, sur la piste choisie par `choose_subtitle_track`
   (createur fr/en, puis originale fr/en, puis originale dans une autre langue :
   voir "Sous-titres : jamais de traduction automatique") ; pas de fusion

@@ -1,5 +1,5 @@
 {# One Raton line: drawing, line, then the limit notice and the button when the scenario has them.
-   `view` comes from app/web/raton.py (`render_line`); `heading` is False on the test page, where
+   `view` comes from app/services/raton/picker.py (`render_line`); `heading` is False on the test page, where
    many stages share a page and only the home line is the page's <h1>. #}
 {% macro raton_stage(view, heading=True) %}
 <div class="raton-stage" data-raton-scenario="{{ view.id }}">

@@ -19,7 +19,7 @@ bibliothèque : il lui faut des outils. Deux familles de recherche existent :
 
 - **textuelle** (`chercher_chaines`, `chercher_videos`) : mots-clés dans les
   titres, noms de chaînes, labels, commentaires
-  (`app/services/search.py`) ;
+  (`app/services/common/search.py`) ;
 - **sémantique** (`chercher_dans_les_notes`) : trouver ce qui *parle de* un
   sujet même avec d'autres mots (« rétro-ingénierie » pour « reverse
   engineering »), dans le contenu des vidéos.
@@ -85,15 +85,15 @@ modèle reste le texte nu.
 
 | Élément | Où | Détail |
 |---|---|---|
-| Découpage | `app/services/llm.py:split_notes_sections` | un chunk par section Markdown des notes ; sections vides ignorées ; repli `Notes` |
-| Texte embeddé | `app/services/embeddings.py:contextualized_text` | `Titre — Chaîne — Section\ncontenu` |
-| Embedding | `app/services/embeddings.py` | API Voyage, `EMBEDDING_MODEL` (`voyage-3.5`), 1024 dimensions, `input_type` `document` (notes) / `query` (question) |
+| Découpage | `app/services/llm/prompts.py:split_notes_sections` | un chunk par section Markdown des notes ; sections vides ignorées ; repli `Notes` |
+| Texte embeddé | `app/services/rag/embeddings.py:contextualized_text` | `Titre — Chaîne — Section\ncontenu` |
+| Embedding | `app/services/rag/embeddings.py` | API Voyage, `EMBEDDING_MODEL` (`voyage-3.5`), 1024 dimensions, `input_type` `document` (notes) / `query` (question) |
 | Stockage | `video_note_chunks` | `vector(1024)`, sans index vectoriel (scan exact) |
-| Indexation | `app/services/rag_indexing.py:index_video_notes` | au `generate` appliqué ; embed **avant** de supprimer les anciens chunks |
+| Indexation | `app/services/rag/indexing.py:index_video_notes` | au `generate` appliqué (tâche de fond `run_notes_indexing_job`) ; embed **avant** de supprimer les anciens chunks |
 | Chunk de résumé | `rag_indexing.py:index_video_notes`, `backfill_summary_chunks` | le résumé court (`transcript.summary_short.txt`) est indexé comme une section « Résumé » ; rattrapage des vidéos déjà indexées sans ce chunk (embeddings seuls, aucun appel LLM) |
-| Génération des notes | `app/services/auto_notes.py` | lot nocturne (Message Batches, moitié prix, effort `low`) : notes + résumé court pour les vidéos sans notes, 100 par nuit, hors shorts et hors catégories exclues ; voir [13](13-jobs-logs-planification.md) |
+| Génération des notes | `app/services/rag/auto_notes.py` | lot nocturne (Message Batches, moitié prix, effort `low`) : notes + résumé court pour les vidéos sans notes, 100 par nuit, hors shorts et hors catégories exclues ; voir [13](13-jobs-logs-planification.md) |
 | Rattrapage | `rag_indexing.py:backfill_note_chunks` | au démarrage et à chaque passage du lot nocturne : vidéos avec `transcript.notes.txt` et sans chunk ; no-op sans clé ; s'arrête à la première panne API |
-| Recherche | `app/services/rag_retrieval.py:retrieve_relevant_chunks` | 50 plus proches (cosinus) → reranking → seuil → au plus 2/vidéo → 8 |
+| Recherche | `app/services/rag/retrieval.py:retrieve_relevant_chunks` | 50 plus proches (cosinus) → reranking → seuil → au plus 2/vidéo → 8 |
 | Reranking | `embeddings.py:rerank`, `rag_retrieval.py:rerank_chunks` | `RERANK_MODEL` (`rerank-2.5`), `MIN_RELEVANCE_SCORE = 0.2`, repli sur l'ordre vectoriel si l'API échoue |
 
 Configuration : `VOYAGE_API_KEY`, `EMBEDDING_MODEL`, `RERANK_MODEL` (voir

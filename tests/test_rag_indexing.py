@@ -6,8 +6,8 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services import rag_indexing
-from app.services.rag_retrieval import count_indexed_videos
+from app.services.rag import indexing as rag_indexing
+from app.services.rag.retrieval import count_indexed_videos
 
 
 def make_session():
@@ -43,12 +43,11 @@ def chunks_for(db, video_id):
 
 def test_index_video_notes_creates_one_chunk_per_non_empty_section(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
     video = add_video(db)
 
     rag_indexing.index_video_notes(
-        video.id, "## Faits\n- Fait 1\n\n## Dates\nAucun élément identifié."
+        db, video.id, "## Faits\n- Fait 1\n\n## Dates\nAucun élément identifié."
     )
 
     chunks = chunks_for(db, video.id)
@@ -59,12 +58,11 @@ def test_index_video_notes_creates_one_chunk_per_non_empty_section(monkeypatch):
 
 def test_index_video_notes_replaces_existing_chunks_on_regeneration(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.0, 0.0, 0.0] for _ in texts])
     video = add_video(db)
 
-    rag_indexing.index_video_notes(video.id, "## Faits\n- Ancien fait")
-    rag_indexing.index_video_notes(video.id, "## Faits\n- Nouveau fait")
+    rag_indexing.index_video_notes(db, video.id, "## Faits\n- Ancien fait")
+    rag_indexing.index_video_notes(db, video.id, "## Faits\n- Nouveau fait")
 
     chunks = chunks_for(db, video.id)
     assert len(chunks) == 1
@@ -75,12 +73,11 @@ def test_index_video_notes_with_only_empty_sections_creates_no_chunks_and_skips_
     monkeypatch,
 ):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     calls = []
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: calls.append(texts) or [])
     video = add_video(db)
 
-    rag_indexing.index_video_notes(video.id, "## Faits\nAucun élément identifié.")
+    rag_indexing.index_video_notes(db, video.id, "## Faits\nAucun élément identifié.")
 
     assert chunks_for(db, video.id) == []
     assert calls == []  # no point calling the embedding model for zero chunks
@@ -88,14 +85,13 @@ def test_index_video_notes_with_only_empty_sections_creates_no_chunks_and_skips_
 
 def test_count_indexed_videos_counts_distinct_videos_with_chunks(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.0, 0.0, 0.0] for _ in texts])
     indexed_video = add_video(db, "abc123")
     add_video(db, "other")
 
     assert count_indexed_videos(db) == 0
 
-    rag_indexing.index_video_notes(indexed_video.id, "## Faits\n- Un fait\n\n## Dates\n- 2026")
+    rag_indexing.index_video_notes(db, indexed_video.id, "## Faits\n- Un fait\n\n## Dates\n- 2026")
 
     # Two chunks from the same video still count as one indexed video.
     assert count_indexed_videos(db) == 1
@@ -103,17 +99,16 @@ def test_count_indexed_videos_counts_distinct_videos_with_chunks(monkeypatch):
 
 def test_failed_embedding_keeps_the_previous_chunks(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.0, 0.0, 0.0] for _ in texts])
     video = add_video(db)
-    rag_indexing.index_video_notes(video.id, "## Faits\n- Ancien fait")
+    rag_indexing.index_video_notes(db, video.id, "## Faits\n- Ancien fait")
 
     def failing(texts):
         raise rag_indexing.EmbeddingError("API down")
 
     monkeypatch.setattr(rag_indexing, "embed_texts", failing)
     try:
-        rag_indexing.index_video_notes(video.id, "## Faits\n- Nouveau fait")
+        rag_indexing.index_video_notes(db, video.id, "## Faits\n- Nouveau fait")
     except rag_indexing.EmbeddingError:
         pass
 
@@ -122,7 +117,6 @@ def test_failed_embedding_keeps_the_previous_chunks(monkeypatch):
 
 def test_backfill_indexes_videos_with_notes_and_no_chunks(monkeypatch, tmp_path):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
     monkeypatch.setattr(
         rag_indexing, "get_settings", lambda: type("S", (), {"voyage_api_key": "pa-test"})()
@@ -161,7 +155,6 @@ def test_backfill_does_nothing_without_an_api_key(monkeypatch):
 
 def test_index_video_notes_embeds_the_section_with_its_video_and_channel(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     embedded = []
     monkeypatch.setattr(
         rag_indexing,
@@ -170,7 +163,7 @@ def test_index_video_notes_embeds_the_section_with_its_video_and_channel(monkeyp
     )
     video = add_video(db)
 
-    rag_indexing.index_video_notes(video.id, "## Faits\n- Fait 1")
+    rag_indexing.index_video_notes(db, video.id, "## Faits\n- Fait 1")
 
     assert embedded == ["Vidéo test — Chaîne test — Faits\n- Fait 1"]
     # The stored content stays the bare text shown to the model.
@@ -179,7 +172,6 @@ def test_index_video_notes_embeds_the_section_with_its_video_and_channel(monkeyp
 
 def test_index_video_notes_adds_a_chunk_for_the_short_summary(monkeypatch):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     embedded = []
     monkeypatch.setattr(
         rag_indexing,
@@ -188,7 +180,9 @@ def test_index_video_notes_adds_a_chunk_for_the_short_summary(monkeypatch):
     )
     video = add_video(db)
 
-    rag_indexing.index_video_notes(video.id, "## Faits\n- Fait 1", "  Le sujet en trois lignes.  ")
+    rag_indexing.index_video_notes(
+        db, video.id, "## Faits\n- Fait 1", "  Le sujet en trois lignes.  "
+    )
 
     assert [chunk.section for chunk in chunks_for(db, video.id)] == ["Faits", "Résumé"]
     assert chunks_for(db, video.id)[1].content == "Le sujet en trois lignes."
@@ -197,7 +191,6 @@ def test_index_video_notes_adds_a_chunk_for_the_short_summary(monkeypatch):
 
 def test_backfill_notes_indexes_the_summary_file_next_to_the_notes(monkeypatch, tmp_path):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
     monkeypatch.setattr(
         rag_indexing, "get_settings", lambda: type("S", (), {"voyage_api_key": "pa-test"})()
@@ -221,7 +214,6 @@ def test_backfill_notes_indexes_the_summary_file_next_to_the_notes(monkeypatch, 
 
 def test_backfill_summary_chunks_only_touches_indexed_videos_lacking_one(monkeypatch, tmp_path):
     db = make_session()
-    monkeypatch.setattr(rag_indexing, "SessionLocal", lambda: db)
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.1, 0.2, 0.3] for _ in texts])
     monkeypatch.setattr(
         rag_indexing, "get_settings", lambda: type("S", (), {"voyage_api_key": "pa-test"})()

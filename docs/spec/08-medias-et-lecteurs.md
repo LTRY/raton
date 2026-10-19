@@ -160,7 +160,7 @@ La position est connue a deux endroits :
   cle soeur `...:at` porte l'horodatage (ms) de la derniere ecriture ;
 - **serveur** : le journal d'activite (`POST /videos/{id}/activity`, jobs
   `played`) contient deja `position_seconds`. `latest_playback_positions`
-  (`app/web/playback.py`) en extrait la derniere position par type de media, et
+  (`app/services/videos/playback.py`) en extrait la derniere position par type de media, et
   `/videos/{id}` l'expose sur le lecteur via `data-resume-server-position` /
   `data-resume-server-at` (et `data-track-resume-server-*` sur le bouton
   "Ecouter").
@@ -250,8 +250,8 @@ pour les lecteurs video/audio classiques (`app/static/js/app.js`,
 ## Video vue et fichiers retires
 
 Le seuil de 90 % de lecture est evalue cote serveur par
-`POST /videos/{id}/activity` (`mark_watched_if_complete`,
-`app/services/media_storage.py`) : la premiere fois que
+`POST /videos/{id}/activity` (`record_playback_activity`, qui appelle
+`mark_watched_if_complete`, `app/services/videos/playback.py`) : la premiere fois que
 `position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
 seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont
 decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).
@@ -313,7 +313,7 @@ lecteur présent sur la page :
   dès l'évènement `loadedmetadata` du mini-lecteur.
 
 Recherche SponsorBlock automatique : un téléchargement manuel réussi
-(`app/services/scanner.py:download_manual_media`) déclenche automatiquement
+(`app/services/ingest/manual_download.py:download_manual_media`) déclenche automatiquement
 la même recherche SponsorBlock que le bouton, sur les catégories activées
 dans `/settings` — best-effort, une erreur (réseau, API indisponible) est
 avalée silencieusement sans faire échouer le téléchargement ; le bouton

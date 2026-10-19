@@ -9,35 +9,32 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import VideoRead
-from app.services.background_jobs import run_channel_profile_backfill_job
-from app.services.channel_profile import remove_channel_profile_files
-from app.services.library_charts import library_chart_data
-from app.services.settings import (
-    GLOBAL_QUOTA_BYTES_KEY,
-    MEDIA_ROOT_KEY,
-    VIDEO_CATEGORY_LABELS_KEY,
-    VIDEO_LIBRARY_VIEWS_KEY,
+from app.services.channels import manage as channel_manage
+from app.services.channels.manage import ChannelAlreadyInLibraryError
+from app.services.common.categories import (
+    parse_video_category_label_styles,
+)
+from app.services.common.library_views import (
+    parse_video_library_views,
+)
+from app.services.common.ratings import InvalidRatingError, set_rating
+from app.services.common.settings import (
     get_global_quota_bytes,
     get_media_root,
-    get_sponsor_segment_categories,
     get_sponsor_skip_enabled,
     get_video_category_label_styles,
     get_video_category_labels,
     get_video_library_views,
-    parse_video_category_label_styles,
-    parse_video_library_views,
-    serialize_video_category_label_styles,
-    serialize_video_category_labels,
-    serialize_video_library_views,
-    set_setting,
+    save_settings,
 )
-from app.services.sponsor_segments import normalize_skip_segments
-from app.services.storage import get_total_used_bytes
-from app.services.yt import ChannelNotFoundError, extract_channel_info
+from app.services.jobs.backfills import run_channel_profile_backfill_job
+from app.services.media.storage import get_total_used_bytes
+from app.services.videos.charts import library_chart_data
+from app.services.youtube.channel_info import ChannelNotFoundError
+from app.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 
 router = APIRouter(prefix="/api")
 
@@ -51,25 +48,14 @@ def list_channels(db: Session = Depends(get_db)) -> list[Channel]:
 def create_channel(
     payload: ChannelCreate, db: Session = Depends(get_db), background_tasks: BackgroundTasks = None
 ) -> Channel:
-    if payload.rating < 0 or payload.rating > 5:
-        raise HTTPException(status_code=400, detail="Rating must be between 0 and 5")
     try:
-        info = extract_channel_info(payload.url)
+        channel = channel_manage.create_channel(db, payload.url, rating=payload.rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail="Rating must be between 0 and 5") from exc
     except ChannelNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Channel not found") from exc
-    resolved_url = info.get("url", payload.url)
-    existing = db.scalar(select(Channel).where(Channel.url == resolved_url))
-    if existing:
-        raise HTTPException(status_code=409, detail="Channel already exists")
-    channel = Channel(
-        url=resolved_url,
-        name=info["name"],
-        yt_channel_id=info["yt_channel_id"],
-        rating=payload.rating,
-    )
-    db.add(channel)
-    db.commit()
-    db.refresh(channel)
+    except ChannelAlreadyInLibraryError as exc:
+        raise HTTPException(status_code=409, detail="Channel already exists") from exc
     if background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
     return channel
@@ -84,8 +70,7 @@ def rate_channel(
     channel = db.get(Channel, channel_id)
     if channel is None:
         raise HTTPException(status_code=404, detail="Channel not found")
-    channel.rating = rating
-    db.commit()
+    set_rating(db, channel, rating)
     db.refresh(channel)
     return channel
 
@@ -95,9 +80,7 @@ def delete_channel(channel_id: int, db: Session = Depends(get_db)) -> None:
     channel = db.get(Channel, channel_id)
     if channel is None:
         raise HTTPException(status_code=404, detail="Channel not found")
-    remove_channel_profile_files(get_media_root(db), channel.yt_channel_id)
-    db.delete(channel)
-    db.commit()
+    channel_manage.delete_channel(db, channel)
 
 
 @router.get("/videos", response_model=list[VideoRead])
@@ -117,8 +100,7 @@ def rate_video(
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Video not found")
-    video.rating = rating
-    db.commit()
+    set_rating(db, video, rating)
     db.refresh(video)
     return video
 
@@ -134,21 +116,7 @@ def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> 
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    categories = get_sponsor_segment_categories(db)
-    rows = (
-        list(
-            db.scalars(
-                select(VideoSponsorSegment)
-                .where(
-                    VideoSponsorSegment.video_id == video.id,
-                    VideoSponsorSegment.category.in_(categories),
-                )
-                .order_by(VideoSponsorSegment.start_seconds)
-            )
-        )
-        if categories
-        else []
-    )
+    rows = active_sponsor_segments(db, video.id)
     return {"skip_enabled": get_sponsor_skip_enabled(db), "segments": normalize_skip_segments(rows)}
 
 
@@ -180,33 +148,25 @@ def read_settings(db: Session = Depends(get_db)) -> SettingsRead:
 
 @router.put("/settings", response_model=SettingsRead)
 def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> SettingsRead:
-    if payload.media_root is not None:
-        set_setting(db, MEDIA_ROOT_KEY, str(Path(payload.media_root).expanduser()))
-    if payload.global_quota_bytes is not None:
-        set_setting(db, GLOBAL_QUOTA_BYTES_KEY, str(payload.global_quota_bytes))
-    if payload.video_category_labels is not None:
-        set_setting(
-            db,
-            VIDEO_CATEGORY_LABELS_KEY,
-            serialize_video_category_labels(payload.video_category_labels),
-        )
-    if payload.video_category_label_styles is not None:
-        set_setting(
-            db,
-            VIDEO_CATEGORY_LABELS_KEY,
-            serialize_video_category_label_styles(
-                parse_video_category_label_styles(json.dumps(payload.video_category_label_styles))
-            ),
-        )
-    if payload.video_library_views is not None:
-        set_setting(
-            db,
-            VIDEO_LIBRARY_VIEWS_KEY,
-            serialize_video_library_views(
-                parse_video_library_views(json.dumps(payload.video_library_views))
-            ),
-        )
-    db.commit()
+    label_styles = (
+        parse_video_category_label_styles(json.dumps(payload.video_category_label_styles))
+        if payload.video_category_label_styles is not None
+        else None
+    )
+    save_settings(
+        db,
+        media_root=str(Path(payload.media_root).expanduser())
+        if payload.media_root is not None
+        else None,
+        global_quota_bytes=payload.global_quota_bytes,
+        category_labels=payload.video_category_labels,
+        category_label_styles=label_styles,
+        library_views=(
+            parse_video_library_views(json.dumps(payload.video_library_views))
+            if payload.video_library_views is not None
+            else None
+        ),
+    )
     return read_settings(db)
 
 

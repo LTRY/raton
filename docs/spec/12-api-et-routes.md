@@ -178,7 +178,7 @@ Videos :
 - `GET /chat/jobs/{job_id}` : statut/resolution d'un job `kind="library_chat"` (equivalent cross-video de `GET /videos/{id}/transcript/jobs/{job_id}`) ; `pending` porte aussi `tool_calls` (appels d'outils deja faits).
 - `GET /videos/import` : page du formulaire de telechargement manuel (entree Import du menu Bibliotheque).
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
-- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`yt.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Repond en JSON (`status`, `message`, `video_id`, `return_to`) avec `X-Requested-With: fetch`, sinon redirige vers la fiche. Pas de transcript ni de metadonnees YouTube.
+- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`app/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Repond en JSON (`status`, `message`, `video_id`, `return_to`) avec `X-Requested-With: fetch`, sinon redirige vers la fiche. Pas de transcript ni de metadonnees YouTube.
 - `POST /videos/share-import` : point d'entree du raccourci iOS de la feuille de
   partage (Safari/YouTube). Champ de formulaire `url` ; seuls les liens
   YouTube (`youtube.com`, `m.`/`music.`, `youtu.be`) sont acceptes (400 JSON
@@ -204,7 +204,7 @@ Parametres et divers :
   scan tourne.
 - `GET /settings/scan/events?after=N` : evenements du scan emis apres `N`,
   `{events: [{id, level, message, final}], last_id, running}`. Flux en memoire du
-  processus (`app/services/scan_events.py`), pas une table.
+  processus (`app/services/ingest/scan_events.py`), pas une table.
 - `GET /logs` : logs jobs, filtres `status` (`all`, `errors`, `warnings`, `running`), `q` (recherche) et `page` (voir [11 Interface HTML](11-interface-html.md), section Logs).
 
 Le scan des chaines n'a pas de route dans `/api` : il est declenche par le
@@ -214,7 +214,9 @@ scheduler ou par `POST /settings/scan` (voir
 ## API interne `/api`
 
 - `GET /api/channels`
-- `POST /api/channels` : lance aussi le rattrapage du profil en arriere-plan
+- `POST /api/channels` : lance aussi le rattrapage du profil en arriere-plan ;
+  `409` si la chaine est deja dans la bibliotheque, reconnue par son identifiant
+  YouTube quelle que soit l'URL donnee (meme regle que le formulaire de `/channels`)
 - `POST /api/channels/{id}/rating?rating=0..5`
 - `DELETE /api/channels/{id}` : supprime aussi le dossier de profil de la chaine
 - `GET /api/videos`

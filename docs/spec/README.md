@@ -42,6 +42,7 @@ incomplete, sauf si elle est explicitement marquee comme cible future.
 - [07 YouTube et telechargements](07-youtube-et-telechargements.md)
 - [08 Medias et lecteurs](08-medias-et-lecteurs.md)
 - [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)
+- [10 Services](10-services.md)
 - [11 Interface HTML](11-interface-html.md)
 - [12 API et routes](12-api-et-routes.md)
 - [13 Jobs, logs et planification](13-jobs-logs-planification.md)
