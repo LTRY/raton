@@ -55,7 +55,17 @@ SERVICE_PACKAGE_DEPENDENCIES = {
     "videos": {"common", "media"},
     "raton": {"common", "videos"},
     "rag": {"channels", "common", "llm", "videos", "youtube"},
-    "jobs": {"channels", "common", "ingest", "llm", "media", "rag", "videos", "youtube"},
+    "jobs": {
+        "channels",
+        "common",
+        "ingest",
+        "llm",
+        "media",
+        "playlists",
+        "rag",
+        "videos",
+        "youtube",
+    },
 }
 
 
@@ -87,6 +97,18 @@ def test_models_import_no_service():
         if module == "app.services" or module.startswith("app.services.")
     )
     assert not offenders, f"models import services: {offenders}"
+
+
+def test_only_jobs_open_a_db_session():
+    # A background job owns its session; every other service works in the session it is given,
+    # so a request or a job commits one unit of work (docs/spec/03-architecture.md).
+    offenders = sorted(
+        str(path.relative_to(APP / "services"))
+        for path in (APP / "services").rglob("*.py")
+        if path.relative_to(APP / "services").parts[0] != "jobs"
+        and "app.db.session.SessionLocal" in imported_modules(path)
+    )
+    assert not offenders, f"open the session in app/services/jobs/ instead: {offenders}"
 
 
 def test_every_service_module_belongs_to_a_known_package():

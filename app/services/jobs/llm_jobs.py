@@ -21,6 +21,7 @@ from app.services.llm.prompts import (
 )
 from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
+from app.services.rag.indexing import index_video_notes
 from app.services.rag.library_chat_history import add_chat_exchange
 from app.services.rag.library_chat_schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from app.services.rag.library_chat_tools import LibraryChatToolbox
@@ -130,6 +131,15 @@ def run_llm_job(job_id: int) -> None:
             run_channel_profile_backfill_job()
         except Exception:
             logger.exception("Récupération des profils de chaînes échouée après le chat")
+
+
+def run_notes_indexing_job(video_id: int, notes_text: str, summary_short: str | None) -> None:
+    """Index the notes a `generate` job has just written, once the poll that applied them returned."""
+    db = SessionLocal()
+    try:
+        index_video_notes(db, video_id, notes_text, summary_short)
+    finally:
+        db.close()
 
 
 def video_analysis_has_image(video: Video, provider: str) -> bool:

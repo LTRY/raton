@@ -7,14 +7,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from yt_dlp import YoutubeDL
 
-from app.core.logging import logged_job
-from app.db.session import SessionLocal
-from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.common.job_log import log_job
 from app.services.ingest.media_import import import_video_metadata
-from app.services.ingest.throttle import RateLimitedError, pause_between_imports
+from app.services.ingest.throttle import pause_between_imports
 from app.services.playlists.editing import add_video_to_playlist
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
@@ -193,185 +190,56 @@ def parse_playlist_csv(content: bytes) -> list[dict[str, Any]]:
     return rows
 
 
-@logged_job("playlist_url_import")
-def run_playlist_url_import_job(job_id: int, playlist_id: int) -> None:
-    db = SessionLocal()
-    try:
-        job = db.get(DownloadJob, job_id)
-        playlist = db.get(Playlist, playlist_id)
-        if job is None:
-            return
-        if playlist is None or not playlist.source_url:
-            job.status = "failed"
-            job.message = "Playlist introuvable."
-            db.commit()
-            return
+def import_playlist_entry(
+    db: Session,
+    playlist: Playlist,
+    yt_video_id: str,
+    video_url: str,
+    *,
+    preview: dict[str, Any] | None = None,
+    added_at: datetime | None = None,
+    pace: bool = False,
+) -> tuple[Video, bool]:
+    """Add one video to the playlist, importing its fiche first when the library lacks it.
 
-        job.status = "running"
-        job.message = f"Import de la playlist {playlist.title} en cours..."
-        db.commit()
-
-        imported = 0
-        fetched = 0
-        rate_limited = False
-        page = 1
-        while page <= MAX_PLAYLIST_IMPORT_PAGES and not rate_limited:
-            try:
-                entries = list_playlist_entries(
-                    playlist.source_url, page=page, page_size=PLAYLIST_IMPORT_PAGE_SIZE
-                )
-            except Exception as exc:
-                log_job(db, "failed", f"Échec de la lecture de la playlist: {exc}")
-                break
-            if not entries:
-                break
-
-            # Playlists mix old/new videos in arbitrary order (unlike a
-            # channel's newest-first feed), so unlike scan_channel_section
-            # this must keep going past already-known videos, not stop.
-            for entry in entries:
-                yt_video_id = entry.get("id")
-                if not yt_video_id:
-                    continue
-                video_url = entry.get("url") or f"https://www.youtube.com/watch?v={yt_video_id}"
-                if not video_url.startswith("http"):
-                    video_url = f"https://www.youtube.com/watch?v={yt_video_id}"
-                try:
-                    video = db.scalar(select(Video).where(Video.yt_video_id == yt_video_id))
-                    if video is None:
-                        # Only a real fetch is paced: a known video costs no request.
-                        if fetched:
-                            pause_between_imports()
-                        fetched += 1
-                        video = import_video_metadata(
-                            db,
-                            video_url,
-                            channel_id=None,
-                            preview=entry,
-                            download_source="auto",
-                            source_section="videos",
-                            is_new=False,
-                        )
-                    add_video_to_playlist(db, playlist.id, video.id)
-                    log_job(
-                        db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id
-                    )
-                    imported += 1
-                except RateLimitedError as exc:
-                    db.rollback()
-                    log_job(db, "failed", f"Import de la playlist interrompu: {exc}")
-                    rate_limited = True
-                    break
-                except Exception as exc:
-                    db.rollback()
-                    log_job(db, "failed", f"Échec de l'import d'une vidéo de la playlist: {exc}")
-            page += 1
-
-        job = db.get(DownloadJob, job_id)
-        if job:
-            plural = "s" if imported != 1 else ""
-            if rate_limited:
-                job.status = "failed"
-                job.message = (
-                    f"Import interrompu: YouTube limite les requêtes (HTTP 429). {imported} vidéo{plural} "
-                    f"importée{plural} pour la playlist {playlist.title}; relancer l'import plus tard "
-                    "reprendra les vidéos restantes."
-                )
-            else:
-                job.status = "metadata"
-                job.message = (
-                    f"{imported} vidéo{plural} importée{plural} pour la playlist {playlist.title}."
-                )
-            db.commit()
-    except Exception as exc:
-        db.rollback()
-        job = db.get(DownloadJob, job_id)
-        if job:
-            job.status = "failed"
-            job.message = f"Import de la playlist échoué: {exc}"
-            db.commit()
-    finally:
-        db.close()
+    Returns the fiche and whether it was fetched from YouTube. Only a real fetch is paced
+    (`pace` is False for the first one of a run): a known video costs no request.
+    """
+    video = db.scalar(select(Video).where(Video.yt_video_id == yt_video_id))
+    fetched = video is None
+    if fetched:
+        if pace:
+            pause_between_imports()
+        video = import_video_metadata(
+            db,
+            video_url,
+            channel_id=None,
+            preview=preview,
+            download_source="auto",
+            source_section="videos",
+            is_new=False,
+        )
+    add_video_to_playlist(db, playlist.id, video.id, added_at=added_at)
+    log_job(db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id)
+    return video, fetched
 
 
-@logged_job("playlist_csv_import")
-def run_playlist_csv_import_job(job_id: int, playlist_id: int, rows: list[dict[str, Any]]) -> None:
-    db = SessionLocal()
-    try:
-        job = db.get(DownloadJob, job_id)
-        playlist = db.get(Playlist, playlist_id)
-        if job is None:
-            return
-        if playlist is None:
-            job.status = "failed"
-            job.message = "Playlist introuvable."
-            db.commit()
-            return
-
-        job.status = "running"
-        job.message = f"Import de la playlist {playlist.title} en cours..."
-        db.commit()
-
-        imported = 0
-        fetched = 0
-        rate_limited = False
-        for row in rows:
-            yt_video_id = row.get("yt_video_id")
-            if not yt_video_id:
-                continue
-            video_url = f"https://www.youtube.com/watch?v={yt_video_id}"
-            try:
-                video = db.scalar(select(Video).where(Video.yt_video_id == yt_video_id))
-                if video is None:
-                    # Only a real fetch is paced: a known video costs no request.
-                    if fetched:
-                        pause_between_imports()
-                    fetched += 1
-                    video = import_video_metadata(
-                        db,
-                        video_url,
-                        channel_id=None,
-                        download_source="auto",
-                        source_section="videos",
-                        is_new=False,
-                    )
-                add_video_to_playlist(db, playlist.id, video.id, added_at=row.get("added_at"))
-                log_job(db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id)
-                imported += 1
-            except RateLimitedError as exc:
-                db.rollback()
-                log_job(db, "failed", f"Import de la playlist interrompu: {exc}")
-                rate_limited = True
-                break
-            except Exception as exc:
-                db.rollback()
-                log_job(db, "warning", f"Vidéo ignorée (introuvable ou privée): {exc}")
-
-        job = db.get(DownloadJob, job_id)
-        if job:
-            plural = "s" if imported != 1 else ""
-            if rate_limited:
-                job.status = "failed"
-                job.message = (
-                    f"Import interrompu: YouTube limite les requêtes (HTTP 429). {imported} vidéo{plural} "
-                    f"importée{plural} pour la playlist {playlist.title}; relancer l'import plus tard "
-                    "reprendra les vidéos restantes."
-                )
-            else:
-                job.status = "metadata"
-                job.message = (
-                    f"{imported} vidéo{plural} importée{plural} pour la playlist {playlist.title}."
-                )
-            db.commit()
-    except Exception as exc:
-        db.rollback()
-        job = db.get(DownloadJob, job_id)
-        if job:
-            job.status = "failed"
-            job.message = f"Import de la playlist échoué: {exc}"
-            db.commit()
-    finally:
-        db.close()
+def playlist_import_summary(
+    playlist: Playlist, imported: int, rate_limited: bool
+) -> tuple[str, str]:
+    """Final (status, message) of a playlist import job."""
+    plural = "s" if imported != 1 else ""
+    if rate_limited:
+        return (
+            "failed",
+            f"Import interrompu: YouTube limite les requêtes (HTTP 429). {imported} vidéo{plural} "
+            f"importée{plural} pour la playlist {playlist.title}; relancer l'import plus tard "
+            "reprendra les vidéos restantes.",
+        )
+    return (
+        "metadata",
+        f"{imported} vidéo{plural} importée{plural} pour la playlist {playlist.title}.",
+    )
 
 
 def playlist_to_csv(playlist: Playlist) -> str:

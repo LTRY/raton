@@ -20,6 +20,7 @@ from app.services.common.durations import format_duration
 from app.services.common.job_log import log_job
 from app.services.common.settings import get_video_category_label_styles
 from app.services.jobs.downloads import run_manual_download_job
+from app.services.jobs.playlists import run_playlist_csv_import_job, run_playlist_url_import_job
 from app.services.playlists.editing import (
     add_video_to_playlist,
     apply_item_order,
@@ -42,8 +43,6 @@ from app.services.playlists.imports import (
     parse_playlist_csv,
     playlist_to_csv,
     preview_playlist,
-    run_playlist_csv_import_job,
-    run_playlist_url_import_job,
 )
 from app.web.formatting import format_long_duration
 from app.web.shared import (

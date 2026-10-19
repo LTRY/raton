@@ -238,7 +238,7 @@ def _apply_entry(db: Session, job: LlmJob, entry: BatchEntry) -> bool:
         summary_path.write_text(summary_short, encoding="utf-8")
     job.status = "applied"
     try:
-        index_video_notes(video.id, notes_text, summary_short or None)
+        index_video_notes(db, video.id, notes_text, summary_short or None)
     except EmbeddingError as exc:
         # The notes are saved; backfill_note_chunks indexes them on a later sweep or at startup.
         logger.warning("Notes de la vidéo %s écrites mais non indexées : %s", video.id, exc)

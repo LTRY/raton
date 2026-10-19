@@ -61,7 +61,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
 4. lance `run_playlist_url_import_job` en arriere-plan ;
 5. retourne JSON si requete fetch, sinon redirige avec message.
 
-`run_playlist_url_import_job` :
+`run_playlist_url_import_job` (`app/services/jobs/playlists.py`) :
 
 1. passe le job `running` ;
 2. parcourt toutes les pages de `list_playlist_entries` jusqu'a une page
@@ -99,7 +99,7 @@ des abonnements de chaine (`POST /channels/import-csv` puis
 CSV playlist est une inclusion inconditionnelle, il n'y a pas de choix
 utilisateur ligne par ligne a faire avant de lancer l'import.
 
-`run_playlist_csv_import_job` :
+`run_playlist_csv_import_job` (`app/services/jobs/playlists.py`) :
 
 1. passe le job `running` ;
 2. pour chaque ligne, appelle `import_video_metadata(..., is_new=False)` puis

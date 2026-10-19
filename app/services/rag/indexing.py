@@ -2,9 +2,8 @@
 
 The chunking is local, the embedding is a call to the Voyage API
 (app/services/rag/embeddings.py). It is not an LLM completion, so it runs right
-after notes are applied rather than going through the LlmJob queued/running/done
-lifecycle used for text generation (see the `notes` branch of
-transcript_job_status in app/web/routes/transcript.py).
+after notes are applied (`run_notes_indexing_job` in app/services/jobs/llm_jobs.py) rather
+than going through the LlmJob queued/running/done lifecycle used for text generation.
 """
 
 import logging
@@ -13,7 +12,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings, local_media_path
-from app.db.session import SessionLocal
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
 from app.services.llm.prompts import split_notes_sections
@@ -38,42 +36,39 @@ def read_summary_short(transcript_path: str) -> str | None:
     return text.strip() or None
 
 
-def index_video_notes(video_id: int, notes_text: str, summary_short: str | None = None) -> None:
+def index_video_notes(
+    db: Session, video_id: int, notes_text: str, summary_short: str | None = None
+) -> None:
     """Replace a video's chunks: one per notes section, plus one for its short résumé when it has one.
 
-    The résumé gives the gist of the video, which the notes (atomic facts) do not.
+    The résumé gives the gist of the video, which the notes (atomic facts) do not. Commits the
+    caller's session.
     """
-    db = SessionLocal()
-    try:
-        video = db.get(Video, video_id)
-        if video is None:
-            return
-        channel_name = video.channel.name if video.channel is not None else None
-        sections = split_notes_sections(notes_text)
-        if summary_short and summary_short.strip():
-            sections.append((SUMMARY_SECTION_NAME, summary_short.strip()))
-        # Embedded before the old chunks are deleted: an API failure keeps the
-        # previous index instead of leaving the video unsearchable.
-        embeddings = (
-            embed_texts(
-                [
-                    contextualized_text(video.title, channel_name, name, content)
-                    for name, content in sections
-                ]
-            )
-            if sections
-            else []
+    video = db.get(Video, video_id)
+    if video is None:
+        return
+    channel_name = video.channel.name if video.channel is not None else None
+    sections = split_notes_sections(notes_text)
+    if summary_short and summary_short.strip():
+        sections.append((SUMMARY_SECTION_NAME, summary_short.strip()))
+    # Embedded before the old chunks are deleted: an API failure keeps the
+    # previous index instead of leaving the video unsearchable.
+    embeddings = (
+        embed_texts(
+            [
+                contextualized_text(video.title, channel_name, name, content)
+                for name, content in sections
+            ]
         )
-        db.query(VideoNoteChunk).filter(VideoNoteChunk.video_id == video_id).delete()
-        for (section, content), embedding in zip(sections, embeddings, strict=True):
-            db.add(
-                VideoNoteChunk(
-                    video_id=video_id, section=section, content=content, embedding=embedding
-                )
-            )
-        db.commit()
-    finally:
-        db.close()
+        if sections
+        else []
+    )
+    db.query(VideoNoteChunk).filter(VideoNoteChunk.video_id == video_id).delete()
+    for (section, content), embedding in zip(sections, embeddings, strict=True):
+        db.add(
+            VideoNoteChunk(video_id=video_id, section=section, content=content, embedding=embedding)
+        )
+    db.commit()
 
 
 def backfill_note_chunks(db: Session) -> int:
@@ -102,7 +97,7 @@ def backfill_note_chunks(db: Session) -> int:
         if not split_notes_sections(notes_text):
             continue
         try:
-            index_video_notes(video_id, notes_text, read_summary_short(transcript_path))
+            index_video_notes(db, video_id, notes_text, read_summary_short(transcript_path))
         except EmbeddingError as exc:
             logger.warning("Indexation des notes interrompue : %s", exc)
             break
@@ -141,7 +136,7 @@ def backfill_summary_chunks(db: Session) -> int:
         except OSError:
             continue
         try:
-            index_video_notes(video_id, notes_text, summary)
+            index_video_notes(db, video_id, notes_text, summary)
         except EmbeddingError as exc:
             logger.warning("Indexation des résumés interrompue : %s", exc)
             break

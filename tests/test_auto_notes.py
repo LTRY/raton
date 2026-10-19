@@ -114,7 +114,7 @@ class FakeProvider(AnthropicProvider):
 def no_embeddings(monkeypatch):
     """Indexing is Voyage's business (tests/test_rag_indexing.py); here we only record what is asked."""
     calls = []
-    monkeypatch.setattr(auto_notes, "index_video_notes", lambda *args: calls.append(args))
+    monkeypatch.setattr(auto_notes, "index_video_notes", lambda db, *args: calls.append(args))
     monkeypatch.setattr(auto_notes, "backfill_note_chunks", lambda db: 0)
     monkeypatch.setattr(auto_notes, "backfill_summary_chunks", lambda db: 0)
     return calls

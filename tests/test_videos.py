@@ -840,7 +840,7 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
     assert json.loads(response.body)["status"] == "generated"
     assert len(scheduled) == 1
     fn, args, kwargs = scheduled[0]
-    assert fn is transcript_routes.index_video_notes
+    assert fn is transcript_routes.run_notes_indexing_job
     assert args[0] == video.id
     assert "- Fait 1\n- Fait 2" in args[1]
     assert kwargs == {}

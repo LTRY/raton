@@ -14,6 +14,7 @@ from app.services.jobs.llm_jobs import (
     apply_transcript_chat_result,
     enqueue_llm_job,
     run_llm_job,
+    run_notes_indexing_job,
     video_analysis_has_image,
 )
 from app.services.llm.prompts import (
@@ -21,7 +22,6 @@ from app.services.llm.prompts import (
     build_generation_prompt,
     partial_generation_summary,
 )
-from app.services.rag.indexing import index_video_notes
 from app.services.videos.documents import (
     clear_transcript_chat,
     get_transcript_paths,
@@ -217,7 +217,10 @@ def transcript_job_status(
             generated = apply_generation_result(db, video, job)
             if generated is not None:
                 background_tasks.add_task(
-                    index_video_notes, video.id, generated["notes_text"], generated["summary_short"]
+                    run_notes_indexing_job,
+                    video.id,
+                    generated["notes_text"],
+                    generated["summary_short"],
                 )
             return JSONResponse(
                 {

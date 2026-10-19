@@ -140,7 +140,10 @@ sa propre session DB :
 - `downloads.py` : telechargement manuel, relance du transcript, import de
   metadonnees d'une chaine ;
 - `llm_jobs.py` : creation (`enqueue_llm_job`) et execution (`run_llm_job`)
-  d'un `LlmJob` ;
+  d'un `LlmJob`, indexation des notes qu'un `generate` vient d'ecrire
+  (`run_notes_indexing_job`) ;
+- `playlists.py` : import d'une playlist depuis son URL ou un CSV Google
+  Takeout ;
 - `backfills.py` : rattrapages (profils de chaines, nombres de vues,
   transcripts, index des notes, miniatures) ;
 - `scheduler.py` : le planificateur APScheduler qui lance les jobs quotidiens.
@@ -181,12 +184,12 @@ racine de `app/services/` :
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
 | `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |
 | `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill`, `channel_exploration` |
-| `playlists/` | Import de playlists (`imports`) et edition d'une playlist et de ses elements (`editing`) |
+| `playlists/` | Import de playlists (`imports` : apercu, lecture du CSV, ajout d'une entree) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture et passage en Vu a 90 % (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`), fichiers ecrits a cote du transcript, discussion par video comprise (`documents`) |
 | `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`), outils du chat (`library_chat_schema` : ce que le modele peut appeler ; `library_chat_tools` : leur execution) |
 | `raton/` | La mascotte de l'accueil : catalogue des scenarios (`scenarios`), choix de la replique (`picker`), suivi des visites (`visits`) |
-| `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`) et planificateur (`scheduler`) |
+| `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`, `playlists`) et planificateur (`scheduler`) |
 
 Les dependances entre paquets vont dans un seul sens : `common` ne depend
 d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
@@ -195,6 +198,8 @@ de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
 `media` ; `raton` de `common` et `videos` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
 appelle les autres paquets et aucun ne l'importe en retour. Aucun service
 n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
+Seul `jobs` ouvre une session DB (`SessionLocal`) : les autres services
+travaillent dans la session qu'on leur passe, celle de la requete ou du job.
 Aucun modele (`app/models/`) n'importe un service : une constante qui
 dimensionne une colonne est definie a cote de cette colonne.
 `tests/test_code_structure.py` fait respecter ces regles.

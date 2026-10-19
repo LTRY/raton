@@ -89,7 +89,7 @@ modèle reste le texte nu.
 | Texte embeddé | `app/services/rag/embeddings.py:contextualized_text` | `Titre — Chaîne — Section\ncontenu` |
 | Embedding | `app/services/rag/embeddings.py` | API Voyage, `EMBEDDING_MODEL` (`voyage-3.5`), 1024 dimensions, `input_type` `document` (notes) / `query` (question) |
 | Stockage | `video_note_chunks` | `vector(1024)`, sans index vectoriel (scan exact) |
-| Indexation | `app/services/rag/indexing.py:index_video_notes` | au `generate` appliqué ; embed **avant** de supprimer les anciens chunks |
+| Indexation | `app/services/rag/indexing.py:index_video_notes` | au `generate` appliqué (tâche de fond `run_notes_indexing_job`) ; embed **avant** de supprimer les anciens chunks |
 | Chunk de résumé | `rag_indexing.py:index_video_notes`, `backfill_summary_chunks` | le résumé court (`transcript.summary_short.txt`) est indexé comme une section « Résumé » ; rattrapage des vidéos déjà indexées sans ce chunk (embeddings seuls, aucun appel LLM) |
 | Génération des notes | `app/services/rag/auto_notes.py` | lot nocturne (Message Batches, moitié prix, effort `low`) : notes + résumé court pour les vidéos sans notes, 100 par nuit, hors shorts et hors catégories exclues ; voir [13](13-jobs-logs-planification.md) |
 | Rattrapage | `rag_indexing.py:backfill_note_chunks` | au démarrage et à chaque passage du lot nocturne : vidéos avec `transcript.notes.txt` et sans chunk ; no-op sans clé ; s'arrête à la première panne API |
