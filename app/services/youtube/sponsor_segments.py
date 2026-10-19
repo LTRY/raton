@@ -96,3 +96,16 @@ def fetch_sponsor_segments(db: Session, video) -> list[VideoSponsorSegment]:
     categories = get_sponsor_segment_categories(db)
     segments = fetch_sponsorblock_segments(video.yt_video_id, categories)
     return replace_video_sponsor_segments(db, video.id, "sponsorblock", segments)
+
+
+class SponsorSegmentsFetchError(ValueError):
+    pass
+
+
+def refresh_sponsor_segments(db: Session, video) -> list[VideoSponsorSegment]:
+    """`fetch_sponsor_segments` at a person's request: any failure is rolled back and reported."""
+    try:
+        return fetch_sponsor_segments(db, video)
+    except Exception as exc:
+        db.rollback()
+        raise SponsorSegmentsFetchError(f"Recherche SponsorBlock impossible : {exc}") from exc

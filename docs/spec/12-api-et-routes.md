@@ -277,6 +277,44 @@ scheduler ou par `POST /settings/scan` (voir
 - `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`
   (tous statuts), la plus recente d'abord.
 
+### Actions sur une fiche
+
+Corps en JSON. Chaque route appelle le meme service que son formulaire HTML
+(meme validation, memes messages d'erreur) ; `404 Vidéo introuvable` si la
+fiche n'existe pas. Les routes qui modifient la fiche repondent son etat
+modifiable : `{id, is_new, list_state, rating, categories, comment,
+watched_at}`.
+
+- `POST /api/videos/{id}/open` : ce que fait l'ouverture de sa page, la
+  sort des Nouveautes (`GET /api/videos/{id}`, lui, ne change rien).
+- `PUT /api/videos/{id}/list-state` `{state}` : `watched`, `unwatched`,
+  `hidden`, ou `clear` pour revenir a l'etat deduit de la lecture ; `400`
+  sinon. Equivalent de `POST /videos/{id}/list-state`.
+- `PUT /api/videos/{id}/categories` `{categories: [...]}` : remplace les
+  categories de la fiche (normalisees, ajoutees a la liste des categories).
+- `PUT /api/videos/{id}/comment` `{comment}` : une chaine vide efface le
+  commentaire.
+- `POST /api/videos/{id}/activity` `{media_type, position_seconds,
+  duration_seconds, watched_seconds}` : rapport de lecture d'un lecteur, peut
+  passer la fiche en Vu ; `media_type` vaut `video` ou `audio` (`400`
+  sinon). Equivalent de `POST /videos/{id}/activity`.
+- `POST /api/videos/{id}/media/{audio|video}/download` `{video_quality}`
+  (facultatif, `1080` par defaut) : `202 {job_id, status, message,
+  status_url}`, le telechargement tourne en arriere-plan ; `400` pour un
+  autre format ou une qualite inconnue.
+- `DELETE /api/videos/{id}/media/{audio|video}` : `204` ; `400` si le
+  format est refuse (meme regle que `POST /videos/{id}/media/{type}/delete`).
+- `POST /api/videos/{id}/transcript/download` : nouvelle tentative de
+  recuperation du transcript, `202` comme un telechargement.
+- `POST /api/videos/{id}/sponsor-segments/fetch` : interroge SponsorBlock et
+  remplace les segments `sponsorblock` de la fiche ; repond `{count,
+  skip_enabled, segments}` (comme `GET /api/videos/{id}/sponsor-segments`),
+  `502` si SponsorBlock ou l'enregistrement echoue.
+- `GET /api/jobs/{id}` : etat d'un job lance par ces actions, a interroger
+  jusqu'a `done` : `{id, status, message, video_id, done}`, plus `videos`
+  (fiches deja importees) pour une exploration de chaine ; `404 Job
+  introuvable`. Meme contenu que `GET /jobs/{id}`.
+
 Les messages d'erreur de `/api` (champ `detail`) sont en francais, comme
 ceux des pages HTML : une erreur levee par un service renvoie son propre
 message (`Chaîne introuvable pour …`, `… est déjà dans la bibliothèque.`),

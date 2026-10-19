@@ -28,16 +28,21 @@ from app.services.common.settings import (
 from app.services.ingest.channel_exploration import (
     CHANNEL_IMPORT_PROGRESS_LIMIT,
     cancel_channel_exploration,
-    channel_exploration_videos,
 )
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media
 from app.services.ingest.metadata_import import import_video_metadata
 from app.services.jobs.downloads import (
     CHANNEL_VIDEO_PAGE_SIZE,
+    InvalidMediaFormatError,
+    JobNotFoundError,
+    queue_media_download,
+    queue_transcript_retry,
     run_manual_download_job,
+    run_media_download_job,
     run_transcript_retry_job,
 )
+from app.services.jobs.downloads import job_status as read_job_status
 from app.services.videos.detail_view import VideoNotFoundError, open_video_detail
 from app.services.videos.download_options import (
     normalize_download_media_types,
@@ -58,10 +63,12 @@ from app.services.videos.library_view import (
     library_saved_views,
 )
 from app.services.videos.playback import (
+    InvalidPlaybackMediaError,
     record_playback_activity,
 )
 from app.services.youtube.sponsor_segments import (
-    fetch_sponsor_segments,
+    SponsorSegmentsFetchError,
+    refresh_sponsor_segments,
 )
 from app.web.formatting import estimate_channel_periodicity
 from app.web.shared import (
@@ -224,10 +231,9 @@ def fetch_video_sponsorblock_segments(
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
     is_fetch = request.headers.get("x-requested-with") == "fetch"
     try:
-        rows = fetch_sponsor_segments(db, video)
-    except Exception as exc:
-        db.rollback()
-        message = f"Recherche SponsorBlock impossible : {exc}"
+        rows = refresh_sponsor_segments(db, video)
+    except SponsorSegmentsFetchError as exc:
+        message = str(exc)
         if is_fetch:
             return JSONResponse({"status": "failed", "message": message}, status_code=400)
         query = urlencode({"level": "error", "message": message})
@@ -456,24 +462,12 @@ def download_video_media_form(
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
     # `next` is optional: without it the JSON reply carries no `return_to` and the client reloads the current page.
     target = internal_return_path(return_to, "") if isinstance(return_to, str) else ""
-    if media_type not in {"audio", "video"}:
-        raise HTTPException(status_code=400, detail="Le format doit être vidéo ou audio.")
+    video_quality = video_quality if isinstance(video_quality, str) else "1080"
     try:
-        video_quality = normalize_video_quality(
-            video_quality if isinstance(video_quality, str) else "1080"
-        )
-    except ValueError as exc:
+        job = queue_media_download(db, video, media_type, video_quality)
+    except InvalidMediaFormatError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    job = log_job(db, "queued", "Téléchargement en file d'attente.", video_id=video.id)
-    background_tasks.add_task(
-        run_manual_download_job,
-        job.id,
-        video.url,
-        [media_type, "metadata"],
-        False,
-        video_quality=video_quality,
-    )
+    background_tasks.add_task(run_media_download_job, job.id, video.url, media_type, video_quality)
     if request.headers.get("x-requested-with") == "fetch":
         return JSONResponse(
             {
@@ -502,7 +496,7 @@ def retry_video_transcript_form(
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
 
-    job = log_job(db, "queued", "Récupération du transcript en file d'attente.", video_id=video.id)
+    job = queue_transcript_retry(db, video)
     background_tasks.add_task(run_transcript_retry_job, job.id, video.id)
     if request.headers.get("x-requested-with") == "fetch":
         return JSONResponse(
@@ -532,31 +526,21 @@ def log_video_activity(
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    if media_type not in {"video", "audio"}:
-        raise HTTPException(status_code=400, detail="Type de média invalide")
-
-    record_playback_activity(
-        db, video, media_type, position_seconds, duration_seconds, watched_seconds
-    )
+    try:
+        record_playback_activity(
+            db, video, media_type, position_seconds, duration_seconds, watched_seconds
+        )
+    except InvalidPlaybackMediaError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"status": "logged"}
 
 
 @router.get("/jobs/{job_id}")
 def job_status(job_id: int, db: Session = Depends(get_db)):
-    job = db.get(DownloadJob, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job introuvable")
-    payload = {
-        "id": job.id,
-        "status": job.status,
-        "message": job.message,
-        "video_id": job.video_id,
-        "done": job.status in JOB_DONE_STATUSES,
-    }
-    imported = channel_exploration_videos(db, job)
-    if imported is not None:
-        payload["videos"] = imported
-    return payload
+    try:
+        return read_job_status(db, job_id)
+    except JobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/videos/import-metadata")
