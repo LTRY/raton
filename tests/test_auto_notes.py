@@ -139,7 +139,7 @@ def test_prompt_asks_for_notes_and_a_short_summary_only():
         and "Questions suggérées" not in prompt
         and "clickbait" not in prompt
     )
-    assert prompt.endswith("LE TRANSCRIPT\n")
+    assert prompt.endswith("<transcript>\nLE TRANSCRIPT\n</transcript>\n")
 
 
 def test_split_auto_notes_result_returns_notes_and_summary():
