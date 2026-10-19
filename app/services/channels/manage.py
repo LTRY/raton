@@ -6,7 +6,8 @@ from app.models.channel import Channel
 from app.services.channels.lookup import find_channel
 from app.services.channels.profile import remove_channel_profile_files
 from app.services.ratings import check_rating
-from app.services.settings import get_media_root
+from app.services.settings import add_video_category_labels, get_media_root
+from app.services.settings_format import serialized_category_labels
 from app.services.youtube.channel_info import extract_channel_info
 
 
@@ -48,3 +49,28 @@ def delete_channel(db: Session, channel: Channel) -> None:
     remove_channel_profile_files(get_media_root(db), channel.yt_channel_id)
     db.delete(channel)
     db.commit()
+
+
+def set_channel_categories(db: Session, channel: Channel, labels: list[str]) -> None:
+    """Store the channel's labels and give them to its fiches that have none of their own."""
+    category_labels = serialized_category_labels(labels)
+    channel.category_labels = category_labels
+    add_video_category_labels(db, labels)
+    if category_labels:
+        for video in channel.videos:
+            if not video.category_labels:
+                video.category_labels = category_labels
+    db.commit()
+
+
+def bell_section(section: str) -> str:
+    return "shorts" if section in {"short", "shorts"} else "videos"
+
+
+def toggle_channel_bell(db: Session, channel: Channel, section: str) -> bool:
+    """Switch the cloche of `section` ("videos" or "shorts"); returns whether it is now on."""
+    bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
+    enabled = not getattr(channel, bell)
+    setattr(channel, bell, enabled)
+    db.commit()
+    return enabled

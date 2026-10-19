@@ -11,33 +11,38 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import desc, func, nullslast, select
 from sqlalchemy.orm import Session
 
 from app.core.logging import log_event
 from app.db.session import get_db
 from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
 from app.services.background_jobs import (
     run_channel_metadata_import_job,
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
+from app.services.channels.listing import (
+    CHANNEL_SORTS,
+    channel_entries,
+    channels_by_yt_id,
+    video_counts_by_channel,
+)
 from app.services.channels.manage import (
     ChannelAlreadyInLibraryError,
+    bell_section,
     create_channel,
     delete_channel,
+    set_channel_categories,
+    toggle_channel_bell,
 )
 from app.services.channels.subscriptions import (
     SubscriptionsCsvError,
-    decode_import_token,
-    encode_import_token,
+    add_subscriptions,
     parse_subscriptions_csv,
+    preview_subscriptions,
 )
 from app.services.job_log import log_job
 from app.services.ratings import InvalidRatingError, check_rating, set_rating
-from app.services.search import channel_search_rank
 from app.services.settings import (
     add_video_category_labels,
     get_video_category_label_styles,
@@ -92,14 +97,7 @@ def youtube_channel_search(request: Request, db: Session) -> dict | None:
     except Exception as exc:
         search["error"] = f"Recherche YouTube impossible : {exc}"
         return search
-    known = {
-        channel.yt_channel_id: channel
-        for channel in db.scalars(
-            select(Channel).where(
-                Channel.yt_channel_id.in_([result["yt_channel_id"] for result in results])
-            )
-        )
-    }
+    known = channels_by_yt_id(db, [result["yt_channel_id"] for result in results])
     search["results"] = [
         {**result, "existing": known.get(result["yt_channel_id"])} for result in results
     ]
@@ -109,7 +107,7 @@ def youtube_channel_search(request: Request, db: Session) -> dict | None:
 def channels_context(request: Request, rated: bool | None, page: int, db: Session) -> dict:
     search_query = normalized_search_query(request.query_params.get("q"))
     selected_sort = request.query_params.get("sort")
-    if selected_sort not in {"rating", "activity", "alpha", "added"}:
+    if selected_sort not in CHANNEL_SORTS:
         selected_sort = "activity"
     rated_values = request.query_params.getlist("rated") if "query_string" in request.scope else []
     legacy_favorite_values = (
@@ -123,85 +121,19 @@ def channels_context(request: Request, rated: bool | None, page: int, db: Sessio
         rated_filter = rated
     else:
         rated_filter = True
-    last_played_subquery = (
-        select(DownloadJob.channel_id, func.max(DownloadJob.created_at).label("last_played_at"))
-        .where(DownloadJob.status == "played", DownloadJob.channel_id.is_not(None))
-        .group_by(DownloadJob.channel_id)
-        .subquery()
-    )
-    if selected_sort == "activity":
-        ordering = (
-            nullslast(desc(last_played_subquery.c.last_played_at)),
-            desc(Channel.rating),
-            Channel.name,
-        )
-    elif selected_sort == "rating":
-        ordering = (
-            desc(Channel.rating),
-            nullslast(desc(last_played_subquery.c.last_played_at)),
-            Channel.name,
-        )
-    elif selected_sort == "alpha":
-        ordering = (
-            Channel.name,
-            desc(Channel.rating),
-            nullslast(desc(last_played_subquery.c.last_played_at)),
-        )
-    elif selected_sort == "added":
-        ordering = (desc(Channel.created_at), desc(Channel.id))
-    else:
-        ordering = (
-            nullslast(desc(last_played_subquery.c.last_played_at)),
-            desc(Channel.rating),
-            Channel.name,
-        )
-    query = (
-        select(Channel, last_played_subquery.c.last_played_at)
-        .outerjoin(
-            last_played_subquery,
-            Channel.id == last_played_subquery.c.channel_id,
-        )
-        .order_by(*ordering)
-    )
-    if rated_filter:
-        query = query.where(Channel.rating > 0)
-    all_channel_entries = [
-        {"channel": channel, "last_played_at": last_played_at}
-        for channel, last_played_at in db.execute(query)
-    ]
-    if search_query:
-        ranked = [
-            (channel_search_rank(entry["channel"], search_query), entry)
-            for entry in all_channel_entries
-        ]
-        # Stable sort: the selected sort still orders channels inside a relevance tier.
-        all_channel_entries = [
-            entry
-            for rank, entry in sorted((r for r in ranked if r[0] is not None), key=lambda r: r[0])
-        ]
-    channel_entries, page, total_pages = paginate(all_channel_entries, page)
+    all_channel_entries = channel_entries(db, selected_sort, rated_filter, search_query)
+    page_entries, page, total_pages = paginate(all_channel_entries, page)
     # Counted for the visible page only: the card shows how many library entries (fiches) the channel has.
-    page_channel_ids = [entry["channel"].id for entry in channel_entries]
-    video_counts = (
-        dict(
-            db.execute(
-                select(Video.channel_id, func.count(Video.id))
-                .where(Video.channel_id.in_(page_channel_ids))
-                .group_by(Video.channel_id)
-            ).all()
-        )
-        if page_channel_ids
-        else {}
-    )
-    for entry in channel_entries:
+    video_counts = video_counts_by_channel(db, [entry["channel"].id for entry in page_entries])
+    for entry in page_entries:
         entry["video_count"] = video_counts.get(entry["channel"].id, 0)
     category_label_styles = get_video_category_label_styles(db)
     added_channel_id = request.query_params.get(ADDED_CHANNEL_PARAM, "")
     added_channel = db.get(Channel, int(added_channel_id)) if added_channel_id.isdecimal() else None
     return {
         "added_channel": added_channel,
-        "channel_entries": channel_entries,
-        "channels": [entry["channel"] for entry in channel_entries],
+        "channel_entries": page_entries,
+        "channels": [entry["channel"] for entry in page_entries],
         "total_channel_entry_count": len(all_channel_entries),
         "rated_filter": rated_filter,
         "search_query": search_query,
@@ -239,27 +171,8 @@ def import_channels_csv_preview(
     except SubscriptionsCsvError as exc:
         return redirect(append_query("/channels", {"level": "error", "message": str(exc)}))
 
-    existing_channel_ids = {
-        cid
-        for (cid,) in db.execute(
-            select(Channel.yt_channel_id).where(Channel.yt_channel_id.is_not(None))
-        )
-    }
-    existing_urls = {url for (url,) in db.execute(select(Channel.url))}
-
-    preview_rows = []
-    new_count = 0
-    for row in parsed_rows:
-        already_imported = row["channel_id"] in existing_channel_ids or row["url"] in existing_urls
-        new_count += 0 if already_imported else 1
-        preview_rows.append(
-            {
-                **row,
-                "already_imported": already_imported,
-                "token": None if already_imported else encode_import_token(row),
-            }
-        )
-    preview_rows.sort(key=lambda row: row["name"].casefold())
+    preview_rows = preview_subscriptions(db, parsed_rows)
+    new_count = sum(1 for row in preview_rows if not row["already_imported"])
 
     context = channels_context(request, None, 1, db)
     context["csv_preview"] = {
@@ -276,26 +189,7 @@ def import_channels_csv_confirm(
     db: Session = Depends(get_db),
     background_tasks: BackgroundTasks = None,
 ):
-    existing_channel_ids = {
-        cid
-        for (cid,) in db.execute(
-            select(Channel.yt_channel_id).where(Channel.yt_channel_id.is_not(None))
-        )
-    }
-    existing_urls = {url for (url,) in db.execute(select(Channel.url))}
-
-    added = 0
-    seen_channel_ids: set[str] = set()
-    for token in import_rows:
-        row = decode_import_token(token)
-        if row is None or row["channel_id"] in existing_channel_ids or row["url"] in existing_urls:
-            continue
-        if row["channel_id"] in seen_channel_ids:
-            continue
-        seen_channel_ids.add(row["channel_id"])
-        db.add(Channel(url=row["url"], name=row["name"], yt_channel_id=row["channel_id"], rating=1))
-        added += 1
-    db.commit()
+    added = add_subscriptions(db, import_rows)
     if added and background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
 
@@ -390,14 +284,7 @@ def update_channel_categories_form(
         *form_list_values(preset_categories),
         *parse_video_category_labels(form_text_value(custom_categories)),
     ]
-    category_labels = serialized_category_labels(submitted_categories)
-    channel.category_labels = category_labels
-    add_video_category_labels(db, submitted_categories)
-    if category_labels:
-        for video in channel.videos:
-            if not video.category_labels:
-                video.category_labels = category_labels
-    db.commit()
+    set_channel_categories(db, channel, submitted_categories)
     return redirect(internal_return_path(return_to, "/channels"))
 
 
@@ -412,12 +299,9 @@ def toggle_channel_auto_metadata_form(
     channel = db.get(Channel, channel_id)
     if channel is None:
         raise HTTPException(status_code=404, detail="Chaîne introuvable")
-    section = "shorts" if section in {"short", "shorts"} else "videos"
-    bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
+    section = bell_section(section)
     section_label = "shorts" if section == "shorts" else "vidéos"
-    enabled = not getattr(channel, bell)
-    setattr(channel, bell, enabled)
-    db.commit()
+    enabled = toggle_channel_bell(db, channel, section)
     log_event(logger, "channel.bell", channel_id=channel.id, section=section, enabled=enabled)
     target = internal_return_path(return_to, "/channels")
     if not enabled:
@@ -467,7 +351,7 @@ def import_channel_metadata_form(
             return JSONResponse({"status": "failed", "message": message}, status_code=404)
         return redirect(append_query(target, {"level": "error", "message": message}))
 
-    section = "shorts" if section in {"short", "shorts"} else "videos"
+    section = bell_section(section)
     section_label = "shorts" if section == "shorts" else "vidéos"
     job = log_job(
         db,
