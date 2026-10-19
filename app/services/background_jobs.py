@@ -25,13 +25,8 @@ from app.services.channels.scanner import (
     retry_transcript_download,
     scan_channel_section,
 )
-from app.services.llm.provider import (
-    ANALYSIS_CLICKBAIT_HEADER,
-    THUMBNAIL_MEDIA_TYPES,
-    AnthropicProvider,
-    CompletionFailed,
-    get_llm_provider,
-)
+from app.services.llm.prompts import ANALYSIS_CLICKBAIT_HEADER, THUMBNAIL_MEDIA_TYPES
+from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
 from app.services.media.thumbnails import backfill_video_thumbnails
 from app.services.rag.indexing import backfill_note_chunks

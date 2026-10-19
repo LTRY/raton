@@ -26,14 +26,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import get_settings, local_media_path
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.llm.provider import (
-    AnthropicProvider,
-    BatchEntry,
+from app.services.llm.prompts import (
     build_auto_notes_prompt,
-    get_llm_provider,
     split_auto_notes_result,
     split_notes_sections,
 )
+from app.services.llm.provider import AnthropicProvider, BatchEntry, get_llm_provider
 from app.services.rag.embeddings import EmbeddingError
 from app.services.rag.indexing import (
     NOTES_FILE_NAME,

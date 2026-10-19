@@ -16,7 +16,7 @@ from app.core.config import get_settings, local_media_path
 from app.db.session import SessionLocal
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services.llm.provider import split_notes_sections
+from app.services.llm.prompts import split_notes_sections
 from app.services.rag.embeddings import EmbeddingError, contextualized_text, embed_texts
 
 logger = logging.getLogger(__name__)

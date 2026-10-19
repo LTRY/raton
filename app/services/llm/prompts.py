@@ -1,0 +1,523 @@
+import re
+
+NOTES_SECTION_NAMES = ["Faits", "Dates", "Lieux", "Acteurs", "Concepts", "Relations causales"]
+
+
+NOTES_EMPTY_SECTION_MARKER = "Aucun élément identifié."
+
+
+_NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _notes_instructions() -> str:
+    section_headers = "\n".join(f"## {name}" for name in NOTES_SECTION_NAMES)
+    return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
+Produis des notes structurées et exhaustives à partir de ce transcript, avec
+exactement ces sections Markdown, dans cet ordre, chacune précédée de son
+titre exact et rien d'autre avant le premier titre :
+
+{section_headers}
+
+Sous chaque titre, liste les éléments correspondants sous forme de puces (une
+puce par élément). Si une section n'a aucun élément pertinent, écris
+"{NOTES_EMPTY_SECTION_MARKER}" sous le titre plutôt que d'omettre la section.
+
+N'invente rien : si une information ne figure pas dans le transcript, ne
+l'ajoute pas. Base-toi uniquement sur le texte ci-dessous."""
+
+
+def build_notes_prompt(transcript: str) -> str:
+    return f"""{_notes_instructions()}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+
+def split_notes_sections(text: str) -> list[tuple[str, str]]:
+    """Split a build_notes_prompt completion into (section_name, content) chunks.
+
+    One chunk per Markdown section, used both to render the notes tab and to
+    index each section as a separate embedding for cross-video RAG search
+    (app/services/rag/indexing.py). Sections that are empty or just the
+    "no items" placeholder are skipped — they carry no retrievable content.
+    Falls back to a single ("Notes", text) chunk if the model didn't follow
+    the section-header format at all.
+    """
+    matches = list(_NOTES_SECTION_HEADER_RE.finditer(text))
+    if not matches:
+        stripped = text.strip()
+        return [("Notes", stripped)] if stripped else []
+    sections = []
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        name = match.group(1).strip()
+        content = text[start:end].strip()
+        if not content or content == NOTES_EMPTY_SECTION_MARKER:
+            continue
+        sections.append((name, content))
+    return sections
+
+
+SUMMARY_SHORT_HEADER = "## Résumé court"
+
+
+SUMMARY_FULL_HEADER = "## Résumé complet"
+
+
+SUMMARY_QUESTIONS_HEADER = "## Questions suggérées"
+
+
+_BULLET_LINE_RE = re.compile(r"^\s*[-*]\s+(.+?)\s*$", re.MULTILINE)
+
+
+def _summary_instructions() -> str:
+    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
+
+Produis trois éléments fidèles et autonomes à propos de cette vidéo, dans cet
+ordre exact, avec ces trois titres Markdown exacts et rien d'autre avant le
+premier titre :
+
+{SUMMARY_SHORT_HEADER}
+Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
+vidéo — de quoi se faire une idée sans l'avoir vue.
+
+{SUMMARY_FULL_HEADER}
+Un texte suivi en paragraphes qui restitue le sujet, l'argumentation et les
+conclusions dans un ordre logique (pas nécessairement chronologique si le
+propos digresse), termine par 2 à 4 points clés (puces).
+
+{SUMMARY_QUESTIONS_HEADER}
+3 à 5 questions, une par ligne en puces, auxquelles un spectateur pourrait
+avoir envie que cette vidéo réponde — des questions concrètes sur le contenu
+réellement traité, pas des questions génériques qui iraient pour n'importe
+quelle vidéo.
+
+Règles communes :
+- N'invente rien : base-toi uniquement sur le transcript ci-dessous.
+- Le résumé complet est un texte suivi en paragraphes, pas une liste de faits
+  en vrac.
+- Longueur proportionnée au contenu : reste un résumé, ne cherche pas à tout
+  restituer."""
+
+
+def build_summary_prompt(transcript: str) -> str:
+    return f"""{_summary_instructions()}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+
+def split_summary_result(text: str) -> tuple[str, str, list[str]]:
+    """Split a build_summary_prompt completion into (short, full, questions).
+
+    Falls back to (empty, whole text as the full summary, []) if the model
+    didn't follow the header format — degrades gracefully instead of guessing.
+    """
+    full_marker = re.search(
+        rf"^{re.escape(SUMMARY_FULL_HEADER)}\s*$", text, re.IGNORECASE | re.MULTILINE
+    )
+    if full_marker is None:
+        return "", text.strip(), []
+    short = re.sub(
+        rf"^{re.escape(SUMMARY_SHORT_HEADER)}\s*$",
+        "",
+        text[: full_marker.start()],
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
+    questions_marker = re.search(
+        rf"^{re.escape(SUMMARY_QUESTIONS_HEADER)}\s*$", text, re.IGNORECASE | re.MULTILINE
+    )
+    if questions_marker is None:
+        return short.strip(), text[full_marker.end() :].strip(), []
+    full = text[full_marker.end() : questions_marker.start()].strip()
+    questions = [
+        match.group(1) for match in _BULLET_LINE_RE.finditer(text[questions_marker.end() :])
+    ]
+    return short.strip(), full, questions
+
+
+THUMBNAIL_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
+
+ANALYSIS_CLICKBAIT_HEADER = "## Score clickbait"
+
+
+ANALYSIS_RELEVANCE_HEADER = "## Pertinence du contenu"
+
+
+ANALYSIS_SUGGESTIONS_HEADER = "## Suggestions"
+
+
+_ANALYSIS_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+
+
+_ANALYSIS_SCORE_RE = re.compile(r"Score\s*:\s*(\d{1,2})\s*/\s*10")
+
+
+_ANALYSIS_PERCENT_RE = re.compile(r"Contenu utile\s*:\s*(\d{1,3})\s*%")
+
+
+_ANALYSIS_JUSTIFICATION_RE = re.compile(r"Justification\s*:\s*(.+)", re.DOTALL)
+
+
+_ANALYSIS_TITLE_RE = re.compile(r"^Titre\s*\d\s*:\s*(.+)$", re.MULTILINE)
+
+
+_ANALYSIS_CATEGORIES_RE = re.compile(r"^Catégories\s*:\s*(.+)$", re.MULTILINE)
+
+
+def _video_analysis_instructions(title: str, has_image: bool) -> str:
+    clickbait_section = ""
+    if has_image:
+        clickbait_section = f"""{ANALYSIS_CLICKBAIT_HEADER}
+Compare la miniature jointe et le titre ci-dessus au contenu réel du
+transcript. Réponds sur exactement deux lignes, sans rien ajouter :
+Score : <un nombre entier de 1 à 10, où 10 signifie parfaitement fidèle et 1 signifie clickbait extrême>/10
+Justification : <une phrase expliquant l'écart ou l'absence d'écart>
+
+"""
+    image_mention = " et la miniature jointe" if has_image else ""
+    return f"""Tu es un analyste qui évalue une vidéo à partir de son transcript{image_mention}.
+
+Titre actuel de la vidéo : {title}
+
+Produis les sections suivantes, dans cet ordre exact, avec ces titres
+Markdown exacts et rien d'autre avant le premier titre :
+
+{clickbait_section}{ANALYSIS_RELEVANCE_HEADER}
+Évalue la part du contenu qui traite réellement le sujet annoncé, par
+opposition au remplissage (introduction longue, sponsors, redites,
+digressions hors sujet). Réponds sur exactement deux lignes, sans rien
+ajouter :
+Contenu utile : <un nombre entier de 0 à 100>%
+Justification : <une phrase expliquant l'estimation>
+
+{ANALYSIS_SUGGESTIONS_HEADER}
+Propose 3 titres alternatifs plus fidèles au contenu réel (du plus au moins
+convaincant), et 1 à 3 catégories qui décrivent ce sujet réel. Réponds sur
+exactement quatre lignes, sans rien ajouter :
+Titre 1 : <premier titre suggéré>
+Titre 2 : <deuxième titre suggéré>
+Titre 3 : <troisième titre suggéré>
+Catégories : <catégorie 1>, <catégorie 2>, <catégorie 3>
+
+Règles communes :
+- N'invente rien : base-toi uniquement sur le transcript ci-dessous{image_mention}.
+- Respecte strictement le format de ligne demandé pour chaque champ, sans
+  texte supplémentaire ni ligne vide au milieu d'une section."""
+
+
+def build_video_analysis_prompt(transcript: str, title: str, has_image: bool) -> str:
+    return f"""{_video_analysis_instructions(title, has_image)}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+
+def split_video_analysis_result(text: str, has_image: bool) -> dict:
+    """Split a build_video_analysis_prompt completion into an analysis dict.
+
+    Keys are present only when their section exists and matches the expected
+    line format — missing/malformed sections are silently omitted rather than
+    guessed, mirroring split_summary_result's fallback. has_image=False means
+    the clickbait section was never requested, so it's never looked for even
+    if the model produced one anyway.
+    """
+    matches = list(_ANALYSIS_SECTION_HEADER_RE.finditer(text))
+    sections: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        sections[match.group(1).strip()] = text[start:end].strip()
+
+    result: dict = {}
+
+    if has_image:
+        clickbait_text = sections.get(ANALYSIS_CLICKBAIT_HEADER.removeprefix("## "))
+        if clickbait_text:
+            score_match = _ANALYSIS_SCORE_RE.search(clickbait_text)
+            justification_match = _ANALYSIS_JUSTIFICATION_RE.search(clickbait_text)
+            if score_match:
+                result["clickbait_score"] = int(score_match.group(1))
+            if justification_match:
+                result["clickbait_rationale"] = justification_match.group(1).strip()
+
+    relevance_text = sections.get(ANALYSIS_RELEVANCE_HEADER.removeprefix("## "))
+    if relevance_text:
+        percent_match = _ANALYSIS_PERCENT_RE.search(relevance_text)
+        justification_match = _ANALYSIS_JUSTIFICATION_RE.search(relevance_text)
+        if percent_match:
+            result["relevance_percent"] = int(percent_match.group(1))
+        if justification_match:
+            result["relevance_rationale"] = justification_match.group(1).strip()
+
+    suggestions_text = sections.get(ANALYSIS_SUGGESTIONS_HEADER.removeprefix("## "))
+    if suggestions_text:
+        title_matches = _ANALYSIS_TITLE_RE.findall(suggestions_text)
+        categories_match = _ANALYSIS_CATEGORIES_RE.search(suggestions_text)
+        if title_matches:
+            result["suggested_titles"] = [t.strip() for t in title_matches][:3]
+        if categories_match:
+            result["suggested_categories"] = [
+                c.strip() for c in categories_match.group(1).split(",") if c.strip()
+            ]
+
+    return result
+
+
+GENERATION_NOTES_HEADER = "# Notes"
+
+
+GENERATION_SUMMARY_HEADER = "# Résumé"
+
+
+GENERATION_ANALYSIS_HEADER = "# Analyse"
+
+
+_GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé|Analyse)\s*$", re.MULTILINE)
+
+
+def build_generation_prompt(transcript: str, title: str, has_image: bool) -> str:
+    """Notes + résumé + analyse in a single completion, transcript sent once.
+
+    Wraps the three existing single-purpose instruction blocks under distinct
+    level-1 Markdown headers (their own `##` sub-headers stay level-2, so the
+    two never collide) so split_generation_result can slice the response back
+    into the same three pieces each single-purpose split_* function expects.
+
+    The résumé comes first because it is the part shown to the user while the
+    completion streams (see partial_generation_summary).
+    """
+    return f"""Tu produis trois analyses d'une même vidéo à partir de son
+transcript en un seul appel, pour éviter d'envoyer ce transcript plusieurs
+fois. Produis exactement ces trois sections, dans cet ordre, chacune
+introduite par son titre Markdown de niveau 1 exact et rien d'autre avant le
+premier titre :
+
+{GENERATION_SUMMARY_HEADER}
+{_summary_instructions()}
+
+{GENERATION_NOTES_HEADER}
+{_notes_instructions()}
+
+{GENERATION_ANALYSIS_HEADER}
+{_video_analysis_instructions(title, has_image)}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+
+def split_generation_result(text: str, has_image: bool) -> dict:
+    """Split a build_generation_prompt completion into notes/summary/analysis.
+
+    Slices the response on the three level-1 headers first, then delegates
+    each slice to the matching single-purpose split_* function. A missing
+    top-level section (model didn't follow the format) yields empty/absent
+    results for that piece rather than a guess — same philosophy as the
+    single-purpose split functions.
+    """
+    matches = list(_GENERATION_SECTION_HEADER_RE.finditer(text))
+    blocks: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        start = match.end()
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        blocks[match.group(1)] = text[start:end].strip()
+
+    summary_short, summary_full, summary_questions = split_summary_result(blocks.get("Résumé", ""))
+    return {
+        "notes_text": blocks.get("Notes", ""),
+        "summary_short": summary_short,
+        "summary_full": summary_full,
+        "summary_questions": summary_questions,
+        "analysis": split_video_analysis_result(blocks.get("Analyse", ""), has_image),
+    }
+
+
+def _short_summary_instructions() -> str:
+    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
+
+Produis un seul élément, sous ce titre Markdown exact et rien d'autre avant :
+
+{SUMMARY_SHORT_HEADER}
+Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
+vidéo — de quoi se faire une idée sans l'avoir vue.
+
+N'invente rien : base-toi uniquement sur le transcript ci-dessous."""
+
+
+def build_auto_notes_prompt(transcript: str) -> str:
+    """Notes + résumé court in one completion: what the nightly batch asks for each video.
+
+    The same `# Résumé` / `# Notes` level-1 headers as build_generation_prompt, so the answer is
+    sliced the same way; the long résumé, the questions and the analysis are left to the robot
+    button (they are reading aids, not what the cross-video search indexes).
+    """
+    return f"""Tu produis deux analyses d'une même vidéo à partir de son transcript en un seul
+appel. Produis exactement ces deux sections, dans cet ordre, chacune introduite
+par son titre Markdown de niveau 1 exact et rien d'autre avant le premier titre :
+
+{GENERATION_SUMMARY_HEADER}
+{_short_summary_instructions()}
+
+{GENERATION_NOTES_HEADER}
+{_notes_instructions()}
+
+TRANSCRIPT:
+{transcript}
+"""
+
+
+# The two sections are asked as level-1 titles, but a model sometimes writes "## Notes" under its
+# "# Résumé" (seen on 1 answer out of 844): accept both levels. Neither can be mistaken for a notes
+# section ("## Faits"...) or the "## Résumé court" line, which the end-of-line anchor rules out.
+_AUTO_NOTES_SECTION_HEADER_RE = re.compile(r"^#{1,2}\s+(Notes|Résumé)\s*$", re.MULTILINE)
+
+
+def split_auto_notes_result(text: str) -> tuple[str, str]:
+    """Split a build_auto_notes_prompt completion into (notes_text, summary_short).
+
+    A missing section yields an empty string for that piece, never a guess.
+    """
+    matches = list(_AUTO_NOTES_SECTION_HEADER_RE.finditer(text))
+    blocks: dict[str, str] = {}
+    for index, match in enumerate(matches):
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        blocks[match.group(1)] = text[match.end() : end].strip()
+    summary_block = blocks.get("Résumé", "")
+    summary = re.sub(
+        rf"^{re.escape(SUMMARY_SHORT_HEADER)}\s*$",
+        "",
+        summary_block,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    return blocks.get("Notes", ""), summary.strip()
+
+
+def _between_headers(text: str, start_header: str, end_header: str) -> str | None:
+    """Text after the `start_header` line, up to the `end_header` line if it is there yet."""
+    start = re.search(rf"^{re.escape(start_header)}[ \t]*$", text, re.IGNORECASE | re.MULTILINE)
+    if start is None:
+        return None
+    rest = text[start.end() :]
+    end = re.search(rf"^{re.escape(end_header)}[ \t]*$", rest, re.IGNORECASE | re.MULTILINE)
+    return rest[: end.start()] if end else rest
+
+
+def partial_generation_summary(text: str) -> tuple[str, str]:
+    """(short, full) résumé as far as a still-streaming generation has written them.
+
+    Each value only ever grows from one call to the next on the same stream,
+    so a client can append what is new. That is why a last line starting with
+    `#` is dropped: it is a header still being written, which would otherwise
+    show up as résumé text and then vanish.
+    """
+    matches = list(_GENERATION_SECTION_HEADER_RE.finditer(text))
+    block = ""
+    for index, match in enumerate(matches):
+        if match.group(1) == "Résumé":
+            end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+            block = text[match.end() : end]
+            break
+    head, _, last_line = block.rpartition("\n")
+    if last_line.lstrip().startswith("#"):
+        block = head + "\n"
+    short = _between_headers(block, SUMMARY_SHORT_HEADER, SUMMARY_FULL_HEADER) or ""
+    full = _between_headers(block, SUMMARY_FULL_HEADER, SUMMARY_QUESTIONS_HEADER) or ""
+    return short.strip(), full.strip()
+
+
+def build_chat_prompt(transcript: str, messages: list[dict[str, str]], question: str) -> str:
+    history = "\n\n".join(
+        f"{'UTILISATEUR' if message['role'] == 'user' else 'ASSISTANT'}: {message['content']}"
+        for message in messages[-10:]
+    )
+    return f"""Réponds à la question en utilisant uniquement le transcript fourni.
+Si l'information n'est pas dans le transcript, dis-le clairement.
+Réponds en français, de façon précise. Tu peux citer de courts passages utiles.
+
+TRANSCRIPT:
+{transcript}
+
+HISTORIQUE:
+{history or "(aucun échange précédent)"}
+
+QUESTION:
+{question}
+"""
+
+
+def build_library_chat_prompt(messages: list[dict[str, str]], question: str) -> str:
+    """Build the cross-video ("whole library") chat prompt.
+
+    It carries no library content: the model fetches what it needs through the
+    tools of app/services/rag/library_chat_tools.py, whose reference format this
+    prompt tells it to cite.
+    """
+    history = "\n\n".join(
+        f"{'UTILISATEUR' if message['role'] == 'user' else 'ASSISTANT'}: {message['content']}"
+        for message in messages[-10:]
+    )
+    return f"""Tu es l'assistant de recherche de la bibliothèque vidéo personnelle de
+l'utilisateur : des chaînes YouTube suivies, leurs vidéos, et des notes
+structurées tirées des transcripts.
+
+Utilise les outils pour chercher dans cette bibliothèque avant de répondre, en
+choisissant ceux qui conviennent à la question (une chaîne ou une vidéo précise,
+un thème, une question sur le contenu). Tu peux en enchaîner plusieurs.
+Appuie-toi uniquement sur leurs résultats : si rien ne correspond, dis-le
+clairement plutôt que d'inventer.
+
+L'outil d'historique donne ce que l'utilisateur a déjà regardé ou écouté
+(récent d'abord, avec la progression) : utilise-le pour « qu'ai-je regardé »,
+« ai-je déjà vu... » ou « qu'est-ce que je n'ai pas fini ».
+
+Tu peux aussi chercher sur YouTube une chaîne absente de la bibliothèque, et
+l'ajouter quand l'utilisateur le demande explicitement (« ajoute la chaîne de
+X »). Cherche-la d'abord sur YouTube. Si une candidate correspond nettement à la
+demande (même nom, et bien plus d'abonnés que ses homonymes), ajoute-la et
+confirme-le en précisant son handle et son nombre d'abonnés, pour que
+l'utilisateur puisse vérifier que c'est la bonne. Si plusieurs candidates sont
+plausibles, n'ajoute rien : présente-les,
+une par ligne avec leur handle et leur nombre d'abonnés, et demande laquelle
+ajouter. Quand l'utilisateur en choisit une dans un message suivant, relance la
+recherche avec son handle avant de l'ajouter. Les identifiants [youtube:...]
+servent uniquement à l'outil d'ajout : ne les recopie jamais dans ta réponse.
+
+Chaque chaîne ou vidéo renvoyée par un outil porte une référence, par exemple
+[chaine:12] ou [video:34]. Quand tu cites une chaîne ou une vidéo dans ta
+réponse, écris son nom ou son titre à l'endroit où tu en parles, entouré de sa
+référence sous la forme [[chaine:12|Nom de la chaîne]] ou
+[[video:34|Titre de la vidéo]] : le texte affiché est le nom, qui devient un lien
+cliquable surligné, et la phrase doit se lire normalement sans la syntaxe.
+Tu peux reprendre sous cette forme une référence déjà écrite plus haut dans la
+conversation. Ne référence que ce qui répond vraiment à la question, n'invente
+jamais de référence, et ne recopie jamais de référence en dehors de cette forme.
+
+Les outils ne renvoient qu'un nombre limité de résultats, et la recherche dans
+les notes ne couvre que les vidéos dont les notes ont été générées. Ne présente
+donc jamais tes résultats comme la liste complète : dis ce que tu as trouvé
+(« j'ai trouvé... », « au moins... »), pas ce que la bibliothèque contient en
+tout.
+
+Réponds en français, de façon précise et concise, en vouvoyant l'utilisateur.
+Écris en texte brut : la réponse est affichée telle quelle, sans mise en forme,
+donc pas de Markdown (ni astérisques, ni titres, ni liens). Pour une liste, un
+élément par ligne commençant par un tiret.
+
+HISTORIQUE:
+{history or "(aucun échange précédent)"}
+
+QUESTION:
+{question}
+"""

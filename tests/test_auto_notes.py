@@ -14,12 +14,8 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.llm.provider import (
-    AnthropicProvider,
-    BatchEntry,
-    build_auto_notes_prompt,
-    split_auto_notes_result,
-)
+from app.services.llm.prompts import build_auto_notes_prompt, split_auto_notes_result
+from app.services.llm.provider import AnthropicProvider, BatchEntry
 from app.services.rag import auto_notes
 from app.services.rag import indexing as rag_indexing
 from app.services.rag.auto_notes import (

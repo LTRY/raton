@@ -13,13 +13,12 @@ from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.services.background_jobs import _video_analysis_has_image, enqueue_llm_job, run_llm_job
 from app.services.job_log import log_job
-from app.services.llm.provider import (
+from app.services.llm.chat_history import load_chat, save_chat
+from app.services.llm.prompts import (
     ANALYSIS_CLICKBAIT_HEADER,
     build_chat_prompt,
     build_generation_prompt,
-    load_chat,
     partial_generation_summary,
-    save_chat,
     split_generation_result,
 )
 from app.services.rag.indexing import index_video_notes
