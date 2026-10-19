@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import pytest
 from fastapi import BackgroundTasks, HTTPException
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
@@ -24,6 +24,7 @@ from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.settings import SettingsUpdate
 from app.services import background_jobs, search
+from app.services.channels import manage as channel_manage
 from app.services.channels.identity import channel_values_from_info
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.scheduler import record_scan_result
@@ -5292,7 +5293,7 @@ def test_rating_forms_opt_out_of_turbo_navigation():
 def test_new_channels_are_rated_by_default(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )
@@ -5391,7 +5392,7 @@ def test_redirect_messages_are_rendered_by_the_base_layout_only():
 def test_add_channel_with_a_name_shows_youtube_candidates_instead_of_guessing(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda value: pytest.fail("must not resolve a name"),
     )
@@ -5479,7 +5480,7 @@ def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch):
     )
     db.commit()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda value: {
             "url": "https://www.youtube.com/@deja-la",
@@ -5587,7 +5588,7 @@ def test_imported_video_channel_name_does_not_fall_back_to_channel_id():
 def test_add_channel_returns_not_found_for_missing_handle(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
     )
@@ -5602,7 +5603,7 @@ def test_add_channel_returns_not_found_for_missing_handle(monkeypatch):
 def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        api_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: {
             "url": "https://www.youtube.com/@api-channel",
@@ -5617,10 +5618,56 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
     assert channel.url == "https://www.youtube.com/@api-channel"
 
 
+def test_api_create_channel_refuses_a_channel_added_under_another_url(monkeypatch):
+    # Same rule as the HTML form: the YouTube id identifies the channel, not the URL.
+    db = make_session()
+    db.add(
+        Channel(
+            url="https://www.youtube.com/channel/UCAPI", name="Chaîne API", yt_channel_id="UCAPI"
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(
+        channel_manage,
+        "extract_channel_info",
+        lambda channel_input: {
+            "url": "https://www.youtube.com/@api-channel",
+            "name": "Chaîne API",
+            "yt_channel_id": "UCAPI",
+        },
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        api_routes.create_channel(api_routes.ChannelCreate(url="@api-channel"), db)
+
+    assert exc.value.status_code == 409
+    assert db.scalar(select(func.count(Channel.id))) == 1
+
+
+def test_api_and_form_delete_a_channel_with_its_profile_files(monkeypatch):
+    removed = []
+    monkeypatch.setattr(
+        channel_manage,
+        "remove_channel_profile_files",
+        lambda media_root, yt_channel_id: removed.append(yt_channel_id),
+    )
+    db = make_session()
+    first = Channel(url="https://example.test/a", name="A", yt_channel_id="UCA")
+    second = Channel(url="https://example.test/b", name="B", yt_channel_id="UCB")
+    db.add_all([first, second])
+    db.commit()
+
+    api_routes.delete_channel(first.id, db)
+    channels_routes.delete_channel_form(second.id, "/channels", db)
+
+    assert removed == ["UCA", "UCB"]
+    assert db.scalar(select(func.count(Channel.id))) == 0
+
+
 def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        api_routes,
+        channel_manage,
         "extract_channel_info",
         lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
     )
@@ -5635,7 +5682,7 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
 def test_add_channel_saves_category_labels(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )

@@ -214,7 +214,9 @@ scheduler ou par `POST /settings/scan` (voir
 ## API interne `/api`
 
 - `GET /api/channels`
-- `POST /api/channels` : lance aussi le rattrapage du profil en arriere-plan
+- `POST /api/channels` : lance aussi le rattrapage du profil en arriere-plan ;
+  `409` si la chaine est deja dans la bibliotheque, reconnue par son identifiant
+  YouTube quelle que soit l'URL donnee (meme regle que le formulaire de `/channels`)
 - `POST /api/channels/{id}/rating?rating=0..5`
 - `DELETE /api/channels/{id}` : supprime aussi le dossier de profil de la chaine
 - `GET /api/videos`

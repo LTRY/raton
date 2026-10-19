@@ -24,8 +24,11 @@ from app.services.background_jobs import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
-from app.services.channels.lookup import find_channel
-from app.services.channels.profile import remove_channel_profile_files
+from app.services.channels.manage import (
+    ChannelAlreadyInLibraryError,
+    create_channel,
+    delete_channel,
+)
 from app.services.channels.subscriptions import (
     SubscriptionsCsvError,
     decode_import_token,
@@ -33,15 +36,14 @@ from app.services.channels.subscriptions import (
     parse_subscriptions_csv,
 )
 from app.services.job_log import log_job
+from app.services.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.search import channel_search_rank
 from app.services.settings import (
     add_video_category_labels,
-    get_media_root,
     get_video_category_label_styles,
 )
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
-    extract_channel_info,
     is_channel_reference,
     search_channels,
 )
@@ -337,27 +339,12 @@ def add_channel(
             )
         )
     try:
-        info = extract_channel_info(url)
+        channel = create_channel(db, url, category_labels=category_labels)
     except ChannelNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Chaîne introuvable") from exc
-    resolved_url = info.get("url", url)
-    existing = find_channel(db, resolved_url, info["yt_channel_id"])
-    if existing:
-        return redirect(
-            append_query(
-                "/channels",
-                {"level": "error", "message": f"{existing.name} est déjà dans la bibliothèque."},
-            )
-        )
+    except ChannelAlreadyInLibraryError as exc:
+        return redirect(append_query("/channels", {"level": "error", "message": str(exc)}))
     add_video_category_labels(db, submitted_categories)
-    channel = Channel(
-        url=resolved_url,
-        name=info["name"],
-        yt_channel_id=info["yt_channel_id"],
-        rating=1,
-        category_labels=category_labels,
-    )
-    db.add(channel)
     db.commit()
     if background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
@@ -374,12 +361,13 @@ def rate_channel_form(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    if rating < 0 or rating > 5:
-        raise HTTPException(status_code=400, detail="La note doit être comprise entre 0 et 5.")
     channel = db.get(Channel, channel_id)
-    if channel:
-        channel.rating = rating
-        db.commit()
+    try:
+        check_rating(rating)
+        if channel:
+            set_rating(db, channel, rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if wants_json(request):
         if not channel:
             raise HTTPException(status_code=404, detail="Chaîne introuvable")
@@ -532,7 +520,5 @@ def delete_channel_form(
 ):
     channel = db.get(Channel, channel_id)
     if channel:
-        remove_channel_profile_files(get_media_root(db), channel.yt_channel_id)
-        db.delete(channel)
-        db.commit()
+        delete_channel(db, channel)
     return redirect(internal_return_path(return_to))

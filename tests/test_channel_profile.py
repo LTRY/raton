@@ -14,6 +14,7 @@ from app.models.channel import Channel
 from app.models.setting import AppSetting
 from app.services import background_jobs
 from app.services import scheduler as scheduler_module
+from app.services.channels import manage as channel_manage
 from app.services.channels import profile as channel_profile
 from app.services.youtube import channel_info
 
@@ -550,7 +551,7 @@ def test_adding_a_channel_queues_the_profile_backfill(tmp_path, monkeypatch):
     client, db, channel = make_client(tmp_path)
     app.dependency_overrides.clear()
     monkeypatch.setattr(
-        channels_routes,
+        channel_manage,
         "extract_channel_info",
         lambda url: {"url": "https://example.test/new", "name": "Nouvelle", "yt_channel_id": "UC2"},
     )

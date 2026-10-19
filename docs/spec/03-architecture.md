@@ -169,14 +169,14 @@ Les services sont rangés en six paquets, un par sujet :
 |---|---|
 | `youtube/` | Tout ce qui parle à YouTube : `yt`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract`, `local_upload` |
-| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `lookup`, `profile`, `subscriptions` |
+| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `manage`, `scan_events`, `lookup`, `profile`, `subscriptions` |
 | `playlists/` | Import de playlists : `imports` |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
 | `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
 
 À la racine de `app/services/` restent : les modules d'orchestration
 `background_jobs` et `scheduler`, et les modules transverses `settings`,
-`settings_format`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
+`settings_format`, `ratings`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
 
 Les dépendances entre paquets vont dans un seul sens :
 `youtube` et `llm` ne dépendent d'aucun autre paquet, `media` dépend de
@@ -203,7 +203,13 @@ Les dépendances entre paquets vont dans un seul sens :
 - `staging.py` : staged folders, merge de fichiers lorsqu'on ajoute audio ou
   video ;
 - `identity.py` : chaine d'une video, URL canonique ;
-- `throttle.py` : pauses entre requetes YouTube et `RateLimitedError`.
+- `throttle.py` : pauses entre requetes YouTube et `RateLimitedError` ;
+- `manage.py` : ajout et suppression d'une chaine, partages par les pages HTML
+  et `/api`.
+
+Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
+et `/api` l'appellent et ne font que traduire ses erreurs en reponse HTTP. La note
+en etoiles d'une chaine ou d'une fiche passe par `app/services/ratings.py`.
 
 L'écriture d'une ligne de journal de jobs (`log_job`) et de l'activite de
 lecture (`record_playback_activity`) est dans `app/services/job_log.py`,

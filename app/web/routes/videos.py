@@ -33,6 +33,7 @@ from app.services.channels.media_import import import_video_metadata
 from app.services.job_log import log_job, record_playback_activity
 from app.services.media.local_upload import LocalUploadError, import_local_media
 from app.services.media.media_storage import mark_watched_if_complete
+from app.services.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.search import video_search_rank
 from app.services.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
@@ -983,12 +984,13 @@ def rate_video_form(
     db: Session = Depends(get_db),
     request: Request = None,
 ):
-    if rating < 0 or rating > 5:
-        raise HTTPException(status_code=400, detail="La note doit être comprise entre 0 et 5.")
     video = db.get(Video, video_id)
-    if video:
-        video.rating = rating
-        db.commit()
+    try:
+        check_rating(rating)
+        if video:
+            set_rating(db, video, rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if wants_json(request):
         if not video:
             raise HTTPException(status_code=404, detail="Vidéo introuvable.")
