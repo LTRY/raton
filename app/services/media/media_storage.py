@@ -68,6 +68,16 @@ def delete_video_media_asset(video: Video, media_type: str) -> None:
     video.file_size_bytes = directory_size(folder)
 
 
+def delete_video_media_file(db: Session, video: Video, media_type: str) -> None:
+    """Delete one format's file at the person's request, and commit; ValueError when refused."""
+    try:
+        delete_video_media_asset(video, media_type)
+    except ValueError:
+        db.rollback()
+        raise
+    db.commit()
+
+
 def purge_watched_media(db: Session, now: datetime | None = None) -> int:
     """Delete the media files of videos watched more than RETENTION ago.
 

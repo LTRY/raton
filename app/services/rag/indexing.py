@@ -18,12 +18,11 @@ from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
 from app.services.llm.prompts import split_notes_sections
 from app.services.rag.embeddings import EmbeddingError, contextualized_text, embed_texts
+from app.services.videos.documents import NOTES_FILE, SHORT_SUMMARY_FILE
 
 logger = logging.getLogger(__name__)
 
 SUMMARY_SECTION_NAME = "Résumé"
-NOTES_FILE_NAME = "transcript.notes.txt"
-SUMMARY_SHORT_FILE_NAME = "transcript.summary_short.txt"
 
 
 def read_summary_short(transcript_path: str) -> str | None:
@@ -31,7 +30,7 @@ def read_summary_short(transcript_path: str) -> str | None:
     try:
         text = (
             local_media_path(transcript_path)
-            .with_name(SUMMARY_SHORT_FILE_NAME)
+            .with_name(SHORT_SUMMARY_FILE)
             .read_text(encoding="utf-8")
         )
     except OSError:
@@ -95,7 +94,7 @@ def backfill_note_chunks(db: Session) -> int:
     ).all()
     indexed = 0
     for video_id, transcript_path in candidates:
-        notes_path = local_media_path(transcript_path).with_name(NOTES_FILE_NAME)
+        notes_path = local_media_path(transcript_path).with_name(NOTES_FILE)
         try:
             notes_text = notes_path.read_text(encoding="utf-8")
         except OSError:
@@ -137,9 +136,7 @@ def backfill_summary_chunks(db: Session) -> int:
             continue
         try:
             notes_text = (
-                local_media_path(transcript_path)
-                .with_name(NOTES_FILE_NAME)
-                .read_text(encoding="utf-8")
+                local_media_path(transcript_path).with_name(NOTES_FILE).read_text(encoding="utf-8")
             )
         except OSError:
             continue

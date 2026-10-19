@@ -12,6 +12,7 @@ from app.core.config import local_media_path
 from app.models.channel import Channel
 from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, video_category_css_style
+from app.services.videos.documents import NOTES_FILE
 from app.services.videos.filters import video_category_labels
 
 templates = Jinja2Templates(directory="app/templates")
@@ -130,7 +131,7 @@ def video_metadata(video: Video) -> dict:
 def video_has_notes(video: Video) -> bool:
     if not video.transcript_path:
         return False
-    return local_media_path(video.transcript_path).with_name("transcript.notes.txt").is_file()
+    return local_media_path(video.transcript_path).with_name(NOTES_FILE).is_file()
 
 
 def video_asset_labels(video: Video) -> list[dict[str, str]]:

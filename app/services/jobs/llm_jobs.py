@@ -12,12 +12,19 @@ from app.core.logging import logged_job
 from app.db.session import SessionLocal
 from app.models.llm_job import LlmJob
 from app.models.video import Video
+from app.services.common.job_log import log_job
 from app.services.jobs.backfills import run_channel_profile_backfill_job
-from app.services.llm.prompts import ANALYSIS_CLICKBAIT_HEADER, THUMBNAIL_MEDIA_TYPES
+from app.services.llm.prompts import (
+    ANALYSIS_CLICKBAIT_HEADER,
+    THUMBNAIL_MEDIA_TYPES,
+    split_generation_result,
+)
 from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
+from app.services.rag.library_chat_history import add_chat_exchange
 from app.services.rag.library_chat_schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from app.services.rag.library_chat_tools import LibraryChatToolbox
+from app.services.videos.documents import append_transcript_chat, write_generated_documents
 
 # How often a streaming `generate` job saves its text so far: short enough that
 # the page polling it shows the résumé as it is written, long enough not to
@@ -154,3 +161,50 @@ def enqueue_llm_job(
     db.commit()
     db.refresh(job)
     return job
+
+
+# A finished job ("done") is applied on the first poll that sees it: its result is written where
+# the fiche or the chat keeps it, then the job becomes "applied" so a replayed poll writes nothing.
+
+
+def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | None:
+    """Write a finished "generate" job's documents; returns what was generated, None if nothing new."""
+    if job.status != "done":
+        return None
+    has_image = ANALYSIS_CLICKBAIT_HEADER in job.prompt
+    generated = split_generation_result(job.result or "", has_image)
+    write_generated_documents(video, generated)
+    job.status = "applied"
+    db.commit()
+    return generated
+
+
+def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None:
+    if job.status != "done":
+        return
+    append_transcript_chat(video, job.question or "", job.result or "")
+    log_job(
+        db,
+        "prompt",
+        f"Prompt envoyé sur {video.title}: {(job.question or '')[:180]}",
+        channel_id=video.channel_id,
+        video_id=video.id,
+    )
+    job.status = "applied"
+    db.commit()
+
+
+def apply_library_chat_result(db: Session, job: LlmJob) -> None:
+    if job.status != "done":
+        return
+    sources = json.loads(job.sources) if job.sources else {}
+    add_chat_exchange(
+        db,
+        job.question or "",
+        job.result or "",
+        sources.get("video_ids", []),
+        sources.get("channel_ids", []),
+    )
+    log_job(db, "prompt", f"Question bibliothèque : {(job.question or '')[:180]}")
+    job.status = "applied"
+    db.commit()

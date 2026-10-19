@@ -51,6 +51,7 @@ from app.services.jobs.downloads import (
 )
 from app.services.jobs.llm_jobs import video_analysis_has_image
 from app.services.media.media_storage import mark_watched_if_complete
+from app.services.videos.documents import read_transcript_documents
 from app.services.videos.download_options import (
     normalize_download_media_types,
     normalize_subtitle_language,
@@ -80,7 +81,7 @@ from app.services.youtube.sponsor_segments import (
     normalize_skip_segments,
 )
 from app.web.formatting import estimate_channel_periodicity, format_views
-from app.web.routes.transcript import transcript_context, video_analysis_payload
+from app.web.routes.transcript import video_analysis_payload
 from app.web.shared import (
     LIBRARY_PAGE_SIZE,
     append_query,
@@ -427,7 +428,7 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
     category_label_styles = get_video_category_label_styles(db)
     query_params = request.query_params if "query_string" in request.scope else {}
     back_path = internal_return_path(query_params.get("next", ""), "/videos")
-    context = transcript_context(video)
+    context = read_transcript_documents(video)
     vtt_content = None
     if video.subtitle_path:
         subtitle_file = local_media_path(video.subtitle_path)

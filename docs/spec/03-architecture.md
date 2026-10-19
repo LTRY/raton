@@ -255,7 +255,7 @@ Responsable de :
 
 - detection des 90 % de lecture (`mark_watched_if_complete`) ;
 - purge quotidienne des fichiers media des videos vues (`purge_watched_media`) ;
-- suppression d'un seul format (`delete_video_media_asset`), partagee avec la
+- suppression d'un seul format (`delete_video_media_asset`, et `delete_video_media_file` qui la valide dans la DB pour la
   route media ;
 - type de media d'une video d'apres ses chemins (`media_type_for_paths`).
 
