@@ -155,6 +155,17 @@ Telechargement video ou audio demande par la personne.
 - **Code** : `download_source = "manual"`
 - **A ne pas confondre avec** : Un import manuel par formulaire (`imported_via_form`), filtre « Import manuel ».
 
+### Ingestion
+
+Tout ce qui fait entrer une fiche dans la bibliotheque : le scan, l'import de
+metadonnees, le telechargement manuel, l'import d'un fichier local et le
+rattrapage des transcripts.
+
+- **Code** : paquet `app/services/ingest/`
+- **A ne pas confondre avec** : L'import d'une playlist, qui range des fiches
+  dans une playlist (`app/services/playlists/`) ; l'import du CSV
+  d'abonnements, qui ajoute des chaines (`app/services/channels/`).
+
 Specs : [02 Fonctionnalites](02-fonctionnalites.md),
 [13 Jobs, logs et planification](13-jobs-logs-planification.md),
 [07 YouTube et telechargements](07-youtube-et-telechargements.md).

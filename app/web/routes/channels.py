@@ -16,11 +16,6 @@ from sqlalchemy.orm import Session
 from app.core.logging import log_event
 from app.db.session import get_db
 from app.models.channel import Channel
-from app.services.background_jobs import (
-    run_channel_metadata_import_job,
-    run_channel_profile_backfill_job,
-    run_channel_profile_refresh_job,
-)
 from app.services.channels.listing import (
     CHANNEL_SORTS,
     channel_entries,
@@ -41,12 +36,20 @@ from app.services.channels.subscriptions import (
     parse_subscriptions_csv,
     preview_subscriptions,
 )
-from app.services.job_log import log_job
-from app.services.ratings import InvalidRatingError, check_rating, set_rating
-from app.services.settings import (
+from app.services.common.job_log import log_job
+from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
+from app.services.common.settings import (
     get_video_category_label_styles,
 )
-from app.services.settings_format import parse_video_category_labels, serialized_category_labels
+from app.services.common.settings_format import (
+    parse_video_category_labels,
+    serialized_category_labels,
+)
+from app.services.jobs.background_jobs import (
+    run_channel_metadata_import_job,
+    run_channel_profile_backfill_job,
+    run_channel_profile_refresh_job,
+)
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,

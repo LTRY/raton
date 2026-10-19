@@ -131,7 +131,7 @@ impose plus (ni langue ni source) ; une langue passee explicitement a
 Un echec de sous-titres n'est qu'un `warning` : la fiche est importee sans
 transcript et le scan continue.
 
-**Rattrapage ponctuel** (`app/services/rag/transcript_backfill.py`, job de
+**Rattrapage ponctuel** (`app/services/ingest/transcript_backfill.py`, job de
 demarrage `backfill_original_transcripts`) : les videos `missing` dont
 `metadata.json` liste une piste exploitable recuperent leur transcript (aucune
 requete pour les autres). Il s'arrete apres 5 echecs consecutifs et n'est
@@ -291,7 +291,7 @@ ou indisponibles au moment du telechargement initial), la fiche video
 uniquement quand `video.transcript_path` est vide) :
 
 - `POST /videos/{id}/transcript/download` cree un `DownloadJob` et lance
-  `retry_transcript_download` (`app/services/channels/media_import.py`) en tache de fond ;
+  `retry_transcript_download` (`app/services/ingest/media_import.py`) en tache de fond ;
 - une seule tentative, sur la piste choisie par `choose_subtitle_track`
   (createur fr/en, puis originale fr/en, puis originale dans une autre langue :
   voir "Sous-titres : jamais de traduction automatique") ; pas de fusion

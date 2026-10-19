@@ -313,7 +313,7 @@ lecteur présent sur la page :
   dès l'évènement `loadedmetadata` du mini-lecteur.
 
 Recherche SponsorBlock automatique : un téléchargement manuel réussi
-(`app/services/channels/media_import.py:download_manual_media`) déclenche automatiquement
+(`app/services/ingest/media_import.py:download_manual_media`) déclenche automatiquement
 la même recherche SponsorBlock que le bouton, sur les catégories activées
 dans `/settings` — best-effort, une erreur (réseau, API indisponible) est
 avalée silencieusement sans faire échouer le téléchargement ; le bouton

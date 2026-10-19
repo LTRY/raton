@@ -89,7 +89,7 @@ Formatage pour l'affichage : durees longues, tailles de stockage et de fichier,
 nombre de vues, periodicite de publication d'une chaine. Enregistre les
 globals Jinja de formatage. Les durees `m:ss` et leur lecture
 (`format_duration`, `format_compact_duration`, `parse_duration_label`) sont
-dans `app/services/durations.py`, car le service de lecture les utilise.
+dans `app/services/common/durations.py`, car le service de lecture les utilise.
 
 ### `app/web/playback.py`
 
@@ -132,7 +132,7 @@ ainsi que les payloads JSON associes et les estimations de duree/cout.
 
 Routes `/chat*` de la discussion sur toute la bibliotheque et leur payload.
 
-### `app/services/background_jobs.py`
+### `app/services/jobs/background_jobs.py`
 
 Fonctions executees via `BackgroundTasks` dans le processus web, chacune avec
 sa propre session DB : `run_manual_download_job`, `run_transcript_retry_job`,
@@ -165,34 +165,46 @@ Expose l'API interne sous `/api`.
 
 ### `app/services/` : organisation par domaine
 
-Les services sont rangés en six paquets, un par sujet :
+Chaque service est dans un paquet, un par sujet ; aucun module ne reste a la
+racine de `app/services/` :
 
 | Paquet | Contenu |
 |---|---|
-| `youtube/` | Tout ce qui parle à YouTube : `yt`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
-| `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract`, `local_upload` |
-| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `manage`, `listing`, `scan_events`, `lookup`, `profile`, `subscriptions` |
+| `common/` | Bases partagees par tous les paquets : reglages (`settings`, `settings_format`), note en etoiles (`ratings`), durees (`durations`), recherche par mots (`search`), outils de fichiers (`files`), journal des jobs (`job_log`) |
+| `youtube/` | Tout ce qui parle a YouTube : `yt`, `channel_info`, `downloads`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
+| `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
+| `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |
+| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill` |
 | `playlists/` | Import de playlists (`imports`) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
-| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
-| `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
+| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
+| `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes` |
+| `jobs/` | Orchestration : taches de fond (`background_jobs`) et planificateur (`scheduler`) |
 
-À la racine de `app/services/` restent : les modules d'orchestration
-`background_jobs` et `scheduler`, et les modules transverses `settings`,
-`settings_format`, `ratings`, `durations`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
+Les dependances entre paquets vont dans un seul sens : `common` ne depend
+d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
+de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
+`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common` et
+`media` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
+appelle les autres paquets et aucun ne l'importe en retour. Aucun service
+n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
+`tests/test_code_structure.py` fait respecter ces regles.
 
-Les dépendances entre paquets vont dans un seul sens :
-`youtube` et `llm` ne dépendent d'aucun autre paquet, `media` dépend de
-`youtube`, `channels` de `media` et `youtube`, `playlists` de `channels` et
-`youtube`, `videos` de `media`, `rag` de `channels`, `llm`, `videos` et `youtube`. `background_jobs` et
-`scheduler` appellent les paquets et personne ne les importe en retour.
-Aucun service n'importe `app/web/` : les routes appellent les services, jamais
-l'inverse. `tests/test_code_structure.py` fait respecter ces règles. Les données de démo
-(`demo_seed`) ne sont pas un service : elles sont dans `scripts/demo_seed.py`.
+Hors de `app/services/` : le resume du journal applicatif (`logs_digest`) est
+dans `app/core/`, a cote de `app/core/logging.py` qui ecrit ce journal ; les
+donnees de demo (`demo_seed`) ne sont pas un service, elles sont dans
+`scripts/demo_seed.py`.
+
+Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
+et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
+reponse HTTP, lancer les taches de fond et rendre la page. Les ecritures dans la
+DB encore faites par la couche web sont listees dans
+`tests/test_code_structure.py` (`WEB_DB_WRITES_LEFT`) : cette liste ne peut que
+raccourcir.
 
 ### `app/services/youtube/`
 
-- `yt.py` : appel yt-dlp journalise (`_ytdlp_call`), detection des erreurs
+- `yt.py` : appel yt-dlp journalise (`ytdlp_call`), detection des erreurs
   429 et des premieres pas encore disponibles, extraction metadata video ;
 - `channel_info.py` : resolution et recherche de chaine, profil, comptage et
   listing des videos d'une chaine ;
@@ -201,30 +213,35 @@ l'inverse. `tests/test_code_structure.py` fait respecter ces règles. Les donné
 
 ### `app/services/channels/`
 
+- `manage.py` : ajout et suppression d'une chaine (partages par les pages HTML
+  et `/api`), categories, cloches ;
+- `listing.py` : liste de `/channels` (tri, filtre Notees, recherche, nombre de
+  fiches) ;
+- `lookup.py` : chaine de la bibliotheque correspondant a une URL ou un
+  identifiant YouTube ;
+- `profile.py` : avatar, banniere et description d'une chaine ;
+- `subscriptions.py` : apercu et import du CSV d'abonnements YouTube.
+
+### `app/services/ingest/`
+
 - `scanner.py` : scan automatique des chaines suivies ;
-- `media_import.py` : import metadata, telechargement manuel, relance du
+- `media_import.py` : import de metadonnees, telechargement manuel, relance du
   transcript ;
 - `staging.py` : staged folders, merge de fichiers lorsqu'on ajoute audio ou
   video ;
 - `identity.py` : chaine d'une video, URL canonique ;
 - `throttle.py` : pauses entre requetes YouTube et `RateLimitedError` ;
-- `manage.py` : ajout et suppression d'une chaine (partages par les pages HTML
-  et `/api`), categories, cloches ;
-- `listing.py` : liste de `/channels` (tri, filtre Notees, recherche, nombre de
-  fiches) ;
-- `subscriptions.py` : apercu et import du CSV d'abonnements YouTube.
+- `scan_events.py` : etat du scan en cours, lu par la page des parametres ;
+- `local_upload.py` : import d'un fichier video ou audio depose depuis
+  l'appareil ;
+- `transcript_backfill.py` : rattrapage des transcripts manquants.
 
-Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
-et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
-reponse HTTP, lancer les taches de fond et rendre la page.
-Les ecritures en base encore faites par la couche web sont listees dans
-`tests/test_code_structure.py` (`WEB_DB_WRITES_LEFT`) : cette liste ne peut que
-raccourcir. La note
-en etoiles d'une chaine ou d'une fiche passe par `app/services/ratings.py`.
+### `app/services/common/`
 
-L'écriture d'une ligne de journal de jobs (`log_job`) et de l'activite de
-lecture (`record_playback_activity`) est dans `app/services/job_log.py`,
-partagé par tous les paquets.
+- `ratings.py` : la note en etoiles d'une chaine ou d'une fiche ;
+- `job_log.py` : une ligne de journal de jobs (`log_job`), l'activite de
+  lecture (`record_playback_activity`), l'arret et la progression d'une
+  exploration de chaine.
 
 ### `app/services/media/media_storage.py`
 
@@ -261,7 +278,7 @@ chaines, de videos, recherche semantique dans les notes) et extraction des
 chaines/videos citees par sa reponse. Voir
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
 
-### `app/services/search.py`
+### `app/services/common/search.py`
 
 Recherche textuelle par mots, insensible a la casse et aux accents, et
 classement par pertinence des videos et des chaines. Partagee par les champs

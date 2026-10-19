@@ -357,7 +357,7 @@ Bibliotheque = quatre vues reliees par une barre de sous-navigation commune
 ## Statistiques
 
 Template : `stats.html`, route `GET /stats` (`app/web/routes/stats.py`),
-agregations dans `app/services/library_charts.py`. Page sans JavaScript : les
+agregations dans `app/services/videos/charts.py`. Page sans JavaScript : les
 graphiques sont des barres CSS (largeurs/hauteurs en pourcentage calcule cote
 serveur). Elle montre :
 
@@ -376,7 +376,7 @@ serveur). Elle montre :
   fenetre complete de 12 mois.
 
 - medias supprimes automatiquement par mois (`purged_media_by_month`,
-  `app/services/library_charts.py`) : barres du nombre de videos dont la purge
+  `app/services/videos/charts.py`) : barres du nombre de videos dont la purge
   (`purge_watched_media`) a supprime les fichiers, comptees depuis les
   lignes `purged` de `download_jobs`, sur 12 mois sans les mois vides en tete ;
   total / mois en cours / moyenne en tete ; la carte est absente tant qu'aucune
@@ -906,7 +906,7 @@ Les pages `/videos` et `/channels` ont chacune un champ `q` dans leur
 formulaire de filtres. La recherche s'ajoute aux filtres actifs (chaine,
 types de fichier, categories, "Notees"...) : elle ne les remplace pas.
 
-Correspondance (`search_rank` dans `app/services/search.py`) :
+Correspondance (`search_rank` dans `app/services/common/search.py`) :
 
 - la requete est decoupee en mots ; **tous** les mots doivent etre presents,
   dans n'importe quel ordre et dans n'importe quel champ (`python tuto`

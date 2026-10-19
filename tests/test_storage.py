@@ -12,9 +12,9 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
-from app.services.channels import media_import, scan_events, scanner, throttle
-from app.services.channels.identity import video_already_downloaded
-from app.services.channels.scanner import run_scan, scan_channel
+from app.services.ingest import media_import, scan_events, scanner, throttle
+from app.services.ingest.identity import video_already_downloaded
+from app.services.ingest.scanner import run_scan, scan_channel
 from app.services.youtube import sponsor_segments
 from app.services.youtube.downloads import build_video_folder
 from app.services.youtube.yt import parse_yt_date
@@ -1365,7 +1365,7 @@ def _missing_video_with_metadata(db, channel, tmp_path, yt_video_id, metadata):
 def test_backfill_original_transcripts_only_retries_videos_that_have_an_original_track(
     monkeypatch, tmp_path
 ):
-    from app.services.rag import transcript_backfill
+    from app.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")
@@ -1398,7 +1398,7 @@ def test_backfill_original_transcripts_only_retries_videos_that_have_an_original
 def test_backfill_original_transcripts_stops_after_repeated_failures_and_resumes_later(
     monkeypatch, tmp_path
 ):
-    from app.services.rag import transcript_backfill
+    from app.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")

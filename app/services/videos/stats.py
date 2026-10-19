@@ -5,8 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.models.channel import Channel
 from app.models.video import Video
+from app.services.common.settings import get_global_quota_bytes
 from app.services.media.storage import get_total_used_bytes
-from app.services.settings import get_global_quota_bytes
 
 
 def library_counts(db: Session) -> dict:

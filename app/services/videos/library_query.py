@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.search import video_search_rank
+from app.services.common.search import video_search_rank
 from app.services.videos.filters import video_asset_kind_condition, video_section_condition
 
 

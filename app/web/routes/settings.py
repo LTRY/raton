@@ -10,13 +10,7 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.channels import scan_events
-from app.services.channels.scanner import scan_lock
-from app.services.llm.usage import llm_usage_summary
-from app.services.rag.auto_notes import LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY
-from app.services.rag.auto_notes import LAST_RUN_SUMMARY_KEY as AUTO_NOTES_LAST_RUN_SUMMARY_KEY
-from app.services.scheduler import get_last_auto_scan_info, scheduled_scan
-from app.services.settings import (
+from app.services.common.settings import (
     AUTO_NOTES_ENABLED_KEY,
     AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
     DEFAULT_VIDEO_CATEGORY_LABELS,
@@ -44,7 +38,7 @@ from app.services.settings import (
     get_video_library_views,
     set_setting,
 )
-from app.services.settings_format import (
+from app.services.common.settings_format import (
     parse_video_category_label_styles,
     parse_video_category_labels,
     parse_video_library_views,
@@ -52,6 +46,12 @@ from app.services.settings_format import (
     serialize_video_category_labels,
     serialize_video_library_views,
 )
+from app.services.ingest import scan_events
+from app.services.ingest.scanner import scan_lock
+from app.services.jobs.scheduler import get_last_auto_scan_info, scheduled_scan
+from app.services.llm.usage import llm_usage_summary
+from app.services.rag.auto_notes import LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY
+from app.services.rag.auto_notes import LAST_RUN_SUMMARY_KEY as AUTO_NOTES_LAST_RUN_SUMMARY_KEY
 from app.web.job_logs import LOG_FILTERS, LOG_PAGE_SIZE, log_days, normalize_log_filter
 from app.web.library_stats import library_stats_context
 from app.web.shared import form_list_values, form_text_value, page_href_builder, redirect, templates

@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.channels import scan_events, throttle
+from app.services.ingest import scan_events, throttle
 
 
 @pytest.fixture(autouse=True)

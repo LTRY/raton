@@ -1,7 +1,7 @@
 """Digest of the application journal (`app.jsonl`): what a reviewer reads before opening the raw file.
 
 Standard library only, so it also runs on the host without the app's dependencies:
-`python -m app.services.logs_digest --dir .local/logs --hours 24`. The journal's format and events
+`python -m app.core.logs_digest --dir .local/logs --hours 24`. The journal's format and events
 are described in docs/spec/13-jobs-logs-planification.md ("Journal applicatif").
 """
 
@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 LOG_FILE_NAME = "app.jsonl"
-# Jobs that must start once a day; keep in step with app/services/scheduler.py.
+# Jobs that must start once a day; keep in step with app/services/jobs/scheduler.py.
 EXPECTED_DAILY_JOBS = ("scheduled_scan", "scheduled_media_purge", "scheduled_auto_notes")
 # A job still running this recently is not "never finished": it may just be long.
 UNFINISHED_AFTER = timedelta(minutes=30)

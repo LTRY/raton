@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime
 
-from app.services.durations import format_compact_duration
+from app.services.common.durations import format_compact_duration
 from app.web.shared import templates
 
 

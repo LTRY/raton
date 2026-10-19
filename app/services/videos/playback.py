@@ -8,7 +8,11 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.job import DownloadJob
-from app.services.durations import format_compact_duration, format_duration, parse_duration_label
+from app.services.common.durations import (
+    format_compact_duration,
+    format_duration,
+    parse_duration_label,
+)
 from app.services.videos.filters import video_category_labels
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}

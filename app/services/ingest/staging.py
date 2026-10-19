@@ -7,13 +7,13 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from app.models.video import Video
-from app.services.files import (
+from app.services.common.files import (
     directory_size,
     move_directory,
     remove_directory,
     unique_sibling_path,
 )
-from app.services.job_log import log_job
+from app.services.common.job_log import log_job
 from app.services.media.audio_extract import copy_audio_track, extractable_video_file
 from app.services.media.media_storage import media_type_for_paths
 

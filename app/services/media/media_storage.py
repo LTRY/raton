@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
 from app.models.video import Video
-from app.services.files import directory_size
-from app.services.job_log import log_job
+from app.services.common.files import directory_size
+from app.services.common.job_log import log_job
 
 WATCHED_RATIO = 0.9
 RETENTION = timedelta(days=7)

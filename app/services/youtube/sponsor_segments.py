@@ -4,7 +4,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.services.settings import get_sponsor_segment_categories
+from app.services.common.settings import get_sponsor_segment_categories
 from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
 
 MINIMUM_SKIP_SECONDS: float = 1.0

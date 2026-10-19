@@ -14,6 +14,12 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
+from app.services.common.settings import (
+    AUTO_NOTES_ENABLED_KEY,
+    AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
+    get_setting,
+    set_setting,
+)
 from app.services.llm.prompts import build_auto_notes_prompt, split_auto_notes_result
 from app.services.llm.provider import AnthropicProvider, BatchEntry
 from app.services.rag import auto_notes
@@ -24,12 +30,6 @@ from app.services.rag.auto_notes import (
     BATCH_SUBMITTED_AT_KEY,
     eligible_videos,
     run_auto_notes_sweep,
-)
-from app.services.settings import (
-    AUTO_NOTES_ENABLED_KEY,
-    AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
-    get_setting,
-    set_setting,
 )
 
 LONG_TRANSCRIPT = "Une phrase du transcript. " * 40  # > MIN_TRANSCRIPT_CHARS

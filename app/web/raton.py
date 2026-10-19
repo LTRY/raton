@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.settings import (
+from app.services.common.settings import (
     SCREEN_TIME_KINDS,
     get_screen_time_limits,
     get_setting,

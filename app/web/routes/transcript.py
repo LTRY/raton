@@ -11,8 +11,9 @@ from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.background_jobs import enqueue_llm_job, run_llm_job, video_analysis_has_image
-from app.services.job_log import log_job
+from app.services.common.job_log import log_job
+from app.services.common.settings import get_llm_provider_name
+from app.services.jobs.background_jobs import enqueue_llm_job, run_llm_job, video_analysis_has_image
 from app.services.llm.chat_history import load_chat, save_chat
 from app.services.llm.prompts import (
     ANALYSIS_CLICKBAIT_HEADER,
@@ -22,7 +23,6 @@ from app.services.llm.prompts import (
     split_generation_result,
 )
 from app.services.rag.indexing import index_video_notes
-from app.services.settings import get_llm_provider_name
 from app.web.shared import redirect
 
 router = APIRouter()

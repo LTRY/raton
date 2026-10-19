@@ -14,17 +14,18 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.channels.media_import import (
-    download_manual_media,
-    import_video_metadata,
-    retry_transcript_download,
-)
 from app.services.channels.profile import (
     PROFILE_FETCH_DELAY_SECONDS,
     pending_profile_channel_ids,
     refresh_channel_profile,
 )
-from app.services.channels.scanner import scan_channel_section
+from app.services.ingest.media_import import (
+    download_manual_media,
+    import_video_metadata,
+    retry_transcript_download,
+)
+from app.services.ingest.scanner import scan_channel_section
+from app.services.ingest.transcript_backfill import backfill_original_transcripts
 from app.services.llm.prompts import ANALYSIS_CLICKBAIT_HEADER, THUMBNAIL_MEDIA_TYPES
 from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
@@ -35,7 +36,6 @@ from app.services.rag.library_chat_tools import (
     MAX_TOOL_TURNS,
     LibraryChatToolbox,
 )
-from app.services.rag.transcript_backfill import backfill_original_transcripts
 from app.services.youtube.view_counts import backfill_view_counts
 
 logger = logging.getLogger(__name__)

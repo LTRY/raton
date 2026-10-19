@@ -215,7 +215,7 @@ Job asynchrone pour toute completion LLM (generation, chat ou notes automatiques
 quel que soit le fournisseur — une ligne est toujours creee, jamais d'appel
 synchrone dans le handler de la requete. Le job est traite dans le process
 web lui-meme, via une tache `fastapi.BackgroundTasks`
-(`app/services/background_jobs.py:run_llm_job`) planifiee juste apres la reponse `queued`.
+(`app/services/jobs/background_jobs.py:run_llm_job`) planifiee juste apres la reponse `queued`.
 
 Champs :
 
@@ -254,7 +254,7 @@ Champs :
   par le fournisseur (pas une estimation par nombre de caracteres), rempli
   pour les completions qui ont reussi et pour un job `failed` dont la reponse
   a ete recue mais inutilisable (tronquee/vide, tokens factures)
-  (`app/services/background_jobs.py:run_llm_job`) ; `cost_usd` reste `null`
+  (`app/services/jobs/background_jobs.py:run_llm_job`) ; `cost_usd` reste `null`
   sauf pour `anthropic` sur un modele dont le tarif est connu
   (`app/services/llm/usage.py:ANTHROPIC_MODEL_PRICING`). Voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) pour

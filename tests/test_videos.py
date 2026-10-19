@@ -23,12 +23,13 @@ from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.settings import SettingsUpdate
-from app.services import background_jobs, search
 from app.services.channels import manage as channel_manage
-from app.services.channels.identity import channel_values_from_info
+from app.services.common import search
+from app.services.common.settings import get_sponsor_skip_enabled
+from app.services.ingest.identity import channel_values_from_info
+from app.services.jobs import background_jobs
+from app.services.jobs.scheduler import record_scan_result
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
-from app.services.scheduler import record_scan_result
-from app.services.settings import get_sponsor_skip_enabled
 from app.services.videos import list_state as videos_list_state
 from app.services.videos import playback as videos_playback
 from app.services.youtube import channel_info, sponsor_segments
@@ -5875,7 +5876,7 @@ def test_settings_page_renders_no_progress_category_checkboxes(tmp_path):
 
 
 def test_ensure_default_settings_seeds_defaults_without_llm_provider():
-    from app.services.settings import ensure_default_settings
+    from app.services.common.settings import ensure_default_settings
 
     db = make_session()
 
@@ -5932,7 +5933,7 @@ def test_settings_page_renders_sponsor_segment_category_checkboxes(tmp_path):
 
 
 def test_get_sponsor_segment_categories_defaults_to_all():
-    from app.services.settings import (
+    from app.services.common.settings import (
         SPONSOR_SEGMENT_CATEGORY_CHOICES,
         get_sponsor_segment_categories,
     )
@@ -5942,7 +5943,7 @@ def test_get_sponsor_segment_categories_defaults_to_all():
 
 
 def test_get_sponsor_segment_categories_filters_unknown_values():
-    from app.services.settings import get_sponsor_segment_categories
+    from app.services.common.settings import get_sponsor_segment_categories
 
     db = make_session()
     db.add(AppSetting(key="sponsor_segment_categories", value="sponsor,bogus,outro"))

@@ -12,13 +12,10 @@ from app.models.video import Video
 from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import VideoRead
-from app.services.background_jobs import run_channel_profile_backfill_job
 from app.services.channels import manage as channel_manage
 from app.services.channels.manage import ChannelAlreadyInLibraryError
-from app.services.library_charts import library_chart_data
-from app.services.media.storage import get_total_used_bytes
-from app.services.ratings import InvalidRatingError, set_rating
-from app.services.settings import (
+from app.services.common.ratings import InvalidRatingError, set_rating
+from app.services.common.settings import (
     GLOBAL_QUOTA_BYTES_KEY,
     MEDIA_ROOT_KEY,
     VIDEO_CATEGORY_LABELS_KEY,
@@ -31,13 +28,16 @@ from app.services.settings import (
     get_video_library_views,
     set_setting,
 )
-from app.services.settings_format import (
+from app.services.common.settings_format import (
     parse_video_category_label_styles,
     parse_video_library_views,
     serialize_video_category_label_styles,
     serialize_video_category_labels,
     serialize_video_library_views,
 )
+from app.services.jobs.background_jobs import run_channel_profile_backfill_job
+from app.services.media.storage import get_total_used_bytes
+from app.services.videos.charts import library_chart_data
 from app.services.youtube.channel_info import ChannelNotFoundError
 from app.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 

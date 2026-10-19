@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.settings import (
+from app.services.common.settings import (
     get_llm_provider_display_label,
     get_no_progress_category_labels,
     get_screen_time_limits,

@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from app.models.job import DownloadJob
-from app.services.durations import format_compact_duration
+from app.services.common.durations import format_compact_duration
 from app.services.videos.playback import local_datetime, playback_activity_view
 from app.web.shared import format_french_date, templates
 

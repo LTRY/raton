@@ -15,6 +15,7 @@ from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
+from app.services.common.settings import AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY, set_setting
 from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
@@ -23,7 +24,6 @@ from app.services.rag.auto_notes import (
     MAX_FAILURES_PER_VIDEO,
 )
 from app.services.rag.dashboard import next_sweep_at, rag_dashboard_data
-from app.services.settings import AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY, set_setting
 
 NOW = datetime(2026, 10, 13, 12, 0, tzinfo=UTC)
 MAX_STATEMENTS = 40

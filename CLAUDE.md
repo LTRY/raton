@@ -96,11 +96,11 @@ Where each kind of code lives, and which service package may import which, is in
 - **Before writing a helper, look for it in `app/services/`.** Two copies of the same rule drift apart (this is how `/api` came to accept a channel the form refused).
 - **A service signals a refused action with an exception** (a `ValueError` subclass whose message is the French text shown to the user); the route maps it to 400/404/409 or an error message. Services commit their own writes.
 - **One subject per module.** Split a module that mixes subjects or grows past ~400 lines; don't import another module's `_private` names — make the name public or move the code.
-- **Moving code moves the test patches with it**: `monkeypatch.setattr` must target the module where the name is looked up. A module-level setting that tests patch (the pauses of `channels/throttle.py`) is read through its module (`throttle.PAUSE_...`), never copied in with `from ... import`.
+- **Moving code moves the test patches with it**: `monkeypatch.setattr` must target the module where the name is looked up. A module-level setting that tests patch (the pauses of `ingest/throttle.py`) is read through its module (`throttle.PAUSE_...`), never copied in with `from ... import`.
 
 Traps:
 
-- Tests that fake the DB session of a background job runner patch `app.services.background_jobs.SessionLocal` (each runner opens its own session).
+- Tests that fake the DB session of a background job runner patch `app.services.jobs.background_jobs.SessionLocal` (each runner opens its own session).
 - `video_path` and `audio_path` can coexist: always check the path columns, never `media_type` alone.
 - The Docker stack ignores `DATABASE_URL`/`MEDIA_ROOT` from `.env` (the compose file hardcodes them); nothing outside Docker reads them. Spec: `04-configuration-et-deploiement.md`.
 

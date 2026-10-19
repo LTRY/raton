@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.logging import log_event
 from app.models.setting import AppSetting
-from app.services.settings_format import (
+from app.services.common.settings_format import (
     DEFAULT_VIDEO_CATEGORY_COLORS,
     DEFAULT_VIDEO_CATEGORY_LABELS,
     DEFAULT_VIDEO_LIBRARY_VIEWS,

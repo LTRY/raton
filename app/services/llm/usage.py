@@ -3,7 +3,7 @@
 Complements the pre-run char-count estimate in app/web/routes/transcript.py
 (estimate_clean_transcript_cost_usd, shown before a clean_transcript job
 starts): this module is the post-run accounting, storing exact usage on each
-LlmJob (app/services/background_jobs.py:run_llm_job) and aggregating it for
+LlmJob (app/services/jobs/background_jobs.py:run_llm_job) and aggregating it for
 display in /settings.
 """
 

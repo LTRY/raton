@@ -132,7 +132,7 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
   une autre machine accede par un point de montage local different a la meme
   bibliotheque media que celle qui a fait les telechargements (ex. prefixe
   `/media/youtube` du conteneur Docker remplace par un montage reseau local). Ne modifie rien dans la DB ; s'applique uniquement au moment de lire
-  les fichiers (`app/web/routes/media.py`, `app/services/channels/identity.py`,
+  les fichiers (`app/web/routes/media.py`, `app/services/ingest/identity.py`,
   `app/services/media/media_storage.py`) et, pour les profils de chaines
   (`_channels/`), aussi a leur ecriture et suppression
   (`app/services/channels/profile.py:local_media_root`).

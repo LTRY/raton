@@ -12,8 +12,8 @@ from app.db.session import Base
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
-from app.services.channels.throttle import RateLimitedError
-from app.services.job_log import log_job
+from app.services.common.job_log import log_job
+from app.services.ingest.throttle import RateLimitedError
 from app.services.playlists import imports as playlists_service
 from app.services.playlists.editing import playlist_title_from_filename
 from app.services.playlists.imports import (
@@ -75,7 +75,7 @@ def fake_import_video_metadata(
     subtitle_source="auto",
     is_new=False,
 ):
-    """Stands in for app.services.channels.scanner.import_video_metadata in tests:
+    """Stands in for app.services.ingest.scanner.import_video_metadata in tests:
     same get-or-create-by-yt_video_id idempotency, no yt-dlp/network calls.
     """
     yt_video_id = (preview or {}).get("id") or video_url.rsplit("v=", 1)[-1]

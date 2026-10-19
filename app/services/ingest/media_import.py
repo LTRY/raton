@@ -10,27 +10,27 @@ from sqlalchemy.orm import Session
 
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
-from app.services.channels.identity import (
+from app.services.common.files import (
+    directory_size,
+    remove_directory,
+)
+from app.services.common.job_log import log_job
+from app.services.common.settings import get_media_root
+from app.services.ingest.identity import (
     canonical_video_url,
     get_or_create_channel_from_info,
     video_source_section,
 )
-from app.services.channels.staging import (
+from app.services.ingest.staging import (
     commit_video_with_files,
     extract_audio_from_downloaded_video,
     final_path,
     merge_staged_files,
     staged_folder,
 )
-from app.services.channels.throttle import RateLimitedError
-from app.services.files import (
-    directory_size,
-    remove_directory,
-)
-from app.services.job_log import log_job
+from app.services.ingest.throttle import RateLimitedError
 from app.services.media.media_storage import media_type_for_paths
 from app.services.media.thumbnails import ensure_video_thumbnails
-from app.services.settings import get_media_root
 from app.services.youtube.downloads import (
     SUBTITLE_EXTENSIONS,
     build_video_folder,

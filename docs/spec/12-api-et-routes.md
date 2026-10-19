@@ -204,7 +204,7 @@ Parametres et divers :
   scan tourne.
 - `GET /settings/scan/events?after=N` : evenements du scan emis apres `N`,
   `{events: [{id, level, message, final}], last_id, running}`. Flux en memoire du
-  processus (`app/services/channels/scan_events.py`), pas une table.
+  processus (`app/services/ingest/scan_events.py`), pas une table.
 - `GET /logs` : logs jobs, filtres `status` (`all`, `errors`, `warnings`, `running`), `q` (recherche) et `page` (voir [11 Interface HTML](11-interface-html.md), section Logs).
 
 Le scan des chaines n'a pas de route dans `/api` : il est declenche par le

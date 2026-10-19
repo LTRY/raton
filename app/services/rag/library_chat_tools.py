@@ -20,8 +20,8 @@ from app.models.channel import Channel
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.video import Video
 from app.services.channels.lookup import find_channel
+from app.services.common.search import channel_search_rank, fold_search_text, video_search_rank
 from app.services.rag import retrieval as rag_retrieval
-from app.services.search import channel_search_rank, fold_search_text, video_search_rank
 from app.services.videos.playback import (
     dashboard_media_activity_logs,
     local_datetime,

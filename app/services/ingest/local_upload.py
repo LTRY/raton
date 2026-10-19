@@ -1,7 +1,7 @@
 """Import of a media file dropped by the user (no YouTube involved).
 
 The file is streamed to a staging folder next to its final folder, then moved in one step, like a
-download (see `app/services/channels/staging.py`). Local videos live under a pseudo-channel so that cards,
+download (see `app/services/ingest/staging.py`). Local videos live under a pseudo-channel so that cards,
 playback and filters need no special case.
 """
 
@@ -18,9 +18,9 @@ from sqlalchemy.orm import Session
 
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
-from app.services.files import move_directory, sanitize_filename, unique_sibling_path
+from app.services.common.files import move_directory, sanitize_filename, unique_sibling_path
+from app.services.common.settings import get_media_root
 from app.services.media.thumbnails import ensure_video_thumbnails
-from app.services.settings import get_media_root
 from app.services.youtube.downloads import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 from app.services.youtube.view_counts import parse_duration_seconds
 

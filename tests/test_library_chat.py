@@ -13,7 +13,7 @@ from app.models.job import DownloadJob
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import TranscriptStatus, Video
-from app.services import background_jobs
+from app.services.jobs import background_jobs
 from app.services.llm.provider import CompletionResult
 from app.services.rag import retrieval as rag_retrieval
 from app.services.rag.library_chat_tools import LibraryChatToolbox

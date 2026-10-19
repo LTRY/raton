@@ -9,15 +9,15 @@ from sqlalchemy.orm import Session
 
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.channels import scan_events, throttle
-from app.services.channels.identity import canonical_video_url, video_already_downloaded
-from app.services.channels.media_import import import_video_metadata
-from app.services.channels.throttle import (
+from app.services.common.job_log import log_job
+from app.services.ingest import scan_events, throttle
+from app.services.ingest.identity import canonical_video_url, video_already_downloaded
+from app.services.ingest.media_import import import_video_metadata
+from app.services.ingest.throttle import (
     RateLimitedError,
     pause,
     pause_between_imports,
 )
-from app.services.job_log import log_job
 from app.services.media.storage import has_auto_download_headroom
 from app.services.youtube.channel_info import list_channel_entries
 from app.services.youtube.yt import is_not_yet_available_error, is_rate_limit_error

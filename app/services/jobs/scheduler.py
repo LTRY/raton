@@ -8,14 +8,15 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.logging import log_event, logged_job
 from app.db.session import SessionLocal
-from app.services.background_jobs import (
+from app.services.common.settings import get_setting, set_setting
+from app.services.ingest.scanner import run_scan
+from app.services.jobs.background_jobs import (
     run_channel_profile_backfill_job,
     run_note_index_backfill_job,
     run_original_transcript_backfill_job,
     run_thumbnail_backfill_job,
     run_view_count_backfill_job,
 )
-from app.services.channels.scanner import run_scan
 from app.services.media.media_storage import purge_watched_media
 from app.services.rag.auto_notes import (
     DAILY_AUTO_NOTES_HOUR,
@@ -24,7 +25,6 @@ from app.services.rag.auto_notes import (
 from app.services.rag.auto_notes import (
     LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY,
 )
-from app.services.settings import get_setting, set_setting
 
 logger = logging.getLogger(__name__)
 

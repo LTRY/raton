@@ -11,7 +11,7 @@ from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
-from app.services.channels import media_import, staging
+from app.services.ingest import media_import, staging
 from app.services.media import audio_extract
 
 MERGED = {

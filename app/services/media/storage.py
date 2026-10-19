@@ -2,8 +2,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.video import Video
-from app.services.files import directory_size
-from app.services.settings import get_global_quota_bytes, get_media_root
+from app.services.common.files import directory_size
+from app.services.common.settings import get_global_quota_bytes, get_media_root
 
 AUTO_DOWNLOAD_MIN_FREE_RATIO = 0.2
 

@@ -9,7 +9,7 @@ import webvtt
 from yt_dlp import YoutubeDL
 
 from app.models.video import TranscriptStatus
-from app.services.files import sanitize_filename
+from app.services.common.files import sanitize_filename
 from app.services.youtube.yt import extract_video_info, ytdlp_call
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.search import channel_search_rank
+from app.services.common.search import channel_search_rank
 
 CHANNEL_SORTS = ("rating", "activity", "alpha", "added")
 

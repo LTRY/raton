@@ -19,7 +19,7 @@ bibliothèque : il lui faut des outils. Deux familles de recherche existent :
 
 - **textuelle** (`chercher_chaines`, `chercher_videos`) : mots-clés dans les
   titres, noms de chaînes, labels, commentaires
-  (`app/services/search.py`) ;
+  (`app/services/common/search.py`) ;
 - **sémantique** (`chercher_dans_les_notes`) : trouver ce qui *parle de* un
   sujet même avec d'autres mots (« rétro-ingénierie » pour « reverse
   engineering »), dans le contenu des vidéos.

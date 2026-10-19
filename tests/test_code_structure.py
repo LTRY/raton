@@ -42,25 +42,27 @@ def test_web_shared_imports_no_other_web_module():
     assert not offenders, f"app/web/shared.py imports {offenders}"
 
 
-# Package -> packages it may import, inside app/services/. A package missing from a value
-# must not be imported by the key; the orchestration modules at the root sit on top of all of them.
+# Package -> packages it may import, inside app/services/. Every service module lives in one of these
+# packages; `jobs` is the orchestration on top of all of them, so no other package imports it.
 SERVICE_PACKAGE_DEPENDENCIES = {
-    "youtube": set(),
-    "llm": set(),
-    "media": {"youtube"},
-    "channels": {"media", "youtube"},
-    "playlists": {"channels", "youtube"},
-    "videos": {"media"},
-    "rag": {"channels", "llm", "videos", "youtube"},
+    "common": set(),
+    "youtube": {"common"},
+    "llm": {"common"},
+    "media": {"common"},
+    "channels": {"common", "youtube"},
+    "ingest": {"common", "media", "youtube"},
+    "playlists": {"common", "ingest", "youtube"},
+    "videos": {"common", "media"},
+    "rag": {"channels", "common", "llm", "videos", "youtube"},
+    "jobs": {"channels", "common", "ingest", "llm", "media", "rag", "videos", "youtube"},
 }
-SERVICE_ORCHESTRATION_MODULES = {"background_jobs", "scheduler"}
 
 
 def service_package(module: str) -> str | None:
     parts = module.split(".")
     if parts[:2] != ["app", "services"] or len(parts) < 3:
         return None
-    return parts[2] if parts[2] in SERVICE_PACKAGE_DEPENDENCIES else None
+    return parts[2]
 
 
 def test_services_import_no_web_module():
@@ -74,25 +76,30 @@ def test_services_import_no_web_module():
     assert not offenders, f"services import the web layer: {offenders}"
 
 
+def test_every_service_module_belongs_to_a_known_package():
+    loose = sorted(
+        str(path.relative_to(APP / "services"))
+        for path in (APP / "services").rglob("*.py")
+        if path.name != "__init__.py"
+        and path.relative_to(APP / "services").parts[0] not in SERVICE_PACKAGE_DEPENDENCIES
+    )
+    assert not loose, f"put these modules in a package of SERVICE_PACKAGE_DEPENDENCIES: {loose}"
+
+
 def test_service_packages_form_a_dag():
-    # Orchestration modules (jobs, scheduler) call the packages; nothing calls them back.
     offenders = []
     for path in sorted((APP / "services").rglob("*.py")):
         relative = path.relative_to(APP / "services")
-        owner = relative.parts[0] if len(relative.parts) > 1 else relative.stem
-        if owner in SERVICE_ORCHESTRATION_MODULES:
+        if len(relative.parts) < 2:
             continue
+        owner = relative.parts[0]
+        allowed = SERVICE_PACKAGE_DEPENDENCIES.get(owner, set())
         for module in imported_modules(path):
-            if module in {f"app.services.{name}" for name in SERVICE_ORCHESTRATION_MODULES} or any(
-                module.startswith(f"app.services.{name}.") for name in SERVICE_ORCHESTRATION_MODULES
-            ):
-                offenders.append(f"{relative}: {module}")
             target = service_package(module)
-            if (
-                target
-                and target != owner
-                and target not in SERVICE_PACKAGE_DEPENDENCIES.get(owner, set())
-            ):
+            # `from app.services import x` names a package too.
+            if target is None and module.startswith("app.services."):
+                target = module.split(".")[2]
+            if target and target != owner and target not in allowed:
                 offenders.append(f"{relative}: {module}")
     assert not offenders, "forbidden service imports: " + ", ".join(sorted(set(offenders)))
 

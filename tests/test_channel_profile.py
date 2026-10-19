@@ -12,10 +12,10 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.setting import AppSetting
-from app.services import background_jobs
-from app.services import scheduler as scheduler_module
 from app.services.channels import manage as channel_manage
 from app.services.channels import profile as channel_profile
+from app.services.jobs import background_jobs
+from app.services.jobs import scheduler as scheduler_module
 from app.services.youtube import channel_info
 
 

@@ -22,6 +22,11 @@ from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
+from app.services.common.settings import (
+    get_auto_notes_enabled,
+    get_auto_notes_excluded_category_labels,
+    get_setting,
+)
 from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
@@ -46,11 +51,6 @@ from app.services.rag.retrieval import (
     MAX_CHUNKS_PER_VIDEO,
     MIN_RELEVANCE_SCORE,
     TOP_K_CHUNKS,
-)
-from app.services.settings import (
-    get_auto_notes_enabled,
-    get_auto_notes_excluded_category_labels,
-    get_setting,
 )
 
 SWEEP_TIMEZONE = "Europe/Paris"

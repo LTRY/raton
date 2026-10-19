@@ -12,9 +12,9 @@ from app.db.session import SessionLocal
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.models.video import Video
-from app.services.channels.media_import import import_video_metadata
-from app.services.channels.throttle import RateLimitedError, pause_between_imports
-from app.services.job_log import log_job
+from app.services.common.job_log import log_job
+from app.services.ingest.media_import import import_video_metadata
+from app.services.ingest.throttle import RateLimitedError, pause_between_imports
 from app.services.playlists.editing import add_video_to_playlist
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 

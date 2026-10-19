@@ -16,7 +16,7 @@ from app.main import app
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.settings import get_setting, set_setting
+from app.services.common.settings import get_setting, set_setting
 from app.web.raton import (
     ART_DIR,
     CATALOGUE,

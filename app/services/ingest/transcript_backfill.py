@@ -14,11 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
 from app.models.video import TranscriptStatus, Video
-from app.services.channels import scan_events
-from app.services.channels.media_import import retry_transcript_download
-from app.services.channels.throttle import pause_between_imports
-from app.services.job_log import log_job
-from app.services.settings import get_setting, set_setting
+from app.services.common.job_log import log_job
+from app.services.common.settings import get_setting, set_setting
+from app.services.ingest import scan_events
+from app.services.ingest.media_import import retry_transcript_download
+from app.services.ingest.throttle import pause_between_imports
 from app.services.youtube.downloads import choose_subtitle_track
 
 logger = logging.getLogger(__name__)

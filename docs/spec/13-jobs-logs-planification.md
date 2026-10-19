@@ -114,7 +114,7 @@ utilisateur ligne par ligne a faire avant de lancer l'import.
 
 ## Scan automatique
 
-Le scheduler APScheduler (`app/services/scheduler.py`) demarre reellement au
+Le scheduler APScheduler (`app/services/jobs/scheduler.py`) demarre reellement au
 lifespan FastAPI (`app/main.py:lifespan`, appel a `start_scheduler()` juste
 apres `ensure_default_settings`, `stop_scheduler()` a l'arret) et enregistre
 un job cron quotidien a `DAILY_SCAN_HOUR` (3h, timezone
@@ -156,7 +156,7 @@ donc avec le meme verrou, la meme garde de stockage et la meme mise a jour de
 "Dernier scan automatique" que le cron.
 
 Le scan (planifie ou manuel) publie ce qu'il fait dans un flux en memoire,
-`app/services/channels/scan_events.py` : debut (nombre de chaines), chaine en cours,
+`app/services/ingest/scan_events.py` : debut (nombre de chaines), chaine en cours,
 nouveautes trouvees et plafond atteint, chaque fiche importee, chaque echec,
 "rien de nouveau", interruption par un 429, garde de stockage, fin avec le
 total et la duree. Le dernier evenement d'un scan porte `final = true`.
@@ -222,10 +222,10 @@ Garde-fous :
 
 ### Revue des 24 dernieres heures
 
-Le journal des dernieres heures se resume avec `app/services/logs_digest.py` : il conclut « nominal » ou liste les problemes par gravite, avec leur cause probable, en lecture seule.
+Le journal des dernieres heures se resume avec `app/core/logs_digest.py` : il conclut « nominal » ou liste les problemes par gravite, avec leur cause probable, en lecture seule.
 
-Elle s'appuie sur `app/services/logs_digest.py` (bibliotheque standard seule),
-lance par `python -m app.services.logs_digest --dir <LOG_DIR> --hours 24`. Le
+Elle s'appuie sur `app/core/logs_digest.py` (bibliotheque standard seule),
+lance par `python -m app.core.logs_digest --dir <LOG_DIR> --hours 24`. Le
 digest lit `app.jsonl` et les fichiers tournes, garde la fenetre demandee et
 sort un resume Markdown : lignes par niveau, redemarrages (`app.started`),
 erreurs et avertissements groupes par signature (les nombres sont
@@ -241,7 +241,7 @@ Verification : `tests/test_app_logging.py`, `tests/test_logs_digest.py`.
 
 ## Nombre de vues des videos
 
-`run_view_count_backfill_job` (`app/services/background_jobs.py`) copie le
+`run_view_count_backfill_job` (`app/services/jobs/background_jobs.py`) copie le
 `view_count` et la `duration` de `metadata.json` dans `videos.view_count` et
 `videos.duration_seconds` pour les videos qui ont un fichier de metadonnees et
 n'ont pas encore l'une des deux valeurs. Il est lance une fois
@@ -250,7 +250,7 @@ trigger) ; sans video en attente, il ne fait rien.
 
 ## Miniatures des videos
 
-`run_thumbnail_backfill_job` (`app/services/background_jobs.py`) cree les
+`run_thumbnail_backfill_job` (`app/services/jobs/background_jobs.py`) cree les
 copies reduites de vignette (`thumbs/320.jpg`, `thumbs/640.jpg`) des videos
 qui n'en ont pas encore. Il est lance une fois au demarrage par
 `start_scheduler()` (job `backfill_thumbnails`, sans trigger), en arriere-plan
@@ -259,7 +259,7 @@ ffmpeg est journalise et la page sert la vignette d'origine.
 
 ## Profil des chaines
 
-`run_channel_profile_backfill_job` (`app/services/background_jobs.py`) recupere
+`run_channel_profile_backfill_job` (`app/services/jobs/background_jobs.py`) recupere
 le profil de chaque chaine dont `metadata_fetched_at` est `NULL` (et qui a un
 `yt_channel_id`), une a la fois, avec 2 s de pause entre deux chaines pour ne
 pas marteler YouTube. C'est le point d'entree unique : il est lance en

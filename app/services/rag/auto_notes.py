@@ -26,6 +26,13 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import get_settings, local_media_path
 from app.models.llm_job import LlmJob
 from app.models.video import Video
+from app.services.common.settings import (
+    get_auto_notes_enabled,
+    get_auto_notes_excluded_category_labels,
+    get_setting,
+    set_setting,
+)
+from app.services.common.settings_format import parse_video_category_labels
 from app.services.llm.prompts import (
     build_auto_notes_prompt,
     split_auto_notes_result,
@@ -40,13 +47,6 @@ from app.services.rag.indexing import (
     backfill_summary_chunks,
     index_video_notes,
 )
-from app.services.settings import (
-    get_auto_notes_enabled,
-    get_auto_notes_excluded_category_labels,
-    get_setting,
-    set_setting,
-)
-from app.services.settings_format import parse_video_category_labels
 
 logger = logging.getLogger(__name__)
 

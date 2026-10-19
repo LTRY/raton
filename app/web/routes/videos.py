@@ -20,16 +20,8 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.models.video import Video
-from app.services.background_jobs import (
-    CHANNEL_VIDEO_PAGE_SIZE,
-    run_manual_download_job,
-    run_transcript_retry_job,
-    video_analysis_has_image,
-)
-from app.services.channels.identity import ensure_video_channel
-from app.services.channels.media_import import import_video_metadata
-from app.services.durations import format_duration
-from app.services.job_log import (
+from app.services.common.durations import format_duration
+from app.services.common.job_log import (
     CHANNEL_IMPORT_PROGRESS_LIMIT,
     JOB_DONE_STATUSES,
     cancel_channel_exploration,
@@ -37,10 +29,8 @@ from app.services.job_log import (
     log_job,
     record_playback_activity,
 )
-from app.services.media.local_upload import LocalUploadError, import_local_media
-from app.services.media.media_storage import mark_watched_if_complete
-from app.services.ratings import InvalidRatingError, check_rating, set_rating
-from app.services.settings import (
+from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
+from app.services.common.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
     add_video_category_labels,
     get_llm_provider_display_label,
@@ -50,7 +40,20 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_library_views,
 )
-from app.services.settings_format import parse_video_category_labels, serialized_category_labels
+from app.services.common.settings_format import (
+    parse_video_category_labels,
+    serialized_category_labels,
+)
+from app.services.ingest.identity import ensure_video_channel
+from app.services.ingest.local_upload import LocalUploadError, import_local_media
+from app.services.ingest.media_import import import_video_metadata
+from app.services.jobs.background_jobs import (
+    CHANNEL_VIDEO_PAGE_SIZE,
+    run_manual_download_job,
+    run_transcript_retry_job,
+    video_analysis_has_image,
+)
+from app.services.media.media_storage import mark_watched_if_complete
 from app.services.videos.download_options import (
     normalize_download_media_types,
     normalize_subtitle_language,

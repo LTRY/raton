@@ -11,9 +11,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
 from app.models.channel import Channel
-from app.services.files import sanitize_filename
-from app.services.job_log import log_job
-from app.services.settings import get_media_root
+from app.services.common.files import sanitize_filename
+from app.services.common.job_log import log_job
+from app.services.common.settings import get_media_root
 from app.services.youtube import channel_info
 from app.services.youtube.url_guard import ensure_public_http_url
 
