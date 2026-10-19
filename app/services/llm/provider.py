@@ -344,40 +344,6 @@ class AnthropicProvider:
                 )
         return entries
 
-    def complete_with_image(
-        self,
-        prompt: str,
-        image_bytes: bytes,
-        media_type: str,
-        on_text: Callable[[str], None] | None = None,
-    ) -> CompletionResult:
-        import base64
-
-        import anthropic
-
-        client = anthropic.Anthropic(
-            api_key=self.api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES
-        )
-        image_block = {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": media_type,
-                "data": base64.standard_b64encode(image_bytes).decode("ascii"),
-            },
-        }
-        with client.messages.stream(
-            model=self.model,
-            max_tokens=max_output_tokens(self.model),
-            messages=[{"role": "user", "content": [image_block, {"type": "text", "text": prompt}]}],
-        ) as stream:
-            _forward_text(stream, on_text)
-            response = stream.get_final_message()
-        _log_single_call(self.model, prompt, response)
-        tally = UsageTally(self.model)
-        tally.add(response.usage)
-        return tally.result(_response_text(response, tally))
-
 
 def get_llm_provider() -> LLMProvider:
     settings = get_settings()

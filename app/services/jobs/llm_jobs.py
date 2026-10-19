@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.core.config import local_media_path
 from app.core.logging import logged_job
 from app.db.session import SessionLocal
 from app.models.llm_job import LlmJob
@@ -18,11 +17,9 @@ from app.services.library_chat.history import add_chat_exchange
 from app.services.library_chat.schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from app.services.library_chat.tools import LibraryChatToolbox
 from app.services.llm.prompts import (
-    ANALYSIS_CLICKBAIT_HEADER,
-    THUMBNAIL_MEDIA_TYPES,
     split_generation_result,
 )
-from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
+from app.services.llm.provider import CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
 from app.services.rag.indexing import index_video_notes
 from app.services.videos.documents import append_transcript_chat, write_generated_documents
@@ -73,24 +70,6 @@ def run_llm_job(job_id: int) -> None:
                 )
                 completion.text, sources = toolbox.extract_sources(completion.text)
                 job.sources = json.dumps(sources)
-            elif (
-                job.kind == "generate"
-                # The clickbait section is only ever requested in the prompt when the
-                # user opted into attaching the thumbnail (see the include_image form
-                # field on /transcript/generate) — checking for it here, rather than
-                # recomputing video_analysis_has_image blindly, is what makes that
-                # opt-out actually take effect instead of always attaching the image
-                # whenever one happens to be available.
-                and ANALYSIS_CLICKBAIT_HEADER in job.prompt
-                and isinstance(provider_instance, AnthropicProvider)
-                and job.video is not None
-                and video_analysis_has_image(job.video, job.provider)
-            ):
-                image_path = local_media_path(job.video.thumbnail_path).resolve()
-                media_type = THUMBNAIL_MEDIA_TYPES.get(image_path.suffix.lower(), "image/jpeg")
-                completion = provider_instance.complete_with_image(
-                    job.prompt, image_path.read_bytes(), media_type, on_text=save_partial_result
-                )
             elif job.kind == "generate":
                 completion = provider_instance.complete(job.prompt, on_text=save_partial_result)
             else:
@@ -142,14 +121,6 @@ def run_notes_indexing_job(video_id: int, notes_text: str, summary_short: str | 
         db.close()
 
 
-def video_analysis_has_image(video: Video, provider: str) -> bool:
-    if provider != "anthropic" or not video.thumbnail_path or not video.folder_path:
-        return False
-    folder = local_media_path(video.folder_path).resolve()
-    thumbnail = local_media_path(video.thumbnail_path).resolve()
-    return thumbnail.is_file() and thumbnail.is_relative_to(folder)
-
-
 def enqueue_llm_job(
     db: Session,
     *,
@@ -181,8 +152,7 @@ def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | No
     """Write a finished "generate" job's documents; returns what was generated, None if nothing new."""
     if job.status != "done":
         return None
-    has_image = ANALYSIS_CLICKBAIT_HEADER in job.prompt
-    generated = split_generation_result(job.result or "", has_image)
+    generated = split_generation_result(job.result or "")
     write_generated_documents(video, generated)
     job.status = "applied"
     db.commit()

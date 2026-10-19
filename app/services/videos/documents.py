@@ -4,7 +4,6 @@ Their names are fixed relative to `transcript.txt`; this module is the only one 
 """
 
 import json
-from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.config import local_media_path
@@ -94,10 +93,7 @@ def read_transcript_documents(video: Video) -> dict:
 
 
 def write_generated_documents(video: Video, generated: dict) -> None:
-    """Write the notes, summaries and questions an LLM generated, and store its analysis.
-
-    The caller commits `video.ai_analysis_json`.
-    """
+    """Write the notes, summaries and questions an LLM generated."""
     transcript_path, _, notes_path = get_transcript_paths(video)
     notes_path.write_text(generated["notes_text"], encoding="utf-8")
     transcript_path.with_name(SUMMARY_FILE).write_text(generated["summary_full"], encoding="utf-8")
@@ -107,9 +103,6 @@ def write_generated_documents(video: Video, generated: dict) -> None:
     transcript_path.with_name(QUESTIONS_FILE).write_text(
         "\n".join(generated["summary_questions"]), encoding="utf-8"
     )
-    analysis = generated["analysis"]
-    analysis["generated_at"] = datetime.now(UTC).isoformat()
-    video.ai_analysis_json = json.dumps(analysis, ensure_ascii=False)
 
 
 def append_transcript_chat(video: Video, question: str, answer: str) -> None:

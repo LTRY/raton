@@ -86,7 +86,6 @@ Champs :
 - `watched_at` : date (avec fuseau, indexee, nullable) a laquelle la lecture a atteint 90 % de la duree pour la premiere fois ; posee par `POST /videos/{id}/activity` (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)), remise a `NULL` quand un telechargement ajoute un format, et point de depart de la retention de [06 Stockage fichiers](06-stockage-fichiers.md). `NULL` = jamais vue a 90 % (donc jamais purgee) ;
 - `view_count` : nombre de vues recopie de `metadata.json` (entier, indexe, nullable), pose a l'import (telechargement manuel, import de metadonnees) et par le rattrapage de demarrage (`app/services/youtube/view_counts.py`, une ancienne migration). Sert au tri « les plus vues » de `/videos`, execute en SQL ; `NULL` compte comme 0. Un `metadata.json` lisible sans compteur donne 0, un fichier illisible laisse `NULL` (reessaye au demarrage suivant) ;
 - `duration_seconds` : duree recopiee de `metadata.json` (entier, nullable), posee au meme moment que `view_count` (une ancienne migration). Sert a la duree affichee sur les cartes : `metadata.json` est le dump complet de yt-dlp (~140 Ko) et n'est pas relu pour chaque carte d'une liste. Un fichier lisible sans duree donne 0 (non affichee), un fichier illisible laisse `NULL` ;
-- `ai_analysis_json` : JSON serialise, ecrit par `POST /videos/{id}/transcript/generate` (avec les notes et le resume, en un seul appel LLM) — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md), section "Génération : notes, résumé et analyse". Cles possibles, toutes absentes plutot que `null` quand la section correspondante n'a pas ete produite : `clickbait_score` (1-10), `clickbait_rationale`, `relevance_percent` (0-100), `relevance_rationale`, `suggested_titles` (liste), `suggested_categories` (liste), `generated_at` (horodatage ISO). Une nouvelle generation remplace tout le JSON ;
 - `created_at`, `updated_at`.
 
 Contraintes :
@@ -220,7 +219,7 @@ web lui-meme, via une tache `fastapi.BackgroundTasks`
 Champs :
 
 - `id` ;
-- `kind` : `generate` (notes + resume + analyse en un
+- `kind` : `generate` (notes + resume en un
   seul appel), `auto_notes` (notes + resume court d'une video, en lot
   nocturne : voir [13 Jobs, logs et planification](13-jobs-logs-planification.md),
   jamais interroge par le navigateur, son prompt n'est pas stocke), `chat` ou
@@ -267,7 +266,7 @@ Champs :
 Un chunk embedde par section de notes structurees, socle du chat cross-video
 (RAG). Peuple/remplace entierement par
 `app/services/rag/indexing.py:index_video_notes` des qu'un job `generate` est
-applique (notes/resume/analyse en un seul appel LLM, voir
+applique (notes/resume en un seul appel LLM, voir
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)). Les
 notes venant du transcript, une video n'est
 recherchable depuis le chat cross-video que si elle a au moins une ligne ici.
@@ -360,9 +359,10 @@ Segments continue de lister les lignes brutes.
 
 Les migrations Alembic sont la source de verite pour l'evolution de schema.
 
-Le depot demarre sur une seule migration, `0001_initial`, qui regroupe tout
+Le depot demarre sur une migration `0001_initial`, qui regroupe tout
 l'historique du schema d'origine : elle active d'abord l'extension Postgres
 `pgvector` (`CREATE EXTENSION IF NOT EXISTS vector`, socle des chunks de notes),
 puis cree toutes les tables. Son `downgrade()` defait tout, extension et type
-`transcript_status` compris. Les migrations suivantes se nomment
-`NNNN_short_slug`.
+`transcript_status` compris. `0002_drop_ai_analysis` retire la colonne
+`videos.ai_analysis_json` (l'onglet Analyse IA n'existe plus). Les migrations
+suivantes se nomment `NNNN_short_slug`.

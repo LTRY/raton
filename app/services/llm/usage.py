@@ -130,10 +130,10 @@ def compute_job_cost_usd(
 
 LLM_JOB_KIND_LABELS: dict[str, str] = {
     "clean_transcript": "Nettoyage de transcript",
-    "generate": "Notes, résumé et analyse",
+    "generate": "Notes et résumé",
     "auto_notes": "Notes et résumé court (lot nocturne)",
-    "notes": "Notes structurées",  # historical, from before notes/summary/analysis were merged
-    "summary": "Résumé",  # historical, from before notes/summary/analysis were merged
+    "notes": "Notes structurées",  # historical, from before notes and summary were merged
+    "summary": "Résumé",  # historical, from before notes and summary were merged
     "chat": "Discussion (vidéo)",
     "library_chat": "Discussion (bibliothèque)",
     "detect_sponsors": "Détection de segments sponsorisés",  # historical, from before LLM detection was removed

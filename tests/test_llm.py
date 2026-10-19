@@ -7,12 +7,10 @@ from app.services.llm.prompts import (
     build_generation_prompt,
     build_notes_prompt,
     build_summary_prompt,
-    build_video_analysis_prompt,
     partial_generation_summary,
     split_generation_result,
     split_notes_sections,
     split_summary_result,
-    split_video_analysis_result,
 )
 from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
 from app.services.videos.documents import load_chat, save_chat
@@ -150,123 +148,25 @@ def test_split_summary_result_falls_back_without_any_header():
     assert questions == []
 
 
-def test_build_video_analysis_prompt_includes_clickbait_section_when_has_image():
-    prompt = build_video_analysis_prompt("Transcript ici.", "Titre vidéo", has_image=True)
-
-    assert "## Score clickbait" in prompt
-    assert "## Pertinence du contenu" in prompt
-    assert "## Suggestions" in prompt
-    assert "Titre vidéo" in prompt
-    assert "Transcript ici." in prompt
-
-
-def test_build_video_analysis_prompt_omits_clickbait_section_without_image():
-    prompt = build_video_analysis_prompt("Transcript ici.", "Titre vidéo", has_image=False)
-
-    assert "## Score clickbait" not in prompt
-    assert "## Pertinence du contenu" in prompt
-    assert "## Suggestions" in prompt
-
-
-def test_split_video_analysis_result_parses_all_sections_with_image():
-    text = (
-        "## Score clickbait\nScore : 7/10\nJustification : Le titre exagère un peu.\n\n"
-        "## Pertinence du contenu\nContenu utile : 65%\nJustification : Beaucoup d'intro.\n\n"
-        "## Suggestions\nTitre 1 : Un titre plus fidèle\nTitre 2 : Un autre angle\n"
-        "Titre 3 : Encore un titre\nCatégories : Tech, Actualité"
-    )
-
-    result = split_video_analysis_result(text, has_image=True)
-
-    assert result == {
-        "clickbait_score": 7,
-        "clickbait_rationale": "Le titre exagère un peu.",
-        "relevance_percent": 65,
-        "relevance_rationale": "Beaucoup d'intro.",
-        "suggested_titles": ["Un titre plus fidèle", "Un autre angle", "Encore un titre"],
-        "suggested_categories": ["Tech", "Actualité"],
-    }
-
-
-def test_split_video_analysis_result_ignores_clickbait_section_without_image():
-    text = (
-        "## Score clickbait\nScore : 7/10\nJustification : Ignoré.\n\n"
-        "## Pertinence du contenu\nContenu utile : 65%\nJustification : Beaucoup d'intro.\n\n"
-        "## Suggestions\nTitre 1 : Un titre plus fidèle\nCatégories : Tech"
-    )
-
-    result = split_video_analysis_result(text, has_image=False)
-
-    assert "clickbait_score" not in result
-    assert "clickbait_rationale" not in result
-    assert result["relevance_percent"] == 65
-    assert result["suggested_titles"] == ["Un titre plus fidèle"]
-    assert result["suggested_categories"] == ["Tech"]
-
-
-def test_split_video_analysis_result_returns_empty_dict_without_any_header():
-    assert split_video_analysis_result("Juste du texte libre.", has_image=True) == {}
-
-
-def test_split_video_analysis_result_omits_malformed_relevance_section():
-    text = "## Pertinence du contenu\nPas le bon format ici.\n\n## Suggestions\nTitre 1 : X\nCatégories : Y"
-
-    result = split_video_analysis_result(text, has_image=False)
-
-    assert "relevance_percent" not in result
-    assert "relevance_rationale" not in result
-    assert result["suggested_titles"] == ["X"]
-
-
-def test_split_video_analysis_result_handles_partial_suggested_titles():
-    text = "## Suggestions\nTitre 1 : Seul titre proposé\nCatégories : Tech"
-
-    result = split_video_analysis_result(text, has_image=False)
-
-    assert result["suggested_titles"] == ["Seul titre proposé"]
-
-
-def test_split_video_analysis_result_omits_suggested_titles_when_absent():
-    text = "## Suggestions\nCatégories : Tech"
-
-    result = split_video_analysis_result(text, has_image=False)
-
-    assert "suggested_titles" not in result
-
-
-def test_split_video_analysis_result_caps_suggested_titles_at_three():
-    text = (
-        "## Suggestions\nTitre 1 : Un\nTitre 2 : Deux\nTitre 3 : Trois\n"
-        "Titre 4 : Quatre\nCatégories : Tech"
-    )
-
-    result = split_video_analysis_result(text, has_image=False)
-
-    assert result["suggested_titles"] == ["Un", "Deux", "Trois"]
-
-
-def test_build_generation_prompt_includes_all_three_top_level_sections_once():
-    prompt = build_generation_prompt("Transcript ici.", "Titre vidéo", has_image=False)
+def test_build_generation_prompt_includes_both_top_level_sections_once():
+    prompt = build_generation_prompt("Transcript ici.")
 
     assert prompt.count("Transcript ici.") == 1  # sent once, not once per document
     assert "# Notes" in prompt
     assert "# Résumé" in prompt
-    assert "# Analyse" in prompt
     for name in NOTES_SECTION_NAMES:
         assert f"## {name}" in prompt
     assert "## Résumé complet" in prompt
-    assert "## Pertinence du contenu" in prompt
-    assert "Titre vidéo" in prompt
+    assert "# Analyse" not in prompt
+    assert "## Pertinence du contenu" not in prompt
     assert "## Score clickbait" not in prompt
 
 
 def test_build_generation_prompt_asks_for_the_summary_first():
     # The résumé is what the page shows while the completion streams.
-    prompt = build_generation_prompt("Transcript ici.", "Titre vidéo", has_image=False)
+    prompt = build_generation_prompt("Transcript ici.")
 
-    assert (
-        prompt.index("\n# Résumé\n") < prompt.index("\n# Notes\n") < prompt.index("\n# Analyse\n")
-    )
+    assert prompt.index("\n# Résumé\n") < prompt.index("\n# Notes\n")
 
 
 def test_partial_generation_summary_is_empty_before_the_summary_starts():
@@ -309,12 +209,6 @@ def test_partial_generation_summary_only_ever_grows():
     assert previous == ("Ligne 1.", "Paragraphe.")
 
 
-def test_build_generation_prompt_includes_clickbait_section_when_has_image():
-    prompt = build_generation_prompt("Transcript ici.", "Titre vidéo", has_image=True)
-
-    assert "## Score clickbait" in prompt
-
-
 def test_split_generation_result_delegates_to_each_single_purpose_splitter():
     text = (
         "# Notes\n"
@@ -327,33 +221,25 @@ def test_split_generation_result_delegates_to_each_single_purpose_splitter():
         "# Résumé\n"
         "## Résumé court\nLigne 1.\nLigne 2.\nLigne 3.\n\n"
         "## Résumé complet\nRésumé du contenu.\n\n"
-        "## Questions suggérées\n- Question A ?\n\n"
-        "# Analyse\n"
-        "## Score clickbait\nScore : 7/10\nJustification : Un peu exagéré.\n\n"
-        "## Pertinence du contenu\nContenu utile : 65%\nJustification : Beaucoup d'intro.\n\n"
-        "## Suggestions\nTitre 1 : Un titre plus fidèle\nCatégories : Tech"
+        "## Questions suggérées\n- Question A ?\n"
     )
 
-    result = split_generation_result(text, has_image=True)
+    result = split_generation_result(text)
 
     assert "## Faits\n- Fait 1" in result["notes_text"]
     assert result["summary_short"] == "Ligne 1.\nLigne 2.\nLigne 3."
     assert result["summary_full"] == "Résumé du contenu."
     assert result["summary_questions"] == ["Question A ?"]
-    assert result["analysis"]["clickbait_score"] == 7
-    assert result["analysis"]["relevance_percent"] == 65
-    assert result["analysis"]["suggested_titles"] == ["Un titre plus fidèle"]
 
 
 def test_split_generation_result_degrades_gracefully_without_any_top_level_header():
-    result = split_generation_result("Juste du texte libre.", has_image=False)
+    result = split_generation_result("Juste du texte libre.")
 
     assert result == {
         "notes_text": "",
         "summary_short": "",
         "summary_full": "",
         "summary_questions": [],
-        "analysis": {},
     }
 
 
@@ -417,57 +303,9 @@ def test_complete_forwards_text_deltas_to_on_text(monkeypatch):
 
     deltas = []
     result = provider.complete("Résume.", on_text=deltas.append)
-    image_deltas = []
-    provider.complete_with_image(
-        "Décris.", b"fake-bytes", "image/jpeg", on_text=image_deltas.append
-    )
 
     assert result.text == "Réponse générée."
-    assert deltas == image_deltas == ["Rép", "onse générée."]
-
-
-def test_complete_with_image_returns_completion_result(monkeypatch):
-    response = _FakeAnthropicResponse("Réponse générée.", input_tokens=10, output_tokens=20)
-    monkeypatch.setattr(anthropic, "Anthropic", lambda **kwargs: _FakeAnthropicClient(response))
-
-    provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
-    result = provider.complete_with_image("Décris cette image.", b"fake-bytes", "image/jpeg")
-
-    assert result.text == "Réponse générée."
-    assert result.model == "claude-sonnet-5"
-    assert result.input_tokens == 10
-    assert result.output_tokens == 20
-
-
-def test_complete_with_image_sends_image_block_before_text(monkeypatch):
-    response = _FakeAnthropicResponse("ok")
-    fake_client_holder = {}
-
-    def make_client(**kwargs):
-        client = _FakeAnthropicClient(response)
-        fake_client_holder["client"] = client
-        return client
-
-    monkeypatch.setattr(anthropic, "Anthropic", make_client)
-
-    provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
-    provider.complete_with_image("Un prompt.", b"\x89PNG", "image/png")
-
-    messages = fake_client_holder["client"].messages.stream_kwargs["messages"]
-    content = messages[0]["content"]
-    assert content[0]["type"] == "image"
-    assert content[0]["source"]["type"] == "base64"
-    assert content[0]["source"]["media_type"] == "image/png"
-    assert content[1] == {"type": "text", "text": "Un prompt."}
-
-
-def test_complete_with_image_raises_on_max_tokens(monkeypatch):
-    response = _FakeAnthropicResponse("tronqué", stop_reason="max_tokens")
-    monkeypatch.setattr(anthropic, "Anthropic", lambda **kwargs: _FakeAnthropicClient(response))
-
-    provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
-    with pytest.raises(RuntimeError, match="tronquée"):
-        provider.complete_with_image("prompt", b"bytes", "image/jpeg")
+    assert deltas == ["Rép", "onse générée."]
 
 
 def test_complete_reports_per_call_cost_and_total_prompt_tokens(monkeypatch):
@@ -507,15 +345,6 @@ def test_truncated_response_keeps_its_billed_usage(monkeypatch):
 
     assert excinfo.value.usage.output_tokens == 200_000
     assert excinfo.value.usage.cost_usd == pytest.approx(2.0)
-
-
-def test_complete_with_image_raises_on_empty_response(monkeypatch):
-    response = _FakeAnthropicResponse("")
-    monkeypatch.setattr(anthropic, "Anthropic", lambda **kwargs: _FakeAnthropicClient(response))
-
-    provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
-    with pytest.raises(RuntimeError, match="aucune réponse"):
-        provider.complete_with_image("prompt", b"bytes", "image/jpeg")
 
 
 class _FakeToolUseBlock:

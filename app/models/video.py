@@ -81,7 +81,6 @@ class Video(Base):
     # Copy of `duration` from metadata.json: a card shows it, and metadata.json is a ~140 KB file that
     # must not be parsed once per card.
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    ai_analysis_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

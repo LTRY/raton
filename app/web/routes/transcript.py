@@ -1,4 +1,3 @@
-import json
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
@@ -15,7 +14,6 @@ from app.services.jobs.llm_jobs import (
     enqueue_llm_job,
     run_llm_job,
     run_notes_indexing_job,
-    video_analysis_has_image,
 )
 from app.services.llm.prompts import (
     build_chat_prompt,
@@ -64,20 +62,6 @@ def documents_payload(video: Video) -> dict:
     }
 
 
-def video_analysis_payload(video: Video) -> dict:
-    analysis = json.loads(video.ai_analysis_json) if video.ai_analysis_json else {}
-    return {
-        "has_analysis": bool(analysis),
-        "clickbait_score": analysis.get("clickbait_score"),
-        "clickbait_rationale": analysis.get("clickbait_rationale"),
-        "relevance_percent": analysis.get("relevance_percent"),
-        "relevance_rationale": analysis.get("relevance_rationale"),
-        "suggested_titles": analysis.get("suggested_titles") or [],
-        "suggested_categories": analysis.get("suggested_categories") or [],
-        "generated_at": analysis.get("generated_at"),
-    }
-
-
 def chat_payload(video: Video, message: str | None = None) -> dict:
     context = read_transcript_documents(video)
     return {
@@ -92,19 +76,17 @@ def generate_video_transcript_documents(
     request: Request,
     video_id: int,
     background_tasks: BackgroundTasks,
-    include_image: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Notes + résumé + analyse in one LLM call (see build_generation_prompt)."""
+    """Notes + résumé in one LLM call (see build_generation_prompt)."""
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
     provider = get_llm_provider_name()
     try:
         transcript_path, _, _ = get_transcript_paths(video)
-        has_image = bool(include_image) and video_analysis_has_image(video, provider)
         prompt = build_generation_prompt(
-            transcript_path.read_text(encoding="utf-8", errors="replace"), video.title, has_image
+            transcript_path.read_text(encoding="utf-8", errors="replace")
         )
         job = enqueue_llm_job(
             db, kind="generate", provider=provider, video_id=video.id, prompt=prompt
@@ -225,9 +207,8 @@ def transcript_job_status(
             return JSONResponse(
                 {
                     "status": "generated",
-                    "message": "Notes, résumé et analyse générés par l'IA.",
+                    "message": "Notes et résumé générés par l'IA.",
                     **documents_payload(video),
-                    **video_analysis_payload(video),
                 }
             )
 

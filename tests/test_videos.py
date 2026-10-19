@@ -295,122 +295,6 @@ def test_video_comment_form_clears_blank_comment():
     assert video.comment is None
 
 
-def test_apply_title_picks_ai_suggestion_and_appends_sparkle():
-    db = make_session()
-    video = add_video(db)
-    video.ai_analysis_json = json.dumps(
-        {"suggested_titles": ["Premier titre", "Deuxième titre", "Troisième titre"]}
-    )
-    db.commit()
-
-    response = videos_routes.apply_video_title_form(
-        video.id, title_choice="2", title_custom="", return_to="/videos/1", db=db
-    )
-
-    assert response.status_code == 303
-    assert response.headers["location"] == "/videos/1"
-    db.refresh(video)
-    assert video.title == "Deuxième titre ✨"
-
-
-def test_apply_title_picks_third_ai_suggestion_and_appends_sparkle():
-    db = make_session()
-    video = add_video(db)
-    video.ai_analysis_json = json.dumps(
-        {"suggested_titles": ["Premier titre", "Deuxième titre", "Troisième titre"]}
-    )
-    db.commit()
-
-    response = videos_routes.apply_video_title_form(
-        video.id, title_choice="3", title_custom="", return_to="/videos/1", db=db
-    )
-
-    assert response.status_code == 303
-    db.refresh(video)
-    assert video.title == "Troisième titre ✨"
-
-
-def test_apply_title_custom_appends_pencil():
-    db = make_session()
-    video = add_video(db)
-    video.ai_analysis_json = json.dumps({"suggested_titles": ["Un titre IA"]})
-    db.commit()
-
-    response = videos_routes.apply_video_title_form(
-        video.id,
-        title_choice="__custom__",
-        title_custom="Mon propre titre",
-        return_to="/videos/1",
-        db=db,
-    )
-
-    assert response.status_code == 303
-    db.refresh(video)
-    assert video.title == "Mon propre titre ✏️"
-
-
-def test_apply_title_replaces_existing_suffix_without_stacking():
-    db = make_session()
-    video = add_video(db)
-    video.title = "Ancien titre ✏️"
-    video.ai_analysis_json = json.dumps({"suggested_titles": ["Nouveau titre IA"]})
-    db.commit()
-
-    videos_routes.apply_video_title_form(
-        video.id, title_choice="1", title_custom="", return_to="/videos/1", db=db
-    )
-
-    db.refresh(video)
-    assert video.title == "Nouveau titre IA ✨"
-
-
-def test_apply_title_out_of_range_choice_falls_back_to_custom_text():
-    db = make_session()
-    video = add_video(db)
-    video.ai_analysis_json = json.dumps({"suggested_titles": ["Seul titre"]})
-    db.commit()
-
-    videos_routes.apply_video_title_form(
-        video.id, title_choice="3", title_custom="Texte de secours", return_to="/videos/1", db=db
-    )
-
-    db.refresh(video)
-    assert video.title == "Texte de secours ✏️"
-
-
-def test_apply_title_rejects_empty_custom_choice():
-    db = make_session()
-    video = add_video(db)
-    original_title = video.title
-    video.ai_analysis_json = json.dumps({"suggested_titles": ["Un titre IA"]})
-    db.commit()
-
-    response = videos_routes.apply_video_title_form(
-        video.id, title_choice="__custom__", title_custom="   ", return_to="/videos/1", db=db
-    )
-
-    assert response.status_code == 303
-    assert "level=error" in response.headers["location"]
-    db.refresh(video)
-    assert video.title == original_title
-
-
-def test_apply_title_rejects_missing_choice_and_blank_custom():
-    db = make_session()
-    video = add_video(db)
-    original_title = video.title
-    db.commit()
-
-    response = videos_routes.apply_video_title_form(
-        video.id, title_choice="", title_custom="", return_to="/videos/1", db=db
-    )
-
-    assert response.status_code == 303
-    assert "level=error" in response.headers["location"]
-    db.refresh(video)
-    assert video.title == original_title
-
-
 def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_path):
     db = make_session()
     folder = tmp_path / "video"
@@ -450,11 +334,10 @@ def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_pat
     assert f'action="/videos/{video.id}/transcript/generate"' in rendered
     # Bouton robot : icone seule, libelle porte par aria-label, infobulle au survol.
     assert 'class="ai-generate-button"' in rendered
-    assert 'aria-label="Générer notes, résumé et analyse"' in rendered
+    assert 'aria-label="Générer notes, résumé"' in rendered
     assert 'id="ai-generate-tooltip"' in rendered
-    assert "Analyse de pertinence" in rendered
-    # The thumbnail is opt-in: the checkbox must not be pre-checked.
-    assert '<input type="checkbox" name="include_image">' in rendered
+    assert "Analyse de pertinence" not in rendered
+    assert 'name="include_image"' not in rendered
     assert f'href="/videos/{video.id}/transcript"' not in rendered
 
 
@@ -733,15 +616,13 @@ def test_api_sponsor_segments_raises_404_for_unknown_video():
     assert excinfo.value.status_code == 404
 
 
-GENERATION_RESULT_TEXT_NO_IMAGE = (
+GENERATION_RESULT_TEXT = (
     "# Notes\n## Faits\n- Fait 1\n- Fait 2\n\n## Dates\nAucun élément identifié.\n\n"
     "## Lieux\nAucun élément identifié.\n\n## Acteurs\nAucun élément identifié.\n\n"
     "## Concepts\nAucun élément identifié.\n\n## Relations causales\nAucun élément identifié.\n\n"
     "# Résumé\n## Résumé court\nLigne 1.\nLigne 2.\nLigne 3.\n\n"
     "## Résumé complet\nRésumé du contenu.\n\n- Point clé 1\n\n"
     "## Questions suggérées\n- Question A ?\n- Question B ?\n\n"
-    "# Analyse\n## Pertinence du contenu\nContenu utile : 65%\nJustification : Beaucoup d'intro.\n\n"
-    "## Suggestions\nTitre 1 : Un titre plus fidèle\nCatégories : Tech"
 )
 
 
@@ -782,7 +663,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
                 )
             )
             return CompletionResult(
-                text=GENERATION_RESULT_TEXT_NO_IMAGE,
+                text=GENERATION_RESULT_TEXT,
                 model="claude-haiku-4-5",
                 input_tokens=200,
                 output_tokens=80,
@@ -802,7 +683,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
             "partial_summary": "Début du résumé",
         }
     ]
-    assert db.get(LlmJob, job_id).result == GENERATION_RESULT_TEXT_NO_IMAGE
+    assert db.get(LlmJob, job_id).result == GENERATION_RESULT_TEXT
 
 
 def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_path, monkeypatch):
@@ -823,7 +704,7 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
         video_id=video.id,
         prompt="...",
         status="done",
-        result=GENERATION_RESULT_TEXT_NO_IMAGE,
+        result=GENERATION_RESULT_TEXT,
     )
     db.add(job)
     db.commit()
@@ -849,251 +730,6 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
     scheduled.clear()
     transcript_routes.transcript_job_status(video.id, job.id, background_tasks, db)
     assert scheduled == []
-
-
-def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
-    monkeypatch, tmp_path
-):
-    db = make_session()
-    folder = tmp_path / "video"
-    folder.mkdir()
-    transcript = folder / "transcript.txt"
-    transcript.write_text("Original brut.", encoding="utf-8")
-    thumbnail = folder / "thumbnail.jpg"
-    thumbnail.write_bytes(b"fake-image-bytes")
-    video = add_video(db)
-    video.folder_path = str(folder)
-    video.transcript_path = str(transcript)
-    video.transcript_status = TranscriptStatus.downloaded
-    video.thumbnail_path = str(thumbnail)
-    db.commit()
-
-    class FakeAnthropicProvider(llm_jobs.AnthropicProvider):
-        def __init__(self):
-            pass
-
-        def complete_with_image(self, prompt, image_bytes, media_type, on_text=None):
-            assert "Original brut." in prompt
-            assert "## Score clickbait" in prompt
-            assert image_bytes == b"fake-image-bytes"
-            assert media_type == "image/jpeg"
-            result_text = (
-                "# Notes\n## Faits\nAucun élément identifié.\n\n## Dates\nAucun élément identifié.\n\n"
-                "## Lieux\nAucun élément identifié.\n\n## Acteurs\nAucun élément identifié.\n\n"
-                "## Concepts\nAucun élément identifié.\n\n## Relations causales\nAucun élément identifié.\n\n"
-                "# Résumé\n## Résumé court\nA.\nB.\nC.\n\n## Résumé complet\nContenu.\n\n## Questions suggérées\n\n"
-                "# Analyse\n## Score clickbait\nScore : 8/10\nJustification : Fidèle.\n\n"
-                "## Pertinence du contenu\nContenu utile : 70%\nJustification : Dense.\n\n"
-                "## Suggestions\nTitre 1 : Titre suggéré\nCatégories : Tech"
-            )
-            return CompletionResult(
-                text=result_text, model="claude-sonnet-5", input_tokens=200, output_tokens=80
-            )
-
-        def complete(self, prompt, on_text=None):
-            raise AssertionError(
-                "complete() ne doit pas être appelé quand une image est disponible"
-            )
-
-    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeAnthropicProvider())
-    monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
-
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
-
-    response = transcript_routes.generate_video_transcript_documents(
-        fetch_request(f"/videos/{video.id}/transcript/generate"),
-        video.id,
-        background_tasks,
-        "on",
-        db,
-    )
-    payload = json.loads(response.body)
-
-    assert response.status_code == 200
-    assert payload["status"] == "queued"
-    job_id = payload["job_id"]
-    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
-
-    llm_jobs.run_llm_job(job_id)
-
-    completed_job = db.get(LlmJob, job_id)
-    assert completed_job.status == "done"
-    assert completed_job.model == "claude-sonnet-5"
-
-    resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
-    resolved_payload = json.loads(resolved.body)
-
-    assert resolved_payload["status"] == "generated"
-    assert resolved_payload["clickbait_score"] == 8
-    assert resolved_payload["relevance_percent"] == 70
-    assert resolved_payload["suggested_titles"] == ["Titre suggéré"]
-    assert resolved_payload["suggested_categories"] == ["Tech"]
-
-    # run_llm_job's db.close() (via the SessionLocal monkeypatch above, which hands
-    # it this same shared session) expunges the identity map, so the `video`
-    # reference from earlier in the test is no longer attached — re-fetch instead
-    # of db.refresh(video), mirroring the completed_job = db.get(...) pattern above.
-    video = db.get(Video, video.id)
-    stored = json.loads(video.ai_analysis_json)
-    assert stored["clickbait_score"] == 8
-    assert stored["suggested_categories"] == ["Tech"]
-    assert "generated_at" in stored
-
-
-def test_generate_documents_omits_image_when_checkbox_unchecked_even_with_thumbnail(
-    monkeypatch, tmp_path
-):
-    db = make_session()
-    folder = tmp_path / "video"
-    folder.mkdir()
-    transcript = folder / "transcript.txt"
-    transcript.write_text("Original brut.", encoding="utf-8")
-    thumbnail = folder / "thumbnail.jpg"
-    thumbnail.write_bytes(b"fake-image-bytes")
-    video = add_video(db)
-    video.folder_path = str(folder)
-    video.transcript_path = str(transcript)
-    video.transcript_status = TranscriptStatus.downloaded
-    video.thumbnail_path = str(thumbnail)
-    db.commit()
-
-    class FakeProvider:
-        def complete(self, prompt, on_text=None):
-            assert "## Score clickbait" not in prompt
-            return CompletionResult(
-                text=GENERATION_RESULT_TEXT_NO_IMAGE,
-                model="claude-haiku-4-5",
-                input_tokens=100,
-                output_tokens=50,
-            )
-
-        def complete_with_image(self, prompt, image_bytes, media_type, on_text=None):
-            raise AssertionError(
-                "complete_with_image() ne doit pas être appelé, la case est décochée"
-            )
-
-    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
-
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
-    )
-
-    response = transcript_routes.generate_video_transcript_documents(
-        fetch_request(f"/videos/{video.id}/transcript/generate"),
-        video.id,
-        background_tasks,
-        None,
-        db,
-    )
-    job_id = json.loads(response.body)["job_id"]
-
-    resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
-    resolved_payload = json.loads(resolved.body)
-
-    assert resolved_payload["clickbait_score"] is None
-    assert resolved_payload["relevance_percent"] == 65
-
-
-def test_video_analysis_has_image_true_when_thumbnail_inside_folder(tmp_path):
-    folder = tmp_path / "video"
-    folder.mkdir()
-    thumbnail = folder / "thumbnail.jpg"
-    thumbnail.write_bytes(b"fake-image-bytes")
-    video = Video(
-        yt_video_id="hasimage123",
-        title="Vidéo avec vignette valide",
-        url="https://youtube.com/watch?v=hasimage123",
-        folder_path=str(folder),
-        thumbnail_path=str(thumbnail),
-        transcript_status=TranscriptStatus.missing,
-    )
-
-    assert llm_jobs.video_analysis_has_image(video, "anthropic") is True
-
-
-def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
-    folder = tmp_path / "video"
-    folder.mkdir()
-    other_folder = tmp_path / "other-video"
-    other_folder.mkdir()
-    thumbnail = other_folder / "thumb.jpg"
-    thumbnail.write_bytes(b"fake-image-bytes")
-    video = Video(
-        yt_video_id="outsideimage123",
-        title="Vidéo avec vignette hors dossier",
-        url="https://youtube.com/watch?v=outsideimage123",
-        folder_path=str(folder),
-        thumbnail_path=str(thumbnail),
-        transcript_status=TranscriptStatus.missing,
-    )
-
-    assert llm_jobs.video_analysis_has_image(video, "anthropic") is False
-
-
-def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_checkbox_checked(
-    monkeypatch, tmp_path
-):
-    db = make_session()
-    folder = tmp_path / "video"
-    folder.mkdir()
-    transcript = folder / "transcript.txt"
-    transcript.write_text("Original brut.", encoding="utf-8")
-    video = add_video(db)
-    video.folder_path = str(folder)
-    video.transcript_path = str(transcript)
-    video.transcript_status = TranscriptStatus.downloaded
-    db.commit()
-
-    class FakeProvider:
-        def complete(self, prompt, on_text=None):
-            assert "## Score clickbait" not in prompt
-            return CompletionResult(
-                text=GENERATION_RESULT_TEXT_NO_IMAGE,
-                model="claude-haiku-4-5",
-                input_tokens=100,
-                output_tokens=50,
-            )
-
-    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
-
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
-    )
-
-    response = transcript_routes.generate_video_transcript_documents(
-        fetch_request(f"/videos/{video.id}/transcript/generate"),
-        video.id,
-        background_tasks,
-        "on",
-        db,
-    )
-    job_id = json.loads(response.body)["job_id"]
-
-    resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
-    resolved_payload = json.loads(resolved.body)
-
-    assert resolved_payload["clickbait_score"] is None
-    assert resolved_payload["relevance_percent"] == 65
 
 
 def test_video_detail_page_hides_summary_tab_and_blurb_when_absent(tmp_path):
@@ -1122,7 +758,7 @@ def test_video_detail_page_hides_summary_tab_and_blurb_when_absent(tmp_path):
     rendered = response.body.decode()
 
     assert response.status_code == 200
-    assert "Générer notes, résumé et analyse" in rendered
+    assert "Générer notes, résumé" in rendered
     assert f'action="/videos/{video.id}/transcript/generate"' in rendered
     assert 'data-tab="summary" role="tab" aria-selected="false" hidden' in rendered
     assert '<p id="video-short-summary" class="video-short-summary" hidden></p>' in rendered
@@ -1195,7 +831,7 @@ def test_video_detail_page_opens_with_no_active_tab(tmp_path):
     assert "transcript-tab active" not in rendered
     assert not re.search(r'class="transcript-tab"[^>]*aria-selected="true"', rendered)
     assert '<div data-tab-panel="text" hidden>' in rendered
-    for panel in ("vtt", "personal-notes", "info", "segments", "analysis"):
+    for panel in ("vtt", "personal-notes", "info", "segments"):
         assert re.search(rf'data-tab-panel="{panel}" hidden>', rendered), panel
 
 
@@ -1227,10 +863,10 @@ def test_video_detail_page_tab_order_starts_with_info_segments_raw(tmp_path):
     assert response.status_code == 200
     tab_order = re.findall(r'class="transcript-tab[^"]*" data-tab="([a-z-]+)"', rendered)
     assert tab_order[:3] == ["info", "segments", "raw"]
-    assert tab_order[3:] == ["notes", "summary", "vtt", "personal-notes", "analysis"]
+    assert tab_order[3:] == ["notes", "summary", "vtt", "personal-notes"]
 
 
-def test_video_detail_page_has_personal_notes_and_analysis_tabs(tmp_path):
+def test_video_detail_page_has_personal_notes_tab_and_no_analysis_tab(tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
@@ -1257,86 +893,10 @@ def test_video_detail_page_has_personal_notes_and_analysis_tabs(tmp_path):
 
     assert response.status_code == 200
     assert 'data-tab="personal-notes"' in rendered
-    assert 'data-tab="analysis"' in rendered
+    assert 'data-tab="analysis"' not in rendered
     assert 'data-tab-panel="personal-notes"' in rendered
-    assert 'data-tab-panel="analysis"' in rendered
+    assert 'data-tab-panel="analysis"' not in rendered
     assert f'action="/videos/{video.id}/comment"' in rendered
-
-
-def test_video_detail_page_shows_generated_analysis(tmp_path):
-    db = make_session()
-    folder = tmp_path / "video"
-    folder.mkdir()
-    transcript = folder / "transcript.txt"
-    transcript.write_text("Original brut.", encoding="utf-8")
-    video = add_video(db)
-    video.folder_path = str(folder)
-    video.transcript_path = str(transcript)
-    video.transcript_status = TranscriptStatus.downloaded
-    video.ai_analysis_json = json.dumps(
-        {
-            "clickbait_score": 8,
-            "clickbait_rationale": "Fidèle au contenu.",
-            "relevance_percent": 70,
-            "relevance_rationale": "Peu de remplissage.",
-            "suggested_titles": ["Un titre plus clair", "Un deuxième angle", "Un troisième essai"],
-            "suggested_categories": ["Tech"],
-            "generated_at": "2026-07-27T10:00:00+00:00",
-        }
-    )
-    db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
-
-    assert "8/10" in rendered
-    assert "Fidèle au contenu." in rendered
-    assert "70% contenu utile" in rendered
-    assert "Un titre plus clair" in rendered
-    assert f'action="/videos/{video.id}/apply-title"' in rendered
-    assert "Un titre plus clair" in rendered
-    assert "Un deuxième angle" in rendered
-    assert "Un troisième essai" in rendered
-    assert 'name="title_choice"' in rendered
-    assert 'name="title_custom"' in rendered
-
-
-def test_video_detail_page_hides_analysis_results_without_analysis(tmp_path):
-    db = make_session()
-    folder = tmp_path / "video"
-    folder.mkdir()
-    transcript = folder / "transcript.txt"
-    transcript.write_text("Original brut.", encoding="utf-8")
-    video = add_video(db)
-    video.folder_path = str(folder)
-    video.transcript_path = str(transcript)
-    video.transcript_status = TranscriptStatus.downloaded
-    db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
-
-    assert 'id="analysis-results" hidden' in rendered
 
 
 def test_video_detail_page_renders_sponsor_segments(tmp_path):

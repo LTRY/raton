@@ -160,7 +160,7 @@ Videos :
 - `GET /raton/variations` : toutes les repliques de Raton, sans condition
   (voir [18 Raton](18-raton-scenarios.md)).
 - `GET /videos/{id}/transcript` : redirection vers detail ancre transcript.
-- `POST /videos/{id}/transcript/generate` : generer les notes structurees, le resume (+ resume court + questions suggerees) et l'analyse IA (score clickbait si case "Inclure la miniature" cochee et vision disponible, score de pertinence, suggestions de titre/categories) en un seul appel LLM, a partir de `transcript.txt` — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
+- `POST /videos/{id}/transcript/generate` : generer les notes structurees, le resume (+ resume court + questions suggerees) en un seul appel LLM, a partir de `transcript.txt` — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
 - `POST /videos/{id}/transcript/download` : retenter la recuperation du
   transcript (FR en priorite, repli EN) pour une video dont le transcript est
   manquant/en echec — voir "Recuperation manuelle du transcript" dans
@@ -168,7 +168,6 @@ Videos :
   `DownloadJob` et le lance en arriere-plan comme les telechargements de
   format ; meme reponse JSON/redirection que `/videos/{id}/media/{media_type}/download`,
   suivie via `GET /videos/download-jobs/{id}`.
-- `POST /videos/{id}/apply-title` : appliquer un des 3 titres suggeres par l'analyse IA ou un titre manuel (`title_choice` = `1`/`2`/`3`/`__custom__`, `title_custom` pour le texte libre) ; ajoute un suffixe `✨` (choix IA) ou `✏️` (choix manuel) au titre, en remplacant un suffixe existant plutot que de l'empiler ; rejette une soumission manuelle vide (`level=error`, aucune ecriture).
 - `POST /videos/{id}/transcript/chat` : poser question.
 - `POST /videos/{id}/transcript/chat/clear` : effacer chat.
 - `GET /videos/{id}/transcript/jobs/{job_id}` : statut/resolution d'un job LLM asynchrone, tous fournisseurs confondus (traite en tache de fond dans le process web) ; pour un job `generate` en cours, renvoie aussi le résumé deja ecrit (`partial_short_summary`, `partial_summary`).
