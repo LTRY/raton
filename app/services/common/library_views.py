@@ -7,6 +7,9 @@ import json
 
 from app.services.common.categories import parse_video_category_labels
 
+# The file types a fiche can be filtered on (`video_asset_kind_condition`).
+VIDEO_ASSET_KINDS = frozenset({"audio", "video", "metadata", "transcript", "imported", "shorts"})
+
 DEFAULT_VIDEO_LIBRARY_VIEWS = [
     {
         "name": "Notés",
@@ -33,7 +36,6 @@ def normalize_video_library_view(item: dict | None) -> dict[str, str | bool | li
     if not isinstance(asset_values, list):
         asset_values = []
     assets = parse_video_category_labels(",".join(str(asset) for asset in asset_values))
-    valid_assets = {"audio", "video", "metadata", "transcript", "imported", "shorts"}
     excluded_asset_values = item.get("excluded_assets", [])
     if not isinstance(excluded_asset_values, list):
         excluded_asset_values = []
@@ -58,9 +60,9 @@ def normalize_video_library_view(item: dict | None) -> dict[str, str | bool | li
         "category_filter_mode": normalize_video_filter_mode(
             str(item.get("category_filter_mode") or "")
         ),
-        "assets": [asset for asset in assets if asset in valid_assets],
+        "assets": [asset for asset in assets if asset in VIDEO_ASSET_KINDS],
         "categories": categories,
-        "excluded_assets": [asset for asset in excluded_assets if asset in valid_assets],
+        "excluded_assets": [asset for asset in excluded_assets if asset in VIDEO_ASSET_KINDS],
         "excluded_categories": excluded_categories,
         "rated": bool(item.get("rated")),
     }

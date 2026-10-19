@@ -238,6 +238,26 @@ scheduler ou par `POST /settings/scan` (voir
   `playlists` (`{playlist_id, title, item_id}`). Lecture seule :
   contrairement a la page, ne sort pas la fiche des Nouveautes. `404` si la
   fiche n'existe pas.
+- `GET /api/library` : la liste de la bibliotheque (ou la page d'une chaine)
+  en JSON, calculee par le meme service que `/videos` (`library_view`), 50
+  fiches par page. Memes noms de parametres que `/videos` : `channel_id`,
+  `section`, `sort`, `asset`, `category`, `exclude_asset`,
+  `exclude_category` (repetables), `rated`, `hide_hidden`, `uncategorized`,
+  `asset_filter_mode`, `category_filter_mode`, `q`, `page`. Memes regles de
+  validation (`library_filters`) : un type de fichier, un tri, une section ou
+  un mode inconnu est ignore ou remplace par son defaut, les categories sont
+  normalisees. Seule difference : sans `asset`, aucun filtre de type de
+  fichier (la page, elle, preselectionne Video et Audio, ou tous les types
+  sur une chaine). Repond `{filters, channel, section, page, total_pages,
+  total, counts, items, saved_views}` : `filters` les filtres reellement
+  appliques, `counts` les compteurs de la page d'une chaine, `items` les
+  cartes (champs de `GET /api/videos` plus `channel_name`,
+  `duration_seconds`, `view_count`, `is_new`, `list_state`, `has_video`,
+  `has_audio`, `has_thumbnail`, `playback` `{position_seconds,
+  duration_seconds, progress_percent, is_completed}` ou `null`),
+  `saved_views` les vues enregistrees avec `active`. `404` si `channel_id`
+  ne designe aucune chaine. Le nombre de requetes SQL ne depend pas de la
+  taille de la bibliotheque.
 - `POST /api/videos/{id}/rating?rating=0..5`
 - `GET /api/videos/{id}/sponsor-segments` : segments a sauter pour cette video,
   au service du mini-lecteur persistant (qui se lance depuis n'importe quelle

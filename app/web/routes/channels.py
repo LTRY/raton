@@ -39,6 +39,7 @@ from app.services.channels.subscriptions import (
 from app.services.common.categories import parse_video_category_labels, serialized_category_labels
 from app.services.common.job_log import log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
+from app.services.common.search import normalized_search_query
 from app.services.common.settings import (
     get_video_category_label_styles,
 )
@@ -65,7 +66,6 @@ from app.web.shared import (
     templates,
     wants_json,
 )
-from app.web.video_library import normalized_search_query
 
 logger = logging.getLogger(__name__)
 

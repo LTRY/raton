@@ -1,7 +1,8 @@
 """What the library list (`/videos` and a channel page) shows for a set of filters, without HTTP.
 
-The route reads the query string into `LibraryFilters` and turns the result into links and markup
-(`app/web/video_library.py`); another client can call these functions with the same filters.
+`/videos` reads its query string into `LibraryFilters` and turns the result into links and markup
+(`app/web/video_library.py`); `GET /api/library` calls the same functions. Both build their
+filters with `library_filters`, which holds the validation rules.
 """
 
 from dataclasses import dataclass, field
@@ -12,7 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.models.channel import Channel
 from app.models.video import Video
+from app.services.common.categories import normalize_video_category_label
 from app.services.common.durations import format_duration
+from app.services.common.library_views import VIDEO_ASSET_KINDS
+from app.services.common.search import normalized_search_query
 from app.services.common.settings import get_video_library_views
 from app.services.videos.filters import video_filters_condition, video_section_condition
 from app.services.videos.library_query import (
@@ -21,8 +25,11 @@ from app.services.videos.library_query import (
     publication_dates,
 )
 from app.services.videos.playback import latest_playback_by_video
+from app.services.youtube.channel_info import normalized_channel_section
 
 LIBRARY_PAGE_SIZE = 50
+LIBRARY_SORTS = ("imported", "published", "views", "rated")
+FILTER_MODES = ("and", "or", "not")
 
 
 @dataclass(frozen=True)
@@ -42,6 +49,58 @@ class LibraryFilters:
     category_filter_mode: str = "or"
     search_query: str = ""
     page: int = 1
+
+
+def _labels(values) -> frozenset[str]:
+    return frozenset(
+        label for label in (normalize_video_category_label(value) for value in values) if label
+    )
+
+
+def _section(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        return normalized_channel_section(value)
+    except ValueError:
+        return None
+
+
+def library_filters(
+    *,
+    channel_id: int | None = None,
+    section: str | None = None,
+    sort: str | None = None,
+    assets=(),
+    categories=(),
+    excluded_assets=(),
+    excluded_categories=(),
+    rated_only: bool = False,
+    hide_hidden: bool = False,
+    uncategorized_only: bool = False,
+    asset_filter_mode: str | None = None,
+    category_filter_mode: str | None = None,
+    search_query: str | None = None,
+    page: int = 1,
+) -> LibraryFilters:
+    """Filters from values as a client sent them: unknown file types, sorts, sections and modes
+    fall back to their default, category labels are normalized, the search is trimmed."""
+    return LibraryFilters(
+        channel_id=channel_id,
+        section=_section(section),
+        sort=sort if sort in LIBRARY_SORTS else ("published" if channel_id else "imported"),
+        assets=frozenset(assets) & VIDEO_ASSET_KINDS,
+        categories=_labels(categories),
+        excluded_assets=frozenset(excluded_assets) & VIDEO_ASSET_KINDS,
+        excluded_categories=_labels(excluded_categories),
+        rated_only=rated_only,
+        hide_hidden=hide_hidden,
+        uncategorized_only=uncategorized_only,
+        asset_filter_mode=asset_filter_mode if asset_filter_mode in FILTER_MODES else "or",
+        category_filter_mode=category_filter_mode if category_filter_mode in FILTER_MODES else "or",
+        search_query=normalized_search_query(search_query),
+        page=max(page, 1),
+    )
 
 
 @dataclass

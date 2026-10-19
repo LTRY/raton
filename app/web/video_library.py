@@ -3,11 +3,9 @@ from urllib.parse import urlencode
 from fastapi import Request
 
 from app.models.video import Video
-from app.services.common.categories import normalize_video_category_label
 from app.services.videos.documents import read_video_metadata as video_metadata
-from app.services.videos.library_view import LibraryFilters
+from app.services.videos.library_view import LibraryFilters, library_filters
 from app.services.videos.list_state import video_auto_list_state, video_list_state
-from app.services.youtube.channel_info import normalized_channel_section
 from app.web.shared import templates
 
 templates.env.globals["video_auto_list_state"] = video_auto_list_state
@@ -37,43 +35,15 @@ VIDEO_ASSET_FILTER_OPTIONS = [
 DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS = {option["kind"] for option in VIDEO_ASSET_FILTER_OPTIONS}
 
 
-def normalized_search_query(value: str | None) -> str:
-    """The query as typed, whitespace collapsed — also what the search field echoes back."""
-    return " ".join((value or "").split())
-
-
 def selected_video_asset_filters(
     request: Request, selected_channel_id: int | None = None
-) -> set[str]:
-    valid_filters = {option["kind"] for option in VIDEO_ASSET_FILTER_OPTIONS}
+) -> list[str]:
+    """The file types the URL asks for; until the form is submitted, the page's preset ones."""
     if request.query_params.get("asset_filters") != "1":
         if selected_channel_id:
-            return set(DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS)
-        return set(DEFAULT_VIDEO_ASSET_FILTERS)
-    return {asset for asset in request.query_params.getlist("asset") if asset in valid_filters}
-
-
-def selected_video_category_filters(request: Request) -> set[str]:
-    return {
-        normalize_video_category_label(label)
-        for label in request.query_params.getlist("category")
-        if normalize_video_category_label(label)
-    }
-
-
-def selected_video_excluded_asset_filters(request: Request) -> set[str]:
-    valid_filters = {option["kind"] for option in VIDEO_ASSET_FILTER_OPTIONS}
-    return {
-        asset for asset in request.query_params.getlist("exclude_asset") if asset in valid_filters
-    }
-
-
-def selected_video_excluded_category_filters(request: Request) -> set[str]:
-    return {
-        normalize_video_category_label(label)
-        for label in request.query_params.getlist("exclude_category")
-        if normalize_video_category_label(label)
-    }
+            return list(DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS)
+        return list(DEFAULT_VIDEO_ASSET_FILTERS)
+    return request.query_params.getlist("asset")
 
 
 def selected_video_filter_mode(request: Request, name: str) -> str:
@@ -182,15 +152,6 @@ def video_active_filter_pills(
     return pills
 
 
-def selected_video_sort(request: Request, selected_channel_id: int | None = None) -> str:
-    sort = request.query_params.get("sort")
-    if sort in {"imported", "published", "views", "rated"}:
-        return sort
-    if selected_channel_id:
-        return "published"
-    return "imported"
-
-
 def video_view_count(video: Video) -> int:
     try:
         return int(video_metadata(video).get("view_count"))
@@ -225,35 +186,25 @@ def normalized_channel_id(channel_id: int | str | None) -> int | None:
     return int(channel_id)
 
 
-def requested_channel_section(request: Request) -> str | None:
-    """The section named in the URL, or None (absent or unknown) for the channel's default one."""
-    section = request.query_params.get("section")
-    if section is None:
-        return None
-    try:
-        return normalized_channel_section(section)
-    except ValueError:
-        return None
-
-
 def library_filters_from_request(
     request: Request, channel_id: int | str | None, page: int
 ) -> LibraryFilters:
+    params = request.query_params
     selected_channel_id = normalized_channel_id(channel_id)
-    return LibraryFilters(
+    return library_filters(
         channel_id=selected_channel_id,
-        section=requested_channel_section(request),
-        sort=selected_video_sort(request, selected_channel_id),
-        assets=frozenset(selected_video_asset_filters(request, selected_channel_id)),
-        categories=frozenset(selected_video_category_filters(request)),
-        excluded_assets=frozenset(selected_video_excluded_asset_filters(request)),
-        excluded_categories=frozenset(selected_video_excluded_category_filters(request)),
-        rated_only=request.query_params.get("rated") == "1",
-        hide_hidden=request.query_params.get("hide_hidden") == "1",
-        uncategorized_only=request.query_params.get("uncategorized") == "1",
+        section=params.get("section"),
+        sort=params.get("sort"),
+        assets=selected_video_asset_filters(request, selected_channel_id),
+        categories=params.getlist("category"),
+        excluded_assets=params.getlist("exclude_asset"),
+        excluded_categories=params.getlist("exclude_category"),
+        rated_only=params.get("rated") == "1",
+        hide_hidden=params.get("hide_hidden") == "1",
+        uncategorized_only=params.get("uncategorized") == "1",
         asset_filter_mode=selected_video_filter_mode(request, "asset_filter_mode"),
         category_filter_mode=selected_video_filter_mode(request, "category_filter_mode"),
-        search_query=normalized_search_query(request.query_params.get("q")),
+        search_query=params.get("q"),
         page=page,
     )
 

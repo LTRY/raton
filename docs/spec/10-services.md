@@ -59,10 +59,10 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `settings` | Réglages stockés en DB (`app_settings`) : lecture avec valeur par défaut, enregistrement du formulaire `/settings` partagé avec `/api` |
 | `categories` | Catégories des chaînes, fiches et playlists et leurs couleurs : normalisation, lecture, écriture |
-| `library_views` | Vues enregistrées de la bibliothèque : forme stockée, lecture, normalisation |
+| `library_views` | Vues enregistrées de la bibliothèque : forme stockée, lecture, normalisation ; types de fichiers filtrables (`VIDEO_ASSET_KINDS`) |
 | `ratings` | Note en étoiles (0 à 5) d'une chaîne ou d'une fiche |
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
-| `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
+| `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; nettoyage de la saisie (`normalized_search_query`) ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
 | `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/errors`) et les statuts après lesquels un job ne change plus |
 
@@ -134,7 +134,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
 | `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
-| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives |
+| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`, construit et validé par `library_filters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives ; sert `/videos` et `GET /api/library` |
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
