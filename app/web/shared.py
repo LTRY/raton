@@ -14,10 +14,9 @@ from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, video_category_css_style
 from app.services.videos.documents import NOTES_FILE
 from app.services.videos.filters import video_category_labels
+from app.services.videos.library_view import LIBRARY_PAGE_SIZE
 
 templates = Jinja2Templates(directory="app/templates")
-
-LIBRARY_PAGE_SIZE = 50
 
 FRENCH_WEEKDAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
 FRENCH_MONTHS_ABBR = [

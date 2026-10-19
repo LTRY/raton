@@ -134,6 +134,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
 | `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
+| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives |
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |

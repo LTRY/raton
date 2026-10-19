@@ -95,7 +95,7 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   des temps de lecture (aujourd'hui/7 jours/30 jours) et charge les videos
   d'un coup. `/settings` et `/dashboard/historique` l'utilisent.
 - Un fichier du disque (`metadata.json`, transcript) n'est pas relu pour chaque
-  ligne d'une liste. Une carte (`downloaded_video_card`) ne lit aucun fichier :
+  ligne d'une liste. Une carte (`downloaded_video_card`, `app/services/videos/library_view.py`) ne lit aucun fichier :
   sa duree vient de `videos.duration_seconds`. Le media est parfois monte depuis une VM
   (Docker sur macOS) ou un `metadata.json` de ~140 Ko coute 20 a 100 ms a froid : le relire
   pour 100 cartes rendait `/dashboard/nouveautes` et `/videos` longs de

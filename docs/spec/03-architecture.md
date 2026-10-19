@@ -100,10 +100,17 @@ jour (`history_day_groups`). Le calcul est dans `app/services/videos/playback.py
 ### `app/web/video_library.py`
 
 Helpers HTTP de la bibliotheque video : lecture des filtres/tri/recherche
-depuis la requete, liens des vues sauvegardees, pastilles de filtres actifs,
-construction d'une carte video (`downloaded_video_card`), mosaique des shorts.
-Les filtres eux-memes (en Python et en SQL) et l'etat de liste Vu/Ecartee sont
-dans `app/services/videos/`.
+depuis la requete (`library_filters_from_request`, qui rend un
+`LibraryFilters`), liens des vues sauvegardees, pastilles de filtres actifs,
+mosaique des shorts.
+
+Ce que la page montre pour un jeu de filtres (chaine et section, page de
+fiches, compteurs, cartes, vues enregistrees actives) est calcule sans HTTP
+par `app/services/videos/library_view.py` : la route ne fait que lire la
+requete, appeler ces fonctions et construire les liens. Un autre client
+(`/api`, un autre front) appelle les memes fonctions avec un
+`LibraryFilters`. Les filtres eux-memes (en Python et en SQL) et l'etat de
+liste Vu/Ecartee sont dans `app/services/videos/`.
 
 ### `app/web/routes/dashboard.py`
 
