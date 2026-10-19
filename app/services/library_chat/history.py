@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.video import Video
-from app.services.rag.library_chat_tools import parse_source_ids
+from app.services.library_chat.tools import parse_source_ids
 
 
 def _join_source_ids(ids: list[int]) -> str | None:

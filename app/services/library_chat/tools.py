@@ -22,14 +22,14 @@ from app.models.video import Video
 from app.services.channels.lookup import find_channel
 from app.services.channels.manage import ChannelAlreadyInLibraryError, add_resolved_channel
 from app.services.common.search import channel_search_rank, fold_search_text, video_search_rank
-from app.services.rag import retrieval as rag_retrieval
-from app.services.rag.library_chat_schema import (
+from app.services.library_chat.schema import (
     DEFAULT_HISTORY_DAYS,
     HISTORY_SCAN_LIMIT,
     MAX_CHANNEL_RESULTS,
     MAX_HISTORY_RESULTS,
     MAX_VIDEO_RESULTS,
 )
+from app.services.rag import retrieval as rag_retrieval
 from app.services.videos.playback import (
     dashboard_media_activity_logs,
     local_datetime,

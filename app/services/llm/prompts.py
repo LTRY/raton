@@ -427,7 +427,7 @@ def build_library_chat_prompt(messages: list[dict[str, str]], question: str) -> 
     """Build the cross-video ("whole library") chat prompt.
 
     It carries no library content: the model fetches what it needs through the
-    tools of app/services/rag/library_chat_tools.py, whose reference format this
+    tools of app/services/library_chat/tools.py, whose reference format this
     prompt tells it to cite.
     """
     history = "\n\n".join(

@@ -1,6 +1,6 @@
 """The tools the library chat model may call (names, descriptions, input schemas) and their bounds.
 
-Their code is `LibraryChatToolbox` (`library_chat_tools.py`).
+Their code is `LibraryChatToolbox` (`tools.py`).
 """
 
 # Each tool turn is a full extra API call, so this bounds both the latency and

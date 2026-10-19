@@ -2,7 +2,7 @@
 
 Read-side counterpart to app/services/rag/indexing.py (which writes/embeds
 chunks). Exposed to the library-wide chat as one of its tools
-(app/services/rag/library_chat_tools.py) to ground answers in the user's own video
+(app/services/library_chat/tools.py) to ground answers in the user's own video
 notes instead of the model's general knowledge.
 """
 

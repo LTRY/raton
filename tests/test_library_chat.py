@@ -14,9 +14,9 @@ from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import TranscriptStatus, Video
 from app.services.jobs import backfills, llm_jobs
+from app.services.library_chat.tools import LibraryChatToolbox
 from app.services.llm.provider import CompletionResult
 from app.services.rag import retrieval as rag_retrieval
-from app.services.rag.library_chat_tools import LibraryChatToolbox
 from app.services.rag.retrieval import RetrievedChunk
 from app.services.youtube import channel_info
 from app.web.routes import library_chat as library_chat_routes

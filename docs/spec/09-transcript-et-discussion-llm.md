@@ -421,8 +421,8 @@ une chaine YouTube a la bibliotheque).
 
 ### Outils
 
-Definis dans `app/services/rag/library_chat_tools.py` (`LIBRARY_CHAT_TOOLS`,
-executes par `LibraryChatToolbox`) :
+Definis dans `app/services/library_chat/schema.py` (`LIBRARY_CHAT_TOOLS`),
+executes par `LibraryChatToolbox` (`app/services/library_chat/tools.py`) :
 
 - `chercher_chaines(requete)` : recherche textuelle par mots, insensible a la
   casse et aux accents, sur le nom, les labels, l'URL et l'identifiant YouTube

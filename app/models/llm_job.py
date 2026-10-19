@@ -44,7 +44,7 @@ class LlmJob(Base):
     sources: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON, library_chat only: the tool calls made so far ([{"label", "result"}]),
     # written while the job runs so the status route can show them live. See
-    # app/services/rag/library_chat_tools.py:LibraryChatToolbox.
+    # app/services/library_chat/tools.py:LibraryChatToolbox.
     tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     model: Mapped[str | None] = mapped_column(String(50), nullable=True)

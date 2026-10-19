@@ -8,13 +8,13 @@ from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.services.common.settings import get_llm_provider_name
 from app.services.jobs.llm_jobs import apply_library_chat_result, enqueue_llm_job, run_llm_job
-from app.services.llm.prompts import build_library_chat_prompt
-from app.services.rag.library_chat_history import (
+from app.services.library_chat.history import (
     chat_history,
     chat_messages,
     clear_chat,
     total_video_count,
 )
+from app.services.llm.prompts import build_library_chat_prompt
 from app.services.rag.retrieval import count_indexed_videos
 
 router = APIRouter()

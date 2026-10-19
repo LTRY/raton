@@ -187,7 +187,8 @@ racine de `app/services/` :
 | `playlists/` | Import de playlists (`imports` : apercu, lecture du CSV, ajout d'une entree) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture et passage en Vu a 90 % (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`), fichiers ecrits a cote du transcript, discussion par video comprise (`documents`) |
-| `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`), outils du chat (`library_chat_schema` : ce que le modele peut appeler ; `library_chat_tools` : leur execution) |
+| `rag/` | Notes et recherche semantique : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`) |
+| `library_chat/` | Chat bibliotheque : outils du chat (`schema` : ce que le modele peut appeler ; `tools` : leur execution), conversation enregistree (`history`) |
 | `raton/` | La mascotte de l'accueil : catalogue des scenarios (`scenarios`), choix de la replique (`picker`), suivi des visites (`visits`) |
 | `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`, `playlists`) et planificateur (`scheduler`) |
 
@@ -195,7 +196,8 @@ Les dependances entre paquets vont dans un seul sens : `common` ne depend
 d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
 de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
 `playlists` de `common`, `ingest` et `youtube` ; `videos` de `common` et
-`media` ; `raton` de `common` et `videos` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
+`media` ; `raton` de `common` et `videos` ; `rag` de `common`, `llm` et `videos` ;
+`library_chat` de `channels`, `common`, `rag`, `videos` et `youtube`. `jobs`
 appelle les autres paquets et aucun ne l'importe en retour. Aucun service
 n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
 Seul `jobs` ouvre une session DB (`SessionLocal`) : les autres services
@@ -287,7 +289,7 @@ Responsable de :
   question/reponse sur transcript, chat bibliotheque) et decoupage des
   reponses.
 
-### `app/services/rag/library_chat_tools.py`
+### `app/services/library_chat/tools.py`
 
 Outils que le modele appelle pendant le chat cross-video (recherche de
 chaines, de videos, recherche semantique dans les notes) et extraction des

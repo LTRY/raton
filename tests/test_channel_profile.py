@@ -400,7 +400,7 @@ def test_start_scheduler_queues_a_profile_backfill_at_startup(monkeypatch, tmp_p
 
 
 def test_toolbox_remembers_channels_it_added():
-    from app.services.rag.library_chat_tools import LibraryChatToolbox
+    from app.services.library_chat.tools import LibraryChatToolbox
 
     db = make_session()
     toolbox = LibraryChatToolbox(db)
