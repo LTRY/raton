@@ -109,44 +109,38 @@ def test_split_notes_sections_returns_nothing_for_blank_text():
     assert split_notes_sections("   ") == []
 
 
-def test_build_summary_prompt_includes_all_three_headers():
+def test_build_summary_prompt_includes_both_headers_and_no_full_summary():
     prompt = build_summary_prompt("Transcript ici.")
 
     assert "## Résumé court" in prompt
-    assert "## Résumé complet" in prompt
+    assert "Résumé complet" not in prompt
     assert "## Questions suggérées" in prompt
     assert "Transcript ici." in prompt
 
 
-def test_split_summary_result_parses_short_full_and_questions():
+def test_split_summary_result_parses_short_and_questions():
     text = (
         "## Résumé court\nLigne 1.\nLigne 2.\nLigne 3.\n\n"
-        "## Résumé complet\nRésumé du contenu.\n\n- Point clé 1\n\n"
         "## Questions suggérées\n- Question A ?\n- Question B ?\n* Question C ?"
     )
 
-    short, full, questions = split_summary_result(text)
+    short, questions = split_summary_result(text)
 
     assert short == "Ligne 1.\nLigne 2.\nLigne 3."
-    assert full == "Résumé du contenu.\n\n- Point clé 1"
     assert questions == ["Question A ?", "Question B ?", "Question C ?"]
 
 
 def test_split_summary_result_falls_back_without_questions_header():
-    text = "## Résumé court\nLigne 1.\n\n## Résumé complet\nRésumé complet."
-
-    short, full, questions = split_summary_result(text)
+    short, questions = split_summary_result("## Résumé court\nLigne 1.")
 
     assert short == "Ligne 1."
-    assert full == "Résumé complet."
     assert questions == []
 
 
 def test_split_summary_result_falls_back_without_any_header():
-    short, full, questions = split_summary_result("Juste du texte libre.")
+    short, questions = split_summary_result("Juste du texte libre.")
 
-    assert short == ""
-    assert full == "Juste du texte libre."
+    assert short == "Juste du texte libre."
     assert questions == []
 
 
@@ -158,7 +152,8 @@ def test_build_generation_prompt_includes_both_top_level_sections_once():
     assert "# Résumé" in prompt
     for name in NOTES_SECTION_NAMES:
         assert f"## {name}" in prompt
-    assert "## Résumé complet" in prompt
+    assert "## Questions suggérées" in prompt
+    assert "Résumé complet" not in prompt
     assert "# Analyse" not in prompt
     assert "## Pertinence du contenu" not in prompt
     assert "## Score clickbait" not in prompt
@@ -187,43 +182,35 @@ def test_notes_prompt_defines_every_section_and_keeps_bullets_self_contained():
 
 
 def test_partial_generation_summary_is_empty_before_the_summary_starts():
-    assert partial_generation_summary("") == ("", "")
-    assert partial_generation_summary("# Résu") == ("", "")
-    assert partial_generation_summary("# Résumé\n## Résumé court") == ("", "")
+    assert partial_generation_summary("") == ""
+    assert partial_generation_summary("# Résu") == ""
+    assert partial_generation_summary("# Résumé\n## Résumé court") == ""
 
 
 def test_partial_generation_summary_follows_the_text_as_it_streams():
     text = (
         "# Résumé\n## Résumé court\nLigne 1.\nLigne 2.\n\n"
-        "## Résumé complet\nPremier paragraphe.\n\n- Point clé\n\n"
         "## Questions suggérées\n- Question ?\n\n"
         "# Notes\n## Faits\n- Fait 1"
     )
 
-    assert partial_generation_summary(text[: text.index("Ligne 2.")]) == ("Ligne 1.", "")
-    assert partial_generation_summary(text[: text.index("paragraphe")]) == (
-        "Ligne 1.\nLigne 2.",
-        "Premier",
-    )
-    assert partial_generation_summary(text) == (
-        "Ligne 1.\nLigne 2.",
-        "Premier paragraphe.\n\n- Point clé",
-    )
+    assert partial_generation_summary(text[: text.index("Ligne 2.")]) == "Ligne 1."
+    assert partial_generation_summary(text[: text.index("Ligne 2.") + 5]) == "Ligne 1.\nLigne"
+    assert partial_generation_summary(text) == "Ligne 1.\nLigne 2."
 
 
 def test_partial_generation_summary_only_ever_grows():
     # A header still being written must never show up as résumé text.
     text = (
-        "# Résumé\n## Résumé court\nLigne 1.\n\n## Résumé complet\nParagraphe.\n\n"
+        "# Résumé\n## Résumé court\nLigne 1.\nLigne 2.\n\n"
         "## Questions suggérées\n- Question ?\n\n# Notes\n## Faits\n- Fait"
     )
-    previous = ("", "")
+    previous = ""
     for end in range(len(text) + 1):
         current = partial_generation_summary(text[:end])
-        assert current[0].startswith(previous[0])
-        assert current[1].startswith(previous[1])
+        assert current.startswith(previous)
         previous = current
-    assert previous == ("Ligne 1.", "Paragraphe.")
+    assert previous == "Ligne 1.\nLigne 2."
 
 
 def test_split_generation_result_delegates_to_each_single_purpose_splitter():
@@ -237,7 +224,6 @@ def test_split_generation_result_delegates_to_each_single_purpose_splitter():
         "## Relations causales\nAucun élément identifié.\n\n"
         "# Résumé\n"
         "## Résumé court\nLigne 1.\nLigne 2.\nLigne 3.\n\n"
-        "## Résumé complet\nRésumé du contenu.\n\n"
         "## Questions suggérées\n- Question A ?\n"
     )
 
@@ -245,7 +231,6 @@ def test_split_generation_result_delegates_to_each_single_purpose_splitter():
 
     assert "## Faits\n- Fait 1" in result["notes_text"]
     assert result["summary_short"] == "Ligne 1.\nLigne 2.\nLigne 3."
-    assert result["summary_full"] == "Résumé du contenu."
     assert result["summary_questions"] == ["Question A ?"]
 
 
@@ -255,7 +240,6 @@ def test_split_generation_result_degrades_gracefully_without_any_top_level_heade
     assert result == {
         "notes_text": "",
         "summary_short": "",
-        "summary_full": "",
         "summary_questions": [],
     }
 

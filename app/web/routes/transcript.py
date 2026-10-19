@@ -46,16 +46,12 @@ def documents_payload(video: Video) -> dict:
     context = read_transcript_documents(video)
     transcript = context["transcript"] or ""
     notes_transcript = context["notes_transcript"] or ""
-    summary_transcript = context["summary_transcript"] or ""
     return {
         "transcript": transcript,
         "transcript_length": len(transcript),
         "notes_transcript": notes_transcript,
         "notes_length": len(notes_transcript),
         "has_notes": bool(context["notes_transcript"]),
-        "summary_transcript": summary_transcript,
-        "summary_length": len(summary_transcript),
-        "has_summary": bool(context["summary_transcript"]),
         "short_summary": context["short_summary"] or "",
         "suggested_questions": context["suggested_questions"],
         "has_questions": bool(context["suggested_questions"]),
@@ -180,9 +176,7 @@ def transcript_job_status(
         payload = {"status": "pending"}
         if job.kind == "generate" and job.result:
             # run_llm_job saves the text streamed so far in `result`.
-            short, full = partial_generation_summary(job.result)
-            payload["partial_short_summary"] = short
-            payload["partial_summary"] = full
+            payload["partial_short_summary"] = partial_generation_summary(job.result)
         return JSONResponse(payload)
 
     if job.status == "failed":

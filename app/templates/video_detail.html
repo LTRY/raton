@@ -326,7 +326,6 @@
         <button type="button" class="transcript-tab" data-tab="segments" role="tab" aria-selected="false">Segments{% if sponsor_segments %} ({{ sponsor_segments | length }}){% endif %}</button>
         <button type="button" class="transcript-tab" data-tab="raw" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Transcript</button>
         <button type="button" class="transcript-tab" data-tab="notes" role="tab" aria-selected="false" {% if not notes_transcript %}hidden{% endif %}>Notes structurées</button>
-        <button type="button" class="transcript-tab" data-tab="summary" role="tab" aria-selected="false" {% if not summary_transcript %}hidden{% endif %}>Résumé</button>
         <button type="button" class="transcript-tab" data-tab="vtt" role="tab" aria-selected="false" {% if not vtt_content %}hidden{% endif %}>.vtt</button>
         <button type="button" class="transcript-tab" data-tab="personal-notes" role="tab" aria-selected="false">Commentaire</button>
       </div>
@@ -595,7 +594,7 @@
   const tabButtons = document.querySelectorAll(".transcript-tab");
   const textPanel = document.querySelector('[data-tab-panel="text"]');
   const otherPanels = document.querySelectorAll(".transcript-panel[data-tab-panel]");
-  const TEXT_TABS = new Set(["raw", "notes", "summary"]);
+  const TEXT_TABS = new Set(["raw", "notes"]);
   let transcriptStatusTimer;
 
   function setTranscriptStatus(message, level) {
@@ -665,12 +664,6 @@
       length: {{ (notes_transcript or "") | length }},
       available: {{ "true" if notes_transcript else "false" }},
     },
-    summary: {
-      label: "Résumé",
-      content: {{ (summary_transcript or "") | tojson }},
-      length: {{ (summary_transcript or "") | length }},
-      available: {{ "true" if summary_transcript else "false" }},
-    },
     questions: {
       items: {{ (suggested_questions or []) | tojson }},
       available: {{ "true" if suggested_questions else "false" }},
@@ -685,8 +678,6 @@
     "#segments-sponsors": "segments",
   };
   let activeTab = "";
-  // The word stream of the résumé being generated, null the rest of the time.
-  let summaryStream = null;
   let hashTab = HASH_TABS[window.location.hash];
   // Under 800px the "info" and "segments" tabs are hidden: their content is in
   // the "⋮" popover, so an anchor to them opens it instead of a tab-less panel.
@@ -702,13 +693,8 @@
   function renderActiveTab() {
     if (TEXT_TABS.has(activeTab)) {
       const doc = documents[activeTab];
-      if (activeTab === "summary" && summaryStream) {
-        transcriptContent.replaceChildren(summaryStream.element);
-        transcriptVersion.textContent = "Résumé · génération en cours…";
-      } else {
-        transcriptContent.textContent = doc.content;
-        transcriptVersion.textContent = `${doc.length} caractères · ${doc.label}`;
-      }
+      transcriptContent.textContent = doc.content;
+      transcriptVersion.textContent = `${doc.length} caractères · ${doc.label}`;
       if (textPanel) textPanel.hidden = false;
       otherPanels.forEach((panel) => {
         panel.hidden = true;
@@ -742,12 +728,6 @@
       content: payload.notes_transcript,
       length: payload.notes_length,
       available: payload.has_notes,
-    };
-    documents.summary = {
-      label: "Résumé",
-      content: payload.summary_transcript,
-      length: payload.summary_length,
-      available: payload.has_summary,
     };
     if (typeof payload.short_summary === "string") {
       shortSummary.textContent = payload.short_summary;
@@ -912,15 +892,13 @@
       event.preventDefault();
       // Icon button: its text cannot be swapped like the other LLM actions
       // (that would wipe the SVG), so the loading state is a class that trades
-      // the icon for a spinner. It keeps spinning after the résumé is written,
+      // the icon for a spinner. It keeps spinning after the résumé court is written,
       // while the notes are still being generated.
       const button = generateForm.querySelector("button");
       button.disabled = true;
       button.classList.add("ai-generate-loading");
       if (generateStatus) generateStatus.hidden = true;
       const previous = {
-        tab: activeTab,
-        summary: documents.summary,
         shortText: shortSummary.textContent,
         shortHidden: shortSummary.hidden,
       };
@@ -936,12 +914,7 @@
           throw new Error(payload.message || "Génération impossible.");
         }
         if (payload.status === "queued") {
-          // The résumé is written in its tab, opened right away, and the
-          // short one under the video title.
-          summaryStream = createWordStream(document.createElement("span"));
-          documents.summary = { label: "Résumé", content: "", length: 0, available: true };
-          activeTab = "summary";
-          renderActiveTab();
+          // The résumé court is written under the video title as it arrives.
           payload = await pollLlmJob(payload.job_id, {
             interval: 400,
             onPending(pending) {
@@ -953,27 +926,16 @@
                 }
                 shortStream.push(pending.partial_short_summary);
               }
-              if (pending.partial_summary) summaryStream.push(pending.partial_summary);
             },
           });
-          await Promise.all([
-            summaryStream.finish(payload.summary_transcript || ""),
-            shortStream && shortStream.finish(payload.short_summary || ""),
-          ]);
+          if (shortStream) await shortStream.finish(payload.short_summary || "");
         }
-        summaryStream = null;
         if (shortStream) shortStream.stop();
         shortStream = null;
         updateDocuments(payload);
         renderActiveTab();
         window.showToast(payload.message || "Notes et résumé générés par l'IA.");
       } catch (error) {
-        if (summaryStream) {
-          summaryStream = null;
-          documents.summary = previous.summary;
-          if (activeTab === "summary" && !previous.summary.available) activeTab = previous.tab;
-          renderActiveTab();
-        }
         if (shortStream) {
           shortStream.stop();
           shortSummary.textContent = previous.shortText;

@@ -88,7 +88,7 @@ Document genere par le LLM a partir du transcript (faits, dates, lieux, acteurs.
 
 ### Resume
 
-Resume court (3 lignes) genere avec les notes.
+Resume court (3 lignes) genere avec les notes. Il n'existe pas de resume complet.
 
 - **Code** : `transcript.summary_short.txt`
 - **A ne pas confondre avec** : Les notes structurees.
