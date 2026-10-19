@@ -14,21 +14,15 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.job import DownloadJob
-from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, serialized_category_labels
-from app.services.common.durations import format_duration
 from app.services.common.job_log import JOB_DONE_STATUSES, log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.common.settings import (
-    SPONSOR_SEGMENT_CATEGORY_LABELS,
     add_video_category_labels,
-    get_llm_provider_display_label,
     get_no_progress_category_labels,
-    get_sponsor_skip_enabled,
     get_video_category_label_styles,
 )
 from app.services.ingest.channel_exploration import (
@@ -44,7 +38,7 @@ from app.services.jobs.downloads import (
     run_manual_download_job,
     run_transcript_retry_job,
 )
-from app.services.videos.documents import read_transcript_documents
+from app.services.videos.detail_view import VideoNotFoundError, open_video_detail
 from app.services.videos.download_options import (
     normalize_download_media_types,
     normalize_subtitle_language,
@@ -52,7 +46,6 @@ from app.services.videos.download_options import (
     normalize_video_quality,
 )
 from app.services.videos.editing import (
-    mark_video_opened,
     set_video_categories,
     set_video_comment,
     set_video_list_state,
@@ -65,15 +58,12 @@ from app.services.videos.library_view import (
     library_saved_views,
 )
 from app.services.videos.playback import (
-    latest_playback_positions,
     record_playback_activity,
 )
 from app.services.youtube.sponsor_segments import (
-    active_sponsor_segments,
     fetch_sponsor_segments,
-    normalize_skip_segments,
 )
-from app.web.formatting import estimate_channel_periodicity, format_views
+from app.web.formatting import estimate_channel_periodicity
 from app.web.shared import (
     append_query,
     category_style_map,
@@ -84,9 +74,9 @@ from app.web.shared import (
     page_href_builder,
     redirect,
     templates,
-    video_metadata,
     wants_json,
 )
+from app.web.video_detail import video_detail_context
 from app.web.video_library import (
     VIDEO_ASSET_FILTER_OPTIONS,
     library_filters_from_request,
@@ -254,14 +244,6 @@ def fetch_video_sponsorblock_segments(
     return redirect(f"/videos/{video_id}?{query}#segments-sponsors")
 
 
-def _back_label(back_path: str) -> str:
-    if back_path.startswith("/playlists/"):
-        return "Retour à la playlist"
-    if "channel_id=" in back_path:
-        return "Retour à la chaîne"
-    return "Retour à la bibliothèque"
-
-
 # Declared before `/videos/{video_id}`, which would otherwise capture "import" and answer 422.
 @router.post("/jobs/{job_id}/cancel")
 def cancel_channel_import_job(job_id: int, db: Session = Depends(get_db)):
@@ -320,101 +302,16 @@ def import_video_page(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/videos/{video_id}", response_class=HTMLResponse)
 def video_detail_page(request: Request, video_id: int, db: Session = Depends(get_db)):
-    video = db.get(Video, video_id)
-    if video is None:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    mark_video_opened(db, video)
-
-    category_label_styles = get_video_category_label_styles(db)
+    try:
+        detail = open_video_detail(db, video_id)
+    except VideoNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     query_params = request.query_params if "query_string" in request.scope else {}
     back_path = internal_return_path(query_params.get("next", ""), "/videos")
-    context = read_transcript_documents(video)
-    vtt_content = None
-    if video.subtitle_path:
-        subtitle_file = local_media_path(video.subtitle_path)
-        if subtitle_file.is_file():
-            vtt_content = subtitle_file.read_text(encoding="utf-8", errors="replace")
-    raw_metadata = video_metadata(video)
-    extended_metadata = {
-        "description": raw_metadata.get("description") or None,
-        "tags": [tag for tag in (raw_metadata.get("tags") or []) if tag],
-        "chapters": [
-            {
-                "title": chapter["title"],
-                "start_label": format_duration(chapter.get("start_time")) or "0:00",
-            }
-            for chapter in (raw_metadata.get("chapters") or [])
-            if isinstance(chapter, dict) and chapter.get("title")
-        ],
-        "duration": format_duration(raw_metadata.get("duration")),
-        "view_count": format_views(raw_metadata.get("view_count")),
-        "like_count": format_views(raw_metadata.get("like_count")),
-        "comment_count": format_views(raw_metadata.get("comment_count")),
-        "uploader": raw_metadata.get("uploader") or raw_metadata.get("channel"),
-    }
-    extended_metadata["has_content"] = any(
-        [
-            extended_metadata["description"],
-            extended_metadata["tags"],
-            extended_metadata["chapters"],
-            extended_metadata["view_count"],
-            extended_metadata["like_count"],
-            extended_metadata["comment_count"],
-        ]
-    )
-    sponsor_segment_rows = active_sponsor_segments(db, video.id)
-    sponsor_segments = [
-        {
-            "category_label": SPONSOR_SEGMENT_CATEGORY_LABELS.get(row.category, row.category),
-            "start_seconds": row.start_seconds,
-            "start_label": format_duration(row.start_seconds) or "0:00",
-            "end_label": format_duration(row.end_seconds) or "0:00",
-        }
-        for row in sponsor_segment_rows
-    ]
-    context.update(
-        {
-            "video": video,
-            "category_options": category_label_styles,
-            "category_option_labels": [style["label"] for style in category_label_styles],
-            "category_style_map": category_style_map(category_label_styles),
-            "extended_metadata": extended_metadata,
-            "vtt_content": vtt_content,
-            "sponsor_segments": sponsor_segments,
-            "resume_positions": latest_playback_positions(db, video.id),
-            "sponsor_skip_payload": {
-                "enabled": get_sponsor_skip_enabled(db),
-                "segments": normalize_skip_segments(sponsor_segment_rows),
-            },
-            "back_path": back_path,
-            "back_label": _back_label(back_path),
-            "video_playlist_links": [
-                {"playlist": item.playlist, "item_id": item.id} for item in video.playlist_items
-            ],
-            "all_playlists": list(db.scalars(select(Playlist).order_by(Playlist.title))),
-            "message": query_params.get("message"),
-            "message_level": query_params.get("level", "success"),
-            "llm_provider_label": get_llm_provider_display_label(),
-            "chat_widget_config": {
-                "defaultScope": "video",
-                "llmProviderLabel": get_llm_provider_display_label(),
-                "scopes": {
-                    "video": {
-                        "askUrl": f"/videos/{video.id}/transcript/chat",
-                        "clearUrl": f"/videos/{video.id}/transcript/chat/clear",
-                        "jobUrlTemplate": f"/videos/{video.id}/transcript/jobs/" + "{job_id}",
-                        "placeholder": "Discuter du contenu",
-                        "messages": context["chat_messages"],
-                    },
-                },
-            },
-        }
-    )
-    return templates.TemplateResponse(
-        request,
-        "video_detail.html",
-        context,
-    )
+    context = video_detail_context(detail, back_path)
+    context["message"] = query_params.get("message")
+    context["message_level"] = query_params.get("level", "success")
+    return templates.TemplateResponse(request, "video_detail.html", context)
 
 
 @router.post("/videos/download")

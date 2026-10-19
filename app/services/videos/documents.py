@@ -1,6 +1,8 @@
-"""The text files written next to a fiche's transcript: notes, summaries, questions, chat.
+"""The files written next to a fiche: `metadata.json`, and next to its transcript the notes,
+summaries, questions and chat.
 
-Their names are fixed relative to `transcript.txt`; this module is the only one that knows them.
+The transcript files' names are fixed relative to `transcript.txt`; this module is the only one
+that knows them.
 """
 
 import json
@@ -14,6 +16,23 @@ SUMMARY_FILE = "transcript.summary.txt"
 SHORT_SUMMARY_FILE = "transcript.summary_short.txt"
 QUESTIONS_FILE = "transcript.questions.txt"
 CHAT_FILE = "transcript.chat.json"
+
+
+def read_video_metadata(video: Video) -> dict:
+    """The fiche's metadata.json as yt-dlp wrote it; {} when missing or unreadable.
+
+    A ~140 KB file: read it for one fiche, never for every row of a list.
+    """
+    if not video.metadata_path:
+        return {}
+    path = local_media_path(video.metadata_path)
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError, OSError:
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def get_transcript_paths(video: Video) -> tuple[Path, Path, Path]:

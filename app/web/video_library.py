@@ -4,13 +4,11 @@ from fastapi import Request
 
 from app.models.video import Video
 from app.services.common.categories import normalize_video_category_label
+from app.services.videos.documents import read_video_metadata as video_metadata
 from app.services.videos.library_view import LibraryFilters
 from app.services.videos.list_state import video_auto_list_state, video_list_state
 from app.services.youtube.channel_info import normalized_channel_section
-from app.web.shared import (
-    templates,
-    video_metadata,
-)
+from app.web.shared import templates
 
 templates.env.globals["video_auto_list_state"] = video_auto_list_state
 templates.env.globals["video_list_state"] = video_list_state

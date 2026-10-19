@@ -52,7 +52,7 @@ SERVICE_PACKAGE_DEPENDENCIES = {
     "channels": {"common", "youtube"},
     "ingest": {"common", "media", "youtube"},
     "playlists": {"common", "ingest", "youtube"},
-    "videos": {"common", "media"},
+    "videos": {"common", "media", "youtube"},
     "raton": {"common", "videos"},
     "rag": {"common", "llm", "videos"},
     "library_chat": {"channels", "common", "rag", "videos", "youtube"},

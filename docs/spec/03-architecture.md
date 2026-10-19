@@ -112,6 +112,15 @@ requete, appeler ces fonctions et construire les liens. Un autre client
 `LibraryFilters`. Les filtres eux-memes (en Python et en SQL) et l'etat de
 liste Vu/Ecartee sont dans `app/services/videos/`.
 
+### `app/web/video_detail.py`
+
+Contexte du template de la page d'une fiche : libelles (durees, nombres de
+vues, categories de segments sponsors), lien et libelle de retour, config du
+widget de discussion. Les donnees elles-memes (documents, sous-titres,
+metadonnees, segments, positions de reprise) viennent brutes de
+`app/services/videos/detail_view.py`, qui sert aussi tout autre client de
+la fiche.
+
 ### `app/web/routes/dashboard.py`
 
 Tableau de bord (`/`), pages `/dashboard/nouveautes` et
