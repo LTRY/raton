@@ -57,7 +57,7 @@ class Video(Base):
     downloaded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
-    # First time playback reached 90% (see app/services/media/media_storage.py); starts the
+    # First time playback reached 90% (see app/services/videos/playback.py); starts the
     # retention countdown. Never overwritten, so replays don't push the deletion back.
     watched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True

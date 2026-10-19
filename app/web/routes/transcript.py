@@ -16,7 +16,6 @@ from app.services.jobs.llm_jobs import (
     run_llm_job,
     video_analysis_has_image,
 )
-from app.services.llm.chat_history import load_chat
 from app.services.llm.prompts import (
     build_chat_prompt,
     build_generation_prompt,
@@ -26,6 +25,7 @@ from app.services.rag.indexing import index_video_notes
 from app.services.videos.documents import (
     clear_transcript_chat,
     get_transcript_paths,
+    load_chat,
     read_transcript_documents,
 )
 from app.web.shared import redirect

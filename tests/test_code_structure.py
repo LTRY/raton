@@ -52,7 +52,7 @@ SERVICE_PACKAGE_DEPENDENCIES = {
     "channels": {"common", "youtube"},
     "ingest": {"common", "media", "youtube"},
     "playlists": {"common", "ingest", "youtube"},
-    "videos": {"common", "llm", "media"},
+    "videos": {"common", "media"},
     "raton": {"common", "videos"},
     "rag": {"channels", "common", "llm", "videos", "youtube"},
     "jobs": {"channels", "common", "ingest", "llm", "media", "rag", "videos", "youtube"},
@@ -75,6 +75,18 @@ def test_services_import_no_web_module():
         if module == "app.web" or module.startswith("app.web.")
     )
     assert not offenders, f"services import the web layer: {offenders}"
+
+
+def test_models_import_no_service():
+    # Services build on the models; a model importing a service would make that service load with
+    # every table, and its constants belong next to the column they size.
+    offenders = sorted(
+        f"{path.relative_to(APP)}: {module}"
+        for path in (APP / "models").rglob("*.py")
+        for module in imported_modules(path)
+        if module == "app.services" or module.startswith("app.services.")
+    )
+    assert not offenders, f"models import services: {offenders}"
 
 
 def test_every_service_module_belongs_to_a_known_package():

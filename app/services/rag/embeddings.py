@@ -14,14 +14,12 @@ import httpx
 
 from app.core.config import get_settings
 from app.core.logging import log_external
+from app.models.video_note_chunk import EMBEDDING_DIMENSIONS
 
 logger = logging.getLogger(__name__)
 
 VOYAGE_EMBEDDINGS_URL = "https://api.voyageai.com/v1/embeddings"
 VOYAGE_RERANK_URL = "https://api.voyageai.com/v1/rerank"
-# Must match the `vector(N)` column of video_note_chunks. voyage-3.5 accepts
-# 256/512/1024/2048 through `output_dimension`.
-EMBEDDING_DIMENSIONS = 1024
 # The API refuses more inputs than this in one embeddings request.
 MAX_INPUTS_PER_REQUEST = 128
 REQUEST_TIMEOUT_SECONDS = 30.0

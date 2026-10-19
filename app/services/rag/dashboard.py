@@ -21,7 +21,7 @@ from app.core.config import get_settings
 from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.models.video_note_chunk import VideoNoteChunk
+from app.models.video_note_chunk import EMBEDDING_DIMENSIONS, VideoNoteChunk
 from app.services.common.settings import (
     get_auto_notes_enabled,
     get_auto_notes_excluded_category_labels,
@@ -53,7 +53,6 @@ from app.services.rag.dashboard_stats import (
     percent,
     recent_failures,
 )
-from app.services.rag.embeddings import EMBEDDING_DIMENSIONS
 from app.services.rag.retrieval import (
     CANDIDATE_CHUNKS,
     MAX_CHUNKS_PER_VIDEO,

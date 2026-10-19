@@ -11,11 +11,10 @@ from sqlalchemy.orm import Session
 
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.models.video_note_chunk import VideoNoteChunk
+from app.models.video_note_chunk import EMBEDDING_DIMENSIONS, VideoNoteChunk
 from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
 )
-from app.services.rag.embeddings import EMBEDDING_DIMENSIONS
 from app.services.rag.indexing import SUMMARY_SECTION_NAME
 
 HISTORY_DAYS = 14

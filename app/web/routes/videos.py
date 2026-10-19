@@ -22,14 +22,7 @@ from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels, serialized_category_labels
 from app.services.common.durations import format_duration
-from app.services.common.job_log import (
-    CHANNEL_IMPORT_PROGRESS_LIMIT,
-    JOB_DONE_STATUSES,
-    cancel_channel_exploration,
-    channel_exploration_videos,
-    log_job,
-    record_playback_activity,
-)
+from app.services.common.job_log import JOB_DONE_STATUSES, log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.common.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
@@ -41,6 +34,11 @@ from app.services.common.settings import (
     get_video_category_label_styles,
     get_video_library_views,
 )
+from app.services.ingest.channel_exploration import (
+    CHANNEL_IMPORT_PROGRESS_LIMIT,
+    cancel_channel_exploration,
+    channel_exploration_videos,
+)
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media
 from app.services.ingest.media_import import import_video_metadata
@@ -50,7 +48,6 @@ from app.services.jobs.downloads import (
     run_transcript_retry_job,
 )
 from app.services.jobs.llm_jobs import video_analysis_has_image
-from app.services.media.media_storage import mark_watched_if_complete
 from app.services.videos.documents import read_transcript_documents
 from app.services.videos.download_options import (
     normalize_download_media_types,
@@ -74,7 +71,11 @@ from app.services.videos.library_query import (
     library_section_counts,
     publication_dates,
 )
-from app.services.videos.playback import latest_playback_by_video, latest_playback_positions
+from app.services.videos.playback import (
+    latest_playback_by_video,
+    latest_playback_positions,
+    record_playback_activity,
+)
 from app.services.youtube.sponsor_segments import (
     active_sponsor_segments,
     fetch_sponsor_segments,
@@ -740,7 +741,6 @@ def log_video_activity(
     if media_type not in {"video", "audio"}:
         raise HTTPException(status_code=400, detail="Type de média invalide")
 
-    mark_watched_if_complete(video, position_seconds, duration_seconds)
     record_playback_activity(
         db, video, media_type, position_seconds, duration_seconds, watched_seconds
     )

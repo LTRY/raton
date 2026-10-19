@@ -250,8 +250,8 @@ pour les lecteurs video/audio classiques (`app/static/js/app.js`,
 ## Video vue et fichiers retires
 
 Le seuil de 90 % de lecture est evalue cote serveur par
-`POST /videos/{id}/activity` (`mark_watched_if_complete`,
-`app/services/media/media_storage.py`) : la premiere fois que
+`POST /videos/{id}/activity` (`record_playback_activity`, qui appelle
+`mark_watched_if_complete`, `app/services/videos/playback.py`) : la premiere fois que
 `position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
 seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont
 decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).

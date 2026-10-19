@@ -180,10 +180,10 @@ racine de `app/services/` :
 | `youtube/` | Tout ce qui parle a YouTube : `yt`, `channel_info`, `downloads`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
 | `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |
-| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill` |
+| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill`, `channel_exploration` |
 | `playlists/` | Import de playlists (`imports`) et edition d'une playlist et de ses elements (`editing`) |
-| `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
-| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
+| `llm/` | Appels Anthropic : `provider`, `prompts`, `usage` |
+| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture et passage en Vu a 90 % (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`), fichiers ecrits a cote du transcript, discussion par video comprise (`documents`) |
 | `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`), outils du chat (`library_chat_schema` : ce que le modele peut appeler ; `library_chat_tools` : leur execution) |
 | `raton/` | La mascotte de l'accueil : catalogue des scenarios (`scenarios`), choix de la replique (`picker`), suivi des visites (`visits`) |
 | `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`) et planificateur (`scheduler`) |
@@ -191,10 +191,12 @@ racine de `app/services/` :
 Les dependances entre paquets vont dans un seul sens : `common` ne depend
 d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
 de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
-`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common`, `llm` et
+`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common` et
 `media` ; `raton` de `common` et `videos` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
 appelle les autres paquets et aucun ne l'importe en retour. Aucun service
 n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
+Aucun modele (`app/models/`) n'importe un service : une constante qui
+dimensionne une colonne est definie a cote de cette colonne.
 `tests/test_code_structure.py` fait respecter ces regles.
 
 Hors de `app/services/` : le resume du journal applicatif (`logs_digest`) est
@@ -239,20 +241,20 @@ reponse HTTP, lancer les taches de fond et rendre la page. Rien sous `app/web/` 
 - `scan_events.py` : etat du scan en cours, lu par la page des parametres ;
 - `local_upload.py` : import d'un fichier video ou audio depose depuis
   l'appareil ;
-- `transcript_backfill.py` : rattrapage des transcripts manquants.
+- `transcript_backfill.py` : rattrapage des transcripts manquants ;
+- `channel_exploration.py` : arret et progression d'une exploration de
+  chaine (import de metadonnees de toute une chaine).
 
 ### `app/services/common/`
 
 - `ratings.py` : la note en etoiles d'une chaine ou d'une fiche ;
-- `job_log.py` : une ligne de journal de jobs (`log_job`), l'activite de
-  lecture (`record_playback_activity`), l'arret et la progression d'une
-  exploration de chaine.
+- `job_log.py` : une ligne de journal de jobs (`log_job`) et les statuts
+  apres lesquels un job ne change plus.
 
 ### `app/services/media/media_storage.py`
 
 Responsable de :
 
-- detection des 90 % de lecture (`mark_watched_if_complete`) ;
 - purge quotidienne des fichiers media des videos vues (`purge_watched_media`) ;
 - suppression d'un seul format (`delete_video_media_asset`, et `delete_video_media_file` qui la valide dans la DB pour la
   route media ;
@@ -273,8 +275,7 @@ Responsable de :
   du chat cross-video ;
 - `prompts.py` : construction des prompts (notes, resume, analyse video,
   question/reponse sur transcript, chat bibliotheque) et decoupage des
-  reponses ;
-- `chat_history.py` : lecture/ecriture historique chat.
+  reponses.
 
 ### `app/services/rag/library_chat_tools.py`
 

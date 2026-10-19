@@ -5,7 +5,11 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
-from app.services.rag.embeddings import EMBEDDING_DIMENSIONS
+
+# Size of the Voyage vectors stored in `embedding`; app/services/rag/embeddings.py asks the API for
+# this size (voyage-3.5 accepts 256/512/1024/2048). Changing it needs a migration of the column and
+# a re-embedding of every chunk.
+EMBEDDING_DIMENSIONS = 1024
 
 
 class VideoNoteChunk(Base):

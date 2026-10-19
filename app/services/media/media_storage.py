@@ -1,4 +1,3 @@
-import math
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import or_, select
@@ -9,7 +8,6 @@ from app.models.video import Video
 from app.services.common.files import directory_size
 from app.services.common.job_log import log_job
 
-WATCHED_RATIO = 0.9
 RETENTION = timedelta(days=7)
 ARCHIVE_MIN_RATING = 4
 
@@ -24,25 +22,6 @@ def media_type_for_paths(
     if metadata_path:
         return "metadata"
     return "metadata"
-
-
-def mark_watched_if_complete(
-    video: Video, position_seconds: float, duration_seconds: float, now: datetime | None = None
-) -> bool:
-    """Start the retention countdown the first time playback reaches WATCHED_RATIO.
-
-    Does not commit. The date is set once and never moved by playback, so replaying a video
-    doesn't postpone its deletion. A new download adding a format resets it to
-    NULL (see `media_import`), restarting the countdown.
-    """
-    if not (math.isfinite(position_seconds) and math.isfinite(duration_seconds)):
-        return False
-    if video.watched_at is not None or duration_seconds <= 0:
-        return False
-    if position_seconds / duration_seconds < WATCHED_RATIO:
-        return False
-    video.watched_at = now or datetime.now(UTC)
-    return True
 
 
 def delete_video_media_asset(video: Video, media_type: str) -> None:

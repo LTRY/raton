@@ -1,6 +1,7 @@
-"""Playback activity read back from the `played` jobs: positions, screen-time stats, history."""
+"""Playback activity: recorded as `played` jobs, then read back as positions, screen-time stats, history."""
 
 import json
+import math
 import re
 from datetime import UTC, date, datetime, timedelta
 
@@ -8,14 +9,17 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.job import DownloadJob
+from app.models.video import Video
 from app.services.common.durations import (
     format_compact_duration,
     format_duration,
     parse_duration_label,
 )
+from app.services.common.job_log import log_job
 from app.services.videos.filters import video_category_labels
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}
+WATCHED_RATIO = 0.9
 
 
 PLAYBACK_STATS_KINDS = [
@@ -24,6 +28,63 @@ PLAYBACK_STATS_KINDS = [
     ("podcast", "Podcasts"),
     ("music", "Musique"),
 ]
+
+
+def mark_watched_if_complete(
+    video: Video, position_seconds: float, duration_seconds: float, now: datetime | None = None
+) -> bool:
+    """Mark the fiche Vu (`watched_at`) the first time playback reaches WATCHED_RATIO.
+
+    Does not commit. The date is set once and never moved by playback, so replaying a video
+    doesn't postpone the purge of its files. A new download adding a format resets it to
+    NULL (see `media_import`), restarting the countdown.
+    """
+    if not (math.isfinite(position_seconds) and math.isfinite(duration_seconds)):
+        return False
+    if video.watched_at is not None or duration_seconds <= 0:
+        return False
+    if position_seconds / duration_seconds < WATCHED_RATIO:
+        return False
+    video.watched_at = now or datetime.now(UTC)
+    return True
+
+
+def record_playback_activity(
+    db: Session,
+    video: Video,
+    media_type: str,
+    position_seconds: float,
+    duration_seconds: float,
+    watched_seconds: float,
+) -> DownloadJob:
+    """Record one playback report of the players: the Vu mark, then a `played` job, in one commit.
+
+    The JSON shape of the job is the one `playback_activity_payload_view` reads back.
+    """
+    mark_watched_if_complete(video, position_seconds, duration_seconds)
+    position_seconds = max(position_seconds, 0)
+    duration_seconds = max(duration_seconds, 0)
+    watched_seconds = max(watched_seconds, 0)
+    action = "Reprise" if position_seconds >= 3 else "Lecture"
+    media_label = "audio" if media_type == "audio" else "vidéo"
+    return log_job(
+        db,
+        "played",
+        json.dumps(
+            {
+                "type": "playback",
+                "action": action,
+                "media_label": media_label,
+                "position_seconds": position_seconds,
+                "duration_seconds": duration_seconds,
+                "watched_seconds": watched_seconds,
+                "title": video.title,
+            },
+            ensure_ascii=False,
+        ),
+        channel_id=video.channel_id,
+        video_id=video.id,
+    )
 
 
 def legacy_playback_activity_view(message: str) -> dict[str, str | float] | None:
