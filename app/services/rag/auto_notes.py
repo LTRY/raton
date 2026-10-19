@@ -44,9 +44,9 @@ from app.services.settings import (
     get_auto_notes_enabled,
     get_auto_notes_excluded_category_labels,
     get_setting,
-    parse_video_category_labels,
     set_setting,
 )
+from app.services.settings_format import parse_video_category_labels
 
 logger = logging.getLogger(__name__)
 

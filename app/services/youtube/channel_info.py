@@ -10,20 +10,14 @@ from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_ur
 from app.services.youtube.yt import _ytdlp_call
 
 CHANNEL_SECTIONS = {"videos", "shorts"}
-
-
 CHANNEL_SECTION_ALIASES = {
     "video": "videos",
     "videos": "videos",
     "short": "shorts",
     "shorts": "shorts",
 }
-
-
 # YouTube's own "Type: Channel" search filter, as the `sp` query parameter.
 CHANNEL_SEARCH_FILTER = "EgIQAg%3D%3D"
-
-
 CHANNEL_SEARCH_LIMIT = 8
 
 

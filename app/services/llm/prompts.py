@@ -1,11 +1,7 @@
 import re
 
 NOTES_SECTION_NAMES = ["Faits", "Dates", "Lieux", "Acteurs", "Concepts", "Relations causales"]
-
-
 NOTES_EMPTY_SECTION_MARKER = "Aucun élément identifié."
-
-
 _NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -61,14 +57,8 @@ def split_notes_sections(text: str) -> list[tuple[str, str]]:
 
 
 SUMMARY_SHORT_HEADER = "## Résumé court"
-
-
 SUMMARY_FULL_HEADER = "## Résumé complet"
-
-
 SUMMARY_QUESTIONS_HEADER = "## Questions suggérées"
-
-
 _BULLET_LINE_RE = re.compile(r"^\s*[-*]\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -146,32 +136,14 @@ THUMBNAIL_MEDIA_TYPES = {
     ".png": "image/png",
     ".webp": "image/webp",
 }
-
-
 ANALYSIS_CLICKBAIT_HEADER = "## Score clickbait"
-
-
 ANALYSIS_RELEVANCE_HEADER = "## Pertinence du contenu"
-
-
 ANALYSIS_SUGGESTIONS_HEADER = "## Suggestions"
-
-
 _ANALYSIS_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
-
-
 _ANALYSIS_SCORE_RE = re.compile(r"Score\s*:\s*(\d{1,2})\s*/\s*10")
-
-
 _ANALYSIS_PERCENT_RE = re.compile(r"Contenu utile\s*:\s*(\d{1,3})\s*%")
-
-
 _ANALYSIS_JUSTIFICATION_RE = re.compile(r"Justification\s*:\s*(.+)", re.DOTALL)
-
-
 _ANALYSIS_TITLE_RE = re.compile(r"^Titre\s*\d\s*:\s*(.+)$", re.MULTILINE)
-
-
 _ANALYSIS_CATEGORIES_RE = re.compile(r"^Catégories\s*:\s*(.+)$", re.MULTILINE)
 
 
@@ -276,14 +248,8 @@ def split_video_analysis_result(text: str, has_image: bool) -> dict:
 
 
 GENERATION_NOTES_HEADER = "# Notes"
-
-
 GENERATION_SUMMARY_HEADER = "# Résumé"
-
-
 GENERATION_ANALYSIS_HEADER = "# Analyse"
-
-
 _GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé|Analyse)\s*$", re.MULTILINE)
 
 

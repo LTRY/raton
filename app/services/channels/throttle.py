@@ -8,11 +8,7 @@ import random
 import time
 
 PAUSE_BETWEEN_IMPORTS = (2.0, 5.0)
-
-
 PAUSE_BETWEEN_CHANNELS = (10.0, 30.0)
-
-
 # After a channel that only needed a listing (nothing imported): one light request, no need to wait long.
 PAUSE_AFTER_LISTING_ONLY = (1.0, 3.0)
 

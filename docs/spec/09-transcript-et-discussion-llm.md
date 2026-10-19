@@ -195,7 +195,7 @@ en isolation.
   combinée n'est pas corrélée 1:1 à la longueur d'entrée) — planification
   asynchrone par `BackgroundTasks` ;
 - **un seul appel LLM produit les trois documents**, pour n'envoyer le
-  transcript qu'une seule fois (`app/services/llm/provider.py:build_generation_prompt`) :
+  transcript qu'une seule fois (`app/services/llm/prompts.py:build_generation_prompt`) :
   le prompt combine les instructions des trois anciens prompts à usage unique
   (`build_notes_prompt`/`build_summary_prompt`/`build_video_analysis_prompt`,
   conservés et toujours utilisables individuellement) sous trois titres
@@ -217,7 +217,7 @@ en isolation.
     (part du contenu qui traite réellement le sujet annoncé, par opposition
     au remplissage), `## Suggestions` (3 titres alternatifs + 1 à 3
     catégories suggérées) ; n'invente rien dans les trois blocs ;
-- `app/services/llm/provider.py:split_generation_result(text, has_image)` découpe
+- `app/services/llm/prompts.py:split_generation_result(text, has_image)` découpe
   d'abord la réponse sur les trois titres de niveau 1, puis délègue chaque
   bloc au split_* à usage unique correspondant (`split_notes_sections` en
   interne via l'indexation RAG ci-dessous, `split_summary_result`,
@@ -242,7 +242,7 @@ en isolation.
 des notes. Un lot nocturne (`auto_notes`, voir
 [13 Jobs, logs et planification](13-jobs-logs-planification.md)) produit, pour
 les vidéos qui n'en ont pas, **les notes structurées et le résumé court
-seulement** (`app/services/llm/provider.py:build_auto_notes_prompt`, mêmes instructions
+seulement** (`app/services/llm/prompts.py:build_auto_notes_prompt`, mêmes instructions
 de notes et de résumé court que ci-dessus, sans résumé complet, questions ni
 analyse) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
 (jamais écrasé s'il existe déjà : un résumé généré à la main prévaut). Le
@@ -253,7 +253,7 @@ tout, y compris ces deux fichiers.
 
 **Indexation RAG cross-video** : dès que le job `generate` est appliqué, une
 tâche `BackgroundTasks` découpe le seul bloc `# Notes` (pas le texte combiné
-entier) en chunks par section (`app/services/llm/provider.py:split_notes_sections`,
+entier) en chunks par section (`app/services/llm/prompts.py:split_notes_sections`,
 sections vides/placeholder ignorées), les embed via l'API Voyage
 (`app/services/rag/embeddings.py`, `EMBEDDING_MODEL`, 1024 dimensions,
 `VOYAGE_API_KEY`), chaque section précédée du titre de la vidéo et de sa
@@ -299,7 +299,7 @@ tant qu'aucune analyse n'a encore été générée pour cette vidéo.
   pour un job `generate` dont la reponse a commence a arriver, la reponse
   porte en plus `partial_short_summary` et `partial_summary` : le résumé court
   et le résumé complet tels qu'ecrits jusque-la
-  (`app/services/llm/provider.py:partial_generation_summary`). Ces deux valeurs ne font
+  (`app/services/llm/prompts.py:partial_generation_summary`). Ces deux valeurs ne font
   que s'allonger d'un poll au suivant (un titre Markdown en cours d'ecriture
   n'y apparait jamais), ce qui permet au client de n'ajouter que la suite ;
   `run_llm_job` enregistre pour cela le texte recu dans `llm_jobs.result`
@@ -496,7 +496,7 @@ ou essayer autrement.
 
 Chaque chaine ou video renvoyee par un outil porte une reference
 `[chaine:ID]` ou `[video:ID]`. Le prompt
-(`app/services/llm/provider.py:build_library_chat_prompt`) demande au modele d'ecrire,
+(`app/services/llm/prompts.py:build_library_chat_prompt`) demande au modele d'ecrire,
 a l'endroit ou il en parle, le nom de chaque chaine ou video qu'il retient
 sous la forme `[[chaine:ID|Nom]]` / `[[video:ID|Titre]]` : le texte affiche
 est le nom, la syntaxe disparait a l'affichage (voir

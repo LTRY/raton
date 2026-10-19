@@ -42,13 +42,15 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_category_labels,
     get_video_library_views,
+    set_setting,
+)
+from app.services.settings_format import (
     parse_video_category_label_styles,
     parse_video_category_labels,
     parse_video_library_views,
     serialize_video_category_label_styles,
     serialize_video_category_labels,
     serialize_video_library_views,
-    set_setting,
 )
 from app.web.job_logs import LOG_FILTERS, LOG_PAGE_SIZE, log_days, normalize_log_filter
 from app.web.library_stats import library_stats_context

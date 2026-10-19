@@ -13,14 +13,8 @@ from app.services.files import sanitize_filename
 from app.services.youtube.yt import _ytdlp_call, extract_video_info
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
-
-
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".opus", ".ogg", ".wav", ".flac"}
-
-
 THUMB_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-
-
 SUBTITLE_EXTENSIONS = {".vtt", ".srt", ".json3"}
 
 

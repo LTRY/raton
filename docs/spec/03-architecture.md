@@ -169,14 +169,14 @@ Les services sont rangés en six paquets, un par sujet :
 |---|---|
 | `youtube/` | Tout ce qui parle à YouTube : `yt`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract`, `local_upload` |
-| `channels/` | Chaînes et scan : `scanner`, `scan_events`, `lookup`, `profile`, `subscriptions` |
+| `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `lookup`, `profile`, `subscriptions` |
 | `playlists/` | Import de playlists : `imports` |
-| `llm/` | Appels Anthropic : `provider`, `usage` |
+| `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
 | `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
 
 À la racine de `app/services/` restent : les modules d'orchestration
 `background_jobs` et `scheduler`, et les modules transverses `settings`,
-`search`, `files`, `job_log`, `logs_digest` et `library_charts`.
+`settings_format`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
 
 Les dépendances entre paquets vont dans un seul sens :
 `youtube` et `llm` ne dépendent d'aucun autre paquet, `media` dépend de
@@ -195,18 +195,19 @@ Les dépendances entre paquets vont dans un seul sens :
 - `downloads.py` : telechargement audio/video, sous-titres et miniature,
   detection des fichiers telecharges, ecriture metadata et transcript.
 
-### `app/services/channels/scanner.py`
+### `app/services/channels/`
 
-Responsable de :
+- `scanner.py` : scan automatique des chaines suivies ;
+- `media_import.py` : import metadata, telechargement manuel, relance du
+  transcript ;
+- `staging.py` : staged folders, merge de fichiers lorsqu'on ajoute audio ou
+  video ;
+- `identity.py` : chaine d'une video, URL canonique ;
+- `throttle.py` : pauses entre requetes YouTube et `RateLimitedError`.
 
-- scan automatique ;
-- import metadata ;
-- telechargement manuel ;
-- staged folders ;
-- merge de fichiers lorsqu'on ajoute audio ou video.
-
-L'écriture d'une ligne de journal de jobs (`log_job`) est dans
-`app/services/job_log.py`, partagé par tous les paquets.
+L'écriture d'une ligne de journal de jobs (`log_job`) et de l'activite de
+lecture (`record_playback_activity`) est dans `app/services/job_log.py`,
+partagé par tous les paquets.
 
 ### `app/services/media/media_storage.py`
 
@@ -225,16 +226,16 @@ Responsable de :
 - calcul d'espace utilise ;
 - marge restante sous le quota global pour les telechargements automatiques.
 
-### `app/services/llm/provider.py`
+### `app/services/llm/`
 
-Responsable de :
-
-- interface `LLMProvider` et implementation `AnthropicProvider` appelant
-  directement l'API Anthropic (`LLM_PROVIDER`) ;
-- boucle d'appels d'outils (`AnthropicProvider.complete_with_tools`) pour le
-  chat cross-video ;
-- question/reponse sur transcript ;
-- lecture/ecriture historique chat.
+- `provider.py` : interface `LLMProvider` et implementation
+  `AnthropicProvider` appelant directement l'API Anthropic (`LLM_PROVIDER`),
+  dont la boucle d'appels d'outils (`AnthropicProvider.complete_with_tools`)
+  du chat cross-video ;
+- `prompts.py` : construction des prompts (notes, resume, analyse video,
+  question/reponse sur transcript, chat bibliotheque) et decoupage des
+  reponses ;
+- `chat_history.py` : lecture/ecriture historique chat.
 
 ### `app/services/rag/library_chat_tools.py`
 

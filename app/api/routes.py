@@ -29,12 +29,14 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_category_labels,
     get_video_library_views,
+    set_setting,
+)
+from app.services.settings_format import (
     parse_video_category_label_styles,
     parse_video_library_views,
     serialize_video_category_label_styles,
     serialize_video_category_labels,
     serialize_video_library_views,
-    set_setting,
 )
 from app.services.youtube.channel_info import ChannelNotFoundError, extract_channel_info
 from app.services.youtube.sponsor_segments import normalize_skip_segments

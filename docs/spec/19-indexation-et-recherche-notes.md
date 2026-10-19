@@ -85,7 +85,7 @@ modèle reste le texte nu.
 
 | Élément | Où | Détail |
 |---|---|---|
-| Découpage | `app/services/llm/provider.py:split_notes_sections` | un chunk par section Markdown des notes ; sections vides ignorées ; repli `Notes` |
+| Découpage | `app/services/llm/prompts.py:split_notes_sections` | un chunk par section Markdown des notes ; sections vides ignorées ; repli `Notes` |
 | Texte embeddé | `app/services/rag/embeddings.py:contextualized_text` | `Titre — Chaîne — Section\ncontenu` |
 | Embedding | `app/services/rag/embeddings.py` | API Voyage, `EMBEDDING_MODEL` (`voyage-3.5`), 1024 dimensions, `input_type` `document` (notes) / `query` (question) |
 | Stockage | `video_note_chunks` | `vector(1024)`, sans index vectoriel (scan exact) |

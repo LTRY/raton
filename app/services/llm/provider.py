@@ -8,22 +8,14 @@ from app.core.config import get_settings
 from app.services.llm.usage import BATCH_DISCOUNT, compute_call_cost_usd, max_output_tokens
 
 LLM_TIMEOUT_SECONDS = 900
-
-
 # Batch requests are not streamed, so the ceiling only has to cover notes plus the thinking
 # that adaptive models add at low effort; a truncated answer fails (and is billed) instead.
 BATCH_MAX_OUTPUT_TOKENS = 32_000
-
-
 # These jobs always run in the background (never blocking the HTTP request), so
 # there's no UX cost to retrying harder on transient errors (429/5xx, including
 # Anthropic's "overloaded_error") than the SDK's default of 2 retries.
 LLM_MAX_RETRIES = 6
-
-
 logger = logging.getLogger("raton.llm")
-
-
 # Tool results can be long lists; the log keeps enough to follow the exchange.
 LOG_EXCERPT_CHARS = 1500
 

@@ -23,13 +23,9 @@ from app.services.youtube.channel_info import list_channel_entries
 from app.services.youtube.yt import is_not_yet_available_error, is_rate_limit_error
 
 scan_lock = threading.Lock()
-
-
 # YouTube answers HTTP 429 when yt-dlp hits it in a burst, and subtitles are the first thing it
 # refuses. This bounds the load of one scan; the pauses between requests are in `throttle`.
 MAX_IMPORTS_PER_SECTION = 10
-
-
 logger = logging.getLogger(__name__)
 
 

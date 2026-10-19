@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from app.core.config import local_media_path
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.settings import video_category_css_style
+from app.services.settings_format import video_category_css_style
 
 templates = Jinja2Templates(directory="app/templates")
 
