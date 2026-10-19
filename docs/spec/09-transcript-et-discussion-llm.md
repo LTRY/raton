@@ -175,11 +175,20 @@ en isolation.
   utilisables individuellement) sous deux titres Markdown de **niveau 1**
   exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
   réponse arrive) — chacun suivi des mêmes sous-sections de niveau 2 qu'avant :
+  - La règle « rien d'autre avant le premier titre » n'est énoncée qu'une fois,
+    pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
+    n'en portent pas (deux consignes imbriquées faisaient parfois écrire
+    `## Notes` au lieu de `# Notes`) ;
   - Notes (apres le résumé dans la réponse) : exactement 6 sections (`NOTES_SECTION_NAMES`) — `## Faits`,
     `## Dates`, `## Lieux`, `## Acteurs`, `## Concepts`, `## Relations
     causales` — chacune en puces, sans rien inventer ; une section sans
     élément pertinent contient le texte fixe "Aucun élément identifié."
-    plutôt que d'être omise ;
+    plutôt que d'être omise. Le prompt définit le contenu de chaque section
+    (`NOTES_SECTIONS`) pour qu'un élément n'atterrisse que dans une seule, et
+    impose que chaque puce se comprenne seule, hors du reste des notes (noms
+    propres plutôt que pronoms ou « cette vidéo »), car chaque section est
+    indexée comme un chunk à part ; le transcript étant automatique, un nom
+    propre écrit de plusieurs façons garde sa graphie la plus fréquente ;
   - Résumé : `## Résumé court` (exactement 3 lignes, sujet + conclusion
     principale), `## Résumé complet` (texte suivi en paragraphes qui
     restitue sujet/argumentation/conclusions dans un ordre logique, termine

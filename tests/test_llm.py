@@ -4,6 +4,8 @@ import pytest
 from app.services.llm import provider as llm
 from app.services.llm.prompts import (
     NOTES_SECTION_NAMES,
+    NOTES_SECTIONS,
+    build_auto_notes_prompt,
     build_generation_prompt,
     build_notes_prompt,
     build_summary_prompt,
@@ -167,6 +169,21 @@ def test_build_generation_prompt_asks_for_the_summary_first():
     prompt = build_generation_prompt("Transcript ici.")
 
     assert prompt.index("\n# Résumé\n") < prompt.index("\n# Notes\n")
+
+
+def test_combined_prompts_state_the_nothing_before_the_first_title_rule_once():
+    # Nested copies of the rule contradicted the level-1 titles (a "## Notes" came back once).
+    for prompt in (build_generation_prompt("T."), build_auto_notes_prompt("T.")):
+        assert prompt.count("rien d'autre avant le premier titre") == 1
+
+
+def test_notes_prompt_defines_every_section_and_keeps_bullets_self_contained():
+    prompt = build_notes_prompt("T.")
+
+    assert set(NOTES_SECTIONS) == set(NOTES_SECTION_NAMES)
+    for name, definition in NOTES_SECTIONS.items():
+        assert f"- {name} : {definition}" in prompt
+    assert "se comprend seule" in prompt
 
 
 def test_partial_generation_summary_is_empty_before_the_summary_starts():
