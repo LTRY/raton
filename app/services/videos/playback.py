@@ -271,3 +271,22 @@ def dashboard_media_activity_logs(db: Session, limit: int | None = None) -> list
         seen_media_keys.add(media_key)
         media_activity_logs.append(job)
     return media_activity_logs
+
+
+def latest_playback_by_video(db: Session, video_ids: list[int]) -> dict[int, dict]:
+    """Last playback of each of these fiches, for the progress bar of their cards."""
+    latest: dict[int, dict] = {}
+    if not video_ids:
+        return latest
+    jobs = db.scalars(
+        select(DownloadJob)
+        .where(DownloadJob.status == "played", DownloadJob.video_id.in_(video_ids))
+        .order_by(desc(DownloadJob.created_at))
+    )
+    for job in jobs:
+        if job.video_id in latest:
+            continue
+        playback = playback_activity_view(job)
+        if playback:
+            latest[job.video_id] = playback
+    return latest

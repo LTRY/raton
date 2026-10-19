@@ -31,7 +31,7 @@ from app.services.scheduler import record_scan_result
 from app.services.settings import get_sponsor_skip_enabled
 from app.services.videos import list_state as videos_list_state
 from app.services.videos import playback as videos_playback
-from app.services.youtube import channel_info
+from app.services.youtube import channel_info, sponsor_segments
 from app.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
 from app.web import formatting, playback, shared
 from app.web.routes import channels as channels_routes
@@ -587,7 +587,7 @@ def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        videos_routes,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: [
             {"category": "sponsor", "start_seconds": 10.0, "end_seconds": 20.0}
@@ -616,7 +616,7 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
     def fail(*args, **kwargs):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(videos_routes, "fetch_sponsorblock_segments", fail)
+    monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
     response = videos_routes.fetch_video_sponsorblock_segments(
         fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
@@ -6252,16 +6252,16 @@ def test_set_video_list_state_persists_each_value():
     video = add_video(db)
 
     for state in ("watched", "unwatched", "hidden"):
-        videos_routes.set_video_list_state(video.id, state, db)
+        videos_routes.set_video_list_state_form(video.id, state, db)
         assert db.get(Video, video.id).list_state == state
 
 
 def test_set_video_list_state_clear_resets_to_null():
     db = make_session()
     video = add_video(db)
-    videos_routes.set_video_list_state(video.id, "hidden", db)
+    videos_routes.set_video_list_state_form(video.id, "hidden", db)
 
-    response = videos_routes.set_video_list_state(video.id, "clear", db)
+    response = videos_routes.set_video_list_state_form(video.id, "clear", db)
 
     assert db.get(Video, video.id).list_state is None
     assert json.loads(response.body.decode()) == {"state": None}
@@ -6272,7 +6272,7 @@ def test_set_video_list_state_rejects_unknown_value():
     video = add_video(db)
 
     with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state(video.id, "bogus", db)
+        videos_routes.set_video_list_state_form(video.id, "bogus", db)
 
     assert excinfo.value.status_code == 400
 
@@ -6281,7 +6281,7 @@ def test_set_video_list_state_rejects_unknown_video():
     db = make_session()
 
     with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state(9999, "hidden", db)
+        videos_routes.set_video_list_state_form(9999, "hidden", db)
 
     assert excinfo.value.status_code == 404
 

@@ -30,7 +30,7 @@ from app.services.files import (
 from app.services.job_log import log_job
 from app.services.media.media_storage import media_type_for_paths
 from app.services.media.thumbnails import ensure_video_thumbnails
-from app.services.settings import get_media_root, get_sponsor_segment_categories
+from app.services.settings import get_media_root
 from app.services.youtube.downloads import (
     SUBTITLE_EXTENSIONS,
     build_video_folder,
@@ -41,8 +41,7 @@ from app.services.youtube.downloads import (
     write_metadata,
     write_transcript,
 )
-from app.services.youtube.sponsor_segments import replace_video_sponsor_segments
-from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
+from app.services.youtube.sponsor_segments import fetch_sponsor_segments
 from app.services.youtube.url_guard import ensure_public_http_url
 from app.services.youtube.view_counts import parse_duration_seconds, parse_view_count
 from app.services.youtube.yt import extract_video_info, is_rate_limit_error, parse_yt_date
@@ -259,9 +258,7 @@ def download_manual_media(
         ensure_video_thumbnails(video)
         log_job(db, "downloaded", f"Downloaded {video.title}", video_id=video.id)
         try:
-            categories = get_sponsor_segment_categories(db)
-            segments = fetch_sponsorblock_segments(video.yt_video_id, categories)
-            replace_video_sponsor_segments(db, video.id, "sponsorblock", segments)
+            fetch_sponsor_segments(db, video)
         except Exception:
             # SponsorBlock is best-effort here; the manual "Rechercher" button covers
             # retries. Roll back so a failure inside replace_video_sponsor_segments

@@ -15,6 +15,7 @@ from app.models.video import TranscriptStatus, Video
 from app.services.channels import media_import, scan_events, scanner, throttle
 from app.services.channels.identity import video_already_downloaded
 from app.services.channels.scanner import run_scan, scan_channel
+from app.services.youtube import sponsor_segments
 from app.services.youtube.downloads import build_video_folder
 from app.services.youtube.yt import parse_yt_date
 
@@ -136,7 +137,7 @@ def test_manual_download_fetches_sponsorblock_segments_automatically(monkeypatch
 
     calls = []
     monkeypatch.setattr(
-        media_import,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: (
             calls.append((yt_video_id, categories))
@@ -181,7 +182,7 @@ def test_manual_download_ignores_sponsorblock_failures(monkeypatch, tmp_path):
     def fail(*args, **kwargs):
         raise RuntimeError("SponsorBlock down")
 
-    monkeypatch.setattr(media_import, "fetch_sponsorblock_segments", fail)
+    monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
     # Must not raise even though SponsorBlock fails — the download itself succeeds regardless.
     video = media_import.download_manual_media(db, "https://example.test/video2", "video", False)
@@ -218,7 +219,7 @@ def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
 
     monkeypatch.setattr(media_import, "download_media", fake_download_media)
     monkeypatch.setattr(
-        media_import,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: [
             {"category": "sponsor", "start_seconds": 1.0, "end_seconds": 2.0}
@@ -238,7 +239,7 @@ def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
         )
         db.commit()
 
-    monkeypatch.setattr(media_import, "replace_video_sponsor_segments", fake_replace)
+    monkeypatch.setattr(sponsor_segments, "replace_video_sponsor_segments", fake_replace)
 
     # Must not raise even though the sponsor-segment write itself fails mid-commit.
     video = media_import.download_manual_media(db, "https://example.test/video3", "video", False)

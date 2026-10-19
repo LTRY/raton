@@ -1,9 +1,11 @@
 from collections.abc import Iterable
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.models.video_sponsor_segment import VideoSponsorSegment
+from app.services.settings import get_sponsor_segment_categories
+from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
 
 MINIMUM_SKIP_SECONDS: float = 1.0
 
@@ -64,3 +66,33 @@ def normalize_skip_segments(rows: Iterable[VideoSponsorSegment]) -> list[dict[st
     return [
         {"start": start, "end": end} for start, end in merged if end - start >= MINIMUM_SKIP_SECONDS
     ]
+
+
+def active_sponsor_segments(db: Session, video_id: int) -> list[VideoSponsorSegment]:
+    """The fiche's segments of the categories enabled in the settings, in playback order.
+
+    A list, not the `ScalarResult`: callers read the rows twice (the list shown and the skip payload).
+    """
+    categories = get_sponsor_segment_categories(db)
+    if not categories:
+        return []
+    return list(
+        db.scalars(
+            select(VideoSponsorSegment)
+            .where(
+                VideoSponsorSegment.video_id == video_id,
+                VideoSponsorSegment.category.in_(categories),
+            )
+            .order_by(VideoSponsorSegment.start_seconds)
+        )
+    )
+
+
+def fetch_sponsor_segments(db: Session, video) -> list[VideoSponsorSegment]:
+    """Ask SponsorBlock for the fiche's segments of the enabled categories and store them.
+
+    Raises on a SponsorBlock or database failure; the caller decides whether that matters.
+    """
+    categories = get_sponsor_segment_categories(db)
+    segments = fetch_sponsorblock_segments(video.yt_video_id, categories)
+    return replace_video_sponsor_segments(db, video.id, "sponsorblock", segments)

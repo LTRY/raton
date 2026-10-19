@@ -9,7 +9,6 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import VideoRead
@@ -26,7 +25,6 @@ from app.services.settings import (
     VIDEO_LIBRARY_VIEWS_KEY,
     get_global_quota_bytes,
     get_media_root,
-    get_sponsor_segment_categories,
     get_sponsor_skip_enabled,
     get_video_category_label_styles,
     get_video_category_labels,
@@ -41,7 +39,7 @@ from app.services.settings_format import (
     serialize_video_library_views,
 )
 from app.services.youtube.channel_info import ChannelNotFoundError
-from app.services.youtube.sponsor_segments import normalize_skip_segments
+from app.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 
 router = APIRouter(prefix="/api")
 
@@ -123,21 +121,7 @@ def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> 
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    categories = get_sponsor_segment_categories(db)
-    rows = (
-        list(
-            db.scalars(
-                select(VideoSponsorSegment)
-                .where(
-                    VideoSponsorSegment.video_id == video.id,
-                    VideoSponsorSegment.category.in_(categories),
-                )
-                .order_by(VideoSponsorSegment.start_seconds)
-            )
-        )
-        if categories
-        else []
-    )
+    rows = active_sponsor_segments(db, video.id)
     return {"skip_enabled": get_sponsor_skip_enabled(db), "segments": normalize_skip_segments(rows)}
 
 
