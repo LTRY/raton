@@ -1,6 +1,6 @@
 """Demo data for throwaway instances (PR previews).
 
-Run as `python -m app.services.demo_seed` against an empty sqlite database: it
+Run as `python -m scripts.demo_seed` against an empty sqlite database: it
 creates the tables and a handful of channels and videos, then does nothing on
 the following runs. No media files exist behind these rows, so players have
 nothing to play, but every list and detail page has something to show.

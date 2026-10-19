@@ -161,7 +161,32 @@ Contient :
 
 Expose l'API interne sous `/api`.
 
-### `app/services/yt.py`
+### `app/services/` : organisation par domaine
+
+Les services sont rangés en six paquets, un par sujet :
+
+| Paquet | Contenu |
+|---|---|
+| `youtube/` | Tout ce qui parle à YouTube : `yt`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
+| `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract`, `local_upload` |
+| `channels/` | Chaînes et scan : `scanner`, `scan_events`, `lookup`, `profile`, `subscriptions` |
+| `playlists/` | Import de playlists : `imports` |
+| `llm/` | Appels Anthropic : `provider`, `usage` |
+| `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
+
+À la racine de `app/services/` restent : les modules d'orchestration
+`background_jobs` et `scheduler`, et les modules transverses `settings`,
+`search`, `files`, `job_log`, `logs_digest` et `library_charts`.
+
+Les dépendances entre paquets vont dans un seul sens :
+`youtube` et `llm` ne dépendent d'aucun autre paquet, `media` dépend de
+`youtube`, `channels` de `media` et `youtube`, `playlists` de `channels` et
+`youtube`, `rag` de `channels`, `llm` et `youtube`. `background_jobs` et
+`scheduler` appellent les paquets et personne ne les importe en retour.
+`tests/test_code_structure.py` fait respecter ces règles. Les données de démo
+(`demo_seed`) ne sont pas un service : elles sont dans `scripts/demo_seed.py`.
+
+### `app/services/youtube/yt.py`
 
 Responsable de :
 
@@ -173,7 +198,7 @@ Responsable de :
 - detection des fichiers telecharges ;
 - ecriture metadata et transcript.
 
-### `app/services/scanner.py`
+### `app/services/channels/scanner.py`
 
 Responsable de :
 
@@ -181,26 +206,29 @@ Responsable de :
 - import metadata ;
 - telechargement manuel ;
 - staged folders ;
-- merge de fichiers lorsqu'on ajoute audio ou video ;
-- jobs de log.
+- merge de fichiers lorsqu'on ajoute audio ou video.
 
-### `app/services/media_storage.py`
+L'écriture d'une ligne de journal de jobs (`log_job`) est dans
+`app/services/job_log.py`, partagé par tous les paquets.
+
+### `app/services/media/media_storage.py`
 
 Responsable de :
 
 - detection des 90 % de lecture (`mark_watched_if_complete`) ;
 - purge quotidienne des fichiers media des videos vues (`purge_watched_media`) ;
 - suppression d'un seul format (`delete_video_media_asset`), partagee avec la
-  route media.
+  route media ;
+- type de media d'une video d'apres ses chemins (`media_type_for_paths`).
 
-### `app/services/storage.py`
+### `app/services/media/storage.py`
 
 Responsable de :
 
 - calcul d'espace utilise ;
 - marge restante sous le quota global pour les telechargements automatiques.
 
-### `app/services/llm.py`
+### `app/services/llm/provider.py`
 
 Responsable de :
 
@@ -211,7 +239,7 @@ Responsable de :
 - question/reponse sur transcript ;
 - lecture/ecriture historique chat.
 
-### `app/services/library_chat_tools.py`
+### `app/services/rag/library_chat_tools.py`
 
 Outils que le modele appelle pendant le chat cross-video (recherche de
 chaines, de videos, recherche semantique dans les notes) et extraction des

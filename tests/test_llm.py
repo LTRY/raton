@@ -1,8 +1,8 @@
 import anthropic
 import pytest
 
-from app.services import llm
-from app.services.llm import (
+from app.services.llm import provider as llm
+from app.services.llm.provider import (
     NOTES_SECTION_NAMES,
     AnthropicProvider,
     CompletionFailed,

@@ -10,11 +10,11 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services import scan_events
-from app.services.auto_notes import LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY
-from app.services.auto_notes import LAST_RUN_SUMMARY_KEY as AUTO_NOTES_LAST_RUN_SUMMARY_KEY
-from app.services.llm_usage import llm_usage_summary
-from app.services.scanner import scan_lock
+from app.services.channels import scan_events
+from app.services.channels.scanner import scan_lock
+from app.services.llm.usage import llm_usage_summary
+from app.services.rag.auto_notes import LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY
+from app.services.rag.auto_notes import LAST_RUN_SUMMARY_KEY as AUTO_NOTES_LAST_RUN_SUMMARY_KEY
 from app.services.scheduler import get_last_auto_scan_info, scheduled_scan
 from app.services.settings import (
     AUTO_NOTES_ENABLED_KEY,

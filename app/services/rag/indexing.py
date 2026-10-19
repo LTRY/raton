@@ -1,7 +1,7 @@
 """Chunk + embed a video's structured notes into VideoNoteChunk rows.
 
 The chunking is local, the embedding is a call to the Voyage API
-(app/services/embeddings.py). It is not an LLM completion, so it runs right
+(app/services/rag/embeddings.py). It is not an LLM completion, so it runs right
 after notes are applied rather than going through the LlmJob queued/running/done
 lifecycle used for text generation (see the `notes` branch of
 transcript_job_status in app/web/routes/transcript.py).
@@ -16,8 +16,8 @@ from app.core.config import get_settings, local_media_path
 from app.db.session import SessionLocal
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services.embeddings import EmbeddingError, contextualized_text, embed_texts
-from app.services.llm import split_notes_sections
+from app.services.llm.provider import split_notes_sections
+from app.services.rag.embeddings import EmbeddingError, contextualized_text, embed_texts
 
 logger = logging.getLogger(__name__)
 

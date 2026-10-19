@@ -2,7 +2,7 @@
 
 The page answers "where is each video in the pipeline, and what happens tonight?". Nothing here is
 stored: the buckets are recomputed from `videos`, `llm_jobs`, `video_note_chunks` and the
-`app_settings` keys of the nightly sweep (app/services/auto_notes.py). The classification reuses
+`app_settings` keys of the nightly sweep (app/services/rag/auto_notes.py). The classification reuses
 `auto_notes.skip_reason`, so the "next batch" list is the one the sweep would submit.
 
 Only database facts are read, never files: the transcript's size and the notes file are checked by
@@ -22,12 +22,13 @@ from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services.auto_notes import (
+from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
     BATCH_SIZE,
     BATCH_STALE_AFTER,
     BATCH_SUBMITTED_AT_KEY,
+    DAILY_AUTO_NOTES_HOUR,
     LAST_RUN_AT_KEY,
     LAST_RUN_SUMMARY_KEY,
     MAX_FAILURES_PER_VIDEO,
@@ -38,15 +39,14 @@ from app.services.auto_notes import (
     in_flight_video_ids,
     skip_reason,
 )
-from app.services.embeddings import EMBEDDING_DIMENSIONS
-from app.services.rag_indexing import SUMMARY_SECTION_NAME
-from app.services.rag_retrieval import (
+from app.services.rag.embeddings import EMBEDDING_DIMENSIONS
+from app.services.rag.indexing import SUMMARY_SECTION_NAME
+from app.services.rag.retrieval import (
     CANDIDATE_CHUNKS,
     MAX_CHUNKS_PER_VIDEO,
     MIN_RELEVANCE_SCORE,
     TOP_K_CHUNKS,
 )
-from app.services.scheduler import DAILY_AUTO_NOTES_HOUR
 from app.services.settings import (
     get_auto_notes_enabled,
     get_auto_notes_excluded_category_labels,

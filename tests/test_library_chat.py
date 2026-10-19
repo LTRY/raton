@@ -13,10 +13,12 @@ from app.models.job import DownloadJob
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import TranscriptStatus, Video
-from app.services import background_jobs, rag_retrieval, yt
-from app.services.library_chat_tools import LibraryChatToolbox
-from app.services.llm import CompletionResult
-from app.services.rag_retrieval import RetrievedChunk
+from app.services import background_jobs
+from app.services.llm.provider import CompletionResult
+from app.services.rag import retrieval as rag_retrieval
+from app.services.rag.library_chat_tools import LibraryChatToolbox
+from app.services.rag.retrieval import RetrievedChunk
+from app.services.youtube import yt
 from app.web.routes import library_chat as library_chat_routes
 
 
@@ -622,7 +624,7 @@ def test_run_llm_job_stores_the_tool_calls_of_a_library_chat(monkeypatch):
 
 
 def test_notes_search_failing_to_embed_tells_the_model_and_does_not_fail_the_job(monkeypatch):
-    from app.services.embeddings import EmbeddingError
+    from app.services.rag.embeddings import EmbeddingError
 
     db = make_session()
 

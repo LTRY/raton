@@ -8,12 +8,6 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.logging import log_event, logged_job
 from app.db.session import SessionLocal
-from app.services.auto_notes import (
-    LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY,
-)
-from app.services.auto_notes import (
-    run_auto_notes_sweep,
-)
 from app.services.background_jobs import (
     run_channel_profile_backfill_job,
     run_note_index_backfill_job,
@@ -21,8 +15,15 @@ from app.services.background_jobs import (
     run_thumbnail_backfill_job,
     run_view_count_backfill_job,
 )
-from app.services.media_storage import purge_watched_media
-from app.services.scanner import run_scan
+from app.services.channels.scanner import run_scan
+from app.services.media.media_storage import purge_watched_media
+from app.services.rag.auto_notes import (
+    DAILY_AUTO_NOTES_HOUR,
+    run_auto_notes_sweep,
+)
+from app.services.rag.auto_notes import (
+    LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY,
+)
 from app.services.settings import get_setting, set_setting
 
 logger = logging.getLogger(__name__)
@@ -50,8 +51,6 @@ LAST_MEDIA_PURGE_AT_KEY = "last_media_cache_cleanup_at"
 
 AUTO_NOTES_JOB_ID = "auto_notes_sweep"
 AUTO_NOTES_CATCHUP_JOB_ID = "auto_notes_sweep_catchup"
-# After the 3am scan has imported the night's videos and the 4am purge has run.
-DAILY_AUTO_NOTES_HOUR = 5
 
 
 def record_scan_result(db: Session, result: dict) -> None:

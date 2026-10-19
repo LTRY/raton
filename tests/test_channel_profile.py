@@ -12,8 +12,10 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.setting import AppSetting
-from app.services import background_jobs, channel_profile, yt
+from app.services import background_jobs
 from app.services import scheduler as scheduler_module
+from app.services.channels import profile as channel_profile
+from app.services.youtube import yt
 
 
 def make_session():
@@ -391,7 +393,7 @@ def test_start_scheduler_queues_a_profile_backfill_at_startup(monkeypatch, tmp_p
 
 
 def test_toolbox_remembers_channels_it_added():
-    from app.services.library_chat_tools import LibraryChatToolbox
+    from app.services.rag.library_chat_tools import LibraryChatToolbox
 
     db = make_session()
     toolbox = LibraryChatToolbox(db)

@@ -29,7 +29,7 @@ export APP_AUTO_CREATE_TABLES=true
 mkdir -p "$MEDIA_ROOT"
 
 cd "$repo"
-uv run --python 3.14 python -m app.services.demo_seed
+uv run --python 3.14 python -m scripts.demo_seed
 uv run --python 3.14 uvicorn app.main:app --host 127.0.0.1 --port "$port" --log-level warning &
 server_pid=$!
 for _ in $(seq 1 60); do

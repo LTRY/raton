@@ -28,14 +28,14 @@ from app.services.background_jobs import (
     run_manual_download_job,
     run_transcript_retry_job,
 )
-from app.services.local_upload import LocalUploadError, import_local_media
-from app.services.media_storage import mark_watched_if_complete
-from app.services.scanner import (
+from app.services.channels.scanner import (
     ensure_video_channel,
     import_video_metadata,
-    log_job,
     record_playback_activity,
 )
+from app.services.job_log import log_job
+from app.services.media.local_upload import LocalUploadError, import_local_media
+from app.services.media.media_storage import mark_watched_if_complete
 from app.services.search import video_search_rank
 from app.services.settings import (
     SPONSOR_SEGMENT_CATEGORY_LABELS,
@@ -48,8 +48,11 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_library_views,
 )
-from app.services.sponsor_segments import normalize_skip_segments, replace_video_sponsor_segments
-from app.services.sponsorblock import fetch_sponsorblock_segments
+from app.services.youtube.sponsor_segments import (
+    normalize_skip_segments,
+    replace_video_sponsor_segments,
+)
+from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
 from app.web.formatting import estimate_channel_periodicity, format_duration, format_views
 from app.web.playback import latest_playback_positions, playback_activity_view
 from app.web.routes.transcript import transcript_context, video_analysis_payload

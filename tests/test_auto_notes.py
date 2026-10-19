@@ -14,19 +14,20 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services import auto_notes, rag_indexing
-from app.services.auto_notes import (
+from app.services.llm.provider import (
+    AnthropicProvider,
+    BatchEntry,
+    build_auto_notes_prompt,
+    split_auto_notes_result,
+)
+from app.services.rag import auto_notes
+from app.services.rag import indexing as rag_indexing
+from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
     BATCH_SUBMITTED_AT_KEY,
     eligible_videos,
     run_auto_notes_sweep,
-)
-from app.services.llm import (
-    AnthropicProvider,
-    BatchEntry,
-    build_auto_notes_prompt,
-    split_auto_notes_result,
 )
 from app.services.settings import (
     AUTO_NOTES_ENABLED_KEY,

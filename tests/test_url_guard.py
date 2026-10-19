@@ -3,8 +3,9 @@ import urllib.request
 
 import pytest
 
-from app.services import channel_profile, yt
-from app.services.url_guard import UnsafeUrlError, ensure_public_http_url
+from app.services.channels import profile as channel_profile
+from app.services.youtube import yt
+from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
 
 @pytest.mark.parametrize(

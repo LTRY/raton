@@ -26,8 +26,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import get_settings, local_media_path
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.embeddings import EmbeddingError
-from app.services.llm import (
+from app.services.llm.provider import (
     AnthropicProvider,
     BatchEntry,
     build_auto_notes_prompt,
@@ -35,7 +34,8 @@ from app.services.llm import (
     split_auto_notes_result,
     split_notes_sections,
 )
-from app.services.rag_indexing import (
+from app.services.rag.embeddings import EmbeddingError
+from app.services.rag.indexing import (
     NOTES_FILE_NAME,
     SUMMARY_SHORT_FILE_NAME,
     backfill_note_chunks,
@@ -53,6 +53,8 @@ from app.services.settings import (
 logger = logging.getLogger(__name__)
 
 AUTO_NOTES_KIND = "auto_notes"
+# After the 3am scan has imported the night's videos and the 4am purge has run.
+DAILY_AUTO_NOTES_HOUR = 5
 BATCH_SIZE = 100
 # A video whose requests keep failing (too long, refused...) is left alone: a truncated answer is billed.
 MAX_FAILURES_PER_VIDEO = 3

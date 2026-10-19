@@ -35,13 +35,13 @@ def read_lines(log_dir):
 
 def test_module_loggers_reach_the_json_file(log_dir):
     # Most modules use getLogger(__name__), i.e. the "app." tree, not "raton".
-    logging.getLogger("app.services.scanner").info("scan started")
+    logging.getLogger("app.services.channels.scanner").info("scan started")
     log_event(logging.getLogger("raton.llm"), "llm.call", model="m", tokens=12)
 
     first, second = read_lines(log_dir)
     assert first["msg"] == "scan started"
     assert first["level"] == "INFO"
-    assert first["logger"] == "app.services.scanner"
+    assert first["logger"] == "app.services.channels.scanner"
     assert first["ts"][:4].isdigit()
     assert second["event"] == "llm.call"
     assert second["tokens"] == 12
@@ -122,7 +122,7 @@ def test_logged_job_records_a_crash_and_reraises(log_dir):
 
 
 def test_log_external_records_success_and_failure(log_dir):
-    logger = logging.getLogger("app.services.yt")
+    logger = logging.getLogger("app.services.youtube.yt")
     with log_external(logger, "yt-dlp", "extract", url="u"):
         pass
     with pytest.raises(OSError), log_external(logger, "yt-dlp", "extract", url="u"):

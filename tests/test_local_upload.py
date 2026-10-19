@@ -10,8 +10,8 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.setting import AppSetting
 from app.models.video import Video
-from app.services import local_upload
-from app.services.local_upload import LocalUploadError, import_local_media
+from app.services.media import local_upload
+from app.services.media.local_upload import LocalUploadError, import_local_media
 from app.web.routes import videos as videos_routes
 
 

@@ -24,22 +24,22 @@ from app.services.background_jobs import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
-from app.services.channel_profile import remove_channel_profile_files
-from app.services.channels import find_channel
-from app.services.scanner import log_job
+from app.services.channels.lookup import find_channel
+from app.services.channels.profile import remove_channel_profile_files
+from app.services.channels.subscriptions import (
+    SubscriptionsCsvError,
+    decode_import_token,
+    encode_import_token,
+    parse_subscriptions_csv,
+)
+from app.services.job_log import log_job
 from app.services.search import channel_search_rank
 from app.services.settings import (
     add_video_category_labels,
     get_media_root,
     get_video_category_label_styles,
 )
-from app.services.subscriptions import (
-    SubscriptionsCsvError,
-    decode_import_token,
-    encode_import_token,
-    parse_subscriptions_csv,
-)
-from app.services.yt import (
+from app.services.youtube.yt import (
     ChannelNotFoundError,
     extract_channel_info,
     is_channel_reference,

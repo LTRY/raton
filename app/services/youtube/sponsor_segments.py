@@ -13,7 +13,7 @@ def replace_video_sponsor_segments(
 ) -> list[VideoSponsorSegment]:
     """Remplace tous les segments de `source` d'une vidéo par `segments`.
 
-    SponsorBlock (app/services/sponsorblock.py) est la seule source aujourd'hui,
+    SponsorBlock (app/services/youtube/sponsorblock.py) est la seule source aujourd'hui,
     mais l'écriture reste limitée aux lignes de sa propre `source` : relancer son
     bouton de récupération ne touche jamais aux lignes écrites par une autre
     source. La colonne `source` est conservée pour cette raison, afin qu'une

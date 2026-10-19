@@ -12,13 +12,13 @@ from app.db.session import SessionLocal
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
-from app.services.scanner import (
+from app.services.channels.scanner import (
     RateLimitedError,
     import_video_metadata,
-    log_job,
     pause_between_imports,
 )
-from app.services.url_guard import UnsafeUrlError, ensure_public_http_url
+from app.services.job_log import log_job
+from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
 MAX_PLAYLIST_IMPORT_PAGES = 40
 PLAYLIST_IMPORT_PAGE_SIZE = 50

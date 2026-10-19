@@ -12,14 +12,15 @@ from app.db.session import Base
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
-from app.services import playlists as playlists_service
-from app.services.playlists import (
+from app.services.channels.scanner import RateLimitedError
+from app.services.job_log import log_job
+from app.services.playlists import imports as playlists_service
+from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
     parse_playlist_csv,
     run_playlist_csv_import_job,
 )
-from app.services.scanner import RateLimitedError, log_job
 from app.web.routes import playlists as playlists_routes
 
 CSV_SAMPLE = (
@@ -73,7 +74,7 @@ def fake_import_video_metadata(
     subtitle_source="auto",
     is_new=False,
 ):
-    """Stands in for app.services.scanner.import_video_metadata in tests:
+    """Stands in for app.services.channels.scanner.import_video_metadata in tests:
     same get-or-create-by-yt_video_id idempotency, no yt-dlp/network calls.
     """
     yt_video_id = (preview or {}).get("id") or video_url.rsplit("v=", 1)[-1]

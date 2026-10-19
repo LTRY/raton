@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import scan_events, scanner
+from app.services.channels import scan_events, scanner
 from app.web.routes import settings as settings_routes
 
 

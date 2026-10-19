@@ -381,7 +381,7 @@ serveur). Elle montre :
   lignes `purged` de `download_jobs`, sur 12 mois sans les mois vides en tete ;
   total / mois en cours / moyenne en tete ; la carte est absente tant qu'aucune
   purge n'a eu lieu. Le poids libere n'est pas enregistre, donc pas affiche ;
-- depenses en modele par mois (`llm_spend_by_month`, `app/services/llm_usage.py`) :
+- depenses en modele par mois (`llm_spend_by_month`, `app/services/llm/usage.py`) :
   barres empilees par groupe de jobs (notes et resumes, nettoyage de
   transcript, discussions, autres), cout total au-dessus de chaque barre,
   total / mois en cours / moyenne en tete. Cout reel des `llm_jobs` ayant un
@@ -398,7 +398,7 @@ snapshots.
 ## Indexation RAG
 
 Template : `rag_dashboard.html`, route `GET /rag` (`app/web/routes/rag.py`),
-donnees dans `app/services/rag_dashboard.py` (`rag_dashboard_data`). Lien
+donnees dans `app/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
 "Indexation RAG" dans une carte de `/settings` (ancre `#rag`). Page de lecture sans JavaScript,
 construite avec les cartes et barres CSS de `/stats` ; elle repond a "ou en
 est l'indexation des notes et que va faire le passage de la nuit ?" et sert

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from app.core.config import get_settings
-from app.services.llm_usage import BATCH_DISCOUNT, compute_call_cost_usd, max_output_tokens
+from app.services.llm.usage import BATCH_DISCOUNT, compute_call_cost_usd, max_output_tokens
 
 LLM_TIMEOUT_SECONDS = 900
 # Batch requests are not streamed, so the ceiling only has to cover notes plus the thinking
@@ -429,7 +429,7 @@ def split_notes_sections(text: str) -> list[tuple[str, str]]:
 
     One chunk per Markdown section, used both to render the notes tab and to
     index each section as a separate embedding for cross-video RAG search
-    (app/services/rag_indexing.py). Sections that are empty or just the
+    (app/services/rag/indexing.py). Sections that are empty or just the
     "no items" placeholder are skipped — they carry no retrievable content.
     Falls back to a single ("Notes", text) chunk if the model didn't follow
     the section-header format at all.
@@ -825,7 +825,7 @@ def build_library_chat_prompt(messages: list[dict[str, str]], question: str) -> 
     """Build the cross-video ("whole library") chat prompt.
 
     It carries no library content: the model fetches what it needs through the
-    tools of app/services/library_chat_tools.py, whose reference format this
+    tools of app/services/rag/library_chat_tools.py, whose reference format this
     prompt tells it to cite.
     """
     history = "\n\n".join(

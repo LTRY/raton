@@ -8,7 +8,7 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.media_storage import mark_watched_if_complete, purge_watched_media
+from app.services.media.media_storage import mark_watched_if_complete, purge_watched_media
 
 
 def make_session():

@@ -6,8 +6,8 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services import rag_indexing
-from app.services.rag_retrieval import count_indexed_videos
+from app.services.rag import indexing as rag_indexing
+from app.services.rag.retrieval import count_indexed_videos
 
 
 def make_session():

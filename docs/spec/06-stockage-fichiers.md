@@ -57,7 +57,7 @@ Un dossier video peut contenir :
 - copies reduites de la vignette : `thumbs/320.jpg` et `thumbs/640.jpg`
   (JPEG, jamais agrandies), dans un sous-dossier pour que la decouverte des
   fichiers du dossier ne les prenne pas pour la vignette d'origine. Creees par
-  `ensure_video_thumbnails` (`app/services/thumbnails.py`, ffmpeg) apres chaque
+  `ensure_video_thumbnails` (`app/services/media/thumbnails.py`, ffmpeg) apres chaque
   telechargement ou import, et par un rattrapage au demarrage ; supprimees avec
   le dossier ;
 - sous-titres sources : `.vtt`, `.srt`, `.json3` ;
@@ -108,13 +108,13 @@ apres operation, pas seulement le dernier fichier telecharge.
 
 Il n'y a pas de nettoyage par quota ou par limite de chaine : le quota global
 ne fait qu'arreter les telechargements automatiques quand il reste moins de 20 %
-de marge (`app/services/storage.py:has_auto_download_headroom`). Les fichiers
+de marge (`app/services/media/storage.py:has_auto_download_headroom`). Les fichiers
 ne sont supprimes que par la retention ci-dessous ou a la main.
 
 ### Retention des medias vus (purge)
 
 Les fichiers audio/video du serveur sont soumis a une retention
-(`purge_watched_media`, `app/services/media_storage.py`) :
+(`purge_watched_media`, `app/services/media/media_storage.py`) :
 
 - une video est « vue » quand la lecture atteint 90 % de la duree
   (`videos.watched_at`, voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;

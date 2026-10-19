@@ -84,7 +84,7 @@ Champs :
 - `rating` : note utilisateur de 0 à 5 ;
 - `file_size_bytes` : taille totale du dossier media ;
 - `watched_at` : date (avec fuseau, indexee, nullable) a laquelle la lecture a atteint 90 % de la duree pour la premiere fois ; posee par `POST /videos/{id}/activity` (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)), remise a `NULL` quand un telechargement ajoute un format, et point de depart de la retention de [06 Stockage fichiers](06-stockage-fichiers.md). `NULL` = jamais vue a 90 % (donc jamais purgee) ;
-- `view_count` : nombre de vues recopie de `metadata.json` (entier, indexe, nullable), pose a l'import (telechargement manuel, import de metadonnees) et par le rattrapage de demarrage (`app/services/view_counts.py`, une ancienne migration). Sert au tri « les plus vues » de `/videos`, execute en SQL ; `NULL` compte comme 0. Un `metadata.json` lisible sans compteur donne 0, un fichier illisible laisse `NULL` (reessaye au demarrage suivant) ;
+- `view_count` : nombre de vues recopie de `metadata.json` (entier, indexe, nullable), pose a l'import (telechargement manuel, import de metadonnees) et par le rattrapage de demarrage (`app/services/youtube/view_counts.py`, une ancienne migration). Sert au tri « les plus vues » de `/videos`, execute en SQL ; `NULL` compte comme 0. Un `metadata.json` lisible sans compteur donne 0, un fichier illisible laisse `NULL` (reessaye au demarrage suivant) ;
 - `duration_seconds` : duree recopiee de `metadata.json` (entier, nullable), posee au meme moment que `view_count` (une ancienne migration). Sert a la duree affichee sur les cartes : `metadata.json` est le dump complet de yt-dlp (~140 Ko) et n'est pas relu pour chaque carte d'une liste. Un fichier lisible sans duree donne 0 (non affichee), un fichier illisible laisse `NULL` ;
 - `ai_analysis_json` : JSON serialise, ecrit par `POST /videos/{id}/transcript/generate` (avec les notes et le resume, en un seul appel LLM) — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md), section "Génération : notes, résumé et analyse". Cles possibles, toutes absentes plutot que `null` quand la section correspondante n'a pas ete produite : `clickbait_score` (1-10), `clickbait_rationale`, `relevance_percent` (0-100), `relevance_rationale`, `suggested_titles` (liste), `suggested_categories` (liste), `generated_at` (horodatage ISO). Une nouvelle generation remplace tout le JSON ;
 - `created_at`, `updated_at`.
@@ -229,7 +229,7 @@ Champs :
   produite** depuis le retrait de cette detection, mais les lignes deja en
   base sont conservees : une ancienne migration ne
   touche pas `llm_jobs`. Le libelle correspondant reste donc volontairement
-  dans `app/services/llm_usage.py` pour que ces jobs passes continuent de
+  dans `app/services/llm/usage.py` pour que ces jobs passes continuent de
   s'afficher dans la section "Couts LLM" de `/settings`. Il en va de meme de
   `clean_transcript` (nettoyage LLM retire, voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
@@ -256,17 +256,17 @@ Champs :
   a ete recue mais inutilisable (tronquee/vide, tokens factures)
   (`app/services/background_jobs.py:run_llm_job`) ; `cost_usd` reste `null`
   sauf pour `anthropic` sur un modele dont le tarif est connu
-  (`app/services/llm_usage.py:ANTHROPIC_MODEL_PRICING`). Voir
+  (`app/services/llm/usage.py:ANTHROPIC_MODEL_PRICING`). Voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) pour
   le detail du calcul. Agrege par type de job et par modele dans `/settings`
-  (section "Couts LLM", `app/services/llm_usage.py:llm_usage_summary`).
+  (section "Couts LLM", `app/services/llm/usage.py:llm_usage_summary`).
 - `created_at`, `completed_at`.
 
 ### `video_note_chunks`
 
 Un chunk embedde par section de notes structurees, socle du chat cross-video
 (RAG). Peuple/remplace entierement par
-`app/services/rag_indexing.py:index_video_notes` des qu'un job `generate` est
+`app/services/rag/indexing.py:index_video_notes` des qu'un job `generate` est
 applique (notes/resume/analyse en un seul appel LLM, voir
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)). Les
 notes venant du transcript, une video n'est
@@ -283,7 +283,7 @@ Champs :
   embeddé : celui-ci est `Titre — Chaîne — Section` suivi du contenu
   (`embeddings.contextualized_text`) ;
 - `embedding` : `vector(1024)` (extension `pgvector`), genere par l'API Voyage
-  AI (`app/services/embeddings.py`, modele `EMBEDDING_MODEL`, `voyage-3.5` par
+  AI (`app/services/rag/embeddings.py`, modele `EMBEDDING_MODEL`, `voyage-3.5` par
   defaut, `VOYAGE_API_KEY` requise). Un seul modele et une seule dimension
   pour toute la table : en changer impose de tout re-embedder (migration qui
   vide la table, puis reindexation au demarrage, voir
@@ -339,7 +339,7 @@ une source manuelle ultérieure sans migration. Ne pas la supprimer.
 
 Règle `(category, source)` : pas de contrainte d'unicité dans la DB ; c'est le
 remplacement applicatif qui garantit la cohérence
-(`app/services/sponsor_segments.py:replace_video_sponsor_segments`) —
+(`app/services/youtube/sponsor_segments.py:replace_video_sponsor_segments`) —
 relancer la recherche SponsorBlock pour une vidéo supprime d'abord toutes les
 lignes existantes de **cette seule source** puis réinsère le résultat courant.
 
@@ -347,7 +347,7 @@ Avant l'envoi aux lecteurs (page détail et
 `GET /api/videos/{id}/sponsor-segments`, voir
 [12 API et routes](12-api-et-routes.md)), les lignes filtrées par catégories
 activées passent par
-`app/services/sponsor_segments.py:normalize_skip_segments` : tri par
+`app/services/youtube/sponsor_segments.py:normalize_skip_segments` : tri par
 `start_seconds`, fusion des segments qui se chevauchent ou se touchent
 (SponsorBlock renvoie régulièrement des doublons issus de plusieurs
 contributeurs), puis rejet des segments dont la durée après fusion est

@@ -17,7 +17,7 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.view_counts import backfill_view_counts
+from app.services.youtube.view_counts import backfill_view_counts
 from app.web.shared import LIBRARY_PAGE_SIZE
 from app.web.video_library import video_filters_condition, video_matches_filters
 
@@ -155,7 +155,9 @@ def test_videos_page_paginates_in_sql_and_sorts_by_stored_view_count(db):
 
 
 def test_backfill_reads_view_counts_from_metadata_files(db, tmp_path, monkeypatch):
-    monkeypatch.setattr("app.services.view_counts.local_media_path", lambda path: Path(path))
+    monkeypatch.setattr(
+        "app.services.youtube.view_counts.local_media_path", lambda path: Path(path)
+    )
     counted = tmp_path / "counted.json"
     counted.write_text(json.dumps({"view_count": 1234, "duration": 754.0}))
     bare = tmp_path / "bare.json"

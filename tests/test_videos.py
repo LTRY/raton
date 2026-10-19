@@ -24,12 +24,12 @@ from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
 from app.schemas.settings import SettingsUpdate
 from app.services import background_jobs, search
-from app.services import yt as yt_service
-from app.services.llm import CompletionFailed, CompletionResult, UsageTally
-from app.services.scanner import channel_values_from_info
+from app.services.channels.scanner import channel_values_from_info
+from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.scheduler import record_scan_result
 from app.services.settings import get_sponsor_skip_enabled
-from app.services.yt import ChannelNotFoundError, resolve_channel_url
+from app.services.youtube import yt as yt_service
+from app.services.youtube.yt import ChannelNotFoundError, resolve_channel_url
 from app.web import formatting, playback, shared, video_library
 from app.web.routes import channels as channels_routes
 from app.web.routes import dashboard as dashboard_routes

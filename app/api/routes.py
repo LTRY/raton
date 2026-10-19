@@ -14,8 +14,9 @@ from app.schemas.channel import ChannelCreate, ChannelRead
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import VideoRead
 from app.services.background_jobs import run_channel_profile_backfill_job
-from app.services.channel_profile import remove_channel_profile_files
+from app.services.channels.profile import remove_channel_profile_files
 from app.services.library_charts import library_chart_data
+from app.services.media.storage import get_total_used_bytes
 from app.services.settings import (
     GLOBAL_QUOTA_BYTES_KEY,
     MEDIA_ROOT_KEY,
@@ -35,9 +36,8 @@ from app.services.settings import (
     serialize_video_library_views,
     set_setting,
 )
-from app.services.sponsor_segments import normalize_skip_segments
-from app.services.storage import get_total_used_bytes
-from app.services.yt import ChannelNotFoundError, extract_channel_info
+from app.services.youtube.sponsor_segments import normalize_skip_segments
+from app.services.youtube.yt import ChannelNotFoundError, extract_channel_info
 
 router = APIRouter(prefix="/api")
 

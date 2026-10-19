@@ -7,11 +7,23 @@ from sqlalchemy.orm import Session
 from app.core.config import local_media_path
 from app.models.video import Video
 from app.services.files import directory_size
-from app.services.scanner import log_job, media_type_for_paths
+from app.services.job_log import log_job
 
 WATCHED_RATIO = 0.9
 RETENTION = timedelta(days=7)
 ARCHIVE_MIN_RATING = 4
+
+
+def media_type_for_paths(
+    video_path: str | None, audio_path: str | None, metadata_path: str | None
+) -> str:
+    if video_path:
+        return "video"
+    if audio_path:
+        return "audio"
+    if metadata_path:
+        return "metadata"
+    return "metadata"
 
 
 def mark_watched_if_complete(

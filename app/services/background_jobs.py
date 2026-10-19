@@ -14,30 +14,34 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.channel_profile import (
+from app.services.channels.profile import (
     PROFILE_FETCH_DELAY_SECONDS,
     pending_profile_channel_ids,
     refresh_channel_profile,
 )
-from app.services.library_chat_tools import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS, LibraryChatToolbox
-from app.services.llm import (
+from app.services.channels.scanner import (
+    download_manual_media,
+    import_video_metadata,
+    retry_transcript_download,
+    scan_channel_section,
+)
+from app.services.llm.provider import (
     ANALYSIS_CLICKBAIT_HEADER,
     THUMBNAIL_MEDIA_TYPES,
     AnthropicProvider,
     CompletionFailed,
     get_llm_provider,
 )
-from app.services.llm_usage import compute_job_cost_usd
-from app.services.rag_indexing import backfill_note_chunks
-from app.services.scanner import (
-    download_manual_media,
-    import_video_metadata,
-    retry_transcript_download,
-    scan_channel_section,
+from app.services.llm.usage import compute_job_cost_usd
+from app.services.media.thumbnails import backfill_video_thumbnails
+from app.services.rag.indexing import backfill_note_chunks
+from app.services.rag.library_chat_tools import (
+    LIBRARY_CHAT_TOOLS,
+    MAX_TOOL_TURNS,
+    LibraryChatToolbox,
 )
-from app.services.thumbnails import backfill_video_thumbnails
-from app.services.transcript_backfill import backfill_original_transcripts
-from app.services.view_counts import backfill_view_counts
+from app.services.rag.transcript_backfill import backfill_original_transcripts
+from app.services.youtube.view_counts import backfill_view_counts
 
 logger = logging.getLogger(__name__)
 

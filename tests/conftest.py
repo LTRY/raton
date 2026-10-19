@@ -1,6 +1,6 @@
 import pytest
 
-from app.services import scan_events, scanner
+from app.services.channels import scan_events, scanner
 
 
 @pytest.fixture(autouse=True)

@@ -12,7 +12,8 @@ from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.services.background_jobs import _video_analysis_has_image, enqueue_llm_job, run_llm_job
-from app.services.llm import (
+from app.services.job_log import log_job
+from app.services.llm.provider import (
     ANALYSIS_CLICKBAIT_HEADER,
     build_chat_prompt,
     build_generation_prompt,
@@ -21,8 +22,7 @@ from app.services.llm import (
     save_chat,
     split_generation_result,
 )
-from app.services.rag_indexing import index_video_notes
-from app.services.scanner import log_job
+from app.services.rag.indexing import index_video_notes
 from app.services.settings import get_llm_provider_name
 from app.web.shared import redirect
 

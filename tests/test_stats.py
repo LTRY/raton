@@ -22,7 +22,7 @@ from app.services.library_charts import (
     monthly_view,
     purged_media_by_month,
 )
-from app.services.llm_usage import llm_spend_by_month
+from app.services.llm.usage import llm_spend_by_month
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 

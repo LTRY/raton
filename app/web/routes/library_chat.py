@@ -10,10 +10,10 @@ from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import Video
 from app.services.background_jobs import enqueue_llm_job, run_llm_job
-from app.services.library_chat_tools import parse_source_ids
-from app.services.llm import build_library_chat_prompt
-from app.services.rag_retrieval import count_indexed_videos
-from app.services.scanner import log_job
+from app.services.job_log import log_job
+from app.services.llm.provider import build_library_chat_prompt
+from app.services.rag.library_chat_tools import parse_source_ids
+from app.services.rag.retrieval import count_indexed_videos
 from app.services.settings import get_llm_provider_name
 
 router = APIRouter()

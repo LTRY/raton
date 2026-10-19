@@ -5,13 +5,13 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
-from app.services.embeddings import EMBEDDING_DIMENSIONS
+from app.services.rag.embeddings import EMBEDDING_DIMENSIONS
 
 
 class VideoNoteChunk(Base):
     """One embedded section of a video's structured notes, for cross-video RAG search.
 
-    Populated by app/services/rag_indexing.py whenever notes are (re)generated in
+    Populated by app/services/rag/indexing.py whenever notes are (re)generated in
     the Markdown-sectioned format produced by build_notes_prompt; a video only
     becomes searchable from the cross-video chat once it has at least one row
     here. Rows are replaced wholesale on regeneration (see

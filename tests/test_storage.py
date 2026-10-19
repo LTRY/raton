@@ -12,8 +12,8 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
-from app.services import scan_events, scanner
-from app.services.scanner import run_scan, scan_channel, video_already_downloaded
+from app.services.channels import scan_events, scanner
+from app.services.channels.scanner import run_scan, scan_channel, video_already_downloaded
 
 
 def make_session():
@@ -926,7 +926,7 @@ def test_retry_transcript_download_replaces_differently_named_stale_subtitle(mon
 
 
 def test_manual_redownload_resets_watched_at_so_purge_keeps_new_file(monkeypatch, tmp_path):
-    from app.services.media_storage import purge_watched_media
+    from app.services.media.media_storage import purge_watched_media
 
     db = make_session()
     folder = tmp_path / "Manual channel" / "2026-06-01 - Manual video"
@@ -1359,7 +1359,7 @@ def _missing_video_with_metadata(db, channel, tmp_path, yt_video_id, metadata):
 def test_backfill_original_transcripts_only_retries_videos_that_have_an_original_track(
     monkeypatch, tmp_path
 ):
-    from app.services import transcript_backfill
+    from app.services.rag import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")
@@ -1392,7 +1392,7 @@ def test_backfill_original_transcripts_only_retries_videos_that_have_an_original
 def test_backfill_original_transcripts_stops_after_repeated_failures_and_resumes_later(
     monkeypatch, tmp_path
 ):
-    from app.services import transcript_backfill
+    from app.services.rag import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")

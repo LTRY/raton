@@ -9,11 +9,11 @@ from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.channel_profile import channels_root
-from app.services.media_storage import delete_video_media_asset
-from app.services.scanner import ensure_video_channel
+from app.services.channels.profile import channels_root
+from app.services.channels.scanner import ensure_video_channel
+from app.services.media.media_storage import delete_video_media_asset
+from app.services.media.thumbnails import THUMBNAIL_WIDTHS, thumbnail_variant_path
 from app.services.settings import get_media_root
-from app.services.thumbnails import THUMBNAIL_WIDTHS, thumbnail_variant_path
 from app.web.shared import append_query, internal_return_path, redirect
 
 router = APIRouter()

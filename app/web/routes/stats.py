@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.services.library_charts import library_chart_data, monthly_view, purged_media_by_month
-from app.services.llm_usage import llm_spend_by_month
+from app.services.llm.usage import llm_spend_by_month
 from app.services.settings import get_global_quota_bytes
 from app.web.shared import templates
 

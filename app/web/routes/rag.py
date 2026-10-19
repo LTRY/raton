@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.services.rag_dashboard import rag_dashboard_data
+from app.services.rag.dashboard import rag_dashboard_data
 from app.web.shared import templates
 
 router = APIRouter()

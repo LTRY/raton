@@ -1,8 +1,8 @@
 """Cross-video RAG retrieval: given a question, find the most relevant notes chunks.
 
-Read-side counterpart to app/services/rag_indexing.py (which writes/embeds
+Read-side counterpart to app/services/rag/indexing.py (which writes/embeds
 chunks). Exposed to the library-wide chat as one of its tools
-(app/services/library_chat_tools.py) to ground answers in the user's own video
+(app/services/rag/library_chat_tools.py) to ground answers in the user's own video
 notes instead of the model's general knowledge.
 """
 
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 from app.models.video import Video
 from app.models.video_note_chunk import VideoNoteChunk
-from app.services.embeddings import EmbeddingError, contextualized_text, embed_text, rerank
+from app.services.rag.embeddings import EmbeddingError, contextualized_text, embed_text, rerank
 
 logger = logging.getLogger(__name__)
 

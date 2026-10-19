@@ -13,7 +13,7 @@ def fetch_sponsorblock_segments(yt_video_id: str, categories: list[str]) -> list
     video) as well as for an empty categories list — both are "nothing to
     show", not errors. Any other HTTP/network failure raises, left to the
     caller to catch (mirrors download_subtitles's own try/except at the call
-    site, app/services/yt.py:288-291) — a SponsorBlock outage must never
+    site, app/services/youtube/yt.py:288-291) — a SponsorBlock outage must never
     break a download or a scan.
     """
     if not categories:

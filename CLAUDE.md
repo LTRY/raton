@@ -29,7 +29,7 @@ Prefix the title with scope tags, then an imperative English summary: `[FRONT] S
 
 Whenever a change is visible in the UI, show the user screenshots of the result in the conversation — don't just describe it. Do the same to illustrate a problem: a layout bug, a broken page or an unexpected state is clearer shown than explained. Capture both a desktop and a phone width when the layout differs.
 
-How: `scripts/screenshot.sh [path] [out-dir]` runs the app on a throwaway sqlite database seeded with the demo data (never the user's real data), captures `desktop.png` (1280px) and `phone.png` (390px, full page) with headless Playwright, prints the page's `scrollWidth`/`clientWidth` at both widths, then stops the server. For a page that needs other rows, seed them the same way (`app/services/demo_seed.py`). `curl` alone cannot catch layout bugs.
+How: `scripts/screenshot.sh [path] [out-dir]` runs the app on a throwaway sqlite database seeded with the demo data (never the user's real data), captures `desktop.png` (1280px) and `phone.png` (390px, full page) with headless Playwright, prints the page's `scrollWidth`/`clientWidth` at both widths, then stops the server. For a page that needs other rows, seed them the same way (`scripts/demo_seed.py`). `curl` alone cannot catch layout bugs.
 
 ## Design rule: no horizontal page scroll on iPhone
 

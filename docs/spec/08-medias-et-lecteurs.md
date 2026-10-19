@@ -251,7 +251,7 @@ pour les lecteurs video/audio classiques (`app/static/js/app.js`,
 
 Le seuil de 90 % de lecture est evalue cote serveur par
 `POST /videos/{id}/activity` (`mark_watched_if_complete`,
-`app/services/media_storage.py`) : la premiere fois que
+`app/services/media/media_storage.py`) : la premiere fois que
 `position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
 seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont
 decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).
@@ -313,7 +313,7 @@ lecteur présent sur la page :
   dès l'évènement `loadedmetadata` du mini-lecteur.
 
 Recherche SponsorBlock automatique : un téléchargement manuel réussi
-(`app/services/scanner.py:download_manual_media`) déclenche automatiquement
+(`app/services/channels/scanner.py:download_manual_media`) déclenche automatiquement
 la même recherche SponsorBlock que le bouton, sur les catégories activées
 dans `/settings` — best-effort, une erreur (réseau, API indisponible) est
 avalée silencieusement sans faire échouer le téléchargement ; le bouton

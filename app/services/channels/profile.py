@@ -11,11 +11,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
 from app.models.channel import Channel
-from app.services import yt
 from app.services.files import sanitize_filename
-from app.services.scanner import log_job
+from app.services.job_log import log_job
 from app.services.settings import get_media_root
-from app.services.url_guard import ensure_public_http_url
+from app.services.youtube import yt
+from app.services.youtube.url_guard import ensure_public_http_url
 
 CHANNELS_DIRNAME = "_channels"
 # Pause between two channels of a backfill, so a long import does not hammer YouTube.

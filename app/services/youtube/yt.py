@@ -12,7 +12,7 @@ from app.core.logging import log_external
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus
 from app.services.files import sanitize_filename
-from app.services.url_guard import UnsafeUrlError, ensure_public_http_url
+from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
 logger = logging.getLogger(__name__)
 

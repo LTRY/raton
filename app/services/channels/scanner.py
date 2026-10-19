@@ -12,21 +12,27 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
-from app.core.logging import log_event
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import TranscriptStatus, Video
-from app.services import scan_events
-from app.services.audio_extract import copy_audio_track, extractable_video_file
-from app.services.files import directory_size, move_directory, remove_directory, unique_sibling_path
+from app.services.channels import scan_events
+from app.services.files import (
+    directory_size,
+    move_directory,
+    remove_directory,
+    unique_sibling_path,
+)
+from app.services.job_log import log_job
+from app.services.media.audio_extract import copy_audio_track, extractable_video_file
+from app.services.media.media_storage import media_type_for_paths
+from app.services.media.storage import has_auto_download_headroom
+from app.services.media.thumbnails import ensure_video_thumbnails
 from app.services.settings import get_media_root, get_sponsor_segment_categories
-from app.services.sponsor_segments import replace_video_sponsor_segments
-from app.services.sponsorblock import fetch_sponsorblock_segments
-from app.services.storage import has_auto_download_headroom
-from app.services.thumbnails import ensure_video_thumbnails
-from app.services.url_guard import ensure_public_http_url
-from app.services.view_counts import parse_duration_seconds, parse_view_count
-from app.services.yt import (
+from app.services.youtube.sponsor_segments import replace_video_sponsor_segments
+from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
+from app.services.youtube.url_guard import ensure_public_http_url
+from app.services.youtube.view_counts import parse_duration_seconds, parse_view_count
+from app.services.youtube.yt import (
     SUBTITLE_EXTENSIONS,
     build_video_folder,
     discover_downloaded_files,
@@ -70,38 +76,8 @@ def pause_between_imports() -> None:
     pause(PAUSE_BETWEEN_IMPORTS)
 
 
-JOB_STATUS_LOG_LEVELS = {
-    "failed": logging.ERROR,
-    "warning": logging.WARNING,
-    "skipped": logging.WARNING,
-}
-
-
 def video_already_downloaded(db: Session, yt_video_id: str) -> bool:
     return db.scalar(select(Video.id).where(Video.yt_video_id == yt_video_id)) is not None
-
-
-def log_job(
-    db: Session,
-    status: str,
-    message: str,
-    channel_id: int | None = None,
-    video_id: int | None = None,
-) -> DownloadJob:
-    job = DownloadJob(channel_id=channel_id, video_id=video_id, status=status, message=message)
-    db.add(job)
-    db.commit()
-    # Mirror every `/logs` row into the journal; a playback row carries a JSON payload, not text.
-    log_event(
-        logger,
-        "job.record",
-        level=JOB_STATUS_LOG_LEVELS.get(status, logging.INFO),
-        status=status,
-        message="" if status == "played" else message,
-        channel_id=channel_id,
-        video_id=video_id,
-    )
-    return job
 
 
 def record_playback_activity(
@@ -242,18 +218,6 @@ def retry_transcript_download(
     except Exception:
         remove_directory(staging)
         raise
-
-
-def media_type_for_paths(
-    video_path: str | None, audio_path: str | None, metadata_path: str | None
-) -> str:
-    if video_path:
-        return "video"
-    if audio_path:
-        return "audio"
-    if metadata_path:
-        return "metadata"
-    return "metadata"
 
 
 def canonical_video_url(video_url: str, yt_video_id: str, source_section: str = "videos") -> str:

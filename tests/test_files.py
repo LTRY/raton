@@ -1,8 +1,8 @@
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus
-from app.services import yt
 from app.services.files import sanitize_filename
-from app.services.yt import discover_downloaded_files, write_transcript
+from app.services.youtube import yt
+from app.services.youtube.yt import discover_downloaded_files, write_transcript
 
 
 def test_sanitize_filename_removes_invalid_characters():

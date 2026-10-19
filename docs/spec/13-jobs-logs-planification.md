@@ -156,7 +156,7 @@ donc avec le meme verrou, la meme garde de stockage et la meme mise a jour de
 "Dernier scan automatique" que le cron.
 
 Le scan (planifie ou manuel) publie ce qu'il fait dans un flux en memoire,
-`app/services/scan_events.py` : debut (nombre de chaines), chaine en cours,
+`app/services/channels/scan_events.py` : debut (nombre de chaines), chaine en cours,
 nouveautes trouvees et plafond atteint, chaque fiche importee, chaque echec,
 "rien de nouveau", interruption par un 429, garde de stockage, fin avec le
 total et la duree. Le dernier evenement d'un scan porte `final = true`.
@@ -302,7 +302,7 @@ n'existe pas), un job unique (`purge_media_catchup`) est ajoute.
 Une troisieme tache quotidienne (`auto_notes_sweep`, `scheduled_auto_notes`)
 tourne a 5h `Europe/Paris`, apres le scan de 3h (qui importe les videos
 de la nuit) et la purge de 4h. Elle appelle `run_auto_notes_sweep`
-(`app/services/auto_notes.py`), qui fait deux choses, dans cet ordre :
+(`app/services/rag/auto_notes.py`), qui fait deux choses, dans cet ordre :
 
 1. **collecter** le lot soumis par le passage precedent, s'il y en a un : les
    resultats sont appliques un par un (`transcript.notes.txt`,

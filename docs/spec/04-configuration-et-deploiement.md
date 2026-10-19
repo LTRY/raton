@@ -132,10 +132,10 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
   une autre machine accede par un point de montage local different a la meme
   bibliotheque media que celle qui a fait les telechargements (ex. prefixe
   `/media/youtube` du conteneur Docker remplace par un montage reseau local). Ne modifie rien dans la DB ; s'applique uniquement au moment de lire
-  les fichiers (`app/web/routes/media.py`, `app/services/scanner.py`,
-  `app/services/media_storage.py`) et, pour les profils de chaines
+  les fichiers (`app/web/routes/media.py`, `app/services/channels/scanner.py`,
+  `app/services/media/media_storage.py`) et, pour les profils de chaines
   (`_channels/`), aussi a leur ecriture et suppression
-  (`app/services/channel_profile.py:local_media_root`).
+  (`app/services/channels/profile.py:local_media_root`).
 - `GLOBAL_QUOTA_BYTES` : quota global.
 - `APP_AUTO_CREATE_TABLES` : creation automatique de tables hors Alembic.
 - `LOG_DIR` : dossier du journal applicatif (`app.jsonl`). Vide : pas de
