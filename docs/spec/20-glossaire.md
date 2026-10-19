@@ -256,7 +256,7 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 Assistant de la page d'accueil `/` : choisit une replique et un dessin a chaque chargement.
 
-- **Code** : `app/web/raton.py`
+- **Code** : paquet `app/services/raton/` (catalogue `scenarios.py`, tirage `picker.py`, visites `visits.py`)
 - **A ne pas confondre avec** : Un composant de chat.
 
 ### Dashboard

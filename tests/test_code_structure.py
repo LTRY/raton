@@ -53,6 +53,7 @@ SERVICE_PACKAGE_DEPENDENCIES = {
     "ingest": {"common", "media", "youtube"},
     "playlists": {"common", "ingest", "youtube"},
     "videos": {"common", "llm", "media"},
+    "raton": {"common", "videos"},
     "rag": {"channels", "common", "llm", "videos", "youtube"},
     "jobs": {"channels", "common", "ingest", "llm", "media", "rag", "videos", "youtube"},
 }
@@ -104,22 +105,17 @@ def test_service_packages_form_a_dag():
     assert not offenders, "forbidden service imports: " + ", ".join(sorted(set(offenders)))
 
 
-# Writes still done by the web layer itself, waiting to move into a service. The counts may only go
-# down: a route reads the request, calls a service and renders; the service owns the business rule
-# and its commit (docs/spec/03-architecture.md). Lower a count when you move a write out.
-WEB_DB_WRITES_LEFT = {
-    "web/raton.py": 2,  # visit tracking of the home hero
-}
+# The web layer writes nothing to the DB itself: a route reads the request, calls a service and
+# renders; the service owns the business rule and its commit (docs/spec/03-architecture.md).
 DB_WRITE = re.compile(r"\bdb\.(add|add_all|commit|delete|flush|merge)\(|\.delete\(\)")
 
 
 def test_web_layer_leaves_db_writes_to_services():
-    counts = {}
-    for path in sorted([*(APP / "web").rglob("*.py"), *(APP / "api").rglob("*.py")]):
-        found = len(DB_WRITE.findall(path.read_text(encoding="utf-8")))
-        if found:
-            counts[str(path.relative_to(APP))] = found
-    assert counts == WEB_DB_WRITES_LEFT, (
-        "a route writes to the DB itself: move the write into app/services/ "
-        "(or lower WEB_DB_WRITES_LEFT after moving one out)"
+    offenders = sorted(
+        str(path.relative_to(APP))
+        for path in [*(APP / "web").rglob("*.py"), *(APP / "api").rglob("*.py")]
+        if DB_WRITE.search(path.read_text(encoding="utf-8"))
+    )
+    assert not offenders, (
+        f"these modules write to the DB: move the write into a service: {offenders}"
     )

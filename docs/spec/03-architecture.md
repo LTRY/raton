@@ -185,13 +185,14 @@ racine de `app/services/` :
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
 | `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`), outils du chat (`library_chat_schema` : ce que le modele peut appeler ; `library_chat_tools` : leur execution) |
+| `raton/` | La mascotte de l'accueil : catalogue des scenarios (`scenarios`), choix de la replique (`picker`), suivi des visites (`visits`) |
 | `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`) et planificateur (`scheduler`) |
 
 Les dependances entre paquets vont dans un seul sens : `common` ne depend
 d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
 de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
-`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common` et
-`media` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
+`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common`, `llm` et
+`media` ; `raton` de `common` et `videos` ; `rag` de `channels`, `common`, `llm`, `videos` et `youtube`. `jobs`
 appelle les autres paquets et aucun ne l'importe en retour. Aucun service
 n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
 `tests/test_code_structure.py` fait respecter ces regles.
@@ -203,10 +204,8 @@ donnees de demo (`demo_seed`) ne sont pas un service, elles sont dans
 
 Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
 et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
-reponse HTTP, lancer les taches de fond et rendre la page. Les ecritures dans la
-DB encore faites par la couche web sont listees dans
-`tests/test_code_structure.py` (`WEB_DB_WRITES_LEFT`) : cette liste ne peut que
-raccourcir.
+reponse HTTP, lancer les taches de fond et rendre la page. Rien sous `app/web/` ni
+`app/api/` n'ecrit dans la DB (`tests/test_code_structure.py`).
 
 ### `app/services/youtube/`
 

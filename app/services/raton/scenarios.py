@@ -1,52 +1,37 @@
-"""Raton's home-page scenarios: the catalogue, the visit flow, and the picker.
+"""Raton's home-page scenarios: the catalogue of ideas and what a scenario holds.
 
 The catalogue below is the single list of ideas, active or not. A scenario with
 `active=True` has a condition in `CONDITIONS` and can be shown; the others are
 parked ideas that keep their trigger, their lines and the drawing still to make
-(see docs/spec/18-raton-scenarios.md). A visit follows a fixed flow: the long
-absence line (if any), then one time-of-day greeting, then a random draw among
-the remaining lines, never repeating one within the visit.
+(see docs/spec/18-raton-scenarios.md). Which line a page load shows is chosen in
+`picker.py`; the visit it belongs to is tracked in `visits.py`.
 """
 
-import json
-import random
-from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session, selectinload
-
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.services.common.settings import (
-    SCREEN_TIME_KINDS,
-    get_screen_time_limits,
-    get_setting,
-    set_setting,
-)
-from app.services.videos.filters import followed_video_condition
-from app.services.videos.playback import playback_time_stats
-
-RATON_LAST_SEEN_KEY = "raton_last_seen_at"
-RATON_SESSION_PREVIOUS_KEY = "raton_session_previous_visit_at"
-# JSON list of the lines already shown in the current visit ("<scenario id>:<rank>").
-RATON_SHOWN_KEY = "raton_visit_shown"
-
-
-# A gap this long between two page loads starts a new visit. Without it a
-# refresh right after the "long absence" line would already read as "yesterday".
-SESSION_GAP = timedelta(minutes=30)
 LONG_ABSENCE_DAYS = 2
+
+
 # "Late" is from LATE_HOUR to NIGHT_END_HOUR: the home page stops offering videos.
 LATE_HOUR = 22
+
+
 NIGHT_END_HOUR = 5
+
+
 MINUTES_LEFT_WARNING = 15
+
+
 CLOSING_RATIO = 1.0
+
+
 NEAR_LIMIT_RATIO = 0.9
 
-ART_DIR = Path(__file__).resolve().parents[1] / "static" / "img" / "raton"
+
+ART_DIR = Path(__file__).resolve().parents[2] / "static" / "img" / "raton"
+
 
 GROUPS = {
     "moment": "Moment de la journée",
@@ -59,8 +44,14 @@ GROUPS = {
 
 # Position of a scenario in the flow of a visit.
 STAGE_ABSENCE = "absence"  # first load of a visit, when the user was away
+
+
 STAGE_GREETING = "accueil"  # one line of the time-of-day scenarios
+
+
 STAGE_DRAW = "tirage"  # every later load: random, no repeat within the visit
+
+
 STAGE_LABELS = {
     STAGE_ABSENCE: "Longue absence (1er chargement)",
     STAGE_GREETING: "Accueil horaire",
@@ -327,6 +318,7 @@ CATALOGUE: tuple[Scenario, ...] = (
     ),
 )
 
+
 # Always true and always last in the list, so the list is never empty.
 DEFAULT_SCENARIO = Scenario(
     id="defaut",
@@ -337,6 +329,7 @@ DEFAULT_SCENARIO = Scenario(
     active=True,
     stage=STAGE_DRAW,
 )
+
 
 # Parked scenarios (`tard`, `pause_midi`, `limite_proche`, `quart_d_heure`) have no
 # condition here; their thresholds stay above for when they come back.
@@ -350,224 +343,3 @@ CONDITIONS = {
     "matin_tot": lambda ctx: ctx.first_visit_today and 5 <= ctx.now.hour < 9,
     "matin": lambda ctx: ctx.first_visit_today and 9 <= ctx.now.hour < 12,
 }
-
-
-def active_scenarios() -> list[Scenario]:
-    return [scenario for scenario in CATALOGUE if scenario.active]
-
-
-def line_text(scenario: Scenario, rank: int) -> str:
-    line = scenario.lines[rank]
-    return line if isinstance(line, str) else line[0]
-
-
-def line_art(scenario: Scenario, rank: int) -> str:
-    line = scenario.lines[rank]
-    own = None if isinstance(line, str) else line[1]
-    return own or scenario.art or "journal.webp"
-
-
-def line_key(scenario: Scenario, rank: int) -> str:
-    return f"{scenario.id}:{rank}"
-
-
-def art_files(scenario: Scenario) -> set[str]:
-    """Every drawing the scenario uses, its default and the ones of single lines."""
-    files = {scenario.art} if scenario.art else set()
-    files.update(line[1] for line in scenario.lines if not isinstance(line, str))
-    return files
-
-
-def missing_art() -> list[Scenario]:
-    """Scenarios whose drawing is still to make, or whose file is not on disk."""
-    return [
-        s
-        for s in CATALOGUE
-        if s.art is None or not all((ART_DIR / f).is_file() for f in art_files(s))
-    ]
-
-
-def _holds(scenario: Scenario, ctx: RatonContext) -> bool:
-    return scenario is DEFAULT_SCENARIO or CONDITIONS[scenario.id](ctx)
-
-
-def stage_lines(ctx: RatonContext, stage: str) -> list[tuple[Scenario, int]]:
-    """Every (scenario, rank) of the stage whose scenario holds right now, in catalogue order."""
-    lines: list[tuple[Scenario, int]] = []
-    for scenario in [*active_scenarios(), DEFAULT_SCENARIO]:
-        if scenario.stage == stage and _holds(scenario, ctx):
-            lines.extend((scenario, rank) for rank in range(len(scenario.lines)))
-    return lines
-
-
-def draw_pool(ctx: RatonContext) -> list[tuple[Scenario, int]]:
-    """The lines of the random draw; a holding `closing` scenario wins over all the others."""
-    pool = stage_lines(ctx, STAGE_DRAW)
-    closing = [(scenario, rank) for scenario, rank in pool if scenario.closing]
-    return closing or pool
-
-
-def _stage_of_key(key: str) -> str:
-    scenario_id = key.rpartition(":")[0]
-    for scenario in (*CATALOGUE, DEFAULT_SCENARIO):
-        if scenario.id == scenario_id:
-            return scenario.stage
-    return ""
-
-
-def pick_next(
-    ctx: RatonContext, shown: list[str], rng: random.Random | None = None
-) -> tuple[Scenario, int, list[str]]:
-    """The line of the next page load of a visit, and the updated list of lines shown.
-
-    Flow: long absence (first load only), then one greeting, then the random draw.
-    """
-    rng = rng or random.Random()
-    # Lines of a scenario that no longer exists (catalogue edited mid-visit) are forgotten.
-    shown = [key for key in shown if _stage_of_key(key)]
-    stages_shown = {_stage_of_key(key) for key in shown}
-
-    candidates: list[tuple[Scenario, int]] = []
-    if not shown:
-        candidates = stage_lines(ctx, STAGE_ABSENCE)
-    if not candidates and STAGE_GREETING not in stages_shown and STAGE_DRAW not in stages_shown:
-        candidates = stage_lines(ctx, STAGE_GREETING)
-    if not candidates:
-        pool = draw_pool(ctx)
-        candidates = [(sc, rank) for sc, rank in pool if line_key(sc, rank) not in shown]
-        if not candidates:
-            # Everything of the pool was seen: start a new round, but not with the line just shown.
-            last = shown[-1] if shown and _stage_of_key(shown[-1]) == STAGE_DRAW else None
-            shown = [key for key in shown if _stage_of_key(key) != STAGE_DRAW] + (
-                [last] if last else []
-            )
-            candidates = [
-                (sc, rank) for sc, rank in pool if line_key(sc, rank) not in shown
-            ] or pool
-    scenario, rank = rng.choice(candidates)
-    return scenario, rank, [*shown, line_key(scenario, rank)]
-
-
-def render_line(scenario: Scenario, rank: int) -> dict:
-    """What the template shows for one line of a scenario."""
-    return {
-        "id": scenario.id,
-        "line": line_text(scenario, rank),
-        "cta_label": scenario.cta_label,
-        "cta_href": scenario.cta_href,
-        "art": line_art(scenario, rank),
-        "closing": scenario.closing,
-    }
-
-
-def all_variations() -> list[dict]:
-    """Every line of every active scenario, for the test page; no condition applied."""
-    return [
-        {
-            "id": scenario.id,
-            "stage": STAGE_LABELS[scenario.stage],
-            "trigger": scenario.trigger,
-            "art_brief": scenario.art_brief,
-            "lines": [render_line(scenario, rank) for rank in range(len(scenario.lines))],
-        }
-        for scenario in [*active_scenarios(), DEFAULT_SCENARIO]
-    ]
-
-
-def _parse_datetime(value: str) -> datetime | None:
-    try:
-        return datetime.fromisoformat(value) if value else None
-    except ValueError:
-        return None
-
-
-def _parse_shown(value: str) -> list[str]:
-    try:
-        parsed = json.loads(value)
-    except ValueError:
-        return []
-    return [key for key in parsed if isinstance(key, str)] if isinstance(parsed, list) else []
-
-
-def record_visit(db: Session, now: datetime) -> tuple[datetime | None, list[str]]:
-    """Store this page load; return the previous *visit* (not the previous load) and the lines already shown in this visit."""
-    last_seen = _parse_datetime(get_setting(db, RATON_LAST_SEEN_KEY, ""))
-    new_visit = last_seen is None or now - last_seen >= SESSION_GAP
-    if new_visit:
-        set_setting(db, RATON_SESSION_PREVIOUS_KEY, last_seen.isoformat() if last_seen else "")
-        shown: list[str] = []
-        set_setting(db, RATON_SHOWN_KEY, json.dumps(shown))
-    else:
-        shown = _parse_shown(get_setting(db, RATON_SHOWN_KEY, "[]"))
-    previous = _parse_datetime(get_setting(db, RATON_SESSION_PREVIOUS_KEY, ""))
-    set_setting(db, RATON_LAST_SEEN_KEY, now.isoformat())
-    db.commit()
-    return previous, shown
-
-
-def screen_time_today(db: Session, now: datetime) -> tuple[float, str, float | None, float]:
-    """(highest limit ratio, its kind, fewest minutes left over all kinds, total seconds played today)."""
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    jobs = list(
-        db.scalars(
-            select(DownloadJob)
-            .where(DownloadJob.status == "played")
-            .options(selectinload(DownloadJob.video))
-            # One day of margin: `playback_time_stats` does the exact local-day cut.
-            .where(DownloadJob.created_at >= day_start.replace(tzinfo=None) - timedelta(days=1))
-            .order_by(desc(DownloadJob.created_at))
-        )
-    )
-    stats = playback_time_stats(jobs, now)["today"]
-    limits = get_screen_time_limits(db)
-    best_ratio, best_kind = 0.0, "video"
-    minutes_left: float | None = None
-    total_seconds = 0.0
-    for kind in SCREEN_TIME_KINDS:
-        seconds = float(stats[kind]["seconds"])
-        total_seconds += seconds
-        limit_minutes = limits[kind]["today"]
-        ratio = seconds / (limit_minutes * 60)
-        if minutes_left is None or ratio > best_ratio:
-            best_ratio, best_kind = ratio, kind
-        # The closest limit decides the "15 minutes left" warning, not the busiest kind's.
-        left = max(limit_minutes - seconds / 60, 0.0)
-        minutes_left = left if minutes_left is None else min(minutes_left, left)
-    return best_ratio, best_kind, minutes_left, total_seconds
-
-
-def build_context(db: Session, now: datetime | None = None) -> RatonContext:
-    """Facts about the library and the day; no visit bookkeeping, so it is safe to call from a test page."""
-    now = now or datetime.now().astimezone()
-    ratio, _, minutes_left, played_seconds = screen_time_today(db, now)
-    new_count = (
-        db.scalar(
-            select(func.count(Video.id))
-            .join(Channel, Channel.id == Video.channel_id)
-            .where(Video.is_new.is_(True))
-            .where(followed_video_condition())
-        )
-        or 0
-    )
-    return RatonContext(
-        now=now,
-        limit_ratio=ratio,
-        minutes_left=minutes_left,
-        played_today_seconds=played_seconds,
-        new_count=new_count,
-    )
-
-
-def home_context(
-    db: Session, now: datetime | None = None, rng: random.Random | None = None
-) -> dict:
-    """Template context of the home hero: the line of this page load."""
-    ctx = build_context(db, now)
-    previous_visit, shown = record_visit(db, ctx.now)
-    ctx = replace(ctx, previous_visit=previous_visit)
-    scenario, rank, shown = pick_next(ctx, shown, rng)
-    set_setting(db, RATON_SHOWN_KEY, json.dumps(shown))
-    db.commit()
-    return {
-        "scenario": render_line(scenario, rank),
-    }

@@ -15,6 +15,7 @@ from app.services.common.settings import (
     get_screen_time_limits,
     get_video_category_label_styles,
 )
+from app.services.raton.visits import home_context as raton_home_context
 from app.services.videos.filters import followed_video_condition
 from app.services.videos.playback import (
     dashboard_media_activity_logs,
@@ -23,7 +24,6 @@ from app.services.videos.playback import (
     recent_played_jobs,
 )
 from app.web.playback import history_day_groups, playback_time_dashboard
-from app.web.raton import home_context as raton_home_context
 from app.web.routes.library_chat import library_chat_payload, library_chat_scope_config
 from app.web.shared import (
     category_style_map,
