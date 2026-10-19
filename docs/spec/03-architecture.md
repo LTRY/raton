@@ -170,7 +170,7 @@ racine de `app/services/` :
 
 | Paquet | Contenu |
 |---|---|
-| `common/` | Bases partagees par tous les paquets : reglages (`settings`, `settings_format`), note en etoiles (`ratings`), durees (`durations`), recherche par mots (`search`), outils de fichiers (`files`), journal des jobs (`job_log`) |
+| `common/` | Bases partagees par tous les paquets : reglages (`settings`), categories (`categories`), vues enregistrees (`library_views`), note en etoiles (`ratings`), durees (`durations`), recherche par mots (`search`), outils de fichiers (`files`), journal des jobs (`job_log`) |
 | `youtube/` | Tout ce qui parle a YouTube : `yt`, `channel_info`, `downloads`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
 | `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |

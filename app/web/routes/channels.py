@@ -36,14 +36,11 @@ from app.services.channels.subscriptions import (
     parse_subscriptions_csv,
     preview_subscriptions,
 )
+from app.services.common.categories import parse_video_category_labels, serialized_category_labels
 from app.services.common.job_log import log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.common.settings import (
     get_video_category_label_styles,
-)
-from app.services.common.settings_format import (
-    parse_video_category_labels,
-    serialized_category_labels,
 )
 from app.services.jobs.background_jobs import (
     run_channel_metadata_import_job,

@@ -10,6 +10,16 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
+from app.services.common.categories import (
+    parse_video_category_label_styles,
+    parse_video_category_labels,
+    serialize_video_category_label_styles,
+    serialize_video_category_labels,
+)
+from app.services.common.library_views import (
+    parse_video_library_views,
+    serialize_video_library_views,
+)
 from app.services.common.settings import (
     AUTO_NOTES_ENABLED_KEY,
     AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
@@ -37,14 +47,6 @@ from app.services.common.settings import (
     get_video_category_labels,
     get_video_library_views,
     set_setting,
-)
-from app.services.common.settings_format import (
-    parse_video_category_label_styles,
-    parse_video_category_labels,
-    parse_video_library_views,
-    serialize_video_category_label_styles,
-    serialize_video_category_labels,
-    serialize_video_library_views,
 )
 from app.services.ingest import scan_events
 from app.services.ingest.scanner import scan_lock

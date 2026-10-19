@@ -5,7 +5,7 @@ from sqlalchemy import String, and_, func, literal, or_, true
 
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.common.settings_format import parse_video_category_labels
+from app.services.common.categories import parse_video_category_labels
 
 
 def video_category_labels(video: Video) -> list[str]:

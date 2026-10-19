@@ -15,10 +15,10 @@ from sqlalchemy.orm import Session, selectinload
 from app.db.session import get_db
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
+from app.services.common.categories import parse_video_category_labels
 from app.services.common.durations import format_duration
 from app.services.common.job_log import log_job
 from app.services.common.settings import get_video_category_label_styles
-from app.services.common.settings_format import parse_video_category_labels
 from app.services.jobs.background_jobs import run_manual_download_job
 from app.services.playlists.editing import (
     add_video_to_playlist,

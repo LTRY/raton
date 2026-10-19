@@ -277,7 +277,7 @@ Liste des fiches, avec filtres, tri et recherche.
 
 Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.
 
-- **Code** : `saved_views` (cf. `video_library.py`)
+- **Code** : reglage `video_library_views` (`app/services/common/library_views.py`)
 - **A ne pas confondre avec** : Une playlist.
 
 ### Carte

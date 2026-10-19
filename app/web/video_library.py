@@ -4,8 +4,8 @@ from fastapi import Request
 
 from app.models.channel import Channel
 from app.models.video import Video
+from app.services.common.categories import normalize_video_category_label
 from app.services.common.durations import format_duration
-from app.services.common.settings_format import normalize_video_category_label
 from app.services.videos.list_state import video_auto_list_state, video_list_state
 from app.services.youtube.channel_info import normalized_channel_section
 from app.web.shared import (

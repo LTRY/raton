@@ -5,9 +5,9 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 from app.services.channels.lookup import find_channel
 from app.services.channels.profile import remove_channel_profile_files
+from app.services.common.categories import serialized_category_labels
 from app.services.common.ratings import check_rating
 from app.services.common.settings import add_video_category_labels, get_media_root
-from app.services.common.settings_format import serialized_category_labels
 from app.services.youtube.channel_info import extract_channel_info
 
 

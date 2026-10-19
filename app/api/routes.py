@@ -14,6 +14,15 @@ from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import VideoRead
 from app.services.channels import manage as channel_manage
 from app.services.channels.manage import ChannelAlreadyInLibraryError
+from app.services.common.categories import (
+    parse_video_category_label_styles,
+    serialize_video_category_label_styles,
+    serialize_video_category_labels,
+)
+from app.services.common.library_views import (
+    parse_video_library_views,
+    serialize_video_library_views,
+)
 from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.common.settings import (
     GLOBAL_QUOTA_BYTES_KEY,
@@ -27,13 +36,6 @@ from app.services.common.settings import (
     get_video_category_labels,
     get_video_library_views,
     set_setting,
-)
-from app.services.common.settings_format import (
-    parse_video_category_label_styles,
-    parse_video_library_views,
-    serialize_video_category_label_styles,
-    serialize_video_category_labels,
-    serialize_video_library_views,
 )
 from app.services.jobs.background_jobs import run_channel_profile_backfill_job
 from app.services.media.storage import get_total_used_bytes

@@ -20,6 +20,7 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.models.video import Video
+from app.services.common.categories import parse_video_category_labels, serialized_category_labels
 from app.services.common.durations import format_duration
 from app.services.common.job_log import (
     CHANNEL_IMPORT_PROGRESS_LIMIT,
@@ -39,10 +40,6 @@ from app.services.common.settings import (
     get_sponsor_skip_enabled,
     get_video_category_label_styles,
     get_video_library_views,
-)
-from app.services.common.settings_format import (
-    parse_video_category_labels,
-    serialized_category_labels,
 )
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media

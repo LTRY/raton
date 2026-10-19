@@ -5,8 +5,8 @@ import json
 from sqlalchemy.orm import Session
 
 from app.models.video import Video
+from app.services.common.categories import serialized_category_labels
 from app.services.common.settings import add_video_category_labels
-from app.services.common.settings_format import serialized_category_labels
 from app.services.videos.list_state import VIDEO_LIST_STATES
 
 # Mark a title as chosen among the AI suggestions (✨) or typed by hand (✏️).

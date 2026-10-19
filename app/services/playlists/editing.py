@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
+from app.services.common.categories import serialized_category_labels
 from app.services.common.settings import add_video_category_labels
-from app.services.common.settings_format import serialized_category_labels
 
 
 def next_item_position(db: Session, playlist_id: int) -> int:
