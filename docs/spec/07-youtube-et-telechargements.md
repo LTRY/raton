@@ -291,7 +291,7 @@ ou indisponibles au moment du telechargement initial), la fiche video
 uniquement quand `video.transcript_path` est vide) :
 
 - `POST /videos/{id}/transcript/download` cree un `DownloadJob` et lance
-  `retry_transcript_download` (`app/services/ingest/media_import.py`) en tache de fond ;
+  `retry_transcript_download` (`app/services/ingest/transcript_retry.py`) en tache de fond ;
 - une seule tentative, sur la piste choisie par `choose_subtitle_track`
   (createur fr/en, puis originale fr/en, puis originale dans une autre langue :
   voir "Sous-titres : jamais de traduction automatique") ; pas de fusion

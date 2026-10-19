@@ -37,7 +37,7 @@ def mark_watched_if_complete(
 
     Does not commit. The date is set once and never moved by playback, so replaying a video
     doesn't postpone the purge of its files. A new download adding a format resets it to
-    NULL (see `media_import`), restarting the countdown.
+    NULL (see `manual_download`), restarting the countdown.
     """
     if not (math.isfinite(position_seconds) and math.isfinite(duration_seconds)):
         return False

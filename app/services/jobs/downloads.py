@@ -9,12 +9,10 @@ from app.db.session import SessionLocal
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.ingest.media_import import (
-    download_manual_media,
-    import_video_metadata,
-    retry_transcript_download,
-)
+from app.services.ingest.manual_download import download_manual_media
+from app.services.ingest.metadata_import import import_video_metadata
 from app.services.ingest.scanner import scan_channel_section
+from app.services.ingest.transcript_retry import retry_transcript_download
 
 logger = logging.getLogger(__name__)
 

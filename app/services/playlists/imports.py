@@ -10,7 +10,7 @@ from yt_dlp import YoutubeDL
 from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.common.job_log import log_job
-from app.services.ingest.media_import import import_video_metadata
+from app.services.ingest.metadata_import import import_video_metadata
 from app.services.ingest.throttle import pause_between_imports
 from app.services.playlists.editing import add_video_to_playlist
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url

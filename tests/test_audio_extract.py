@@ -11,7 +11,7 @@ from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
-from app.services.ingest import media_import, staging
+from app.services.ingest import manual_download, staging
 from app.services.media import audio_extract
 
 MERGED = {
@@ -64,8 +64,8 @@ def forbid_network(monkeypatch):
     def refuse(*args, **kwargs):
         raise AssertionError("yt-dlp must not be called")
 
-    monkeypatch.setattr(media_import, "extract_video_info", refuse)
-    monkeypatch.setattr(media_import, "download_media", refuse)
+    monkeypatch.setattr(manual_download, "extract_video_info", refuse)
+    monkeypatch.setattr(manual_download, "download_media", refuse)
 
 
 def test_dedicated_audio_stream_is_detected(tmp_path):
@@ -84,7 +84,7 @@ def test_audio_is_copied_out_of_a_merged_video_without_yt_dlp(monkeypatch, tmp_p
     forbid_network(monkeypatch)
     monkeypatch.setattr(staging, "copy_audio_track", fake_copy)
 
-    updated = media_import.download_manual_media(db, video.url, "audio", False)
+    updated = manual_download.download_manual_media(db, video.url, "audio", False)
 
     assert updated.id == video.id
     assert Path(updated.audio_path).name == "title.m4a"
@@ -98,7 +98,7 @@ def test_degraded_progressive_track_is_downloaded_with_yt_dlp(monkeypatch, tmp_p
     video = make_downloaded_video(db, tmp_path, PROGRESSIVE)
     monkeypatch.setattr(staging, "copy_audio_track", lambda *a: pytest.fail("must not extract"))
     monkeypatch.setattr(
-        media_import,
+        manual_download,
         "extract_video_info",
         lambda url: {"id": "abc123", "title": "Title", "channel": "Chan", "webpage_url": url},
     )
@@ -108,9 +108,9 @@ def test_degraded_progressive_track_is_downloaded_with_yt_dlp(monkeypatch, tmp_p
         (staging / "audio.m4a").write_bytes(b"dedicated")
         return {"id": "abc123", "title": "Title", "webpage_url": url}
 
-    monkeypatch.setattr(media_import, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = media_import.download_manual_media(db, video.url, "audio", False)
+    updated = manual_download.download_manual_media(db, video.url, "audio", False)
 
     assert Path(updated.audio_path).read_bytes() == b"dedicated"
 
@@ -120,7 +120,7 @@ def test_ffmpeg_failure_falls_back_to_yt_dlp(monkeypatch, tmp_path):
     video = make_downloaded_video(db, tmp_path, MERGED)
     monkeypatch.setattr(staging, "copy_audio_track", lambda source, target: False)
     monkeypatch.setattr(
-        media_import,
+        manual_download,
         "extract_video_info",
         lambda url: {"id": "abc123", "title": "Title", "channel": "Chan", "webpage_url": url},
     )
@@ -130,9 +130,9 @@ def test_ffmpeg_failure_falls_back_to_yt_dlp(monkeypatch, tmp_path):
         (staging / "audio.m4a").write_bytes(b"dedicated")
         return {"id": "abc123", "title": "Title", "webpage_url": url}
 
-    monkeypatch.setattr(media_import, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = media_import.download_manual_media(db, video.url, "audio", False)
+    updated = manual_download.download_manual_media(db, video.url, "audio", False)
 
     assert Path(updated.audio_path).read_bytes() == b"dedicated"
     assert not list(Path(video.folder_path).glob("*.partial*"))

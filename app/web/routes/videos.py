@@ -41,7 +41,7 @@ from app.services.ingest.channel_exploration import (
 )
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media
-from app.services.ingest.media_import import import_video_metadata
+from app.services.ingest.metadata_import import import_video_metadata
 from app.services.jobs.downloads import (
     CHANNEL_VIDEO_PAGE_SIZE,
     run_manual_download_job,

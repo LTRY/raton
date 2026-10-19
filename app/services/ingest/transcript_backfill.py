@@ -17,8 +17,8 @@ from app.models.video import TranscriptStatus, Video
 from app.services.common.job_log import log_job
 from app.services.common.settings import get_setting, set_setting
 from app.services.ingest import scan_events
-from app.services.ingest.media_import import retry_transcript_download
 from app.services.ingest.throttle import pause_between_imports
+from app.services.ingest.transcript_retry import retry_transcript_download
 from app.services.youtube.downloads import choose_subtitle_track
 
 logger = logging.getLogger(__name__)

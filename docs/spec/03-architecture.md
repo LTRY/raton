@@ -183,7 +183,7 @@ racine de `app/services/` :
 | `youtube/` | Tout ce qui parle a YouTube : `yt`, `channel_info`, `downloads`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
 | `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
 | `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |
-| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill`, `channel_exploration` |
+| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `metadata_import`, `manual_download`, `transcript_retry`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill`, `channel_exploration` |
 | `playlists/` | Import de playlists (`imports` : apercu, lecture du CSV, ajout d'une entree) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture et passage en Vu a 90 % (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`), fichiers ecrits a cote du transcript, discussion par video comprise (`documents`) |
@@ -237,8 +237,13 @@ reponse HTTP, lancer les taches de fond et rendre la page. Rien sous `app/web/` 
 ### `app/services/ingest/`
 
 - `scanner.py` : scan automatique des chaines suivies ;
-- `media_import.py` : import de metadonnees, telechargement manuel, relance du
-  transcript ;
+- `metadata_import.py` : import de metadonnees d'une video (fiche, miniature,
+  transcript, sans fichier media), appele par le scan, les imports de
+  playlist, l'exploration de chaine et le formulaire d'import ;
+- `manual_download.py` : telechargement manuel du media (video ou audio)
+  d'une video, fusionne dans la fiche existante s'il y en a une ;
+- `transcript_retry.py` : relance du telechargement des sous-titres d'une
+  fiche ;
 - `staging.py` : staged folders, merge de fichiers lorsqu'on ajoute audio ou
   video ;
 - `identity.py` : chaine d'une video, URL canonique ;

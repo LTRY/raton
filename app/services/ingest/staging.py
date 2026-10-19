@@ -28,6 +28,12 @@ def final_path(path: Path | None, staging: Path, final_folder: Path) -> Path | N
     return final_folder / path.relative_to(staging)
 
 
+def final_path_str(path: Path | None, staging: Path, final_folder: Path) -> str | None:
+    """`final_path` as the string a path column stores."""
+    final = final_path(path, staging, final_folder)
+    return str(final) if final else None
+
+
 def commit_video_with_files(db: Session, video: Video, staging: Path, final_folder: Path) -> None:
     moved = False
     try:
