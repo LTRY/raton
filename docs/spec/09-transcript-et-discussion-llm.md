@@ -176,6 +176,13 @@ en isolation.
     pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
     n'en portent pas (deux consignes imbriquées faisaient parfois écrire
     `## Notes` au lieu de `# Notes`) ;
+  - le transcript est toujours placé entre `<transcript>` et `</transcript>`
+    (`prompts.py:_transcript_block`), dans les prompts de notes, de résumé, de
+    génération, de notes automatiques et de chat par vidéo ; les consignes
+    précisent que son contenu est de la matière à analyser, jamais des
+    instructions. Un `</transcript>` présent dans le texte est neutralisé
+    (`</ transcript>`) pour ne pas fermer le bloc. Les titres de la réponse
+    restent en Markdown : seul le transcript en entrée est balisé ;
   - Notes (apres le résumé dans la réponse) : exactement 6 sections (`NOTES_SECTION_NAMES`) — `## Faits`,
     `## Dates`, `## Lieux`, `## Acteurs`, `## Concepts`, `## Relations
     causales` — chacune en puces, sans rien inventer ; une section sans
