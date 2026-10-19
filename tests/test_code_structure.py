@@ -108,11 +108,9 @@ def test_service_packages_form_a_dag():
 # down: a route reads the request, calls a service and renders; the service owns the business rule
 # and its commit (docs/spec/03-architecture.md). Lower a count when you move a write out.
 WEB_DB_WRITES_LEFT = {
-    "api/routes.py": 1,  # PUT /api/settings, twin of POST /settings
     "web/raton.py": 2,  # visit tracking of the home hero
     "web/routes/library_chat.py": 5,  # applying a library chat answer, clearing the chat
     "web/routes/media.py": 1,  # deleting one media file
-    "web/routes/settings.py": 1,  # saving the settings form
     "web/routes/transcript.py": 2,  # applying an LLM job result
 }
 DB_WRITE = re.compile(r"\bdb\.(add|add_all|commit|delete|flush|merge)\(|\.delete\(\)")

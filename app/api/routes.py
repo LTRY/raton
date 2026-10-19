@@ -16,26 +16,19 @@ from app.services.channels import manage as channel_manage
 from app.services.channels.manage import ChannelAlreadyInLibraryError
 from app.services.common.categories import (
     parse_video_category_label_styles,
-    serialize_video_category_label_styles,
-    serialize_video_category_labels,
 )
 from app.services.common.library_views import (
     parse_video_library_views,
-    serialize_video_library_views,
 )
 from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.common.settings import (
-    GLOBAL_QUOTA_BYTES_KEY,
-    MEDIA_ROOT_KEY,
-    VIDEO_CATEGORY_LABELS_KEY,
-    VIDEO_LIBRARY_VIEWS_KEY,
     get_global_quota_bytes,
     get_media_root,
     get_sponsor_skip_enabled,
     get_video_category_label_styles,
     get_video_category_labels,
     get_video_library_views,
-    set_setting,
+    save_settings,
 )
 from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.media.storage import get_total_used_bytes
@@ -155,33 +148,25 @@ def read_settings(db: Session = Depends(get_db)) -> SettingsRead:
 
 @router.put("/settings", response_model=SettingsRead)
 def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> SettingsRead:
-    if payload.media_root is not None:
-        set_setting(db, MEDIA_ROOT_KEY, str(Path(payload.media_root).expanduser()))
-    if payload.global_quota_bytes is not None:
-        set_setting(db, GLOBAL_QUOTA_BYTES_KEY, str(payload.global_quota_bytes))
-    if payload.video_category_labels is not None:
-        set_setting(
-            db,
-            VIDEO_CATEGORY_LABELS_KEY,
-            serialize_video_category_labels(payload.video_category_labels),
-        )
-    if payload.video_category_label_styles is not None:
-        set_setting(
-            db,
-            VIDEO_CATEGORY_LABELS_KEY,
-            serialize_video_category_label_styles(
-                parse_video_category_label_styles(json.dumps(payload.video_category_label_styles))
-            ),
-        )
-    if payload.video_library_views is not None:
-        set_setting(
-            db,
-            VIDEO_LIBRARY_VIEWS_KEY,
-            serialize_video_library_views(
-                parse_video_library_views(json.dumps(payload.video_library_views))
-            ),
-        )
-    db.commit()
+    label_styles = (
+        parse_video_category_label_styles(json.dumps(payload.video_category_label_styles))
+        if payload.video_category_label_styles is not None
+        else None
+    )
+    save_settings(
+        db,
+        media_root=str(Path(payload.media_root).expanduser())
+        if payload.media_root is not None
+        else None,
+        global_quota_bytes=payload.global_quota_bytes,
+        category_labels=payload.video_category_labels,
+        category_label_styles=label_styles,
+        library_views=(
+            parse_video_library_views(json.dumps(payload.video_library_views))
+            if payload.video_library_views is not None
+            else None
+        ),
+    )
     return read_settings(db)
 
 

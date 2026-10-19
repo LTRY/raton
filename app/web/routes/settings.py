@@ -13,27 +13,15 @@ from app.models.video import Video
 from app.services.common.categories import (
     parse_video_category_label_styles,
     parse_video_category_labels,
-    serialize_video_category_label_styles,
     serialize_video_category_labels,
 )
 from app.services.common.library_views import (
     parse_video_library_views,
-    serialize_video_library_views,
 )
 from app.services.common.settings import (
-    AUTO_NOTES_ENABLED_KEY,
-    AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
     DEFAULT_VIDEO_CATEGORY_LABELS,
-    GLOBAL_QUOTA_BYTES_KEY,
-    MEDIA_ROOT_KEY,
-    NO_PROGRESS_CATEGORY_LABELS_KEY,
-    SCREEN_TIME_LIMIT_KEYS,
-    SPONSOR_SEGMENT_CATEGORIES_KEY,
     SPONSOR_SEGMENT_CATEGORY_CHOICES,
     SPONSOR_SEGMENT_CATEGORY_LABELS,
-    SPONSOR_SKIP_ENABLED_KEY,
-    VIDEO_CATEGORY_LABELS_KEY,
-    VIDEO_LIBRARY_VIEWS_KEY,
     get_auto_notes_enabled,
     get_auto_notes_excluded_category_labels,
     get_global_quota_bytes,
@@ -46,7 +34,7 @@ from app.services.common.settings import (
     get_video_category_label_styles,
     get_video_category_labels,
     get_video_library_views,
-    set_setting,
+    save_settings,
 )
 from app.services.ingest import scan_events
 from app.services.ingest.scanner import scan_lock
@@ -142,23 +130,6 @@ def settings_form(
     auto_notes_enabled: str = Form(default=""),
     auto_notes_excluded_categories: list[str] = Form(default=[]),
 ):
-    set_setting(db, MEDIA_ROOT_KEY, media_root)
-    set_setting(db, GLOBAL_QUOTA_BYTES_KEY, str(int(quota_gb * 1024 * 1024 * 1024)))
-    selected_sponsor_categories = set(form_list_values(sponsor_segment_categories))
-    set_setting(
-        db,
-        SPONSOR_SEGMENT_CATEGORIES_KEY,
-        ",".join(
-            category
-            for category in SPONSOR_SEGMENT_CATEGORY_CHOICES
-            if category in selected_sponsor_categories
-        ),
-    )
-    # Une case décochée n'est pas envoyée par le navigateur : l'absence de valeur
-    # vaut donc "false", d'où le default="" sur le paramètre.
-    set_setting(
-        db, SPONSOR_SKIP_ENABLED_KEY, "true" if form_text_value(sponsor_skip_enabled) else "false"
-    )
     styles_value = form_text_value(video_category_styles)
     if styles_value:
         label_styles = parse_video_category_label_styles(styles_value)
@@ -167,38 +138,25 @@ def settings_form(
         label_styles = parse_video_category_label_styles(
             serialize_video_category_labels(labels or DEFAULT_VIDEO_CATEGORY_LABELS)
         )
-    set_setting(db, VIDEO_CATEGORY_LABELS_KEY, serialize_video_category_label_styles(label_styles))
-    library_views_value = form_text_value(video_library_views)
-    set_setting(
+    save_settings(
         db,
-        VIDEO_LIBRARY_VIEWS_KEY,
-        serialize_video_library_views(parse_video_library_views(library_views_value)),
+        media_root=media_root,
+        global_quota_bytes=int(quota_gb * 1024 * 1024 * 1024),
+        category_label_styles=label_styles,
+        library_views=parse_video_library_views(form_text_value(video_library_views)),
+        no_progress_category_labels=form_list_values(no_progress_categories),
+        # Unchecked checkbox: the browser sends nothing, so an empty value means "off".
+        auto_notes_enabled=bool(form_text_value(auto_notes_enabled)),
+        auto_notes_excluded_category_labels=form_list_values(auto_notes_excluded_categories),
+        sponsor_segment_categories=form_list_values(sponsor_segment_categories),
+        sponsor_skip_enabled=bool(form_text_value(sponsor_skip_enabled)),
+        screen_time_today_minutes={
+            "video": screen_time_video_today,
+            "short": screen_time_short_today,
+            "podcast": screen_time_podcast_today,
+            "music": screen_time_music_today,
+        },
     )
-    set_setting(
-        db,
-        NO_PROGRESS_CATEGORY_LABELS_KEY,
-        serialize_video_category_labels(form_list_values(no_progress_categories)),
-    )
-    # Unchecked checkbox: the browser sends nothing, so an empty value means "off".
-    set_setting(
-        db, AUTO_NOTES_ENABLED_KEY, "true" if form_text_value(auto_notes_enabled) else "false"
-    )
-    set_setting(
-        db,
-        AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
-        serialize_video_category_labels(form_list_values(auto_notes_excluded_categories)),
-    )
-    submitted_limits = {
-        "video": screen_time_video_today,
-        "short": screen_time_short_today,
-        "podcast": screen_time_podcast_today,
-        "music": screen_time_music_today,
-    }
-    current_limits = get_screen_time_limits(db)
-    for kind, value in submitted_limits.items():
-        normalized_value = value if isinstance(value, int) else current_limits[kind]["today"]
-        set_setting(db, SCREEN_TIME_LIMIT_KEYS[kind], str(max(1, normalized_value)))
-    db.commit()
     return redirect("/settings")
 
 

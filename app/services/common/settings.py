@@ -12,6 +12,7 @@ from app.services.common.categories import (
     parse_video_category_label_styles,
     parse_video_category_labels,
     serialize_video_category_label_styles,
+    serialize_video_category_labels,
 )
 from app.services.common.library_views import (
     DEFAULT_VIDEO_LIBRARY_VIEWS,
@@ -220,4 +221,73 @@ def ensure_default_settings(db: Session) -> None:
     for key, value in defaults.items():
         if db.get(AppSetting, key) is None:
             db.add(AppSetting(key=key, value=value))
+    db.commit()
+
+
+def save_settings(
+    db: Session,
+    *,
+    media_root: str | None = None,
+    global_quota_bytes: int | None = None,
+    category_labels: list[str] | None = None,
+    category_label_styles: list[dict] | None = None,
+    library_views: list[dict] | None = None,
+    no_progress_category_labels: list[str] | None = None,
+    auto_notes_enabled: bool | None = None,
+    auto_notes_excluded_category_labels: list[str] | None = None,
+    sponsor_segment_categories: list[str] | None = None,
+    sponsor_skip_enabled: bool | None = None,
+    screen_time_today_minutes: dict[str, int | None] | None = None,
+) -> None:
+    """Store the given settings, leave the others as they are, and commit.
+
+    Shared by the /settings form and `PUT /api/settings`. `category_labels` stores bare labels
+    (colours assigned when read); `category_label_styles`, applied after it, stores labels with their
+    colours. A screen-time limit given as None keeps its current value; every limit is at least one
+    minute.
+    """
+    if media_root is not None:
+        set_setting(db, MEDIA_ROOT_KEY, media_root)
+    if global_quota_bytes is not None:
+        set_setting(db, GLOBAL_QUOTA_BYTES_KEY, str(global_quota_bytes))
+    if category_labels is not None:
+        set_setting(db, VIDEO_CATEGORY_LABELS_KEY, serialize_video_category_labels(category_labels))
+    if category_label_styles is not None:
+        set_setting(
+            db,
+            VIDEO_CATEGORY_LABELS_KEY,
+            serialize_video_category_label_styles(category_label_styles),
+        )
+    if library_views is not None:
+        set_setting(db, VIDEO_LIBRARY_VIEWS_KEY, serialize_video_library_views(library_views))
+    if no_progress_category_labels is not None:
+        set_setting(
+            db,
+            NO_PROGRESS_CATEGORY_LABELS_KEY,
+            serialize_video_category_labels(no_progress_category_labels),
+        )
+    if auto_notes_enabled is not None:
+        set_setting(db, AUTO_NOTES_ENABLED_KEY, "true" if auto_notes_enabled else "false")
+    if auto_notes_excluded_category_labels is not None:
+        set_setting(
+            db,
+            AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
+            serialize_video_category_labels(auto_notes_excluded_category_labels),
+        )
+    if sponsor_segment_categories is not None:
+        selected = set(sponsor_segment_categories)
+        set_setting(
+            db,
+            SPONSOR_SEGMENT_CATEGORIES_KEY,
+            ",".join(
+                category for category in SPONSOR_SEGMENT_CATEGORY_CHOICES if category in selected
+            ),
+        )
+    if sponsor_skip_enabled is not None:
+        set_setting(db, SPONSOR_SKIP_ENABLED_KEY, "true" if sponsor_skip_enabled else "false")
+    if screen_time_today_minutes is not None:
+        current_limits = get_screen_time_limits(db)
+        for kind, value in screen_time_today_minutes.items():
+            minutes = value if isinstance(value, int) else current_limits[kind]["today"]
+            set_setting(db, SCREEN_TIME_LIMIT_KEYS[kind], str(max(1, minutes)))
     db.commit()
