@@ -218,7 +218,10 @@ scheduler ou par `POST /settings/scan` (voir
   YouTube quelle que soit l'URL donnee (meme regle que le formulaire de `/channels`)
 - `POST /api/channels/{id}/rating?rating=0..5`
 - `DELETE /api/channels/{id}` : supprime aussi le dossier de profil de la chaine
-- `GET /api/videos`
+- `GET /api/videos?channel_id=<id>&page=N` : fiches les plus recemment
+  importees d'abord, 50 par page (meme taille et meme requete SQL que la
+  liste `/videos`). Repond `{items: [...], page, total_pages, total}` ; une
+  `page` au-dela de la derniere renvoie la derniere, `page=0` donne `422`.
 - `POST /api/videos/{id}/rating?rating=0..5`
 - `GET /api/videos/{id}/sponsor-segments` : segments a sauter pour cette video,
   au service du mini-lecteur persistant (qui se lance depuis n'importe quelle
@@ -228,13 +231,20 @@ scheduler ou par `POST /settings/scan` (voir
   activees et la meme normalisation (tri/fusion/rejet des segments < 1 s) que
   la page detail — voir [05 Modele de donnees](05-modele-de-donnees.md) et
   [08 Medias et lecteurs](08-medias-et-lecteurs.md).
-- `GET /api/stats`
+- `GET /api/stats` : `{channels, videos, used_bytes, quota_bytes}`, memes
+  compteurs que la page `/settings`.
 - `GET /api/stats/charts` : memes donnees que la page `/stats` (stockage et
   fiches par chaine, par format, par mois) — voir
   [11 Interface HTML](11-interface-html.md).
 - `GET /api/settings`
 - `PUT /api/settings`
-- `GET /api/errors`
+- `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`
+  (tous statuts), la plus recente d'abord.
+
+Les messages d'erreur de `/api` (champ `detail`) sont en francais, comme
+ceux des pages HTML : une erreur levee par un service renvoie son propre
+message (`Chaîne introuvable pour …`, `… est déjà dans la bibliothèque.`),
+un identifiant inconnu donne `Chaîne introuvable` ou `Vidéo introuvable`.
 
 ## Redirections
 

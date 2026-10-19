@@ -64,7 +64,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
 | `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
-| `job_log` | Une ligne du journal des jobs (`log_job`) et les statuts après lesquels un job ne change plus |
+| `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/errors`) et les statuts après lesquels un job ne change plus |
 
 ### `youtube/`
 
@@ -133,13 +133,13 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | Module | Responsabilité |
 |---|---|
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
-| `library_query` | Liste paginée de `/videos` et de la page d'une chaîne, calculée en SQL |
+| `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
 | `documents` | Fichiers écrits à côté du transcript : notes, résumés, questions, discussion par vidéo |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
-| `stats` | Compteurs de la bibliothèque pour `/settings` |
+| `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` |
 
 ### `raton/`
