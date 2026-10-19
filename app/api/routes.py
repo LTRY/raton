@@ -36,8 +36,8 @@ from app.services.settings import (
     serialize_video_library_views,
     set_setting,
 )
+from app.services.youtube.channel_info import ChannelNotFoundError, extract_channel_info
 from app.services.youtube.sponsor_segments import normalize_skip_segments
-from app.services.youtube.yt import ChannelNotFoundError, extract_channel_info
 
 router = APIRouter(prefix="/api")
 

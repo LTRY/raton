@@ -22,7 +22,7 @@ from app.models.video import Video
 from app.services.channels.lookup import find_channel
 from app.services.rag import retrieval as rag_retrieval
 from app.services.search import channel_search_rank, fold_search_text, video_search_rank
-from app.services.youtube import yt
+from app.services.youtube import channel_info
 from app.web.playback import dashboard_media_activity_logs, local_datetime, playback_activity_view
 
 # Each tool turn is a full extra API call, so this bounds both the latency and
@@ -448,7 +448,7 @@ class LibraryChatToolbox:
         query = str(arguments.get("requete") or "").strip()
         if not query:
             return "Précise une requête."
-        results = yt.search_channels(query)
+        results = channel_info.search_channels(query)
         if not results:
             self._summary = "Aucune chaîne trouvée sur YouTube."
             return f"Aucune chaîne YouTube ne correspond à « {query} »."

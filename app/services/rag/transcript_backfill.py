@@ -19,7 +19,7 @@ from app.services.channels.media_import import retry_transcript_download
 from app.services.channels.throttle import pause_between_imports
 from app.services.job_log import log_job
 from app.services.settings import get_setting, set_setting
-from app.services.youtube.yt import choose_subtitle_track
+from app.services.youtube.downloads import choose_subtitle_track
 
 logger = logging.getLogger(__name__)
 

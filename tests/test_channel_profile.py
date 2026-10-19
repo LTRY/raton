@@ -15,7 +15,7 @@ from app.models.setting import AppSetting
 from app.services import background_jobs
 from app.services import scheduler as scheduler_module
 from app.services.channels import profile as channel_profile
-from app.services.youtube import yt
+from app.services.youtube import channel_info
 
 
 def make_session():
@@ -73,9 +73,9 @@ PROFILE_INFO = {
 
 def test_fetch_channel_profile_picks_uncropped_images_and_cleans_text(monkeypatch):
     FakeYoutubeDL.info = PROFILE_INFO
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    profile = yt.fetch_channel_profile("https://www.youtube.com/@x")
+    profile = channel_info.fetch_channel_profile("https://www.youtube.com/@x")
 
     assert profile == {
         "description": "High-intensity code tutorials.",
@@ -87,9 +87,9 @@ def test_fetch_channel_profile_picks_uncropped_images_and_cleans_text(monkeypatc
 
 def test_fetch_channel_profile_tolerates_missing_fields(monkeypatch):
     FakeYoutubeDL.info = {"thumbnails": None}
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    assert yt.fetch_channel_profile("https://www.youtube.com/@x") == {
+    assert channel_info.fetch_channel_profile("https://www.youtube.com/@x") == {
         "description": None,
         "keywords": [],
         "avatar_url": None,
@@ -119,7 +119,9 @@ def test_refresh_channel_profile_stores_text_and_images(monkeypatch, tmp_path):
     channel = Channel(url="https://example.test/c", name="C", yt_channel_id="UC1")
     db.add(channel)
     db.commit()
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile())
+    monkeypatch.setattr(
+        channel_profile.channel_info, "fetch_channel_profile", lambda url: fake_profile()
+    )
     monkeypatch.setattr(
         channel_profile,
         "fetch_image_bytes",
@@ -144,7 +146,9 @@ def test_refresh_keeps_the_rest_when_one_image_fails(monkeypatch, tmp_path):
     channel = Channel(url="https://example.test/c", name="C", yt_channel_id="UC1")
     db.add(channel)
     db.commit()
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile())
+    monkeypatch.setattr(
+        channel_profile.channel_info, "fetch_channel_profile", lambda url: fake_profile()
+    )
 
     def flaky(url):
         if url.endswith(".png"):
@@ -170,7 +174,7 @@ def test_refresh_leaves_the_channel_pending_when_yt_dlp_fails(monkeypatch, tmp_p
     def fail(url):
         raise RuntimeError("offline")
 
-    monkeypatch.setattr(channel_profile.yt, "fetch_channel_profile", fail)
+    monkeypatch.setattr(channel_profile.channel_info, "fetch_channel_profile", fail)
 
     assert channel_profile.refresh_channel_profile(db, channel) is False
     assert channel.metadata_fetched_at is None
@@ -186,7 +190,9 @@ def test_refresh_replaces_an_image_whose_extension_changed(monkeypatch, tmp_path
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"old")
     monkeypatch.setattr(
-        channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile(banner_url=None)
+        channel_profile.channel_info,
+        "fetch_channel_profile",
+        lambda url: fake_profile(banner_url=None),
     )
     monkeypatch.setattr(channel_profile, "fetch_image_bytes", lambda url: (b"new", "image/jpeg"))
 
@@ -465,7 +471,9 @@ def test_images_are_written_and_served_through_the_dev_pc_prefix_translation(mon
         ),
     )
     monkeypatch.setattr(
-        channel_profile.yt, "fetch_channel_profile", lambda url: fake_profile(banner_url=None)
+        channel_profile.channel_info,
+        "fetch_channel_profile",
+        lambda url: fake_profile(banner_url=None),
     )
     monkeypatch.setattr(
         channel_profile, "fetch_image_bytes", lambda url: (b"jpg-bytes", "image/jpeg")

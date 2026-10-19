@@ -464,7 +464,7 @@ executes par `LibraryChatToolbox`) :
   enregistre, sans reference. 30 resultats au plus ; 500 lectures lues au
   plus avant regroupement ;
 - `chercher_sur_youtube(requete)` : cherche sur YouTube des chaines par nom
-  (`app/services/youtube/yt.py:search_channels`, voir
+  (`app/services/youtube/channel_info.py:search_channels`, voir
   [07 YouTube et telechargements](07-youtube-et-telechargements.md)). Chaque
   candidate est renvoyee avec un identifiant `[youtube:ID]`, son handle, son
   nombre d'abonnes et le debut de sa description ; celles deja dans la

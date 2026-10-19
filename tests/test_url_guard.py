@@ -4,7 +4,7 @@ import urllib.request
 import pytest
 
 from app.services.channels import profile as channel_profile
-from app.services.youtube import yt
+from app.services.youtube import channel_info
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
 
@@ -51,8 +51,8 @@ def test_unresolvable_host_is_left_to_the_fetcher(monkeypatch):
 
 
 def test_channel_url_to_a_private_host_is_not_resolved():
-    with pytest.raises(yt.ChannelNotFoundError):
-        yt.resolve_channel_url("http://192.168.1.1/@x")
+    with pytest.raises(channel_info.ChannelNotFoundError):
+        channel_info.resolve_channel_url("http://192.168.1.1/@x")
 
 
 def test_image_fetch_refuses_a_private_url():

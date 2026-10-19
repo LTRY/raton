@@ -19,11 +19,8 @@ from app.services.channels.throttle import (
 )
 from app.services.job_log import log_job
 from app.services.media.storage import has_auto_download_headroom
-from app.services.youtube.yt import (
-    is_not_yet_available_error,
-    is_rate_limit_error,
-    list_channel_entries,
-)
+from app.services.youtube.channel_info import list_channel_entries
+from app.services.youtube.yt import is_not_yet_available_error, is_rate_limit_error
 
 scan_lock = threading.Lock()
 

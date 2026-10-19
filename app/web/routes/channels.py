@@ -39,7 +39,7 @@ from app.services.settings import (
     get_media_root,
     get_video_category_label_styles,
 )
-from app.services.youtube.yt import (
+from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     extract_channel_info,
     is_channel_reference,

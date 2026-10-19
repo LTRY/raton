@@ -15,7 +15,8 @@ from app.models.video import TranscriptStatus, Video
 from app.services.channels import media_import, scan_events, scanner, throttle
 from app.services.channels.identity import video_already_downloaded
 from app.services.channels.scanner import run_scan, scan_channel
-from app.services.youtube.yt import build_video_folder, parse_yt_date
+from app.services.youtube.downloads import build_video_folder
+from app.services.youtube.yt import parse_yt_date
 
 
 def make_session():

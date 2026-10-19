@@ -14,7 +14,7 @@ from app.models.channel import Channel
 from app.services.files import sanitize_filename
 from app.services.job_log import log_job
 from app.services.settings import get_media_root
-from app.services.youtube import yt
+from app.services.youtube import channel_info
 from app.services.youtube.url_guard import ensure_public_http_url
 
 CHANNELS_DIRNAME = "_channels"
@@ -98,7 +98,7 @@ def refresh_channel_profile(db: Session, channel: Channel) -> bool:
     if not channel.yt_channel_id:
         return False
     try:
-        profile = yt.fetch_channel_profile(channel.url)
+        profile = channel_info.fetch_channel_profile(channel.url)
     except Exception as exc:
         log_job(
             db,

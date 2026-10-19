@@ -12,8 +12,8 @@ def fetch_sponsorblock_segments(yt_video_id: str, categories: list[str]) -> list
     Returns [] for "no data yet" (SponsorBlock answers 404 for an unknown
     video) as well as for an empty categories list — both are "nothing to
     show", not errors. Any other HTTP/network failure raises, left to the
-    caller to catch (mirrors download_subtitles's own try/except at the call
-    site, app/services/youtube/yt.py:288-291) — a SponsorBlock outage must never
+    caller to catch (mirrors the try/except around download_subtitles at its
+    call sites) — a SponsorBlock outage must never
     break a download or a scan.
     """
     if not categories:

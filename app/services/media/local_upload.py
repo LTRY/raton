@@ -21,8 +21,8 @@ from app.models.video import TranscriptStatus, Video
 from app.services.files import move_directory, sanitize_filename, unique_sibling_path
 from app.services.media.thumbnails import ensure_video_thumbnails
 from app.services.settings import get_media_root
+from app.services.youtube.downloads import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 from app.services.youtube.view_counts import parse_duration_seconds
-from app.services.youtube.yt import AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 
 LOCAL_CHANNEL_URL = "local://files"
 LOCAL_CHANNEL_NAME = "Fichiers locaux"

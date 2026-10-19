@@ -18,7 +18,7 @@ from app.services.llm.provider import CompletionResult
 from app.services.rag import retrieval as rag_retrieval
 from app.services.rag.library_chat_tools import LibraryChatToolbox
 from app.services.rag.retrieval import RetrievedChunk
-from app.services.youtube import yt
+from app.services.youtube import channel_info
 from app.web.routes import library_chat as library_chat_routes
 
 
@@ -400,7 +400,7 @@ def youtube_candidates(*candidates):
 def test_library_chat_adds_a_channel_found_on_youtube(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(
             ("UCleo", "Léo Duff", "@LeoDuff", 822000), ("UCother", "Leo Duff", "@LeFohShow", 341)
@@ -439,7 +439,7 @@ def test_library_chat_adds_a_channel_found_on_youtube(monkeypatch):
 def test_library_chat_cannot_add_a_channel_youtube_did_not_return(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -460,7 +460,7 @@ def test_library_chat_does_not_duplicate_a_channel_already_in_the_library(monkey
     db.add(known)
     db.commit()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -478,7 +478,7 @@ def test_library_chat_does_not_duplicate_a_channel_already_in_the_library(monkey
 def test_library_chat_backfills_profiles_once_after_the_job_is_done(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -503,7 +503,7 @@ def test_library_chat_backfills_profiles_once_after_the_job_is_done(monkeypatch)
     db.commit()
     provider.tool_outputs.clear()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -532,7 +532,7 @@ def test_library_chat_does_not_backfill_when_no_channel_was_added(monkeypatch):
 def test_a_failing_post_chat_backfill_does_not_propagate(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )

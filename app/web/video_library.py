@@ -5,7 +5,7 @@ from sqlalchemy import String, and_, func, literal, or_, true
 
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.youtube.yt import normalized_channel_section
+from app.services.youtube.channel_info import normalized_channel_section
 from app.web.formatting import format_duration
 from app.web.shared import (
     normalize_category_label,

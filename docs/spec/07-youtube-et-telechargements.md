@@ -11,14 +11,14 @@ Pour ajouter une chaine :
 - extraire `channel`, `uploader`, `title` ou l'URL comme nom ;
 - extraire `channel_id`, `uploader_id` ou `id` comme identifiant.
 
-`app/services/youtube/yt.py:extract_channel_info` n'accepte qu'une reference a une
+`app/services/youtube/channel_info.py:extract_channel_info` n'accepte qu'une reference a une
 chaine precise : URL, `@handle`, ou mot seul traite comme un handle. Un nom
 libre (avec espaces) leve `ChannelNotFoundError` : il n'est jamais resolu en
 devinant, il passe par la recherche ci-dessous.
 
 ## Profil de chaine
 
-`app/services/youtube/yt.py:fetch_channel_profile(channel_url)` refait la meme
+`app/services/youtube/channel_info.py:fetch_channel_profile(channel_url)` refait la meme
 extraction plate (`extract_flat`, `skip_download`) que l'ajout et en tire
 `description`, `keywords` (les `tags` de yt-dlp, vides ecartes) et les URL
 d'image : les entrees `avatar_uncropped` et `banner_uncropped` de
@@ -41,7 +41,7 @@ relatif.
 
 ## Recherche de chaine
 
-`app/services/youtube/yt.py:search_channels(query, limit=8)` cherche des chaines par
+`app/services/youtube/channel_info.py:search_channels(query, limit=8)` cherche des chaines par
 nom, sans cle d'API : `yt-dlp` (`extract_flat`) lit la page de resultats
 YouTube `results?search_query=...` avec le filtre "Type : chaine"
 (`sp=EgIQAg%3D%3D`). Les candidates sont renvoyees dans l'ordre de pertinence

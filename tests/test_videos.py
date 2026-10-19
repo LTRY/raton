@@ -28,8 +28,8 @@ from app.services.channels.identity import channel_values_from_info
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.scheduler import record_scan_result
 from app.services.settings import get_sponsor_skip_enabled
-from app.services.youtube import yt as yt_service
-from app.services.youtube.yt import ChannelNotFoundError, resolve_channel_url
+from app.services.youtube import channel_info
+from app.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
 from app.web import formatting, playback, shared, video_library
 from app.web.routes import channels as channels_routes
 from app.web.routes import dashboard as dashboard_routes
@@ -5530,9 +5530,9 @@ def test_search_channels_reads_the_channel_filtered_youtube_search(monkeypatch):
                 ]
             }
 
-    monkeypatch.setattr(yt_service, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    results = yt_service.search_channels("Léo Duff", limit=5)
+    results = channel_info.search_channels("Léo Duff", limit=5)
 
     assert (
         requested["url"]
@@ -5559,7 +5559,7 @@ def test_search_channels_reads_the_channel_filtered_youtube_search(monkeypatch):
             "thumbnail_url": None,
         },
     ]
-    assert yt_service.search_channels("   ") == []
+    assert channel_info.search_channels("   ") == []
 
 
 def test_channel_handle_resolves_to_exact_handle_url():

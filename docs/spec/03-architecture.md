@@ -186,17 +186,14 @@ Les dépendances entre paquets vont dans un seul sens :
 `tests/test_code_structure.py` fait respecter ces règles. Les données de démo
 (`demo_seed`) ne sont pas un service : elles sont dans `scripts/demo_seed.py`.
 
-### `app/services/youtube/yt.py`
+### `app/services/youtube/`
 
-Responsable de :
-
-- extraction chaine ;
-- comptage/listing videos de chaine ;
-- extraction metadata video ;
-- telechargement audio/video ;
-- telechargement sous-titres ;
-- detection des fichiers telecharges ;
-- ecriture metadata et transcript.
+- `yt.py` : appel yt-dlp journalise (`_ytdlp_call`), detection des erreurs
+  429 et des premieres pas encore disponibles, extraction metadata video ;
+- `channel_info.py` : resolution et recherche de chaine, profil, comptage et
+  listing des videos d'une chaine ;
+- `downloads.py` : telechargement audio/video, sous-titres et miniature,
+  detection des fichiers telecharges, ecriture metadata et transcript.
 
 ### `app/services/channels/scanner.py`
 
