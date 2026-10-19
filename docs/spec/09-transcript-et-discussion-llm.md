@@ -456,7 +456,7 @@ executes par `LibraryChatToolbox`) :
 - `consulter_historique(jours, requete)` : historique de lecture (les
   `download_jobs` `played`, voir [11 Interface HTML](11-interface-html.md)),
   du plus recent au plus ancien, **une ligne par video** comme la page
-  d'historique (`app/web/playback.py:dashboard_media_activity_logs`). `jours`
+  d'historique (`app/services/videos/playback.py:dashboard_media_activity_logs`). `jours`
   (30 par defaut) borne la fenetre, `requete` filtre sur le titre ou la
   chaine. Chaque ligne donne la reference de la video et de sa chaine, la date
   et l'heure de lecture, la position (ou « terminee »), la duree et le temps

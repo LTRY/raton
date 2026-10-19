@@ -49,7 +49,8 @@ SERVICE_PACKAGE_DEPENDENCIES = {
     "media": {"youtube"},
     "channels": {"media", "youtube"},
     "playlists": {"channels", "youtube"},
-    "rag": {"channels", "llm", "youtube"},
+    "videos": {"media"},
+    "rag": {"channels", "llm", "videos", "youtube"},
 }
 SERVICE_ORCHESTRATION_MODULES = {"background_jobs", "scheduler"}
 
@@ -59,6 +60,17 @@ def service_package(module: str) -> str | None:
     if parts[:2] != ["app", "services"] or len(parts) < 3:
         return None
     return parts[2] if parts[2] in SERVICE_PACKAGE_DEPENDENCIES else None
+
+
+def test_services_import_no_web_module():
+    # The web layer calls the services, never the reverse: a service is also called by /api and jobs.
+    offenders = sorted(
+        f"{path.relative_to(APP)}: {module}"
+        for path in (APP / "services").rglob("*.py")
+        for module in imported_modules(path)
+        if module == "app.web" or module.startswith("app.web.")
+    )
+    assert not offenders, f"services import the web layer: {offenders}"
 
 
 def test_service_packages_form_a_dag():

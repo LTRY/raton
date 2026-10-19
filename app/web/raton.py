@@ -20,14 +20,14 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.channels.lookup import followed_video_condition
 from app.services.settings import (
     SCREEN_TIME_KINDS,
     get_screen_time_limits,
     get_setting,
     set_setting,
 )
-from app.web.playback import playback_time_stats
+from app.services.videos.filters import followed_video_condition
+from app.services.videos.playback import playback_time_stats
 
 RATON_LAST_SEEN_KEY = "raton_last_seen_at"
 RATON_SESSION_PREVIOUS_KEY = "raton_session_previous_visit_at"

@@ -29,9 +29,11 @@ from app.services.channels.identity import channel_values_from_info
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.scheduler import record_scan_result
 from app.services.settings import get_sponsor_skip_enabled
+from app.services.videos import list_state as videos_list_state
+from app.services.videos import playback as videos_playback
 from app.services.youtube import channel_info
 from app.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
-from app.web import formatting, playback, shared, video_library
+from app.web import formatting, playback, shared
 from app.web.routes import channels as channels_routes
 from app.web.routes import dashboard as dashboard_routes
 from app.web.routes import media as media_routes
@@ -3702,7 +3704,7 @@ def test_content_views_only_link_to_raton_pages():
                 )
             ]
         ),
-        playback_time_stats=playback.empty_playback_stats(),
+        playback_time_stats=videos_playback.empty_playback_stats(),
         category_style_map={},
         chat_widget_config={
             "defaultScope": "library",
@@ -3759,7 +3761,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
         job.created_at = base + timedelta(minutes=offset)
         db.commit()
 
-    positions = playback.latest_playback_positions(db, video.id)
+    positions = videos_playback.latest_playback_positions(db, video.id)
 
     assert positions["video"] == {
         "position_seconds": 252.5,
@@ -3802,7 +3804,7 @@ def test_video_detail_omits_server_resume_position_without_playback():
 
     rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
 
-    assert playback.latest_playback_positions(db, video.id) == {}
+    assert videos_playback.latest_playback_positions(db, video.id) == {}
     assert "data-resume-server-position" not in rendered
 
 
@@ -4228,7 +4230,7 @@ def test_history_day_groups_carries_reading_time_counting_every_playback():
 
     # Two playbacks of the same video today: the list keeps one row, the time keeps both.
     jobs = [played_job(now - timedelta(hours=1), 600), played_job(now - timedelta(hours=2), 300)]
-    seconds_by_day = playback.playback_seconds_by_day(jobs, now)
+    seconds_by_day = videos_playback.playback_seconds_by_day(jobs, now)
 
     groups = playback.history_day_groups(jobs[:1], now, seconds_by_day)
 
@@ -4752,7 +4754,7 @@ def test_playback_time_stats_groups_today_week_and_month_by_media_kind():
     db.add_all([podcast, short, music, old_music, *jobs])
     db.commit()
 
-    stats = playback.playback_time_stats(jobs, now)
+    stats = videos_playback.playback_time_stats(jobs, now)
 
     assert stats["today"]["video"]["duration"] == "2m30"
     assert stats["today"]["video"]["count"] == 1
@@ -4877,8 +4879,8 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
     )
     db.commit()
 
-    all_logs = playback.dashboard_media_activity_logs(db)
-    limited_logs = playback.dashboard_media_activity_logs(db, limit=0)
+    all_logs = videos_playback.dashboard_media_activity_logs(db)
+    limited_logs = videos_playback.dashboard_media_activity_logs(db, limit=0)
 
     assert len(all_logs) == 1
     assert "0:11" in all_logs[0].message
@@ -6193,9 +6195,9 @@ def test_video_list_state_follows_playback_when_unset():
         folder_path="/media/ls-auto",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, False) == "watched"
-    assert video_library.video_list_state(video, {"is_completed": False}, False) == "normal"
-    assert video_library.video_list_state(video, None, False) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "watched"
+    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "normal"
+    assert videos_list_state.video_list_state(video, None, False) == "normal"
 
 
 def test_video_list_state_ignores_playback_for_replay_categories():
@@ -6206,7 +6208,7 @@ def test_video_list_state_ignores_playback_for_replay_categories():
         folder_path="/media/ls-replay",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, True) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, True) == "normal"
 
 
 def test_video_list_state_honours_manual_watched_even_on_replay_category():
@@ -6218,7 +6220,7 @@ def test_video_list_state_honours_manual_watched_even_on_replay_category():
         list_state="watched",
     )
 
-    assert video_library.video_list_state(video, None, True) == "watched"
+    assert videos_list_state.video_list_state(video, None, True) == "watched"
 
 
 def test_video_list_state_unwatched_cancels_completed_playback():
@@ -6230,7 +6232,7 @@ def test_video_list_state_unwatched_cancels_completed_playback():
         list_state="unwatched",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": True}, False) == "normal"
+    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "normal"
 
 
 def test_video_list_state_hidden_wins_over_playback():
@@ -6242,7 +6244,7 @@ def test_video_list_state_hidden_wins_over_playback():
         list_state="hidden",
     )
 
-    assert video_library.video_list_state(video, {"is_completed": False}, False) == "hidden"
+    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "hidden"
 
 
 def test_set_video_list_state_persists_each_value():
@@ -6392,10 +6394,10 @@ def test_video_card_renders_list_state_buttons():
 
 
 def test_video_auto_list_state_reflects_playback_only():
-    assert video_library.video_auto_list_state({"is_completed": True}, False) == "watched"
-    assert video_library.video_auto_list_state({"is_completed": True}, True) == "normal"
-    assert video_library.video_auto_list_state({"is_completed": False}, False) == "normal"
-    assert video_library.video_auto_list_state(None, False) == "normal"
+    assert videos_list_state.video_auto_list_state({"is_completed": True}, False) == "watched"
+    assert videos_list_state.video_auto_list_state({"is_completed": True}, True) == "normal"
+    assert videos_list_state.video_auto_list_state({"is_completed": False}, False) == "normal"
+    assert videos_list_state.video_auto_list_state(None, False) == "normal"
 
 
 def test_video_card_exposes_auto_list_state_for_unhiding():

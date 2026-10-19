@@ -17,9 +17,9 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.video import Video
+from app.services.videos.filters import video_filters_condition, video_matches_filters
 from app.services.youtube.view_counts import backfill_view_counts
 from app.web.shared import LIBRARY_PAGE_SIZE
-from app.web.video_library import video_filters_condition, video_matches_filters
 
 
 @pytest.fixture

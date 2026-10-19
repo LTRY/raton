@@ -85,23 +85,25 @@ modules ci-dessous l'importent, jamais l'inverse.
 
 ### `app/web/formatting.py`
 
-Formatage pour l'affichage : durees, tailles de stockage et de fichier,
+Formatage pour l'affichage : durees longues, tailles de stockage et de fichier,
 nombre de vues, periodicite de publication d'une chaine. Enregistre les
-globals Jinja de formatage.
+globals Jinja de formatage. Les durees `m:ss` et leur lecture
+(`format_duration`, `format_compact_duration`, `parse_duration_label`) sont
+dans `app/services/durations.py`, car le service de lecture les utilise.
 
 ### `app/web/playback.py`
 
-Activite de lecture : vue d'un job `played`/`prompt`
-(`playback_activity_view`), dernieres positions de lecture, statistiques de
-temps d'ecran, regroupement de l'historique par jour, journal d'activite du
-tableau de bord.
+Affichage de l'activite de lecture : couleur et pourcentage des anneaux de
+temps d'ecran (`playback_time_dashboard`), regroupement de l'historique par
+jour (`history_day_groups`). Le calcul est dans `app/services/videos/playback.py`.
 
 ### `app/web/video_library.py`
 
-Helpers de la bibliotheque video : lecture des filtres/tri/recherche depuis
-la requete, correspondance d'une video ou d'une chaine avec ces filtres, etat
-de liste Vu/Ecartee (`video_list_state`), vues sauvegardees, pastilles de
-filtres actifs, construction d'une carte video (`downloaded_video_card`).
+Helpers HTTP de la bibliotheque video : lecture des filtres/tri/recherche
+depuis la requete, liens des vues sauvegardees, pastilles de filtres actifs,
+construction d'une carte video (`downloaded_video_card`), mosaique des shorts.
+Les filtres eux-memes (en Python et en SQL) et l'etat de liste Vu/Ecartee sont
+dans `app/services/videos/`.
 
 ### `app/web/routes/dashboard.py`
 
@@ -172,18 +174,20 @@ Les services sont rangés en six paquets, un par sujet :
 | `channels/` | Chaînes et scan : `scanner`, `media_import`, `staging`, `identity`, `throttle`, `manage`, `scan_events`, `lookup`, `profile`, `subscriptions` |
 | `playlists/` | Import de playlists : `imports` |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
+| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`) |
 | `rag/` | Notes, recherche et chat bibliothèque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes`, `transcript_backfill` |
 
 À la racine de `app/services/` restent : les modules d'orchestration
 `background_jobs` et `scheduler`, et les modules transverses `settings`,
-`settings_format`, `ratings`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
+`settings_format`, `ratings`, `durations`, `search`, `files`, `job_log`, `logs_digest` et `library_charts`.
 
 Les dépendances entre paquets vont dans un seul sens :
 `youtube` et `llm` ne dépendent d'aucun autre paquet, `media` dépend de
 `youtube`, `channels` de `media` et `youtube`, `playlists` de `channels` et
-`youtube`, `rag` de `channels`, `llm` et `youtube`. `background_jobs` et
+`youtube`, `videos` de `media`, `rag` de `channels`, `llm`, `videos` et `youtube`. `background_jobs` et
 `scheduler` appellent les paquets et personne ne les importe en retour.
-`tests/test_code_structure.py` fait respecter ces règles. Les données de démo
+Aucun service n'importe `app/web/` : les routes appellent les services, jamais
+l'inverse. `tests/test_code_structure.py` fait respecter ces règles. Les données de démo
 (`demo_seed`) ne sont pas un service : elles sont dans `scripts/demo_seed.py`.
 
 ### `app/services/youtube/`

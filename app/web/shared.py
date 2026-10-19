@@ -12,6 +12,7 @@ from app.core.config import local_media_path
 from app.models.channel import Channel
 from app.models.video import Video
 from app.services.settings_format import video_category_css_style
+from app.services.videos.filters import video_category_labels
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -131,10 +132,6 @@ def form_list_values(value: list[str] | None) -> list[str]:
 
 def form_text_value(value: str | None) -> str:
     return value if isinstance(value, str) else ""
-
-
-def video_category_labels(video: Video) -> list[str]:
-    return parse_category_labels(getattr(video, "category_labels", None))
 
 
 def channel_category_labels(channel: Channel) -> list[str]:

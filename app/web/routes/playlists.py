@@ -18,6 +18,7 @@ from app.db.session import get_db
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
 from app.services.background_jobs import run_manual_download_job
+from app.services.durations import format_duration
 from app.services.job_log import log_job
 from app.services.playlists.imports import (
     PlaylistCsvError,
@@ -34,7 +35,7 @@ from app.services.playlists.imports import (
     run_playlist_url_import_job,
 )
 from app.services.settings import add_video_category_labels, get_video_category_label_styles
-from app.web.formatting import format_duration, format_long_duration
+from app.web.formatting import format_long_duration
 from app.web.shared import (
     append_query,
     category_style_map,

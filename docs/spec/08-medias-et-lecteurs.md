@@ -160,7 +160,7 @@ La position est connue a deux endroits :
   cle soeur `...:at` porte l'horodatage (ms) de la derniere ecriture ;
 - **serveur** : le journal d'activite (`POST /videos/{id}/activity`, jobs
   `played`) contient deja `position_seconds`. `latest_playback_positions`
-  (`app/web/playback.py`) en extrait la derniere position par type de media, et
+  (`app/services/videos/playback.py`) en extrait la derniere position par type de media, et
   `/videos/{id}` l'expose sur le lecteur via `data-resume-server-position` /
   `data-resume-server-at` (et `data-track-resume-server-*` sur le bouton
   "Ecouter").

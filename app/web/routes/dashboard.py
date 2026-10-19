@@ -9,21 +9,20 @@ from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.channels.lookup import followed_video_condition
 from app.services.settings import (
     get_llm_provider_display_label,
     get_no_progress_category_labels,
     get_screen_time_limits,
     get_video_category_label_styles,
 )
-from app.web.playback import (
+from app.services.videos.filters import followed_video_condition
+from app.services.videos.playback import (
     dashboard_media_activity_logs,
-    history_day_groups,
     playback_seconds_by_day,
-    playback_time_dashboard,
     playback_time_stats,
     recent_played_jobs,
 )
+from app.web.playback import history_day_groups, playback_time_dashboard
 from app.web.raton import home_context as raton_home_context
 from app.web.routes.library_chat import library_chat_payload, library_chat_scope_config
 from app.web.shared import (

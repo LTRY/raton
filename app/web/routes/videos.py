@@ -30,6 +30,7 @@ from app.services.background_jobs import (
 )
 from app.services.channels.identity import ensure_video_channel
 from app.services.channels.media_import import import_video_metadata
+from app.services.durations import format_duration
 from app.services.job_log import log_job, record_playback_activity
 from app.services.media.local_upload import LocalUploadError, import_local_media
 from app.services.media.media_storage import mark_watched_if_complete
@@ -46,13 +47,19 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_library_views,
 )
+from app.services.videos.filters import (
+    video_asset_kind_condition,
+    video_filters_condition,
+    video_section_condition,
+)
+from app.services.videos.list_state import VIDEO_LIST_STATES
+from app.services.videos.playback import latest_playback_positions, playback_activity_view
 from app.services.youtube.sponsor_segments import (
     normalize_skip_segments,
     replace_video_sponsor_segments,
 )
 from app.services.youtube.sponsorblock import fetch_sponsorblock_segments
-from app.web.formatting import estimate_channel_periodicity, format_duration, format_views
-from app.web.playback import latest_playback_positions, playback_activity_view
+from app.web.formatting import estimate_channel_periodicity, format_views
 from app.web.routes.transcript import transcript_context, video_analysis_payload
 from app.web.shared import (
     LIBRARY_PAGE_SIZE,
@@ -73,7 +80,6 @@ from app.web.shared import (
 )
 from app.web.video_library import (
     VIDEO_ASSET_FILTER_OPTIONS,
-    VIDEO_LIST_STATES,
     default_channel_section,
     downloaded_video_card,
     normalized_channel_id,
@@ -87,12 +93,9 @@ from app.web.video_library import (
     selected_video_sort,
     shorts_feature_flags,
     video_active_filter_pills,
-    video_asset_kind_condition,
     video_filters_clear_href,
-    video_filters_condition,
     video_library_view_is_active,
     video_library_view_path,
-    video_section_condition,
 )
 
 router = APIRouter()

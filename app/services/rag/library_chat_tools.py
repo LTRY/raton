@@ -22,8 +22,12 @@ from app.models.video import Video
 from app.services.channels.lookup import find_channel
 from app.services.rag import retrieval as rag_retrieval
 from app.services.search import channel_search_rank, fold_search_text, video_search_rank
+from app.services.videos.playback import (
+    dashboard_media_activity_logs,
+    local_datetime,
+    playback_activity_view,
+)
 from app.services.youtube import channel_info
-from app.web.playback import dashboard_media_activity_logs, local_datetime, playback_activity_view
 
 # Each tool turn is a full extra API call, so this bounds both the latency and
 # the cost of one question.
