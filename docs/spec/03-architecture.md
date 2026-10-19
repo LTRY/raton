@@ -184,7 +184,7 @@ racine de `app/services/` :
 | `playlists/` | Import de playlists (`imports`) et edition d'une playlist et de ses elements (`editing`) |
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
-| `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes` |
+| `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`), outils du chat (`library_chat_schema` : ce que le modele peut appeler ; `library_chat_tools` : leur execution) |
 | `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`) et planificateur (`scheduler`) |
 
 Les dependances entre paquets vont dans un seul sens : `common` ne depend
