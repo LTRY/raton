@@ -132,12 +132,18 @@ ainsi que les payloads JSON associes et les estimations de duree/cout.
 
 Routes `/chat*` de la discussion sur toute la bibliotheque et leur payload.
 
-### `app/services/jobs/background_jobs.py`
+### `app/services/jobs/`
 
 Fonctions executees via `BackgroundTasks` dans le processus web, chacune avec
-sa propre session DB : `run_manual_download_job`, `run_transcript_retry_job`,
-`run_channel_metadata_import_job`, `run_llm_job`. Contient aussi
-`enqueue_llm_job` (creation d'un `LlmJob` `queued`).
+sa propre session DB :
+
+- `downloads.py` : telechargement manuel, relance du transcript, import de
+  metadonnees d'une chaine ;
+- `llm_jobs.py` : creation (`enqueue_llm_job`) et execution (`run_llm_job`)
+  d'un `LlmJob` ;
+- `backfills.py` : rattrapages (profils de chaines, nombres de vues,
+  transcripts, index des notes, miniatures) ;
+- `scheduler.py` : le planificateur APScheduler qui lance les jobs quotidiens.
 
 ### `app/web/routes/media.py`
 
@@ -179,7 +185,7 @@ racine de `app/services/` :
 | `llm/` | Appels Anthropic : `provider`, `prompts`, `chat_history`, `usage` |
 | `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`) |
 | `rag/` | Notes, recherche et chat bibliotheque : `embeddings`, `indexing`, `retrieval`, `dashboard`, `library_chat_tools`, `auto_notes` |
-| `jobs/` | Orchestration : taches de fond (`background_jobs`) et planificateur (`scheduler`) |
+| `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`) et planificateur (`scheduler`) |
 
 Les dependances entre paquets vont dans un seul sens : `common` ne depend
 d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`

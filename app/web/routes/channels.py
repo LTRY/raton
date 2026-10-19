@@ -42,11 +42,11 @@ from app.services.common.ratings import InvalidRatingError, check_rating, set_ra
 from app.services.common.settings import (
     get_video_category_label_styles,
 )
-from app.services.jobs.background_jobs import (
-    run_channel_metadata_import_job,
+from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
+from app.services.jobs.downloads import run_channel_metadata_import_job
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,

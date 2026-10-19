@@ -44,12 +44,12 @@ from app.services.common.settings import (
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media
 from app.services.ingest.media_import import import_video_metadata
-from app.services.jobs.background_jobs import (
+from app.services.jobs.downloads import (
     CHANNEL_VIDEO_PAGE_SIZE,
     run_manual_download_job,
     run_transcript_retry_job,
-    video_analysis_has_image,
 )
+from app.services.jobs.llm_jobs import video_analysis_has_image
 from app.services.media.media_storage import mark_watched_if_complete
 from app.services.videos.download_options import (
     normalize_download_media_types,

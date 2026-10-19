@@ -100,7 +100,7 @@ Where each kind of code lives, and which service package may import which, is in
 
 Traps:
 
-- Tests that fake the DB session of a background job runner patch `app.services.jobs.background_jobs.SessionLocal` (each runner opens its own session).
+- Tests that fake the DB session of a background job runner patch `SessionLocal` in the module of that runner (`app/services/jobs/downloads.py`, `llm_jobs.py`, `backfills.py`): each runner opens its own session, and `run_llm_job` also runs the profile backfill, so its tests patch both modules.
 - `video_path` and `audio_path` can coexist: always check the path columns, never `media_type` alone.
 - The Docker stack ignores `DATABASE_URL`/`MEDIA_ROOT` from `.env` (the compose file hardcodes them); nothing outside Docker reads them. Spec: `04-configuration-et-deploiement.md`.
 

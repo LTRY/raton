@@ -10,7 +10,7 @@ from app.core.logging import log_event, logged_job
 from app.db.session import SessionLocal
 from app.services.common.settings import get_setting, set_setting
 from app.services.ingest.scanner import run_scan
-from app.services.jobs.background_jobs import (
+from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_note_index_backfill_job,
     run_original_transcript_backfill_job,

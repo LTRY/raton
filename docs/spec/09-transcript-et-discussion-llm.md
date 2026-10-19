@@ -180,7 +180,7 @@ en isolation.
 - champ de formulaire `include_image` (case à cocher `Inclure la miniature`
   côté client, dans l'infobulle du bouton robot) : quand cochée, une miniature locale est jointe à l'appel —
   mais seulement si le fournisseur actif est `anthropic` **et** qu'un fichier
-  de miniature existe localement (`app/services/jobs/background_jobs.py:video_analysis_has_image`) ;
+  de miniature existe localement (`app/services/jobs/llm_jobs.py:video_analysis_has_image`) ;
   la case n'est même affichée côté client que si cette condition est vraie ;
   côté serveur, `has_image = bool(include_image) and
   video_analysis_has_image(video, provider)` — un `include_image` forgé
@@ -294,7 +294,7 @@ tant qu'aucune analyse n'a encore été générée pour cette vidéo.
 
 - s'applique a tous les jobs `llm_jobs`, quel que soit le fournisseur
   (traites en tache de fond dans le process web via
-  `app/services/jobs/background_jobs.py:run_llm_job`) ;
+  `app/services/jobs/llm_jobs.py:run_llm_job`) ;
 - tant que le job est `queued`/`running`, repond `{"status": "pending"}` ;
   pour un job `generate` dont la reponse a commence a arriver, la reponse
   porte en plus `partial_short_summary` et `partial_summary` : le résumé court
@@ -332,7 +332,7 @@ quelle que soit l'action déclenchee :
 
 ## Cout reel des jobs LLM
 
-`app/services/jobs/background_jobs.py:run_llm_job` enregistre le cout **reel** sur chaque `LlmJob` des
+`app/services/jobs/llm_jobs.py:run_llm_job` enregistre le cout **reel** sur chaque `LlmJob` des
 que la completion reussit, a partir de l'usage exact renvoye par le
 fournisseur lui-meme (`response.usage` du SDK Anthropic,
 `app/services/llm/provider.py:CompletionResult`) :
@@ -399,7 +399,7 @@ Elle affiche le widget de chat partage (voir
   conservee a part pour etre ajoutee a l'historique une fois la reponse
   obtenue) et repond immediatement `{"status":"queued","job_id":...}`, sans
   jamais bloquer la requete ;
-- planifie `app/services/jobs/background_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
+- planifie `app/services/jobs/llm_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
   jobs LLM asynchrones ci-dessus pour la resolution ;
 - redirige vers `/videos/{id}#discussion`.
 
@@ -539,7 +539,7 @@ chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
   `{"status":"queued","job_id":...}`, meme mecanique asynchrone
   (`BackgroundTasks`) que les autres jobs LLM.
 
-Execution (`app/services/jobs/background_jobs.py:run_llm_job`) : pour
+Execution (`app/services/jobs/llm_jobs.py:run_llm_job`) : pour
 `kind="library_chat"`, le job passe par
 `AnthropicProvider.complete_with_tools`, qui boucle tant que le modele
 demande un outil. Au-dela de `MAX_TOOL_TURNS` (4) tours d'outils, l'appel
@@ -584,7 +584,7 @@ Le fournisseur est choisi uniquement par la variable d'environnement
 `app/services/llm/provider.py:get_llm_provider` et
 `app/services/common/settings.py:get_llm_provider_name`. `anthropic` est la seule
 valeur acceptee : `AnthropicProvider` (`app/services/llm/provider.py`) est appele par
-`app/services/jobs/background_jobs.py:run_llm_job`, en tache de fond dans le process
+`app/services/jobs/llm_jobs.py:run_llm_job`, en tache de fond dans le process
 web juste apres la reponse `{"status":"queued",...}`, jamais de facon
 synchrone dans le handler de la requete.
 

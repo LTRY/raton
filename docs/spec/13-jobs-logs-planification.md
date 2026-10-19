@@ -241,7 +241,7 @@ Verification : `tests/test_app_logging.py`, `tests/test_logs_digest.py`.
 
 ## Nombre de vues des videos
 
-`run_view_count_backfill_job` (`app/services/jobs/background_jobs.py`) copie le
+`run_view_count_backfill_job` (`app/services/jobs/backfills.py`) copie le
 `view_count` et la `duration` de `metadata.json` dans `videos.view_count` et
 `videos.duration_seconds` pour les videos qui ont un fichier de metadonnees et
 n'ont pas encore l'une des deux valeurs. Il est lance une fois
@@ -250,7 +250,7 @@ trigger) ; sans video en attente, il ne fait rien.
 
 ## Miniatures des videos
 
-`run_thumbnail_backfill_job` (`app/services/jobs/background_jobs.py`) cree les
+`run_thumbnail_backfill_job` (`app/services/jobs/backfills.py`) cree les
 copies reduites de vignette (`thumbs/320.jpg`, `thumbs/640.jpg`) des videos
 qui n'en ont pas encore. Il est lance une fois au demarrage par
 `start_scheduler()` (job `backfill_thumbnails`, sans trigger), en arriere-plan
@@ -259,7 +259,7 @@ ffmpeg est journalise et la page sert la vignette d'origine.
 
 ## Profil des chaines
 
-`run_channel_profile_backfill_job` (`app/services/jobs/background_jobs.py`) recupere
+`run_channel_profile_backfill_job` (`app/services/jobs/backfills.py`) recupere
 le profil de chaque chaine dont `metadata_fetched_at` est `NULL` (et qui a un
 `yt_channel_id`), une a la fois, avec 2 s de pause entre deux chaines pour ne
 pas marteler YouTube. C'est le point d'entree unique : il est lance en

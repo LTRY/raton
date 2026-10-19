@@ -37,7 +37,7 @@ from app.services.common.settings import (
     get_video_library_views,
     set_setting,
 )
-from app.services.jobs.background_jobs import run_channel_profile_backfill_job
+from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.media.storage import get_total_used_bytes
 from app.services.videos.charts import library_chart_data
 from app.services.youtube.channel_info import ChannelNotFoundError

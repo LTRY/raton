@@ -27,7 +27,7 @@ from app.services.channels import manage as channel_manage
 from app.services.common import search
 from app.services.common.settings import get_sponsor_skip_enabled
 from app.services.ingest.identity import channel_values_from_info
-from app.services.jobs import background_jobs
+from app.services.jobs import backfills, downloads, llm_jobs
 from app.services.jobs.scheduler import record_scan_result
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.videos import list_state as videos_list_state
@@ -544,9 +544,7 @@ def test_videos_page_hides_labels_on_card(tmp_path):
 
 def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
     db = make_session()
-    job = background_jobs.enqueue_llm_job(
-        db, kind="chat", provider="anthropic", video_id=None, prompt="p"
-    )
+    job = llm_jobs.enqueue_llm_job(db, kind="chat", provider="anthropic", video_id=None, prompt="p")
 
     class FakeProvider:
         def complete(self, prompt, on_text=None):
@@ -554,10 +552,11 @@ def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
             tally.add(SimpleNamespace(input_tokens=1_000_000, output_tokens=1_000_000))
             raise CompletionFailed("La réponse a été tronquée", tally)
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
-    background_jobs.run_llm_job(job.id)
+    llm_jobs.run_llm_job(job.id)
 
     failed = db.get(LlmJob, job.id)
     assert failed.status == "failed"
@@ -789,11 +788,12 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
                 output_tokens=80,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "PARTIAL_RESULT_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "PARTIAL_RESULT_INTERVAL_SECONDS", 0)
 
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     assert polled == [
         {
@@ -868,7 +868,7 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
     video.thumbnail_path = str(thumbnail)
     db.commit()
 
-    class FakeAnthropicProvider(background_jobs.AnthropicProvider):
+    class FakeAnthropicProvider(llm_jobs.AnthropicProvider):
         def __init__(self):
             pass
 
@@ -895,9 +895,10 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
                 "complete() ne doit pas être appelé quand une image est disponible"
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeAnthropicProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeAnthropicProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     scheduled = []
     background_tasks = BackgroundTasks()
@@ -919,9 +920,9 @@ def test_generate_documents_with_image_attaches_thumbnail_when_checkbox_checked(
     assert response.status_code == 200
     assert payload["status"] == "queued"
     job_id = payload["job_id"]
-    assert scheduled == [(background_jobs.run_llm_job, (job_id,), {})]
+    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     completed_job = db.get(LlmJob, job_id)
     assert completed_job.status == "done"
@@ -979,15 +980,16 @@ def test_generate_documents_omits_image_when_checkbox_unchecked_even_with_thumbn
                 "complete_with_image() ne doit pas être appelé, la case est décochée"
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
         "add_task",
-        lambda fn, *args, **kwargs: background_jobs.run_llm_job(args[0]),
+        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
     )
 
     response = transcript_routes.generate_video_transcript_documents(
@@ -1020,7 +1022,7 @@ def test_video_analysis_has_image_true_when_thumbnail_inside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs.video_analysis_has_image(video, "anthropic") is True
+    assert llm_jobs.video_analysis_has_image(video, "anthropic") is True
 
 
 def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
@@ -1039,7 +1041,7 @@ def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs.video_analysis_has_image(video, "anthropic") is False
+    assert llm_jobs.video_analysis_has_image(video, "anthropic") is False
 
 
 def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_checkbox_checked(
@@ -1066,15 +1068,16 @@ def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_ch
                 output_tokens=50,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
     monkeypatch.setattr(transcript_routes, "get_llm_provider_name", lambda: "anthropic")
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
         "add_task",
-        lambda fn, *args, **kwargs: background_jobs.run_llm_job(args[0]),
+        lambda fn, *args, **kwargs: llm_jobs.run_llm_job(args[0]),
     )
 
     response = transcript_routes.generate_video_transcript_documents(
@@ -1606,8 +1609,9 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
                 output_tokens=10,
             )
 
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: FakeProvider())
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     scheduled = []
     background_tasks = BackgroundTasks()
@@ -1636,10 +1640,10 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
     assert response.status_code == 200
     assert payload["status"] == "queued"
     job_id = payload["job_id"]
-    assert scheduled == [(background_jobs.run_llm_job, (job_id,), {})]
+    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     # Simulate the background task the request scheduled.
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
     resolved_payload = json.loads(resolved.body)
@@ -2102,12 +2106,10 @@ def test_run_transcript_retry_job_marks_job_downloaded_on_success(monkeypatch):
         target_video.transcript_status = TranscriptStatus.downloaded
         return target_video
 
-    monkeypatch.setattr(
-        background_jobs, "retry_transcript_download", fake_retry_transcript_download
-    )
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "retry_transcript_download", fake_retry_transcript_download)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
 
-    background_jobs.run_transcript_retry_job(job.id, video.id)
+    downloads.run_transcript_retry_job(job.id, video.id)
 
     completed_job = db.get(DownloadJob, job.id)
     assert completed_job.status == "downloaded"
@@ -2124,12 +2126,10 @@ def test_run_transcript_retry_job_marks_job_failed_when_no_subtitles_found(monke
     def fake_retry_transcript_download(session, target_video, languages=None):
         raise ValueError("Aucun sous-titre disponible (FR ou EN) pour cette vidéo.")
 
-    monkeypatch.setattr(
-        background_jobs, "retry_transcript_download", fake_retry_transcript_download
-    )
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "retry_transcript_download", fake_retry_transcript_download)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
 
-    background_jobs.run_transcript_retry_job(job.id, video.id)
+    downloads.run_transcript_retry_job(job.id, video.id)
 
     completed_job = db.get(DownloadJob, job.id)
     assert completed_job.status == "failed"
@@ -2513,7 +2513,7 @@ def test_download_form_queues_ajax_job(monkeypatch):
     assert f"/videos/download-jobs/{job.id}" in payload
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (
                 job.id,
                 "https://youtube.com/watch?v=abc123",
@@ -2567,7 +2567,7 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     assert job.status == "queued"
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (job.id, "https://youtube.com/watch?v=meta123", ["metadata"], True, None, None, "both"),
             {},
         )
@@ -2610,7 +2610,7 @@ def test_download_form_queues_category_labels(monkeypatch):
     assert response.status_code == 200
     assert scheduled == [
         (
-            background_jobs.run_manual_download_job,
+            downloads.run_manual_download_job,
             (
                 job.id,
                 "https://youtube.com/watch?v=cat123",
@@ -3477,7 +3477,7 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
     assert f'"job_id":{job.id}' in payload
     assert f"/jobs/{job.id}" in payload
     assert scheduled == [
-        (background_jobs.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
+        (downloads.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
     ]
 
     status = videos_routes.job_status(job.id, db)
@@ -3492,21 +3492,21 @@ def test_channel_metadata_import_job_imports_one_page(monkeypatch):
     db.add(job)
     db.commit()
     calls = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(downloads, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        downloads,
         "scan_channel_section",
         lambda db, channel, **kwargs: calls.append(kwargs) or 25,
     )
 
-    background_jobs.run_channel_metadata_import_job(job.id, channel.id, page=1)
+    downloads.run_channel_metadata_import_job(job.id, channel.id, page=1)
 
     assert len(calls) == 1
     assert callable(calls[0].pop("should_stop"))
     assert calls == [
         {
             "page": 1,
-            "page_size": background_jobs.CHANNEL_VIDEO_PAGE_SIZE,
+            "page_size": downloads.CHANNEL_VIDEO_PAGE_SIZE,
             "max_pages": 1,
             "section": "videos",
         }

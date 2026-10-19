@@ -55,7 +55,7 @@ class CompletionResult:
 
     `input_tokens`/`output_tokens` are exact counts from the provider itself
     (not the char/4 heuristic used for pre-run estimates) — this is what lets
-    `app/services/jobs/background_jobs.py:run_llm_job` record real per-job cost instead of guessing.
+    `app/services/jobs/llm_jobs.py:run_llm_job` record real per-job cost instead of guessing.
     """
 
     text: str

@@ -14,7 +14,7 @@ from app.models.channel import Channel
 from app.models.setting import AppSetting
 from app.services.channels import manage as channel_manage
 from app.services.channels import profile as channel_profile
-from app.services.jobs import background_jobs
+from app.services.jobs import backfills
 from app.services.jobs import scheduler as scheduler_module
 from app.services.youtube import channel_info
 
@@ -241,18 +241,18 @@ def test_backfill_job_refreshes_each_pending_channel_with_a_pause(monkeypatch, t
     db.add_all([first, second, done])
     db.commit()
     refreshed, pauses = [], []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, channel: refreshed.append(channel.id),
     )
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: pauses.append(seconds))
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: pauses.append(seconds))
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == [first.id, second.id]
-    assert pauses == [background_jobs.PROFILE_FETCH_DELAY_SECONDS]
+    assert pauses == [backfills.PROFILE_FETCH_DELAY_SECONDS]
 
 
 def test_backfill_returns_at_once_when_another_sweep_is_running(monkeypatch, tmp_path):
@@ -260,18 +260,18 @@ def test_backfill_returns_at_once_when_another_sweep_is_running(monkeypatch, tmp
     db.add(Channel(url="u1", name="un", yt_channel_id="UC1"))
     db.commit()
     refreshed = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, channel: refreshed.append(channel.id),
     )
 
-    with background_jobs._profile_backfill_lock:
-        background_jobs.run_channel_profile_backfill_job()
+    with backfills._profile_backfill_lock:
+        backfills.run_channel_profile_backfill_job()
 
     assert refreshed == []
-    assert not background_jobs._profile_backfill_lock.locked()
+    assert not backfills._profile_backfill_lock.locked()
 
 
 def test_backfill_picks_up_a_channel_added_during_the_sweep(monkeypatch, tmp_path):
@@ -289,11 +289,11 @@ def test_backfill_picks_up_a_channel_added_during_the_sweep(monkeypatch, tmp_pat
         session.commit()
         return True
 
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "refresh_channel_profile", refresh)
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "refresh_channel_profile", refresh)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == ["UC1", "UC2"]
 
@@ -303,15 +303,15 @@ def test_backfill_attempts_a_failing_channel_once_per_run(monkeypatch, tmp_path)
     db.add(Channel(url="u1", name="un", yt_channel_id="UC1"))
     db.commit()
     attempts = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs,
+        backfills,
         "refresh_channel_profile",
         lambda session, c: attempts.append(c.id) or False,
     )
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert len(attempts) == 1
 
@@ -332,11 +332,11 @@ def test_backfill_continues_after_one_channel_raises(monkeypatch, tmp_path):
             raise RuntimeError("stale data")
         refreshed.append(channel.yt_channel_id)
 
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
-    monkeypatch.setattr(background_jobs, "refresh_channel_profile", refresh)
-    monkeypatch.setattr(background_jobs.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "refresh_channel_profile", refresh)
+    monkeypatch.setattr(backfills.time, "sleep", lambda seconds: None)
 
-    background_jobs.run_channel_profile_backfill_job()
+    backfills.run_channel_profile_backfill_job()
 
     assert refreshed == ["UC2"]
 
@@ -365,13 +365,13 @@ def test_refresh_job_refreshes_the_given_channel_even_if_already_fetched(monkeyp
     db.add(channel)
     db.commit()
     refreshed = []
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
     monkeypatch.setattr(
-        background_jobs, "refresh_channel_profile", lambda session, c: refreshed.append(c.id)
+        backfills, "refresh_channel_profile", lambda session, c: refreshed.append(c.id)
     )
 
-    background_jobs.run_channel_profile_refresh_job(channel.id)
-    background_jobs.run_channel_profile_refresh_job(9999)
+    backfills.run_channel_profile_refresh_job(channel.id)
+    backfills.run_channel_profile_refresh_job(9999)
 
     assert refreshed == [channel.id]
 
