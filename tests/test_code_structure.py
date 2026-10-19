@@ -103,7 +103,7 @@ def test_models_import_no_service():
 
 def test_only_jobs_open_a_db_session():
     # A background job owns its session; every other service works in the session it is given,
-    # so a request or a job commits one unit of work (docs/spec/03-architecture.md).
+    # so a request or a job commits one unit of work (docs/spec/10-services.md).
     offenders = sorted(
         str(path.relative_to(APP / "services"))
         for path in (APP / "services").rglob("*.py")
@@ -142,7 +142,7 @@ def test_service_packages_form_a_dag():
 
 
 # The web layer writes nothing to the DB itself: a route reads the request, calls a service and
-# renders; the service owns the business rule and its commit (docs/spec/03-architecture.md).
+# renders; the service owns the business rule and its commit (docs/spec/10-services.md).
 DB_WRITE = re.compile(r"\bdb\.(add|add_all|commit|delete|flush|merge)\(|\.delete\(\)")
 
 
@@ -154,4 +154,44 @@ def test_web_layer_leaves_db_writes_to_services():
     )
     assert not offenders, (
         f"these modules write to the DB: move the write into a service: {offenders}"
+    )
+
+
+SERVICES_SPEC = APP.parent / "docs" / "spec" / "10-services.md"
+
+
+def spec_table_rows(section: str) -> list[list[str]]:
+    """Cells of the markdown table rows under the `## section` / `### section` heading."""
+    text = SERVICES_SPEC.read_text(encoding="utf-8")
+    body = re.split(rf"^#{{2,3}} {re.escape(section)}$", text, flags=re.MULTILINE)[1]
+    body = re.split(r"^#{2,3} ", body, flags=re.MULTILINE)[0]
+    return [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in body.splitlines()
+        if line.startswith("| `")
+    ]
+
+
+def test_services_spec_lists_the_package_dependencies():
+    # The overview table of docs/spec/10-services.md is the readable copy of SERVICE_PACKAGE_DEPENDENCIES.
+    documented = {}
+    for package, _role, depends in spec_table_rows("Vue d'ensemble"):
+        name = package.strip("`/")
+        documented[name] = set(re.findall(r"`(\w+)`", depends))
+    assert documented == SERVICE_PACKAGE_DEPENDENCIES
+
+
+def test_services_spec_lists_every_service_module():
+    documented = set()
+    for package in SERVICE_PACKAGE_DEPENDENCIES:
+        for row in spec_table_rows(f"`{package}/`"):
+            documented.update(f"{package}/{module}" for module in re.findall(r"`(\w+)`", row[0]))
+    actual = {
+        f"{path.parent.name}/{path.stem}"
+        for path in (APP / "services").rglob("*.py")
+        if path.name != "__init__.py"
+    }
+    assert documented == actual, (
+        f"docs/spec/10-services.md: missing {sorted(actual - documented)}, "
+        f"stale {sorted(documented - actual)}"
     )

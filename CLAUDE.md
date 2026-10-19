@@ -89,7 +89,7 @@ Stack: Python 3.14, FastAPI, Jinja2 (server-rendered, no frontend framework), SQ
 
 ### Code layout: routes call services
 
-Where each kind of code lives, and which service package may import which, is in `docs/spec/03-architecture.md` (section "`app/services/` : organisation par domaine"); `tests/test_code_structure.py` enforces it. Read that section before adding a module.
+Where each kind of code lives is in `docs/spec/03-architecture.md`; the service packages, their modules and which package may import which are in `docs/spec/10-services.md`. `tests/test_code_structure.py` enforces the rules. Read `10-services.md` before adding a service module.
 
 - **A business rule is written once, in `app/services/`.** A route (`app/web/routes/`, `app/api/`) only reads the request, calls a service, turns the service's errors into an HTTP response, queues background tasks and renders. It does not query-and-update rows itself, and an HTML route and its `/api` twin call the same service function instead of keeping two copies. Nothing under `app/web/` or `app/api/` writes to the DB (`db.add`, `db.commit`, `db.delete`...); the structure test fails otherwise.
 - **Services never import `app/web/`**, and service packages only import in the direction the structure test allows. A new dependency between packages is a design decision: change the test's map and the spec on purpose, never to silence it, and never create a cycle.

@@ -132,22 +132,6 @@ ainsi que les payloads JSON associes et les estimations de duree/cout.
 
 Routes `/chat*` de la discussion sur toute la bibliotheque et leur payload.
 
-### `app/services/jobs/`
-
-Fonctions executees via `BackgroundTasks` dans le processus web, chacune avec
-sa propre session DB :
-
-- `downloads.py` : telechargement manuel, relance du transcript, import de
-  metadonnees d'une chaine ;
-- `llm_jobs.py` : creation (`enqueue_llm_job`) et execution (`run_llm_job`)
-  d'un `LlmJob`, indexation des notes qu'un `generate` vient d'ecrire
-  (`run_notes_indexing_job`) ;
-- `playlists.py` : import d'une playlist depuis son URL ou un CSV Google
-  Takeout ;
-- `backfills.py` : rattrapages (profils de chaines, nombres de vues,
-  transcripts, index des notes, miniatures) ;
-- `scheduler.py` : le planificateur APScheduler qui lance les jobs quotidiens.
-
 ### `app/web/routes/media.py`
 
 Contient les routes de fichiers locaux :
@@ -172,136 +156,13 @@ Contient :
 
 Expose l'API interne sous `/api`.
 
-### `app/services/` : organisation par domaine
+### `app/services/`
 
-Chaque service est dans un paquet, un par sujet ; aucun module ne reste a la
-racine de `app/services/` :
-
-| Paquet | Contenu |
-|---|---|
-| `common/` | Bases partagees par tous les paquets : reglages (`settings`), categories (`categories`), vues enregistrees (`library_views`), note en etoiles (`ratings`), durees (`durations`), recherche par mots (`search`), outils de fichiers (`files`), journal des jobs (`job_log`) |
-| `youtube/` | Tout ce qui parle a YouTube : `yt`, `channel_info`, `downloads`, `sponsorblock`, `sponsor_segments`, `url_guard`, `view_counts` |
-| `media/` | Fichiers sur disque : `media_storage`, `storage`, `thumbnails`, `audio_extract` |
-| `channels/` | Les chaines elles-memes : `manage`, `listing`, `lookup`, `profile`, `subscriptions` |
-| `ingest/` | Ingestion : tout ce qui fait entrer une fiche dans la bibliotheque (voir [20 Glossaire](20-glossaire.md)) : `scanner`, `metadata_import`, `manual_download`, `transcript_retry`, `staging`, `identity`, `throttle`, `scan_events`, `local_upload`, `transcript_backfill`, `channel_exploration` |
-| `playlists/` | Import de playlists (`imports` : apercu, lecture du CSV, ajout d'une entree) et edition d'une playlist et de ses elements (`editing`) |
-| `llm/` | Appels Anthropic : `provider`, `prompts`, `usage` |
-| `videos/` | Fiches : filtres et conditions SQL de la bibliotheque (`filters`, dont le filtre des Nouveautes), etat Vu/Ecartee (`list_state`), activite et temps de lecture et passage en Vu a 90 % (`playback`), compteurs de la bibliotheque (`stats`), donnees de la page `/stats` (`charts`), liste paginee de `/videos` (`library_query`), modifications d'une fiche (`editing`), options d'un telechargement manuel (`download_options`), fichiers ecrits a cote du transcript, discussion par video comprise (`documents`) |
-| `rag/` | Notes et recherche semantique : `embeddings`, `indexing`, `retrieval`, `auto_notes`, page `/rag` (`dashboard`, `dashboard_stats`) |
-| `library_chat/` | Chat bibliotheque : outils du chat (`schema` : ce que le modele peut appeler ; `tools` : leur execution), conversation enregistree (`history`) |
-| `raton/` | La mascotte de l'accueil : catalogue des scenarios (`scenarios`), choix de la replique (`picker`), suivi des visites (`visits`) |
-| `jobs/` | Orchestration : taches de fond (`downloads`, `llm_jobs`, `backfills`, `playlists`) et planificateur (`scheduler`) |
-
-Les dependances entre paquets vont dans un seul sens : `common` ne depend
-d'aucun paquet ; `youtube`, `llm` et `media` dependent de `common` ; `channels`
-de `common` et `youtube` ; `ingest` de `common`, `media` et `youtube` ;
-`playlists` de `common`, `ingest` et `youtube` ; `videos` de `common` et
-`media` ; `raton` de `common` et `videos` ; `rag` de `common`, `llm` et `videos` ;
-`library_chat` de `channels`, `common`, `rag`, `videos` et `youtube`. `jobs`
-appelle les autres paquets et aucun ne l'importe en retour. Aucun service
-n'importe `app/web/` : les routes appellent les services, jamais l'inverse.
-Seul `jobs` ouvre une session DB (`SessionLocal`) : les autres services
-travaillent dans la session qu'on leur passe, celle de la requete ou du job.
-Aucun modele (`app/models/`) n'importe un service : une constante qui
-dimensionne une colonne est definie a cote de cette colonne.
-`tests/test_code_structure.py` fait respecter ces regles.
-
-Hors de `app/services/` : le resume du journal applicatif (`logs_digest`) est
-dans `app/core/`, a cote de `app/core/logging.py` qui ecrit ce journal ; les
-donnees de demo (`demo_seed`) ne sont pas un service, elles sont dans
-`scripts/demo_seed.py`.
-
-Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
-et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
-reponse HTTP, lancer les taches de fond et rendre la page. Rien sous `app/web/` ni
-`app/api/` n'ecrit dans la DB (`tests/test_code_structure.py`).
-
-### `app/services/youtube/`
-
-- `yt.py` : appel yt-dlp journalise (`ytdlp_call`), detection des erreurs
-  429 et des premieres pas encore disponibles, extraction metadata video ;
-- `channel_info.py` : resolution et recherche de chaine, profil, comptage et
-  listing des videos d'une chaine ;
-- `downloads.py` : telechargement audio/video, sous-titres et miniature,
-  detection des fichiers telecharges, ecriture metadata et transcript.
-
-### `app/services/channels/`
-
-- `manage.py` : ajout et suppression d'une chaine (partages par les pages HTML
-  et `/api`), categories, cloches ;
-- `listing.py` : liste de `/channels` (tri, filtre Notees, recherche, nombre de
-  fiches) ;
-- `lookup.py` : chaine de la bibliotheque correspondant a une URL ou un
-  identifiant YouTube ;
-- `profile.py` : avatar, banniere et description d'une chaine ;
-- `subscriptions.py` : apercu et import du CSV d'abonnements YouTube.
-
-### `app/services/ingest/`
-
-- `scanner.py` : scan automatique des chaines suivies ;
-- `metadata_import.py` : import de metadonnees d'une video (fiche, miniature,
-  transcript, sans fichier media), appele par le scan, les imports de
-  playlist, l'exploration de chaine et le formulaire d'import ;
-- `manual_download.py` : telechargement manuel du media (video ou audio)
-  d'une video, fusionne dans la fiche existante s'il y en a une ;
-- `transcript_retry.py` : relance du telechargement des sous-titres d'une
-  fiche ;
-- `staging.py` : staged folders, merge de fichiers lorsqu'on ajoute audio ou
-  video ;
-- `identity.py` : chaine d'une video, URL canonique ;
-- `throttle.py` : pauses entre requetes YouTube et `RateLimitedError` ;
-- `scan_events.py` : etat du scan en cours, lu par la page des parametres ;
-- `local_upload.py` : import d'un fichier video ou audio depose depuis
-  l'appareil ;
-- `transcript_backfill.py` : rattrapage des transcripts manquants ;
-- `channel_exploration.py` : arret et progression d'une exploration de
-  chaine (import de metadonnees de toute une chaine).
-
-### `app/services/common/`
-
-- `ratings.py` : la note en etoiles d'une chaine ou d'une fiche ;
-- `job_log.py` : une ligne de journal de jobs (`log_job`) et les statuts
-  apres lesquels un job ne change plus.
-
-### `app/services/media/media_storage.py`
-
-Responsable de :
-
-- purge quotidienne des fichiers media des videos vues (`purge_watched_media`) ;
-- suppression d'un seul format (`delete_video_media_asset`, et `delete_video_media_file` qui la valide dans la DB pour la
-  route media ;
-- type de media d'une video d'apres ses chemins (`media_type_for_paths`).
-
-### `app/services/media/storage.py`
-
-Responsable de :
-
-- calcul d'espace utilise ;
-- marge restante sous le quota global pour les telechargements automatiques.
-
-### `app/services/llm/`
-
-- `provider.py` : interface `LLMProvider` et implementation
-  `AnthropicProvider` appelant directement l'API Anthropic (`LLM_PROVIDER`),
-  dont la boucle d'appels d'outils (`AnthropicProvider.complete_with_tools`)
-  du chat cross-video ;
-- `prompts.py` : construction des prompts (notes, resume, analyse video,
-  question/reponse sur transcript, chat bibliotheque) et decoupage des
-  reponses.
-
-### `app/services/library_chat/tools.py`
-
-Outils que le modele appelle pendant le chat cross-video (recherche de
-chaines, de videos, recherche semantique dans les notes) et extraction des
-chaines/videos citees par sa reponse. Voir
-[09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
-
-### `app/services/common/search.py`
-
-Recherche textuelle par mots, insensible a la casse et aux accents, et
-classement par pertinence des videos et des chaines. Partagee par les champs
-de recherche de `/videos` et `/channels` et par les outils du chat
-cross-video.
+Les regles metier, rangees en paquets par domaine (`common`, `youtube`,
+`llm`, `media`, `channels`, `ingest`, `playlists`, `videos`, `raton`, `rag`,
+`library_chat`, `jobs`) : role de chaque paquet et de chaque module,
+dependances autorisees et regles de structure dans
+[10 Services](10-services.md).
 
 ## Flux de donnees
 
