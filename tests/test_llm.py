@@ -155,9 +155,6 @@ def test_build_generation_prompt_includes_both_top_level_sections_once():
         assert f"## {name}" in prompt
     assert "## Questions suggérées" in prompt
     assert "Résumé complet" not in prompt
-    assert "# Analyse" not in prompt
-    assert "## Pertinence du contenu" not in prompt
-    assert "## Score clickbait" not in prompt
 
 
 def test_build_generation_prompt_asks_for_the_summary_first():

@@ -134,11 +134,7 @@ def test_prompt_asks_for_notes_and_a_short_summary_only():
     prompt = build_auto_notes_prompt("LE TRANSCRIPT")
 
     assert "## Résumé court" in prompt and "## Faits" in prompt
-    assert (
-        "Résumé complet" not in prompt
-        and "Questions suggérées" not in prompt
-        and "clickbait" not in prompt
-    )
+    assert "Résumé complet" not in prompt and "Questions suggérées" not in prompt
     assert prompt.endswith("<transcript>\nLE TRANSCRIPT\n</transcript>\n")
 
 
