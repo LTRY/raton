@@ -47,6 +47,7 @@ from app.services.settings import (
     get_video_category_label_styles,
     get_video_library_views,
 )
+from app.services.settings_format import parse_video_category_labels, serialized_category_labels
 from app.services.videos.filters import (
     video_asset_kind_condition,
     video_filters_condition,
@@ -71,9 +72,7 @@ from app.web.shared import (
     internal_return_path,
     page_href_builder,
     paginate,
-    parse_category_labels,
     redirect,
-    serialized_category_labels,
     templates,
     video_metadata,
     wants_json,
@@ -381,7 +380,7 @@ def update_video_categories_form(
 
     submitted_categories = [
         *form_list_values(preset_categories),
-        *parse_category_labels(form_text_value(custom_categories)),
+        *parse_video_category_labels(form_text_value(custom_categories)),
     ]
     video.category_labels = serialized_category_labels(submitted_categories)
     add_video_category_labels(db, submitted_categories)
@@ -703,7 +702,7 @@ def download_video_form(
         )
         submitted_categories = [
             *form_list_values(preset_categories),
-            *parse_category_labels(form_text_value(custom_categories)),
+            *parse_video_category_labels(form_text_value(custom_categories)),
         ]
         category_labels = serialized_category_labels(submitted_categories)
         add_video_category_labels(db, submitted_categories)

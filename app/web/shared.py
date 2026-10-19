@@ -11,7 +11,10 @@ from fastapi.templating import Jinja2Templates
 from app.core.config import local_media_path
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.settings_format import video_category_css_style
+from app.services.settings_format import (
+    parse_video_category_labels,
+    video_category_css_style,
+)
 from app.services.videos.filters import video_category_labels
 
 templates = Jinja2Templates(directory="app/templates")
@@ -102,30 +105,6 @@ def page_href_builder(request: Request, exclude: tuple[str, ...] = ()):
     return page_href
 
 
-def normalize_category_label(label: str) -> str:
-    return " ".join(label.strip().lower().split())
-
-
-def parse_category_labels(value: str | None) -> list[str]:
-    if not value:
-        return []
-    labels = []
-    for item in value.replace("\n", ",").split(","):
-        label = normalize_category_label(item)
-        if label and label not in labels:
-            labels.append(label)
-    return labels
-
-
-def serialized_category_labels(labels: list[str]) -> str | None:
-    normalized = []
-    for label in labels:
-        normalized_label = normalize_category_label(label)
-        if normalized_label and normalized_label not in normalized:
-            normalized.append(normalized_label)
-    return ",".join(normalized) or None
-
-
 def form_list_values(value: list[str] | None) -> list[str]:
     return value if isinstance(value, list) else []
 
@@ -135,7 +114,7 @@ def form_text_value(value: str | None) -> str:
 
 
 def channel_category_labels(channel: Channel) -> list[str]:
-    return parse_category_labels(getattr(channel, "category_labels", None))
+    return parse_video_category_labels(getattr(channel, "category_labels", None))
 
 
 def video_metadata(video: Video) -> dict:

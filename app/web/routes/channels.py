@@ -42,6 +42,7 @@ from app.services.settings import (
     add_video_category_labels,
     get_video_category_label_styles,
 )
+from app.services.settings_format import parse_video_category_labels, serialized_category_labels
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,
@@ -56,9 +57,7 @@ from app.web.shared import (
     internal_return_path,
     page_href_builder,
     paginate,
-    parse_category_labels,
     redirect,
-    serialized_category_labels,
     templates,
     wants_json,
 )
@@ -324,7 +323,7 @@ def add_channel(
 ):
     submitted_categories = [
         *form_list_values(preset_categories),
-        *parse_category_labels(form_text_value(custom_categories)),
+        *parse_video_category_labels(form_text_value(custom_categories)),
     ]
     category_labels = serialized_category_labels(submitted_categories)
     if not is_channel_reference(url):
@@ -389,7 +388,7 @@ def update_channel_categories_form(
 
     submitted_categories = [
         *form_list_values(preset_categories),
-        *parse_category_labels(form_text_value(custom_categories)),
+        *parse_video_category_labels(form_text_value(custom_categories)),
     ]
     category_labels = serialized_category_labels(submitted_categories)
     channel.category_labels = category_labels

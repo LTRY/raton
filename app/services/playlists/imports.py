@@ -10,20 +10,27 @@ from yt_dlp import YoutubeDL
 from app.core.logging import logged_job
 from app.db.session import SessionLocal
 from app.models.job import DownloadJob
-from app.models.playlist import Playlist, PlaylistItem
+from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.channels.media_import import import_video_metadata
 from app.services.channels.throttle import RateLimitedError, pause_between_imports
 from app.services.job_log import log_job
+from app.services.playlists.editing import add_video_to_playlist
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
 
 MAX_PLAYLIST_IMPORT_PAGES = 40
+
+
 PLAYLIST_IMPORT_PAGE_SIZE = 50
 
 
 # Titles yt-dlp gives to flat entries it cannot read (no real metadata behind them).
 _UNAVAILABLE_TITLES = {"[private video]", "[deleted video]"}
+
+
 PREVIEW_SAMPLE_TITLES = 4
+
+
 _KNOWN_LOOKUP_CHUNK = 500
 
 
@@ -186,65 +193,6 @@ def parse_playlist_csv(content: bytes) -> list[dict[str, Any]]:
     return rows
 
 
-def _next_position(db: Session, playlist_id: int) -> int:
-    current_max = db.scalar(
-        select(func.max(PlaylistItem.position)).where(PlaylistItem.playlist_id == playlist_id)
-    )
-    return (current_max or 0) + 1
-
-
-def inherit_playlist_labels(playlist: Playlist, video: Video) -> bool:
-    """Give a video the playlist's labels when it has none of its own, like a channel's labels.
-
-    The caller commits. A video that already has labels (its own, or a channel's copied earlier) keeps them,
-    so the first source wins and a later playlist never overrides a label the user may have set by hand.
-    """
-    if playlist.category_labels and not video.category_labels:
-        video.category_labels = playlist.category_labels
-        return True
-    return False
-
-
-def apply_playlist_labels(db: Session, playlist: Playlist) -> int:
-    """Copy the playlist's labels to its videos that have none; returns how many were labelled."""
-    if not playlist.category_labels:
-        return 0
-    videos = db.scalars(
-        select(Video)
-        .join(PlaylistItem, PlaylistItem.video_id == Video.id)
-        .where(PlaylistItem.playlist_id == playlist.id)
-    )
-    return sum(inherit_playlist_labels(playlist, video) for video in videos)
-
-
-def _link_video_to_playlist(
-    db: Session,
-    playlist_id: int,
-    video_id: int,
-    added_at: datetime | None = None,
-) -> None:
-    existing = db.scalar(
-        select(PlaylistItem).where(
-            PlaylistItem.playlist_id == playlist_id, PlaylistItem.video_id == video_id
-        )
-    )
-    if existing:
-        return
-    db.add(
-        PlaylistItem(
-            playlist_id=playlist_id,
-            video_id=video_id,
-            position=_next_position(db, playlist_id),
-            added_at=added_at,
-        )
-    )
-    playlist = db.get(Playlist, playlist_id)
-    video = db.get(Video, video_id)
-    if playlist is not None and video is not None:
-        inherit_playlist_labels(playlist, video)
-    db.commit()
-
-
 @logged_job("playlist_url_import")
 def run_playlist_url_import_job(job_id: int, playlist_id: int) -> None:
     db = SessionLocal()
@@ -304,7 +252,7 @@ def run_playlist_url_import_job(job_id: int, playlist_id: int) -> None:
                             source_section="videos",
                             is_new=False,
                         )
-                    _link_video_to_playlist(db, playlist.id, video.id)
+                    add_video_to_playlist(db, playlist.id, video.id)
                     log_job(
                         db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id
                     )
@@ -387,7 +335,7 @@ def run_playlist_csv_import_job(job_id: int, playlist_id: int, rows: list[dict[s
                         source_section="videos",
                         is_new=False,
                     )
-                _link_video_to_playlist(db, playlist.id, video.id, added_at=row.get("added_at"))
+                add_video_to_playlist(db, playlist.id, video.id, added_at=row.get("added_at"))
                 log_job(db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id)
                 imported += 1
             except RateLimitedError as exc:
@@ -424,46 +372,6 @@ def run_playlist_csv_import_job(job_id: int, playlist_id: int, rows: list[dict[s
             db.commit()
     finally:
         db.close()
-
-
-def apply_item_order(db: Session, playlist: Playlist, ordered_item_ids: list[int]) -> bool:
-    """Rewrites positions 1..n following ``ordered_item_ids``.
-
-    The ids must be exactly the playlist's current items (no more, no fewer):
-    a stale page that lost a race with a removal must not silently drop or
-    resurrect items, so any mismatch leaves positions untouched.
-    """
-    by_id = {item.id: item for item in playlist.items}
-    if len(ordered_item_ids) != len(by_id) or set(ordered_item_ids) != set(by_id):
-        return False
-    for position, item_id in enumerate(ordered_item_ids, start=1):
-        by_id[item_id].position = position
-    db.commit()
-    return True
-
-
-def duplicate_playlist(db: Session, playlist: Playlist) -> Playlist:
-    """Copy as a manual playlist: the copy is detached from the YouTube/CSV source."""
-    copy = Playlist(
-        title=f"{playlist.title} (copie)"[:500],
-        source="manual",
-        category_labels=playlist.category_labels,
-        free_listening=playlist.free_listening,
-    )
-    db.add(copy)
-    db.flush()
-    for item in playlist.items:
-        db.add(
-            PlaylistItem(
-                playlist_id=copy.id,
-                video_id=item.video_id,
-                position=item.position,
-                added_at=item.added_at,
-            )
-        )
-    db.commit()
-    db.refresh(copy)
-    return copy
 
 
 def playlist_to_csv(playlist: Playlist) -> str:

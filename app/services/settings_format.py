@@ -32,6 +32,16 @@ def normalize_video_category_label(label: str) -> str:
     return " ".join(label.strip().lower().split())
 
 
+def serialized_category_labels(labels: list[str]) -> str | None:
+    """Labels as stored on a channel, fiche or playlist: normalized, deduplicated, comma-joined."""
+    normalized = []
+    for label in labels:
+        normalized_label = normalize_video_category_label(label)
+        if normalized_label and normalized_label not in normalized:
+            normalized.append(normalized_label)
+    return ",".join(normalized) or None
+
+
 def parse_video_category_labels(value: str | None) -> list[str]:
     if not value:
         return []

@@ -15,6 +15,7 @@ from app.models.video import Video
 from app.services.channels.throttle import RateLimitedError
 from app.services.job_log import log_job
 from app.services.playlists import imports as playlists_service
+from app.services.playlists.editing import playlist_title_from_filename
 from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
@@ -314,7 +315,7 @@ def test_delete_playlist_leaves_video_intact():
     db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
     db.commit()
 
-    playlists_routes.delete_playlist(playlist.id, db=db)
+    playlists_routes.delete_playlist_route(playlist.id, db=db)
 
     assert db.get(Playlist, playlist.id) is None
     assert db.get(Video, video.id) is not None
@@ -371,14 +372,14 @@ def test_add_video_to_playlist_existing_and_new_branches():
     db.add(playlist)
     db.commit()
 
-    playlists_routes.add_video_to_playlist(
+    playlists_routes.add_video_to_playlist_form(
         video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
     )
     items = db.scalars(select(PlaylistItem).where(PlaylistItem.video_id == video.id)).all()
     assert len(items) == 1
     assert items[0].playlist_id == playlist.id
 
-    playlists_routes.add_video_to_playlist(
+    playlists_routes.add_video_to_playlist_form(
         video.id, playlist_id="", new_playlist_title="Brand New", return_to="", db=db
     )
     new_playlist = db.scalars(select(Playlist).where(Playlist.title == "Brand New")).one()
@@ -477,9 +478,9 @@ def test_import_playlist_csv_route_rejects_bad_csv():
 
 
 def test_default_playlist_title_from_filename_strips_takeout_prefix():
-    assert playlists_routes._default_playlist_title_from_filename("Vidéos de Tech.csv") == "Tech"
-    assert playlists_routes._default_playlist_title_from_filename("Videos from Tech.csv") == "Tech"
-    assert playlists_routes._default_playlist_title_from_filename("random.csv") == "random"
+    assert playlist_title_from_filename("Vidéos de Tech.csv") == "Tech"
+    assert playlist_title_from_filename("Videos from Tech.csv") == "Tech"
+    assert playlist_title_from_filename("random.csv") == "random"
 
 
 # --- detail page actions --------------------------------------------------------
@@ -534,14 +535,14 @@ def test_sort_playlist_by_title_and_reverse():
     db = make_session()
     playlist, _ = make_playlist_with_videos(db)
 
-    playlists_routes.sort_playlist(playlist.id, by="title", db=db)
+    playlists_routes.sort_playlist_route(playlist.id, by="title", db=db)
     assert ordered_titles(db, playlist) == ["Video A", "Video B", "Video C"]
 
-    playlists_routes.sort_playlist(playlist.id, by="reverse", db=db)
+    playlists_routes.sort_playlist_route(playlist.id, by="reverse", db=db)
     assert ordered_titles(db, playlist) == ["Video C", "Video B", "Video A"]
 
     with pytest.raises(HTTPException) as excinfo:
-        playlists_routes.sort_playlist(playlist.id, by="nope", db=db)
+        playlists_routes.sort_playlist_route(playlist.id, by="nope", db=db)
     assert excinfo.value.status_code == 400
 
 
@@ -549,7 +550,7 @@ def test_rename_and_free_listening_toggle():
     db = make_session()
     playlist, _ = make_playlist_with_videos(db, count=1)
 
-    playlists_routes.rename_playlist(playlist.id, title="  Chill  ", db=db)
+    playlists_routes.rename_playlist_route(playlist.id, title="  Chill  ", db=db)
     assert db.get(Playlist, playlist.id).title == "Chill"
 
     response = playlists_routes.set_playlist_free_listening(
@@ -734,7 +735,7 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels():
     db.commit()
 
     for video in (plain, labelled):
-        playlists_routes.add_video_to_playlist(
+        playlists_routes.add_video_to_playlist_form(
             video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
         )
 

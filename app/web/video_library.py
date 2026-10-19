@@ -5,10 +5,10 @@ from fastapi import Request
 from app.models.channel import Channel
 from app.models.video import Video
 from app.services.durations import format_duration
+from app.services.settings_format import normalize_video_category_label
 from app.services.videos.list_state import video_auto_list_state, video_list_state
 from app.services.youtube.channel_info import normalized_channel_section
 from app.web.shared import (
-    normalize_category_label,
     templates,
     video_metadata,
 )
@@ -58,9 +58,9 @@ def selected_video_asset_filters(
 
 def selected_video_category_filters(request: Request) -> set[str]:
     return {
-        normalize_category_label(label)
+        normalize_video_category_label(label)
         for label in request.query_params.getlist("category")
-        if normalize_category_label(label)
+        if normalize_video_category_label(label)
     }
 
 
@@ -73,9 +73,9 @@ def selected_video_excluded_asset_filters(request: Request) -> set[str]:
 
 def selected_video_excluded_category_filters(request: Request) -> set[str]:
     return {
-        normalize_category_label(label)
+        normalize_video_category_label(label)
         for label in request.query_params.getlist("exclude_category")
-        if normalize_category_label(label)
+        if normalize_video_category_label(label)
     }
 
 

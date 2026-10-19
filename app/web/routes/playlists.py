@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -11,7 +9,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
@@ -20,21 +18,33 @@ from app.models.video import Video
 from app.services.background_jobs import run_manual_download_job
 from app.services.durations import format_duration
 from app.services.job_log import log_job
+from app.services.playlists.editing import (
+    add_video_to_playlist,
+    apply_item_order,
+    create_playlist,
+    delete_playlist,
+    duplicate_playlist,
+    move_item,
+    playlist_title_from_filename,
+    remove_item,
+    rename_playlist,
+    set_free_listening,
+    set_playlist_categories,
+    sort_playlist,
+    videos_missing_media,
+)
 from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
-    apply_item_order,
-    apply_playlist_labels,
-    duplicate_playlist,
     extract_playlist_info,
-    inherit_playlist_labels,
     parse_playlist_csv,
     playlist_to_csv,
     preview_playlist,
     run_playlist_csv_import_job,
     run_playlist_url_import_job,
 )
-from app.services.settings import add_video_category_labels, get_video_category_label_styles
+from app.services.settings import get_video_category_label_styles
+from app.services.settings_format import parse_video_category_labels
 from app.web.formatting import format_long_duration
 from app.web.shared import (
     append_query,
@@ -42,25 +52,12 @@ from app.web.shared import (
     form_list_values,
     form_text_value,
     internal_return_path,
-    parse_category_labels,
     redirect,
-    serialized_category_labels,
     templates,
     wants_json,
 )
 
 router = APIRouter()
-
-_CSV_TITLE_PREFIXES = ("vidéos de ", "videos de ", "videos from ")
-
-
-def _default_playlist_title_from_filename(filename: str) -> str:
-    stem = Path(filename).stem.strip()
-    lowered = stem.lower()
-    for prefix in _CSV_TITLE_PREFIXES:
-        if lowered.startswith(prefix):
-            return stem[len(prefix) :].strip() or stem
-    return stem or "Playlist importée"
 
 
 def _playlist_summary(playlist: Playlist) -> dict:
@@ -72,14 +69,10 @@ def _playlist_summary(playlist: Playlist) -> dict:
     }
 
 
-def _duration_seconds(video: Video) -> int:
-    # The column, not metadata.json: a playlist can hold hundreds of videos and the file is a ~140 KB dump.
-    return video.duration_seconds or 0
-
-
 def _playlist_row(item: PlaylistItem) -> dict:
     video = item.video
-    seconds = _duration_seconds(video)
+    # The column, not metadata.json: a playlist can hold hundreds of videos and the file is a ~140 KB dump.
+    seconds = video.duration_seconds or 0
     return {
         "item": item,
         "video": video,
@@ -125,10 +118,7 @@ def create_playlist_manual(title: str = Form(...), db: Session = Depends(get_db)
         return redirect(
             append_query("/playlists", {"level": "error", "message": "Le titre est obligatoire."})
         )
-    playlist = Playlist(title=title, source="manual")
-    db.add(playlist)
-    db.commit()
-    db.refresh(playlist)
+    playlist = create_playlist(db, title)
     return redirect(f"/playlists/{playlist.id}")
 
 
@@ -164,15 +154,13 @@ def import_playlist_url(
             return JSONResponse({"status": "failed", "message": message}, status_code=404)
         return redirect(append_query("/playlists", {"level": "error", "message": message}))
 
-    playlist = Playlist(
-        title=form_text_value(title) or info["title"],
+    playlist = create_playlist(
+        db,
+        form_text_value(title) or info["title"],
         source="url",
         source_url=info["url"],
         yt_playlist_id=info.get("yt_playlist_id"),
     )
-    db.add(playlist)
-    db.commit()
-    db.refresh(playlist)
 
     job = log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
     background_tasks.add_task(run_playlist_url_import_job, job.id, playlist.id)
@@ -209,13 +197,10 @@ def import_playlist_csv(
             return JSONResponse({"status": "failed", "message": message}, status_code=400)
         return redirect(append_query("/playlists", {"level": "error", "message": message}))
 
-    playlist_title = form_text_value(title) or _default_playlist_title_from_filename(
+    playlist_title = form_text_value(title) or playlist_title_from_filename(
         csv_file.filename or "Playlist importée"
     )
-    playlist = Playlist(title=playlist_title, source="csv")
-    db.add(playlist)
-    db.commit()
-    db.refresh(playlist)
+    playlist = create_playlist(db, playlist_title, source="csv")
 
     job = log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
     background_tasks.add_task(run_playlist_csv_import_job, job.id, playlist.id, rows)
@@ -255,7 +240,7 @@ def playlist_detail_page(request: Request, playlist_id: int, db: Session = Depen
         "playlist_detail.html",
         {
             "playlist": playlist,
-            "playlist_categories": parse_category_labels(playlist.category_labels),
+            "playlist_categories": parse_video_category_labels(playlist.category_labels),
             "category_filter_options": category_label_styles,
             "category_style_map": category_style_map(category_label_styles),
             "rows": rows,
@@ -277,11 +262,10 @@ def playlist_detail_page(request: Request, playlist_id: int, db: Session = Depen
 
 
 @router.post("/playlists/{playlist_id}/delete")
-def delete_playlist(playlist_id: int, db: Session = Depends(get_db)):
+def delete_playlist_route(playlist_id: int, db: Session = Depends(get_db)):
     playlist = db.get(Playlist, playlist_id)
     if playlist:
-        db.delete(playlist)
-        db.commit()
+        delete_playlist(db, playlist)
     return redirect(append_query("/playlists", {"message": "Playlist supprimée."}))
 
 
@@ -297,13 +281,12 @@ def _detail_redirect(playlist_id: int, message: str, level: str = "success"):
 
 
 @router.post("/playlists/{playlist_id}/rename")
-def rename_playlist(playlist_id: int, title: str = Form(...), db: Session = Depends(get_db)):
+def rename_playlist_route(playlist_id: int, title: str = Form(...), db: Session = Depends(get_db)):
     playlist = _get_playlist(db, playlist_id)
-    title = form_text_value(title).strip()
-    if not title:
-        return _detail_redirect(playlist_id, "Le titre est obligatoire.", "error")
-    playlist.title = title[:500]
-    db.commit()
+    try:
+        rename_playlist(db, playlist, form_text_value(title))
+    except ValueError as exc:
+        return _detail_redirect(playlist_id, str(exc), "error")
     return _detail_redirect(playlist_id, "Playlist renommée.")
 
 
@@ -317,12 +300,9 @@ def update_playlist_categories(
     playlist = _get_playlist(db, playlist_id)
     submitted_categories = [
         *form_list_values(preset_categories),
-        *parse_category_labels(form_text_value(custom_categories)),
+        *parse_video_category_labels(form_text_value(custom_categories)),
     ]
-    playlist.category_labels = serialized_category_labels(submitted_categories)
-    add_video_category_labels(db, submitted_categories)
-    labelled = apply_playlist_labels(db, playlist)
-    db.commit()
+    labelled = set_playlist_categories(db, playlist, submitted_categories)
     if labelled:
         message = f"Labels enregistrés, appliqués à {labelled} vidéo{'s' if labelled != 1 else ''}."
     else:
@@ -335,8 +315,7 @@ def set_playlist_free_listening(
     request: Request, playlist_id: int, enabled: str = Form("0"), db: Session = Depends(get_db)
 ):
     playlist = _get_playlist(db, playlist_id)
-    playlist.free_listening = enabled == "1"
-    db.commit()
+    set_free_listening(db, playlist, enabled == "1")
     if wants_json(request):
         return JSONResponse({"status": "ok", "free_listening": playlist.free_listening})
     return redirect(f"/playlists/{playlist_id}")
@@ -366,32 +345,12 @@ _SORT_LABELS = {
 
 
 @router.post("/playlists/{playlist_id}/sort")
-def sort_playlist(playlist_id: int, by: str = Form(...), db: Session = Depends(get_db)):
+def sort_playlist_route(playlist_id: int, by: str = Form(...), db: Session = Depends(get_db)):
     playlist = _get_playlist(db, playlist_id)
-    if by not in _SORT_LABELS:
-        raise HTTPException(status_code=400, detail="Tri inconnu")
-    items = list(
-        db.scalars(
-            select(PlaylistItem)
-            .where(PlaylistItem.playlist_id == playlist_id)
-            .order_by(PlaylistItem.position)
-        )
-    )
-    if by == "added":
-        items.sort(
-            key=lambda item: (
-                (item.added_at or item.created_at).timestamp()
-                if (item.added_at or item.created_at)
-                else 0
-            )
-        )
-    elif by == "duration":
-        items.sort(key=lambda item: _duration_seconds(item.video))
-    elif by == "title":
-        items.sort(key=lambda item: item.video.title.casefold())
-    else:
-        items.reverse()
-    apply_item_order(db, playlist, [item.id for item in items])
+    try:
+        sort_playlist(db, playlist, by)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _detail_redirect(playlist_id, f"Playlist triée : {_SORT_LABELS[by]}.")
 
 
@@ -435,8 +394,7 @@ def download_playlist_media(
     playlist = _get_playlist(db, playlist_id)
     if media_type not in {"audio", "video"}:
         raise HTTPException(status_code=400, detail="Le format doit être vidéo ou audio.")
-    path_field = "audio_path" if media_type == "audio" else "video_path"
-    missing = [item.video for item in playlist.items if not getattr(item.video, path_field)]
+    missing = videos_missing_media(playlist, media_type)
     for video in missing:
         job = log_job(db, "queued", "Téléchargement en file d'attente.", video_id=video.id)
         background_tasks.add_task(
@@ -453,13 +411,6 @@ def download_playlist_media(
     )
 
 
-def _next_item_position(db: Session, playlist_id: int) -> int:
-    max_position = db.scalar(
-        select(func.max(PlaylistItem.position)).where(PlaylistItem.playlist_id == playlist_id)
-    )
-    return (max_position or 0) + 1
-
-
 @router.post("/playlists/{playlist_id}/items/{item_id}/remove")
 def remove_playlist_item(
     playlist_id: int,
@@ -470,19 +421,7 @@ def remove_playlist_item(
     item = db.get(PlaylistItem, item_id)
     if item is None or item.playlist_id != playlist_id:
         raise HTTPException(status_code=404, detail="Élément introuvable")
-    db.delete(item)
-    db.commit()
-
-    remaining = list(
-        db.scalars(
-            select(PlaylistItem)
-            .where(PlaylistItem.playlist_id == playlist_id)
-            .order_by(PlaylistItem.position)
-        )
-    )
-    for index, remaining_item in enumerate(remaining, start=1):
-        remaining_item.position = index
-    db.commit()
+    remove_item(db, item)
     return redirect(internal_return_path(return_to, f"/playlists/{playlist_id}"))
 
 
@@ -493,28 +432,12 @@ def move_playlist_item(
     item = db.get(PlaylistItem, item_id)
     if item is None or item.playlist_id != playlist_id:
         raise HTTPException(status_code=404, detail="Élément introuvable")
-
-    items = list(
-        db.scalars(
-            select(PlaylistItem)
-            .where(PlaylistItem.playlist_id == playlist_id)
-            .order_by(PlaylistItem.position)
-        )
-    )
-    index = next((i for i, current in enumerate(items) if current.id == item.id), None)
-    if index is not None:
-        swap_index = index - 1 if direction == "up" else index + 1
-        if 0 <= swap_index < len(items):
-            items[index].position, items[swap_index].position = (
-                items[swap_index].position,
-                items[index].position,
-            )
-            db.commit()
+    move_item(db, item, direction)
     return redirect(f"/playlists/{playlist_id}")
 
 
 @router.post("/videos/{video_id}/playlists")
-def add_video_to_playlist(
+def add_video_to_playlist_form(
     video_id: int,
     playlist_id: str = Form(""),
     new_playlist_title: str = Form(""),
@@ -528,29 +451,12 @@ def add_video_to_playlist(
     target_playlist: Playlist | None = None
     new_title = form_text_value(new_playlist_title).strip()
     if new_title:
-        target_playlist = Playlist(title=new_title, source="manual")
-        db.add(target_playlist)
-        db.commit()
-        db.refresh(target_playlist)
+        target_playlist = create_playlist(db, new_title)
     elif playlist_id:
         target_playlist = db.get(Playlist, int(playlist_id))
 
     if target_playlist is not None:
-        existing = db.scalar(
-            select(PlaylistItem).where(
-                PlaylistItem.playlist_id == target_playlist.id, PlaylistItem.video_id == video_id
-            )
-        )
-        if existing is None:
-            db.add(
-                PlaylistItem(
-                    playlist_id=target_playlist.id,
-                    video_id=video_id,
-                    position=_next_item_position(db, target_playlist.id),
-                )
-            )
-            inherit_playlist_labels(target_playlist, video)
-            db.commit()
+        add_video_to_playlist(db, target_playlist.id, video_id)
 
     target = internal_return_path(return_to, f"/videos/{video_id}")
     return redirect(target)
