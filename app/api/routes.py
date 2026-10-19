@@ -26,14 +26,12 @@ from app.services.common.settings import (
 from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.videos.charts import library_chart_data
 from app.services.videos.library_query import library_page
+from app.services.videos.library_view import LIBRARY_PAGE_SIZE
 from app.services.videos.stats import library_counts
 from app.services.youtube.channel_info import ChannelNotFoundError
 from app.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 
 router = APIRouter(prefix="/api")
-
-# Same page size as the HTML library list.
-API_VIDEO_PAGE_SIZE = 50
 
 # Error details are French, like the messages of the HTML pages and of the service exceptions.
 CHANNEL_NOT_FOUND = "Chaîne introuvable"
@@ -92,7 +90,7 @@ def list_videos(
 ) -> VideoPage:
     where = Video.channel_id == channel_id if channel_id else true()
     videos, page, total_pages, total = library_page(
-        db, where, "imported", "", page, API_VIDEO_PAGE_SIZE
+        db, where, "imported", "", page, LIBRARY_PAGE_SIZE
     )
     return VideoPage(
         items=[VideoRead.model_validate(video) for video in videos],
