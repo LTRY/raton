@@ -10,7 +10,7 @@ from yt_dlp import YoutubeDL
 
 from app.models.video import TranscriptStatus
 from app.services.files import sanitize_filename
-from app.services.youtube.yt import _ytdlp_call, extract_video_info
+from app.services.youtube.yt import extract_video_info, ytdlp_call
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".opus", ".ogg", ".wav", ".flac"}
@@ -71,7 +71,7 @@ def download_media(
                 "preferredcodec": "m4a",
             }
         ]
-    with _ytdlp_call("download_media"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("download_media"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(video_url, download=True)
     return info
 
@@ -157,7 +157,7 @@ def download_subtitles(
         "subtitlesformat": "vtt/best",
         "restrictfilenames": True,
     }
-    with _ytdlp_call("download_subtitles"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("download_subtitles"), YoutubeDL(opts) as ydl:
         _extract_and_write(ydl, video_url, info)
 
 
@@ -178,7 +178,7 @@ def download_thumbnail(video_url: str, folder: Path, info: dict[str, Any] | None
         "writethumbnail": True,
         "restrictfilenames": True,
     }
-    with _ytdlp_call("download_thumbnail"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("download_thumbnail"), YoutubeDL(opts) as ydl:
         _extract_and_write(ydl, video_url, info)
 
 

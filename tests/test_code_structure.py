@@ -1,6 +1,7 @@
 """Structure rules that used to live in CLAUDE.md as prose."""
 
 import ast
+import re
 from pathlib import Path
 
 APP = Path(__file__).resolve().parents[1] / "app"
@@ -94,3 +95,29 @@ def test_service_packages_form_a_dag():
             ):
                 offenders.append(f"{relative}: {module}")
     assert not offenders, "forbidden service imports: " + ", ".join(sorted(set(offenders)))
+
+
+# Writes still done by the web layer itself, waiting to move into a service. The counts may only go
+# down: a route reads the request, calls a service and renders; the service owns the business rule
+# and its commit (docs/spec/03-architecture.md). Lower a count when you move a write out.
+WEB_DB_WRITES_LEFT = {
+    "api/routes.py": 1,  # PUT /api/settings, twin of POST /settings
+    "web/raton.py": 2,  # visit tracking of the home hero
+    "web/routes/library_chat.py": 5,  # applying a library chat answer, clearing the chat
+    "web/routes/media.py": 1,  # deleting one media file
+    "web/routes/settings.py": 1,  # saving the settings form
+    "web/routes/transcript.py": 2,  # applying an LLM job result
+}
+DB_WRITE = re.compile(r"\bdb\.(add|add_all|commit|delete|flush|merge)\(|\.delete\(\)")
+
+
+def test_web_layer_leaves_db_writes_to_services():
+    counts = {}
+    for path in sorted([*(APP / "web").rglob("*.py"), *(APP / "api").rglob("*.py")]):
+        found = len(DB_WRITE.findall(path.read_text(encoding="utf-8")))
+        if found:
+            counts[str(path.relative_to(APP))] = found
+    assert counts == WEB_DB_WRITES_LEFT, (
+        "a route writes to the DB itself: move the write into app/services/ "
+        "(or lower WEB_DB_WRITES_LEFT after moving one out)"
+    )

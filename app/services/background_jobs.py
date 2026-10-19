@@ -363,13 +363,13 @@ def run_llm_job(job_id: int) -> None:
                 # The clickbait section is only ever requested in the prompt when the
                 # user opted into attaching the thumbnail (see the include_image form
                 # field on /transcript/generate) — checking for it here, rather than
-                # recomputing _video_analysis_has_image blindly, is what makes that
+                # recomputing video_analysis_has_image blindly, is what makes that
                 # opt-out actually take effect instead of always attaching the image
                 # whenever one happens to be available.
                 and ANALYSIS_CLICKBAIT_HEADER in job.prompt
                 and isinstance(provider_instance, AnthropicProvider)
                 and job.video is not None
-                and _video_analysis_has_image(job.video, job.provider)
+                and video_analysis_has_image(job.video, job.provider)
             ):
                 image_path = local_media_path(job.video.thumbnail_path).resolve()
                 media_type = THUMBNAIL_MEDIA_TYPES.get(image_path.suffix.lower(), "image/jpeg")
@@ -418,7 +418,7 @@ def run_llm_job(job_id: int) -> None:
             logger.exception("Récupération des profils de chaînes échouée après le chat")
 
 
-def _video_analysis_has_image(video: Video, provider: str) -> bool:
+def video_analysis_has_image(video: Video, provider: str) -> bool:
     if provider != "anthropic" or not video.thumbnail_path or not video.folder_path:
         return False
     folder = local_media_path(video.folder_path).resolve()

@@ -18,7 +18,7 @@ class ChannelAlreadyInLibraryError(Exception):
 
 
 def create_channel(
-    db: Session, url: str, rating: int = 1, category_labels: str | None = None
+    db: Session, url: str, rating: int = 1, category_labels: list[str] | None = None
 ) -> Channel:
     """Resolve `url` on YouTube and add the channel.
 
@@ -36,9 +36,11 @@ def create_channel(
         name=info["name"],
         yt_channel_id=info["yt_channel_id"],
         rating=rating,
-        category_labels=category_labels,
+        category_labels=serialized_category_labels(category_labels or []),
     )
     db.add(channel)
+    if category_labels:
+        add_video_category_labels(db, category_labels)
     db.commit()
     db.refresh(channel)
     return channel

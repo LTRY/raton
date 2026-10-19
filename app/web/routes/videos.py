@@ -22,9 +22,9 @@ from app.models.playlist import Playlist
 from app.models.video import Video
 from app.services.background_jobs import (
     CHANNEL_VIDEO_PAGE_SIZE,
-    _video_analysis_has_image,
     run_manual_download_job,
     run_transcript_retry_job,
+    video_analysis_has_image,
 )
 from app.services.channels.identity import ensure_video_channel
 from app.services.channels.media_import import import_video_metadata
@@ -480,7 +480,7 @@ def video_detail_page(request: Request, video_id: int, db: Session = Depends(get
             "extended_metadata": extended_metadata,
             "vtt_content": vtt_content,
             "video_analysis": video_analysis_payload(video),
-            "can_include_image": _video_analysis_has_image(video, get_llm_provider_name()),
+            "can_include_image": video_analysis_has_image(video, get_llm_provider_name()),
             "sponsor_segments": sponsor_segments,
             "resume_positions": latest_playback_positions(db, video.id),
             "sponsor_skip_payload": {

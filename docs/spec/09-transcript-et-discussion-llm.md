@@ -180,10 +180,10 @@ en isolation.
 - champ de formulaire `include_image` (case à cocher `Inclure la miniature`
   côté client, dans l'infobulle du bouton robot) : quand cochée, une miniature locale est jointe à l'appel —
   mais seulement si le fournisseur actif est `anthropic` **et** qu'un fichier
-  de miniature existe localement (`app/services/background_jobs.py:_video_analysis_has_image`) ;
+  de miniature existe localement (`app/services/background_jobs.py:video_analysis_has_image`) ;
   la case n'est même affichée côté client que si cette condition est vraie ;
   côté serveur, `has_image = bool(include_image) and
-  _video_analysis_has_image(video, provider)` — un `include_image` forgé
+  video_analysis_has_image(video, provider)` — un `include_image` forgé
   sans miniature réelle ni fournisseur `anthropic` reste donc sans effet ;
   **la vision est réservée au fournisseur Anthropic**, via
   `AnthropicProvider.complete_with_image`, un bloc image natif de l'API

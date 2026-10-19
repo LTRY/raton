@@ -9,7 +9,7 @@ from app.core.logging import log_external
 logger = logging.getLogger(__name__)
 
 
-def _ytdlp_call(op: str):
+def ytdlp_call(op: str):
     # A 429 or a scheduled premiere is handled by the callers: a warning, not an error.
     return log_external(
         logger,
@@ -54,5 +54,5 @@ def is_not_yet_available_error(exc: BaseException) -> bool:
 
 def extract_video_info(video_url: str) -> dict[str, Any]:
     opts = {"quiet": True, "skip_download": True, "noplaylist": True}
-    with _ytdlp_call("extract_video_info"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("extract_video_info"), YoutubeDL(opts) as ydl:
         return ydl.extract_info(video_url, download=False)

@@ -85,7 +85,18 @@ The FastAPI app expects a reachable Postgres via `DATABASE_URL` unless you use `
 
 ## Architecture
 
-Stack: Python 3.14, FastAPI, Jinja2 (server-rendered, no frontend framework), SQLAlchemy, Alembic, PostgreSQL 16 (Docker Compose), yt-dlp + ffmpeg, APScheduler, Anthropic API for the LLM features. The layout, data model, data flow and jobs are described in `docs/spec/03-architecture.md`, `05-modele-de-donnees.md` and `13-jobs-logs-planification.md`; the structure rules are enforced by `tests/test_code_structure.py` (no route in `app/main.py`, `app/web/shared.py` imports no other web module).
+Stack: Python 3.14, FastAPI, Jinja2 (server-rendered, no frontend framework), SQLAlchemy, Alembic, PostgreSQL 16 (Docker Compose), yt-dlp + ffmpeg, APScheduler, Anthropic API for the LLM features. The layout, data model, data flow and jobs are described in `docs/spec/03-architecture.md`, `05-modele-de-donnees.md` and `13-jobs-logs-planification.md`; the structure rules are enforced by `tests/test_code_structure.py` (see "Code layout" below).
+
+### Code layout: routes call services
+
+Where each kind of code lives, and which service package may import which, is in `docs/spec/03-architecture.md` (section "`app/services/` : organisation par domaine"); `tests/test_code_structure.py` enforces it. Read that section before adding a module.
+
+- **A business rule is written once, in `app/services/`.** A route (`app/web/routes/`, `app/api/`) only reads the request, calls a service, turns the service's errors into an HTTP response, queues background tasks and renders. It does not query-and-update rows itself, and an HTML route and its `/api` twin call the same service function instead of keeping two copies. `WEB_DB_WRITES_LEFT` in the structure test lists the writes not moved yet: it may only shrink.
+- **Services never import `app/web/`**, and service packages only import in the direction the structure test allows. A new dependency between packages is a design decision: change the test's map and the spec on purpose, never to silence it, and never create a cycle.
+- **Before writing a helper, look for it in `app/services/`.** Two copies of the same rule drift apart (this is how `/api` came to accept a channel the form refused).
+- **A service signals a refused action with an exception** (a `ValueError` subclass whose message is the French text shown to the user); the route maps it to 400/404/409 or an error message. Services commit their own writes.
+- **One subject per module.** Split a module that mixes subjects or grows past ~400 lines; don't import another module's `_private` names — make the name public or move the code.
+- **Moving code moves the test patches with it**: `monkeypatch.setattr` must target the module where the name is looked up. A module-level setting that tests patch (the pauses of `channels/throttle.py`) is read through its module (`throttle.PAUSE_...`), never copied in with `from ... import`.
 
 Traps:
 

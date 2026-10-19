@@ -44,7 +44,6 @@ from app.services.channels.subscriptions import (
 from app.services.job_log import log_job
 from app.services.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.settings import (
-    add_video_category_labels,
     get_video_category_label_styles,
 )
 from app.services.settings_format import parse_video_category_labels, serialized_category_labels
@@ -232,13 +231,11 @@ def add_channel(
             )
         )
     try:
-        channel = create_channel(db, url, category_labels=category_labels)
+        channel = create_channel(db, url, category_labels=submitted_categories)
     except ChannelNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Chaîne introuvable") from exc
     except ChannelAlreadyInLibraryError as exc:
         return redirect(append_query("/channels", {"level": "error", "message": str(exc)}))
-    add_video_category_labels(db, submitted_categories)
-    db.commit()
     if background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
     return redirect(

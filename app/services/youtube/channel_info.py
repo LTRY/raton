@@ -7,7 +7,7 @@ from yt_dlp import YoutubeDL
 
 from app.models.channel import Channel
 from app.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
-from app.services.youtube.yt import _ytdlp_call
+from app.services.youtube.yt import ytdlp_call
 
 CHANNEL_SECTIONS = {"videos", "shorts"}
 CHANNEL_SECTION_ALIASES = {
@@ -81,7 +81,7 @@ def search_channels(query: str, limit: int = CHANNEL_SEARCH_LIMIT) -> list[dict[
         return []
     url = f"https://www.youtube.com/results?search_query={quote_plus(value)}&sp={CHANNEL_SEARCH_FILTER}"
     opts = {"quiet": True, "skip_download": True, "extract_flat": True, "playlistend": limit}
-    with _ytdlp_call("search_channels"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("search_channels"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
     results = []
     for entry in (info.get("entries") if isinstance(info, dict) else None) or []:
@@ -120,7 +120,7 @@ def extract_channel_info(channel_input: str) -> dict[str, Any]:
     url = resolve_channel_url(channel_input)
     opts = {"quiet": True, "skip_download": True, "extract_flat": True, "playlistend": 1}
     try:
-        with _ytdlp_call("extract_channel_info"), YoutubeDL(opts) as ydl:
+        with ytdlp_call("extract_channel_info"), YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as exc:
         if strict_handle:
@@ -147,7 +147,7 @@ def channel_image_url(thumbnails: list[dict[str, Any]] | None, image_id: str) ->
 def fetch_channel_profile(channel_url: str) -> dict[str, Any]:
     """Description, tags and image URLs of a channel, from the same flat extraction used to add it."""
     opts = {"quiet": True, "skip_download": True, "extract_flat": True, "playlistend": 1}
-    with _ytdlp_call("fetch_channel_profile"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("fetch_channel_profile"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(channel_url, download=False)
     if not info:
         raise ChannelNotFoundError(f"Chaîne introuvable pour {channel_url}")
@@ -177,7 +177,7 @@ def count_channel_entries(channel: Channel) -> int | None:
         "ignoreerrors": True,
         "playlistend": 1,
     }
-    with _ytdlp_call("count_channel_entries"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("count_channel_entries"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(channel.url, download=False)
 
     count = count_from_info(info)
@@ -190,7 +190,7 @@ def count_channel_entries(channel: Channel) -> int | None:
         "extract_flat": True,
         "ignoreerrors": True,
     }
-    with _ytdlp_call("count_channel_entries"), YoutubeDL(full_opts) as ydl:
+    with ytdlp_call("count_channel_entries"), YoutubeDL(full_opts) as ydl:
         info = ydl.extract_info(channel.url, download=False)
 
     count = count_from_info(info)
@@ -235,6 +235,6 @@ def list_channel_entries(
         "playliststart": playlist_start,
         "playlistend": playlist_start + page_size - 1,
     }
-    with _ytdlp_call("list_channel_entries"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("list_channel_entries"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(section_url, download=False)
     return [entry for entry in info.get("entries", []) if entry]

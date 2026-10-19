@@ -11,7 +11,7 @@ from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.background_jobs import _video_analysis_has_image, enqueue_llm_job, run_llm_job
+from app.services.background_jobs import enqueue_llm_job, run_llm_job, video_analysis_has_image
 from app.services.job_log import log_job
 from app.services.llm.chat_history import load_chat, save_chat
 from app.services.llm.prompts import (
@@ -152,7 +152,7 @@ def generate_video_transcript_documents(
     provider = get_llm_provider_name()
     try:
         transcript_path, _, _ = get_transcript_paths(video)
-        has_image = bool(include_image) and _video_analysis_has_image(video, provider)
+        has_image = bool(include_image) and video_analysis_has_image(video, provider)
         prompt = build_generation_prompt(
             transcript_path.read_text(encoding="utf-8", errors="replace"), video.title, has_image
         )

@@ -216,7 +216,10 @@ l'inverse. `tests/test_code_structure.py` fait respecter ces règles. Les donné
 
 Une regle metier ne s'ecrit qu'une fois, dans `app/services/` : les routes HTML
 et `/api` l'appellent et ne font que lire la requete, traduire ses erreurs en
-reponse HTTP, lancer les taches de fond et rendre la page. La note
+reponse HTTP, lancer les taches de fond et rendre la page.
+Les ecritures en base encore faites par la couche web sont listees dans
+`tests/test_code_structure.py` (`WEB_DB_WRITES_LEFT`) : cette liste ne peut que
+raccourcir. La note
 en etoiles d'une chaine ou d'une fiche passe par `app/services/ratings.py`.
 
 L'écriture d'une ligne de journal de jobs (`log_job`) et de l'activite de

@@ -1019,7 +1019,7 @@ def test_video_analysis_has_image_true_when_thumbnail_inside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs._video_analysis_has_image(video, "anthropic") is True
+    assert background_jobs.video_analysis_has_image(video, "anthropic") is True
 
 
 def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
@@ -1038,7 +1038,7 @@ def test_video_analysis_has_image_false_when_thumbnail_outside_folder(tmp_path):
         transcript_status=TranscriptStatus.missing,
     )
 
-    assert background_jobs._video_analysis_has_image(video, "anthropic") is False
+    assert background_jobs.video_analysis_has_image(video, "anthropic") is False
 
 
 def test_generate_documents_without_thumbnail_omits_clickbait_section_even_if_checkbox_checked(
