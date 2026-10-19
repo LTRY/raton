@@ -13,10 +13,12 @@ from app.models.job import DownloadJob
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import TranscriptStatus, Video
-from app.services import background_jobs, rag_retrieval, yt
-from app.services.library_chat_tools import LibraryChatToolbox
-from app.services.llm import CompletionResult
-from app.services.rag_retrieval import RetrievedChunk
+from app.services.jobs import backfills, llm_jobs
+from app.services.library_chat.tools import LibraryChatToolbox
+from app.services.llm.provider import CompletionResult
+from app.services.rag import retrieval as rag_retrieval
+from app.services.rag.retrieval import RetrievedChunk
+from app.services.youtube import channel_info
 from app.web.routes import library_chat as library_chat_routes
 
 
@@ -59,14 +61,14 @@ def fake_provider(answer, tool_calls=()):
 
 def ask(db, monkeypatch, provider, question="Une question ?"):
     # The post-chat profile backfill would reach YouTube and the real media root.
-    monkeypatch.setattr(background_jobs, "run_channel_profile_backfill_job", lambda: None)
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: provider)
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "run_channel_profile_backfill_job", lambda: None)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
     response = library_chat_routes.chat_about_library(
         fetch_request("/chat"), BackgroundTasks(), question, db
     )
     job_id = json.loads(response.body)["job_id"]
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
     return json.loads(library_chat_routes.library_chat_job_status(job_id, db).body)
 
 
@@ -106,8 +108,9 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
         f"Chaîne test [chaine:{channel.id}] en parle dans Stoïcisme et action [video:{video.id}].",
         tool_calls=[("chercher_dans_les_notes", {"requete": "stoïcisme"})],
     )
-    monkeypatch.setattr(background_jobs, "get_llm_provider", lambda: provider)
-    monkeypatch.setattr(background_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: provider)
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
 
     scheduled = []
     background_tasks = BackgroundTasks()
@@ -129,9 +132,9 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     assert job.kind == "library_chat"
     assert job.video_id is None
     assert "Qu'est-ce que le stoïcisme ?" in job.prompt
-    assert scheduled == [(background_jobs.run_llm_job, (job_id,), {})]
+    assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
-    background_jobs.run_llm_job(job_id)
+    llm_jobs.run_llm_job(job_id)
 
     assert "dichotomie du contrôle" in provider.tool_outputs[0]
 
@@ -398,7 +401,7 @@ def youtube_candidates(*candidates):
 def test_library_chat_adds_a_channel_found_on_youtube(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(
             ("UCleo", "Léo Duff", "@LeoDuff", 822000), ("UCother", "Leo Duff", "@LeFohShow", 341)
@@ -437,7 +440,7 @@ def test_library_chat_adds_a_channel_found_on_youtube(monkeypatch):
 def test_library_chat_cannot_add_a_channel_youtube_did_not_return(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -458,7 +461,7 @@ def test_library_chat_does_not_duplicate_a_channel_already_in_the_library(monkey
     db.add(known)
     db.commit()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -476,7 +479,7 @@ def test_library_chat_does_not_duplicate_a_channel_already_in_the_library(monkey
 def test_library_chat_backfills_profiles_once_after_the_job_is_done(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -494,19 +497,19 @@ def test_library_chat_backfills_profiles_once_after_the_job_is_done(monkeypatch)
         statuses.append(db.query(LlmJob).one().status)
 
     ask(db, monkeypatch, provider)  # builds the job and installs the no-op hook
-    monkeypatch.setattr(background_jobs, "run_channel_profile_backfill_job", record)
+    monkeypatch.setattr(llm_jobs, "run_channel_profile_backfill_job", record)
     job = db.query(LlmJob).one()
     job.status = "queued"
     db.query(Channel).delete()
     db.commit()
     provider.tool_outputs.clear()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
 
-    background_jobs.run_llm_job(job.id)
+    llm_jobs.run_llm_job(job.id)
 
     assert statuses == ["done"]
 
@@ -515,14 +518,12 @@ def test_library_chat_does_not_backfill_when_no_channel_was_added(monkeypatch):
     db = make_session()
     calls = []
     ask(db, monkeypatch, fake_provider("Rien à ajouter."))
-    monkeypatch.setattr(
-        background_jobs, "run_channel_profile_backfill_job", lambda: calls.append(1)
-    )
+    monkeypatch.setattr(backfills, "run_channel_profile_backfill_job", lambda: calls.append(1))
     job = db.query(LlmJob).one()
     job.status = "queued"
     db.commit()
 
-    background_jobs.run_llm_job(job.id)
+    llm_jobs.run_llm_job(job.id)
 
     assert calls == []
 
@@ -530,7 +531,7 @@ def test_library_chat_does_not_backfill_when_no_channel_was_added(monkeypatch):
 def test_a_failing_post_chat_backfill_does_not_propagate(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        yt,
+        channel_info,
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
@@ -550,9 +551,9 @@ def test_a_failing_post_chat_backfill_does_not_propagate(monkeypatch):
     def boom():
         raise RuntimeError("youtube down")
 
-    monkeypatch.setattr(background_jobs, "run_channel_profile_backfill_job", boom)
+    monkeypatch.setattr(backfills, "run_channel_profile_backfill_job", boom)
 
-    background_jobs.run_llm_job(job.id)  # must not raise
+    llm_jobs.run_llm_job(job.id)  # must not raise
 
     assert db.query(LlmJob).one().status == "done"
 
@@ -622,7 +623,7 @@ def test_run_llm_job_stores_the_tool_calls_of_a_library_chat(monkeypatch):
 
 
 def test_notes_search_failing_to_embed_tells_the_model_and_does_not_fail_the_job(monkeypatch):
-    from app.services.embeddings import EmbeddingError
+    from app.services.rag.embeddings import EmbeddingError
 
     db = make_session()
 

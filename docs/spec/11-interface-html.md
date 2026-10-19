@@ -91,7 +91,7 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   (`selectinload`/`joinedload`), jamais une requete par ligne.
 - Une table qui grossit a chaque lecture (`download_jobs` de statut `played`)
   n'est jamais lue en entier pour un calcul qui ne regarde qu'une periode :
-  `recent_played_jobs` (`app/web/playback.py`) borne la lecture aux 30 jours
+  `recent_played_jobs` (`app/services/videos/playback.py`) borne la lecture aux 30 jours
   des temps de lecture (aujourd'hui/7 jours/30 jours) et charge les videos
   d'un coup. `/settings` et `/dashboard/historique` l'utilisent.
 - Un fichier du disque (`metadata.json`, transcript) n'est pas relu pour chaque
@@ -357,7 +357,7 @@ Bibliotheque = quatre vues reliees par une barre de sous-navigation commune
 ## Statistiques
 
 Template : `stats.html`, route `GET /stats` (`app/web/routes/stats.py`),
-agregations dans `app/services/library_charts.py`. Page sans JavaScript : les
+agregations dans `app/services/videos/charts.py`. Page sans JavaScript : les
 graphiques sont des barres CSS (largeurs/hauteurs en pourcentage calcule cote
 serveur). Elle montre :
 
@@ -376,12 +376,12 @@ serveur). Elle montre :
   fenetre complete de 12 mois.
 
 - medias supprimes automatiquement par mois (`purged_media_by_month`,
-  `app/services/library_charts.py`) : barres du nombre de videos dont la purge
+  `app/services/videos/charts.py`) : barres du nombre de videos dont la purge
   (`purge_watched_media`) a supprime les fichiers, comptees depuis les
   lignes `purged` de `download_jobs`, sur 12 mois sans les mois vides en tete ;
   total / mois en cours / moyenne en tete ; la carte est absente tant qu'aucune
   purge n'a eu lieu. Le poids libere n'est pas enregistre, donc pas affiche ;
-- depenses en modele par mois (`llm_spend_by_month`, `app/services/llm_usage.py`) :
+- depenses en modele par mois (`llm_spend_by_month`, `app/services/llm/usage.py`) :
   barres empilees par groupe de jobs (notes et resumes, nettoyage de
   transcript, discussions, autres), cout total au-dessus de chaque barre,
   total / mois en cours / moyenne en tete. Cout reel des `llm_jobs` ayant un
@@ -398,7 +398,7 @@ snapshots.
 ## Indexation RAG
 
 Template : `rag_dashboard.html`, route `GET /rag` (`app/web/routes/rag.py`),
-donnees dans `app/services/rag_dashboard.py` (`rag_dashboard_data`). Lien
+donnees dans `app/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
 "Indexation RAG" dans une carte de `/settings` (ancre `#rag`). Page de lecture sans JavaScript,
 construite avec les cartes et barres CSS de `/stats` ; elle repond a "ou en
 est l'indexation des notes et que va faire le passage de la nuit ?" et sert
@@ -556,7 +556,7 @@ progression" (reglable dans `/settings`, cle `no_progress_category_labels`,
 defaut **amv**/**musique** — voir « Parametres » plus bas).
 
 - Lecture terminee (`is_completed`, calcule dans `playback_activity_view`/
-  `app/web/playback.py` a partir de la position et de la duree de lecture) et video
+  `app/services/videos/playback.py` a partir de la position et de la duree de lecture) et video
   hors de ces categories : la barre disparait et la carte est grisee
   (classe `video-row-watched` sur `/videos`/dashboard, `dashboard-media-row-completed`
   pour `Historique`) pour signaler que le media a ete vu en entier.
@@ -575,7 +575,7 @@ Les statistiques de la bibliotheque (fiches, transcripts, chaines, chaines
 actives, videos, shorts, medias, stockage utilise / quota avec jauge) et le
 carrousel "Temps de lecture" sont des cartes de `/settings` (ancres
 `#library-stats` et `#playback-time`), calculees par `library_stats_context`
-(`app/web/library_stats.py`). La carte stockage renvoie vers `/stats` (bouton
+(`app/web/library_stats.py`, compteurs dans `app/services/videos/stats.py`). La carte stockage renvoie vers `/stats` (bouton
 "Voir les graphiques").
 
 Le carrousel "Temps de lecture" (`.screen-time-carousel`, periodes
@@ -906,7 +906,7 @@ Les pages `/videos` et `/channels` ont chacune un champ `q` dans leur
 formulaire de filtres. La recherche s'ajoute aux filtres actifs (chaine,
 types de fichier, categories, "Notees"...) : elle ne les remplace pas.
 
-Correspondance (`search_rank` dans `app/services/search.py`) :
+Correspondance (`search_rank` dans `app/services/common/search.py`) :
 
 - la requete est decoupee en mots ; **tous** les mots doivent etre presents,
   dans n'importe quel ordre et dans n'importe quel champ (`python tuto`

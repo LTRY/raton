@@ -5,16 +5,17 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.channel import Channel
-from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
-from app.models.video import Video
-from app.services.background_jobs import enqueue_llm_job, run_llm_job
-from app.services.library_chat_tools import parse_source_ids
-from app.services.llm import build_library_chat_prompt
-from app.services.rag_retrieval import count_indexed_videos
-from app.services.scanner import log_job
-from app.services.settings import get_llm_provider_name
+from app.services.common.settings import get_llm_provider_name
+from app.services.jobs.llm_jobs import apply_library_chat_result, enqueue_llm_job, run_llm_job
+from app.services.library_chat.history import (
+    chat_history,
+    chat_messages,
+    clear_chat,
+    total_video_count,
+)
+from app.services.llm.prompts import build_library_chat_prompt
+from app.services.rag.retrieval import count_indexed_videos
 
 router = APIRouter()
 
@@ -27,51 +28,13 @@ LIBRARY_CHAT_SUGGESTIONS = [
 ]
 
 
-def _join_source_ids(ids: list[int]) -> str | None:
-    return ",".join(str(item_id) for item_id in ids) or None
-
-
 def library_chat_payload(db: Session, message: str | None = None) -> dict:
-    rows = db.query(LibraryChatMessage).order_by(LibraryChatMessage.id).all()
-    video_ids = {video_id for row in rows for video_id in parse_source_ids(row.sources)}
-    channel_ids = {
-        channel_id for row in rows for channel_id in parse_source_ids(row.channel_sources)
-    }
-    video_titles = (
-        dict(db.query(Video.id, Video.title).filter(Video.id.in_(video_ids)).all())
-        if video_ids
-        else {}
-    )
-    channel_names = (
-        dict(db.query(Channel.id, Channel.name).filter(Channel.id.in_(channel_ids)).all())
-        if channel_ids
-        else {}
-    )
-    messages = [
-        {
-            "role": row.role,
-            "content": row.content,
-            # Channels and videos deleted since the answer was given are
-            # silently dropped rather than shown as broken links.
-            "channels": [
-                {"channel_id": channel_id, "name": channel_names[channel_id]}
-                for channel_id in parse_source_ids(row.channel_sources)
-                if channel_id in channel_names
-            ],
-            "citations": [
-                {"video_id": video_id, "title": video_titles[video_id]}
-                for video_id in parse_source_ids(row.sources)
-                if video_id in video_titles
-            ],
-        }
-        for row in rows
-    ]
     return {
         "status": "ok",
         "message": message,
-        "messages": messages,
+        "messages": chat_messages(db),
         "indexed_video_count": count_indexed_videos(db),
-        "total_video_count": db.query(Video).count(),
+        "total_video_count": total_video_count(db),
     }
 
 
@@ -109,10 +72,7 @@ def chat_about_library(
         )
     provider = get_llm_provider_name()
     try:
-        history = [
-            {"role": row.role, "content": row.content}
-            for row in db.query(LibraryChatMessage).order_by(LibraryChatMessage.id).all()
-        ]
+        history = chat_history(db)
         prompt = build_library_chat_prompt(history, question)
         job = enqueue_llm_job(
             db,
@@ -132,8 +92,7 @@ def chat_about_library(
 
 @router.post("/chat/clear")
 def clear_library_chat(db: Session = Depends(get_db)):
-    db.query(LibraryChatMessage).delete()
-    db.commit()
+    clear_chat(db)
     return JSONResponse(library_chat_payload(db, "Discussion effacée."))
 
 
@@ -157,20 +116,7 @@ def library_chat_job_status(job_id: int, db: Session = Depends(get_db)):
         )
 
     try:
-        if job.status == "done":
-            sources = json.loads(job.sources) if job.sources else {}
-            db.add(LibraryChatMessage(role="user", content=job.question or ""))
-            db.add(
-                LibraryChatMessage(
-                    role="assistant",
-                    content=job.result or "",
-                    sources=_join_source_ids(sources.get("video_ids", [])),
-                    channel_sources=_join_source_ids(sources.get("channel_ids", [])),
-                )
-            )
-            log_job(db, "prompt", f"Question bibliothèque : {(job.question or '')[:180]}")
-            job.status = "applied"
-            db.commit()
+        apply_library_chat_result(db, job)
         return JSONResponse(library_chat_payload(db, "Réponse ajoutée."))
     except Exception as exc:
         return JSONResponse(

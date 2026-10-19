@@ -14,25 +14,22 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services import auto_notes, rag_indexing
-from app.services.auto_notes import (
+from app.services.common.settings import (
+    AUTO_NOTES_ENABLED_KEY,
+    AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
+    get_setting,
+    set_setting,
+)
+from app.services.llm.prompts import build_auto_notes_prompt, split_auto_notes_result
+from app.services.llm.provider import AnthropicProvider, BatchEntry
+from app.services.rag import auto_notes
+from app.services.rag import indexing as rag_indexing
+from app.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
     BATCH_SUBMITTED_AT_KEY,
     eligible_videos,
     run_auto_notes_sweep,
-)
-from app.services.llm import (
-    AnthropicProvider,
-    BatchEntry,
-    build_auto_notes_prompt,
-    split_auto_notes_result,
-)
-from app.services.settings import (
-    AUTO_NOTES_ENABLED_KEY,
-    AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
-    get_setting,
-    set_setting,
 )
 
 LONG_TRANSCRIPT = "Une phrase du transcript. " * 40  # > MIN_TRANSCRIPT_CHARS
@@ -117,7 +114,7 @@ class FakeProvider(AnthropicProvider):
 def no_embeddings(monkeypatch):
     """Indexing is Voyage's business (tests/test_rag_indexing.py); here we only record what is asked."""
     calls = []
-    monkeypatch.setattr(auto_notes, "index_video_notes", lambda *args: calls.append(args))
+    monkeypatch.setattr(auto_notes, "index_video_notes", lambda db, *args: calls.append(args))
     monkeypatch.setattr(auto_notes, "backfill_note_chunks", lambda db: 0)
     monkeypatch.setattr(auto_notes, "backfill_summary_chunks", lambda db: 0)
     return calls

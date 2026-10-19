@@ -1,6 +1,7 @@
 from collections.abc import Iterable
 from datetime import datetime
 
+from app.services.common.durations import format_compact_duration
 from app.web.shared import templates
 
 
@@ -14,36 +15,6 @@ def format_long_duration(seconds: int | float | None) -> str | None:
         return None
     hours, minutes = divmod(total_minutes, 60)
     return f"{hours} h {minutes:02d} min" if hours else f"{minutes} min"
-
-
-def format_duration(seconds: int | float | None) -> str | None:
-    if seconds is None:
-        return None
-    try:
-        total_seconds = int(seconds)
-    except TypeError, ValueError:
-        return None
-    if total_seconds <= 0:
-        return None
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours}:{minutes:02d}:{secs:02d}"
-    return f"{minutes}:{secs:02d}"
-
-
-def format_compact_duration(seconds: int | float | None) -> str:
-    if seconds is None:
-        return "0m00"
-    try:
-        total_seconds = max(int(seconds), 0)
-    except TypeError, ValueError:
-        return "0m00"
-    hours, remainder = divmod(total_seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    if hours:
-        return f"{hours}h{minutes}m{secs:02d}"
-    return f"{minutes}m{secs:02d}"
 
 
 def format_two_unit_duration(seconds: int | float | None) -> str:
@@ -97,23 +68,6 @@ def format_video_file_size(value: int | float | None) -> str | None:
 
 
 templates.env.globals["format_video_file_size"] = format_video_file_size
-
-
-def parse_duration_label(label: str | None) -> int | None:
-    if not label:
-        return None
-    parts = label.split(":")
-    if len(parts) not in {2, 3}:
-        return None
-    try:
-        values = [int(part) for part in parts]
-    except ValueError:
-        return None
-    if len(values) == 2:
-        minutes, seconds = values
-        return minutes * 60 + seconds
-    hours, minutes, seconds = values
-    return hours * 3600 + minutes * 60 + seconds
 
 
 def format_views(count: int | float | None) -> str | None:

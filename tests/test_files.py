@@ -1,8 +1,8 @@
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus
-from app.services import yt
-from app.services.files import sanitize_filename
-from app.services.yt import discover_downloaded_files, write_transcript
+from app.services.common.files import sanitize_filename
+from app.services.youtube import channel_info, downloads
+from app.services.youtube.downloads import discover_downloaded_files, write_transcript
 
 
 def test_sanitize_filename_removes_invalid_characters():
@@ -71,9 +71,9 @@ def test_download_media_configures_m4a_without_subtitles(monkeypatch, tmp_path):
         def extract_info(self, url, download):
             return {"id": "test"}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(downloads, "YoutubeDL", FakeYoutubeDL)
 
-    yt.download_media("https://example.com/video", tmp_path, "audio")
+    downloads.download_media("https://example.com/video", tmp_path, "audio")
 
     assert captured["format"] == "bestaudio[ext=m4a]/bestaudio/best"
     assert "writesubtitles" not in captured
@@ -97,9 +97,9 @@ def test_download_media_configures_ios_compatible_mp4(monkeypatch, tmp_path):
         def extract_info(self, url, download):
             return {"id": "test"}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(downloads, "YoutubeDL", FakeYoutubeDL)
 
-    yt.download_media("https://example.com/video", tmp_path, "video")
+    downloads.download_media("https://example.com/video", tmp_path, "video")
 
     assert "[ext=mp4]" in captured["format"]
     assert "[vcodec^=avc1]" in captured["format"]
@@ -126,10 +126,10 @@ def test_download_subtitles_requests_the_original_track_not_a_translation(monkey
         def process_ie_result(self, info, download):
             return info
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(downloads, "YoutubeDL", FakeYoutubeDL)
 
     info = {"automatic_captions": {"fr": [], "fr-orig": [], "en": []}, "subtitles": {}}
-    yt.download_subtitles("https://example.com/video", tmp_path, info=info)
+    downloads.download_subtitles("https://example.com/video", tmp_path, info=info)
 
     assert captured["skip_download"] is True
     # The original track, never the auto-translated `en` (YouTube answers 429 to those).
@@ -155,9 +155,9 @@ def test_download_thumbnail_skips_media_download(monkeypatch, tmp_path):
             calls["download"] = download
             return {"id": "test"}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(downloads, "YoutubeDL", FakeYoutubeDL)
 
-    yt.download_thumbnail("https://example.com/video", tmp_path)
+    downloads.download_thumbnail("https://example.com/video", tmp_path)
 
     assert captured["skip_download"] is True
     assert captured["writethumbnail"] is True
@@ -181,9 +181,9 @@ def test_list_channel_entries_uses_page_window(monkeypatch):
             captured["url"] = url
             return {"entries": [{"id": "test"}]}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    entries = yt.list_channel_entries(
+    entries = channel_info.list_channel_entries(
         Channel(url="https://example.test/channel", name="Test"),
         page=3,
         page_size=25,
@@ -212,9 +212,9 @@ def test_list_channel_entries_can_target_shorts_tab(monkeypatch):
             captured["url"] = url
             return {"entries": [{"id": "short"}]}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    entries = yt.list_channel_entries(
+    entries = channel_info.list_channel_entries(
         Channel(url="https://www.youtube.com/@test/videos", name="Test"),
         section="short",
     )
@@ -239,9 +239,11 @@ def test_count_channel_entries_uses_playlist_count(monkeypatch):
         def extract_info(self, url, download):
             return {"playlist_count": 49}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    count = yt.count_channel_entries(Channel(url="https://example.test/channel", name="Test"))
+    count = channel_info.count_channel_entries(
+        Channel(url="https://example.test/channel", name="Test")
+    )
 
     assert count == 49
     assert captured["playlistend"] == 1
@@ -266,9 +268,11 @@ def test_count_channel_entries_falls_back_to_full_flat_count(monkeypatch):
                 return {"playlist_count": None, "entries": [{"id": "one"}]}
             return {"playlist_count": 994, "entries": [{"id": "one"}]}
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
 
-    count = yt.count_channel_entries(Channel(url="https://example.test/channel", name="Test"))
+    count = channel_info.count_channel_entries(
+        Channel(url="https://example.test/channel", name="Test")
+    )
 
     assert count == 994
     assert captured[0]["playlistend"] == 1
@@ -276,7 +280,7 @@ def test_count_channel_entries_falls_back_to_full_flat_count(monkeypatch):
 
 
 def test_choose_subtitle_track_never_picks_a_translation():
-    choose = yt.choose_subtitle_track
+    choose = downloads.choose_subtitle_track
 
     # French video: the original auto caption, not the machine-translated "en".
     assert choose({"automatic_captions": {"fr-orig": [], "fr": [], "en": []}}) == ("fr-orig", False)
@@ -297,8 +301,8 @@ def test_choose_subtitle_track_never_picks_a_translation():
 def test_choose_subtitle_track_honours_the_manual_and_auto_switches():
     info = {"subtitles": {"fr": []}, "automatic_captions": {"fr-orig": []}}
 
-    assert yt.choose_subtitle_track(info, include_manual=False) == ("fr-orig", False)
-    assert yt.choose_subtitle_track(info, include_auto=False) == ("fr", True)
+    assert downloads.choose_subtitle_track(info, include_manual=False) == ("fr-orig", False)
+    assert downloads.choose_subtitle_track(info, include_auto=False) == ("fr", True)
 
 
 def test_download_subtitles_requests_nothing_when_the_video_has_no_original_track(
@@ -308,9 +312,9 @@ def test_download_subtitles_requests_nothing_when_the_video_has_no_original_trac
         def __init__(self, opts):
             raise AssertionError("no request expected")
 
-    monkeypatch.setattr(yt, "YoutubeDL", FakeYoutubeDL)
+    monkeypatch.setattr(downloads, "YoutubeDL", FakeYoutubeDL)
 
-    yt.download_subtitles(
+    downloads.download_subtitles(
         "https://example.com/video",
         tmp_path,
         info={"automatic_captions": {"fr": [], "en": []}, "subtitles": {}},

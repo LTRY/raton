@@ -1,71 +1,34 @@
-from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.config import local_media_path
 from app.db.session import get_db
 from app.models.llm_job import LlmJob
 from app.models.video import Video
-from app.services.background_jobs import enqueue_llm_job, run_llm_job
-from app.services.llm import (
+from app.services.common.settings import get_llm_provider_name
+from app.services.jobs.llm_jobs import (
+    apply_generation_result,
+    apply_transcript_chat_result,
+    enqueue_llm_job,
+    run_llm_job,
+    run_notes_indexing_job,
+)
+from app.services.llm.prompts import (
     build_chat_prompt,
     build_generation_prompt,
-    load_chat,
     partial_generation_summary,
-    save_chat,
-    split_generation_result,
 )
-from app.services.rag_indexing import index_video_notes
-from app.services.scanner import log_job
-from app.services.settings import get_llm_provider_name
+from app.services.videos.documents import (
+    clear_transcript_chat,
+    get_transcript_paths,
+    load_chat,
+    read_transcript_documents,
+)
 from app.web.shared import redirect
 
 router = APIRouter()
-
-
-def transcript_context(video: Video) -> dict:
-    transcript = None
-    notes_transcript = None
-    summary_transcript = None
-    short_summary = None
-    suggested_questions: list[str] = []
-    chat_messages = []
-    if video.transcript_path:
-        path = local_media_path(video.transcript_path)
-        if path.is_file():
-            transcript = path.read_text(encoding="utf-8", errors="replace")
-            notes_path = path.with_name("transcript.notes.txt")
-            summary_path = path.with_name("transcript.summary.txt")
-            summary_short_path = path.with_name("transcript.summary_short.txt")
-            questions_path = path.with_name("transcript.questions.txt")
-            chat_path = path.with_name("transcript.chat.json")
-            if notes_path.is_file():
-                notes_transcript = notes_path.read_text(encoding="utf-8", errors="replace")
-            if summary_path.is_file():
-                summary_transcript = summary_path.read_text(encoding="utf-8", errors="replace")
-            if summary_short_path.is_file():
-                short_summary = summary_short_path.read_text(encoding="utf-8", errors="replace")
-            if questions_path.is_file():
-                suggested_questions = [
-                    line.strip()
-                    for line in questions_path.read_text(
-                        encoding="utf-8", errors="replace"
-                    ).splitlines()
-                    if line.strip()
-                ]
-            chat_messages = load_chat(chat_path)
-    return {
-        "transcript": transcript,
-        "notes_transcript": notes_transcript,
-        "summary_transcript": summary_transcript,
-        "short_summary": short_summary,
-        "suggested_questions": suggested_questions,
-        "display_transcript": transcript,
-        "chat_messages": chat_messages,
-    }
 
 
 @router.get("/videos/{video_id}/transcript", response_class=HTMLResponse)
@@ -79,21 +42,8 @@ def video_transcript_page(request: Request, video_id: int, db: Session = Depends
     return redirect(target)
 
 
-def get_transcript_paths(video: Video) -> tuple[Path, Path, Path]:
-    if not video.transcript_path:
-        raise ValueError("Aucun transcript n'est disponible.")
-    transcript_path = local_media_path(video.transcript_path)
-    if not transcript_path.is_file():
-        raise ValueError("Le fichier transcript est introuvable.")
-    return (
-        transcript_path,
-        transcript_path.with_name("transcript.chat.json"),
-        transcript_path.with_name("transcript.notes.txt"),
-    )
-
-
 def documents_payload(video: Video) -> dict:
-    context = transcript_context(video)
+    context = read_transcript_documents(video)
     transcript = context["transcript"] or ""
     notes_transcript = context["notes_transcript"] or ""
     summary_transcript = context["summary_transcript"] or ""
@@ -113,7 +63,7 @@ def documents_payload(video: Video) -> dict:
 
 
 def chat_payload(video: Video, message: str | None = None) -> dict:
-    context = transcript_context(video)
+    context = read_transcript_documents(video)
     return {
         "status": "ok",
         "message": message,
@@ -209,11 +159,7 @@ def clear_video_transcript_chat(request: Request, video_id: int, db: Session = D
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    try:
-        _, chat_path, _ = get_transcript_paths(video)
-        chat_path.unlink(missing_ok=True)
-    except ValueError:
-        pass
+    clear_transcript_chat(video)
     if request.headers.get("x-requested-with") == "fetch":
         return JSONResponse(chat_payload(video, "Discussion effacée."))
     return redirect(f"/videos/{video_id}#discussion")
@@ -250,24 +196,14 @@ def transcript_job_status(
     # "done" (first poll after completion) or "applied" (already written, replayed idempotently).
     try:
         if job.kind == "generate":
-            if job.status == "done":
-                generated = split_generation_result(job.result or "")
-                transcript_path, _, notes_path = get_transcript_paths(video)
-                notes_path.write_text(generated["notes_text"], encoding="utf-8")
+            generated = apply_generation_result(db, video, job)
+            if generated is not None:
                 background_tasks.add_task(
-                    index_video_notes, video.id, generated["notes_text"], generated["summary_short"]
+                    run_notes_indexing_job,
+                    video.id,
+                    generated["notes_text"],
+                    generated["summary_short"],
                 )
-                transcript_path.with_name("transcript.summary.txt").write_text(
-                    generated["summary_full"], encoding="utf-8"
-                )
-                transcript_path.with_name("transcript.summary_short.txt").write_text(
-                    generated["summary_short"], encoding="utf-8"
-                )
-                transcript_path.with_name("transcript.questions.txt").write_text(
-                    "\n".join(generated["summary_questions"]), encoding="utf-8"
-                )
-                job.status = "applied"
-                db.commit()
             return JSONResponse(
                 {
                     "status": "generated",
@@ -276,25 +212,7 @@ def transcript_job_status(
                 }
             )
 
-        if job.status == "done":
-            _, chat_path, _ = get_transcript_paths(video)
-            messages = load_chat(chat_path)
-            messages.extend(
-                [
-                    {"role": "user", "content": job.question or ""},
-                    {"role": "assistant", "content": job.result or ""},
-                ]
-            )
-            save_chat(chat_path, messages)
-            log_job(
-                db,
-                "prompt",
-                f"Prompt envoyé sur {video.title}: {(job.question or '')[:180]}",
-                channel_id=video.channel_id,
-                video_id=video.id,
-            )
-            job.status = "applied"
-            db.commit()
+        apply_transcript_chat_result(db, video, job)
         return JSONResponse(chat_payload(video, "Réponse ajoutée."))
     except Exception as exc:
         return JSONResponse(

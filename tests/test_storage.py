@@ -12,8 +12,20 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
-from app.services import scan_events, scanner
-from app.services.scanner import run_scan, scan_channel, video_already_downloaded
+from app.services.ingest import (
+    manual_download,
+    metadata_import,
+    scan_events,
+    scanner,
+    throttle,
+    transcript_retry,
+)
+from app.services.ingest.identity import video_already_downloaded
+from app.services.ingest.scanner import run_scan, scan_channel
+from app.services.youtube import downloads as youtube_downloads
+from app.services.youtube import sponsor_segments
+from app.services.youtube.downloads import build_video_folder
+from app.services.youtube.yt import parse_yt_date
 
 
 def make_session():
@@ -68,7 +80,7 @@ def test_manual_download_stages_files_before_final_folder(monkeypatch, tmp_path)
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -89,9 +101,9 @@ def test_manual_download_stages_files_before_final_folder(monkeypatch, tmp_path)
             "webpage_url": url,
         }
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    video = scanner.download_manual_media(db, "https://example.test/video", "video", False)
+    video = manual_download.download_manual_media(db, "https://example.test/video", "video", False)
 
     final_folder = tmp_path / "Manual channel" / "2026-06-01 - Manual video"
     assert video.channel is not None
@@ -113,7 +125,7 @@ def test_manual_download_fetches_sponsorblock_segments_automatically(monkeypatch
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -129,11 +141,11 @@ def test_manual_download_fetches_sponsorblock_segments_automatically(monkeypatch
         (folder / "video.mp4").write_bytes(b"video")
         return {"id": "manual123", "title": "Manual video", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
     calls = []
     monkeypatch.setattr(
-        scanner,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: (
             calls.append((yt_video_id, categories))
@@ -141,7 +153,7 @@ def test_manual_download_fetches_sponsorblock_segments_automatically(monkeypatch
         ),
     )
 
-    video = scanner.download_manual_media(db, "https://example.test/video", "video", False)
+    video = manual_download.download_manual_media(db, "https://example.test/video", "video", False)
 
     assert calls == [("manual123", ["sponsor"])]
     rows = list(
@@ -157,7 +169,7 @@ def test_manual_download_ignores_sponsorblock_failures(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual456",
@@ -173,15 +185,15 @@ def test_manual_download_ignores_sponsorblock_failures(monkeypatch, tmp_path):
         (folder / "video.mp4").write_bytes(b"video")
         return {"id": "manual456", "title": "Manual video 2", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
     def fail(*args, **kwargs):
         raise RuntimeError("SponsorBlock down")
 
-    monkeypatch.setattr(scanner, "fetch_sponsorblock_segments", fail)
+    monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
     # Must not raise even though SponsorBlock fails — the download itself succeeds regardless.
-    video = scanner.download_manual_media(db, "https://example.test/video2", "video", False)
+    video = manual_download.download_manual_media(db, "https://example.test/video2", "video", False)
 
     assert video.id is not None
 
@@ -197,7 +209,7 @@ def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual789",
@@ -213,9 +225,9 @@ def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
         (folder / "video.mp4").write_bytes(b"video")
         return {"id": "manual789", "title": "Manual video 3", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
     monkeypatch.setattr(
-        scanner,
+        sponsor_segments,
         "fetch_sponsorblock_segments",
         lambda yt_video_id, categories: [
             {"category": "sponsor", "start_seconds": 1.0, "end_seconds": 2.0}
@@ -235,10 +247,10 @@ def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
         )
         db.commit()
 
-    monkeypatch.setattr(scanner, "replace_video_sponsor_segments", fake_replace)
+    monkeypatch.setattr(sponsor_segments, "replace_video_sponsor_segments", fake_replace)
 
     # Must not raise even though the sponsor-segment write itself fails mid-commit.
-    video = scanner.download_manual_media(db, "https://example.test/video3", "video", False)
+    video = manual_download.download_manual_media(db, "https://example.test/video3", "video", False)
 
     assert video.id is not None
     assert (
@@ -276,7 +288,7 @@ def test_manual_download_can_replace_metadata_only_record(monkeypatch, tmp_path)
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -297,10 +309,12 @@ def test_manual_download_can_replace_metadata_only_record(monkeypatch, tmp_path)
             "upload_date": "20260601",
         }
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
-    monkeypatch.setattr(scanner, "download_subtitles", lambda url, folder, **kwargs: None)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_subtitles", lambda url, folder, **kwargs: None)
 
-    updated = scanner.download_manual_media(db, "https://example.test/video", "video", False)
+    updated = manual_download.download_manual_media(
+        db, "https://example.test/video", "video", False
+    )
 
     assert updated.id == video.id
     assert updated.media_type == "video"
@@ -331,7 +345,7 @@ def test_manual_download_preserves_existing_short_url(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "short123",
@@ -352,9 +366,9 @@ def test_manual_download_preserves_existing_short_url(monkeypatch, tmp_path):
             "upload_date": "20260601",
         }
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = scanner.download_manual_media(
+    updated = manual_download.download_manual_media(
         db, "https://www.youtube.com/watch?v=short123", "video", False
     )
 
@@ -369,7 +383,7 @@ def test_manual_download_canonicalizes_new_short_url(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "short123",
@@ -390,9 +404,9 @@ def test_manual_download_canonicalizes_new_short_url(monkeypatch, tmp_path):
             "upload_date": "20260601",
         }
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    video = scanner.download_manual_media(
+    video = manual_download.download_manual_media(
         db, "https://www.youtube.com/shorts/short123", "video", False
     )
 
@@ -422,7 +436,7 @@ def test_manual_download_can_add_audio_to_existing_video(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -439,9 +453,11 @@ def test_manual_download_can_add_audio_to_existing_video(monkeypatch, tmp_path):
         (staging / "audio.mp3").write_bytes(b"audio")
         return {"id": "manual123", "title": "Manual video", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = scanner.download_manual_media(db, "https://example.test/video", "audio", False)
+    updated = manual_download.download_manual_media(
+        db, "https://example.test/video", "audio", False
+    )
 
     assert updated.id == video.id
     assert updated.media_type == "video"
@@ -473,7 +489,7 @@ def test_manual_download_can_add_video_to_existing_audio(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -490,9 +506,11 @@ def test_manual_download_can_add_video_to_existing_audio(monkeypatch, tmp_path):
         (staging / "video.mp4").write_bytes(b"video")
         return {"id": "manual123", "title": "Manual video", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = scanner.download_manual_media(db, "https://example.test/video", "video", False)
+    updated = manual_download.download_manual_media(
+        db, "https://example.test/video", "video", False
+    )
 
     assert updated.id == video.id
     assert updated.media_type == "video"
@@ -510,7 +528,7 @@ def test_import_video_metadata_writes_metadata_and_transcript_without_media(monk
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "extract_video_info",
         lambda url: {
             "id": "meta123",
@@ -536,11 +554,11 @@ def test_import_video_metadata_writes_metadata_and_transcript_without_media(monk
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "thumbnail.webp").write_bytes(b"thumbnail")
 
-    monkeypatch.setattr(scanner, "download_media", fail_download_media)
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
-    monkeypatch.setattr(scanner, "download_thumbnail", fake_download_thumbnail)
+    monkeypatch.setattr(youtube_downloads, "download_media", fail_download_media)
+    monkeypatch.setattr(metadata_import, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(metadata_import, "download_thumbnail", fake_download_thumbnail)
 
-    video = scanner.import_video_metadata(db, "https://example.test/video", channel.id)
+    video = metadata_import.import_video_metadata(db, "https://example.test/video", channel.id)
 
     assert video.media_type == "metadata"
     assert video.video_path is None
@@ -564,10 +582,8 @@ def test_import_video_metadata_adopts_existing_folder_without_video_row(monkeypa
         "webpage_url": "https://example.test/video",
         "upload_date": "20260601",
     }
-    monkeypatch.setattr(scanner, "extract_video_info", lambda url: info)
-    folder = scanner.build_video_folder(
-        tmp_path, channel.name, "Orphan video", scanner.parse_yt_date("20260601")
-    )
+    monkeypatch.setattr(metadata_import, "extract_video_info", lambda url: info)
+    folder = build_video_folder(tmp_path, channel.name, "Orphan video", parse_yt_date("20260601"))
     folder.mkdir(parents=True)
     (folder / "video.mp4").write_bytes(b"video")
     (folder / "audio.mp3").write_bytes(b"audio")
@@ -579,10 +595,10 @@ def test_import_video_metadata_adopts_existing_folder_without_video_row(monkeypa
     def fail_download(*args, **kwargs):
         raise AssertionError("nothing should be downloaded again")
 
-    monkeypatch.setattr(scanner, "download_subtitles", fail_download)
-    monkeypatch.setattr(scanner, "download_thumbnail", fail_download)
+    monkeypatch.setattr(metadata_import, "download_subtitles", fail_download)
+    monkeypatch.setattr(metadata_import, "download_thumbnail", fail_download)
 
-    video = scanner.import_video_metadata(db, "https://example.test/video", channel.id)
+    video = metadata_import.import_video_metadata(db, "https://example.test/video", channel.id)
 
     assert Path(video.folder_path) == folder
     assert video.media_type == "video"
@@ -602,7 +618,7 @@ def test_import_video_metadata_canonicalizes_short_urls(monkeypatch, tmp_path):
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "extract_video_info",
         lambda url: {
             "id": "short123",
@@ -611,9 +627,9 @@ def test_import_video_metadata_canonicalizes_short_urls(monkeypatch, tmp_path):
             "upload_date": "20260601",
         },
     )
-    monkeypatch.setattr(scanner, "download_subtitles", lambda url, folder, **kwargs: None)
+    monkeypatch.setattr(metadata_import, "download_subtitles", lambda url, folder, **kwargs: None)
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "download_thumbnail",
         lambda url, folder, **kwargs: (
             folder.mkdir(parents=True, exist_ok=True),
@@ -621,7 +637,7 @@ def test_import_video_metadata_canonicalizes_short_urls(monkeypatch, tmp_path):
         ),
     )
 
-    video = scanner.import_video_metadata(
+    video = metadata_import.import_video_metadata(
         db,
         "https://www.youtube.com/watch?v=short123",
         channel.id,
@@ -654,7 +670,7 @@ def test_scan_channel_imports_only_metadata_for_new_videos(monkeypatch, tmp_path
         ],
     )
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "extract_video_info",
         lambda url: {
             "id": "auto123",
@@ -681,9 +697,9 @@ def test_scan_channel_imports_only_metadata_for_new_videos(monkeypatch, tmp_path
         folder.mkdir(parents=True, exist_ok=True)
         (folder / "thumbnail.webp").write_bytes(b"thumbnail")
 
-    monkeypatch.setattr(scanner, "download_media", fail_download_media)
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
-    monkeypatch.setattr(scanner, "download_thumbnail", fake_download_thumbnail)
+    monkeypatch.setattr(youtube_downloads, "download_media", fail_download_media)
+    monkeypatch.setattr(metadata_import, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(metadata_import, "download_thumbnail", fake_download_thumbnail)
 
     imported = scan_channel(db, channel)
     video = db.query(Video).filter_by(yt_video_id="auto123").one()
@@ -738,7 +754,7 @@ def test_scan_channel_stops_when_known_video_is_reached(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scanner, "list_channel_entries", fake_list_channel_entries)
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "extract_video_info",
         lambda url: {
             "id": "new123",
@@ -747,9 +763,9 @@ def test_scan_channel_stops_when_known_video_is_reached(monkeypatch, tmp_path):
             "upload_date": "20260602",
         },
     )
-    monkeypatch.setattr(scanner, "download_subtitles", lambda url, folder, **kwargs: None)
+    monkeypatch.setattr(metadata_import, "download_subtitles", lambda url, folder, **kwargs: None)
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "download_thumbnail",
         lambda url, folder, **kwargs: (
             folder.mkdir(parents=True, exist_ok=True),
@@ -840,9 +856,9 @@ def test_retry_transcript_download_prefers_french(monkeypatch, tmp_path):
                 encoding="utf-8",
             )
 
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(transcript_retry, "download_subtitles", fake_download_subtitles)
 
-    result = scanner.retry_transcript_download(db, video, languages=["fr", "en"])
+    result = transcript_retry.retry_transcript_download(db, video, languages=["fr", "en"])
 
     assert result.transcript_status == TranscriptStatus.downloaded
     assert Path(result.transcript_path).read_text(encoding="utf-8") == "Bonjour"
@@ -865,9 +881,9 @@ def test_retry_transcript_download_falls_back_to_english_when_french_missing(mon
                 encoding="utf-8",
             )
 
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(transcript_retry, "download_subtitles", fake_download_subtitles)
 
-    result = scanner.retry_transcript_download(db, video, languages=["fr", "en"])
+    result = transcript_retry.retry_transcript_download(db, video, languages=["fr", "en"])
 
     assert result.transcript_status == TranscriptStatus.downloaded
     assert Path(result.transcript_path).read_text(encoding="utf-8") == "Hello"
@@ -883,11 +899,11 @@ def test_retry_transcript_download_raises_when_no_subtitles_available(monkeypatc
     video = add_video(db, channel, folder, "retrynone", 1)
 
     monkeypatch.setattr(
-        scanner, "download_subtitles", lambda url, staging, languages=None, **kwargs: None
+        transcript_retry, "download_subtitles", lambda url, staging, languages=None, **kwargs: None
     )
 
     with pytest.raises(ValueError):
-        scanner.retry_transcript_download(db, video)
+        transcript_retry.retry_transcript_download(db, video)
 
     assert video.transcript_status == TranscriptStatus.missing
     assert video.transcript_path is None
@@ -915,9 +931,9 @@ def test_retry_transcript_download_replaces_differently_named_stale_subtitle(mon
                 encoding="utf-8",
             )
 
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(transcript_retry, "download_subtitles", fake_download_subtitles)
 
-    result = scanner.retry_transcript_download(db, video, languages=["fr", "en"])
+    result = transcript_retry.retry_transcript_download(db, video, languages=["fr", "en"])
 
     assert result.transcript_status == TranscriptStatus.downloaded
     assert Path(result.transcript_path).read_text(encoding="utf-8") == "Nouveau"
@@ -926,7 +942,7 @@ def test_retry_transcript_download_replaces_differently_named_stale_subtitle(mon
 
 
 def test_manual_redownload_resets_watched_at_so_purge_keeps_new_file(monkeypatch, tmp_path):
-    from app.services.media_storage import purge_watched_media
+    from app.services.media.media_storage import purge_watched_media
 
     db = make_session()
     folder = tmp_path / "Manual channel" / "2026-06-01 - Manual video"
@@ -947,7 +963,7 @@ def test_manual_redownload_resets_watched_at_so_purge_keeps_new_file(monkeypatch
     db.commit()
 
     monkeypatch.setattr(
-        scanner,
+        manual_download,
         "extract_video_info",
         lambda url: {
             "id": "manual123",
@@ -963,9 +979,11 @@ def test_manual_redownload_resets_watched_at_so_purge_keeps_new_file(monkeypatch
         (staging / "video.mp4").write_bytes(b"video")
         return {"id": "manual123", "title": "Manual video", "webpage_url": url}
 
-    monkeypatch.setattr(scanner, "download_media", fake_download_media)
+    monkeypatch.setattr(manual_download, "download_media", fake_download_media)
 
-    updated = scanner.download_manual_media(db, "https://example.test/video", "video", False)
+    updated = manual_download.download_manual_media(
+        db, "https://example.test/video", "video", False
+    )
 
     assert updated.watched_at is None
     assert purge_watched_media(db) == 0
@@ -986,7 +1004,7 @@ def _entries(count, prefix="vid"):
 def _fake_import(imported_ids, fail_on=None):
     def fake(db, video_url, channel_id=None, preview=None, **kwargs):
         if fail_on and preview["id"] == fail_on:
-            raise scanner.RateLimitedError("HTTP Error 429: Too Many Requests")
+            raise throttle.RateLimitedError("HTTP Error 429: Too Many Requests")
         video = Video(
             yt_video_id=preview["id"],
             title=preview["title"],
@@ -1076,7 +1094,7 @@ def test_scan_channel_section_raises_on_rate_limit_and_keeps_what_was_imported(m
         scanner, "import_video_metadata", _fake_import(imported_ids, fail_on="vid1")
     )
 
-    with pytest.raises(scanner.RateLimitedError):
+    with pytest.raises(throttle.RateLimitedError):
         scan_channel(db, channel, max_imports=10)
 
     # vid3 and vid2 went through (oldest first), vid1 was refused and nothing after it was tried.
@@ -1126,7 +1144,7 @@ def test_run_scan_stops_at_the_first_rate_limit(monkeypatch):
 
     def fake_scan(db, channel, **kwargs):
         scanned.append(channel.id)
-        raise scanner.RateLimitedError("HTTP Error 429")
+        raise throttle.RateLimitedError("HTTP Error 429")
 
     monkeypatch.setattr(scanner, "scan_channel", fake_scan)
 
@@ -1150,16 +1168,20 @@ def test_import_video_metadata_reuses_the_extracted_info_for_subtitles_and_thumb
         "webpage_url": "https://example.test/watch/once123",
         "upload_date": "20260601",
     }
-    monkeypatch.setattr(scanner, "extract_video_info", lambda url: extracted)
+    monkeypatch.setattr(metadata_import, "extract_video_info", lambda url: extracted)
     received = []
     monkeypatch.setattr(
-        scanner, "download_subtitles", lambda url, folder, **kwargs: received.append(kwargs["info"])
+        metadata_import,
+        "download_subtitles",
+        lambda url, folder, **kwargs: received.append(kwargs["info"]),
     )
     monkeypatch.setattr(
-        scanner, "download_thumbnail", lambda url, folder, **kwargs: received.append(kwargs["info"])
+        metadata_import,
+        "download_thumbnail",
+        lambda url, folder, **kwargs: received.append(kwargs["info"]),
     )
 
-    scanner.import_video_metadata(
+    metadata_import.import_video_metadata(
         db,
         "https://example.test/watch/once123",
         channel.id,
@@ -1176,7 +1198,7 @@ def test_import_video_metadata_keeps_going_when_a_subtitle_request_gets_429(monk
     db.add(AppSetting(key="media_root", value=str(tmp_path)))
     db.commit()
     monkeypatch.setattr(
-        scanner,
+        metadata_import,
         "extract_video_info",
         lambda url: {"id": "lim123", "title": "Limited", "upload_date": "20260601"},
     )
@@ -1186,10 +1208,12 @@ def test_import_video_metadata_keeps_going_when_a_subtitle_request_gets_429(monk
             "ERROR: Unable to download video subtitles for 'en': HTTP Error 429: Too Many Requests"
         )
 
-    monkeypatch.setattr(scanner, "download_subtitles", refused)
-    monkeypatch.setattr(scanner, "download_thumbnail", lambda url, folder, **kwargs: None)
+    monkeypatch.setattr(metadata_import, "download_subtitles", refused)
+    monkeypatch.setattr(metadata_import, "download_thumbnail", lambda url, folder, **kwargs: None)
 
-    video = scanner.import_video_metadata(db, "https://example.test/watch/lim123", channel.id)
+    video = metadata_import.import_video_metadata(
+        db, "https://example.test/watch/lim123", channel.id
+    )
 
     # The video exists (without transcript) and the scan is not asked to stop.
     assert video.transcript_status == TranscriptStatus.missing
@@ -1238,7 +1262,7 @@ def test_run_scan_resumes_at_the_channel_a_rate_limit_stopped_on(monkeypatch):
 
     def fake_scan(db, channel, **kwargs):
         if channel.name in blocked:
-            raise scanner.RateLimitedError("HTTP Error 429")
+            raise throttle.RateLimitedError("HTTP Error 429")
         return 0
 
     monkeypatch.setattr(scanner, "scan_channel", fake_scan)
@@ -1266,8 +1290,8 @@ def test_run_scan_waits_long_between_channels_only_after_an_import(monkeypatch):
     monkeypatch.setattr(
         scanner, "scan_channel", lambda db, channel, **kwargs: imports[channel.name]
     )
-    monkeypatch.setattr(scanner, "PAUSE_BETWEEN_CHANNELS", (10.0, 30.0))
-    monkeypatch.setattr(scanner, "PAUSE_AFTER_LISTING_ONLY", (1.0, 3.0))
+    monkeypatch.setattr(throttle, "PAUSE_BETWEEN_CHANNELS", (10.0, 30.0))
+    monkeypatch.setattr(throttle, "PAUSE_AFTER_LISTING_ONLY", (1.0, 3.0))
     pauses = []
     monkeypatch.setattr(scanner, "pause", pauses.append)
 
@@ -1337,9 +1361,9 @@ def test_retry_transcript_download_without_language_takes_the_original_track_onc
             "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nمرحبا\n", encoding="utf-8"
         )
 
-    monkeypatch.setattr(scanner, "download_subtitles", fake_download_subtitles)
+    monkeypatch.setattr(transcript_retry, "download_subtitles", fake_download_subtitles)
 
-    result = scanner.retry_transcript_download(db, video)
+    result = transcript_retry.retry_transcript_download(db, video)
 
     # languages=None lets download_subtitles pick the track itself: one attempt, no fr/en loop.
     assert calls == [None]
@@ -1359,7 +1383,7 @@ def _missing_video_with_metadata(db, channel, tmp_path, yt_video_id, metadata):
 def test_backfill_original_transcripts_only_retries_videos_that_have_an_original_track(
     monkeypatch, tmp_path
 ):
-    from app.services import transcript_backfill
+    from app.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")
@@ -1392,7 +1416,7 @@ def test_backfill_original_transcripts_only_retries_videos_that_have_an_original
 def test_backfill_original_transcripts_stops_after_repeated_failures_and_resumes_later(
     monkeypatch, tmp_path
 ):
-    from app.services import transcript_backfill
+    from app.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")

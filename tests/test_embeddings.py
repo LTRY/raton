@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from app.core.config import Settings
-from app.services import embeddings
+from app.services.rag import embeddings
 
 
 class FakeResponse:

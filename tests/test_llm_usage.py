@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.llm_job import LlmJob
-from app.services.llm_usage import (
+from app.services.llm.usage import (
     compute_call_cost_usd,
     compute_job_cost_usd,
     llm_usage_summary,

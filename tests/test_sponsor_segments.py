@@ -8,7 +8,7 @@ from app.db.session import Base
 from app.models.channel import Channel
 from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.services.sponsor_segments import (
+from app.services.youtube.sponsor_segments import (
     MINIMUM_SKIP_SECONDS,
     normalize_skip_segments,
     replace_video_sponsor_segments,

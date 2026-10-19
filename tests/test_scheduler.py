@@ -7,8 +7,8 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import Settings
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
-from app.services import scheduler as scheduler_module
-from app.services.scheduler import (
+from app.services.jobs import scheduler as scheduler_module
+from app.services.jobs.scheduler import (
     get_last_auto_scan_info,
     get_last_media_purge_at,
     record_media_purge,

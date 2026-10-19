@@ -16,32 +16,31 @@ from app.main import app
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
-from app.services.settings import get_setting, set_setting
-from app.web.raton import (
-    ART_DIR,
-    CATALOGUE,
-    CONDITIONS,
-    DEFAULT_SCENARIO,
-    LONG_ABSENCE_DAYS,
-    RATON_SHOWN_KEY,
-    STAGE_ABSENCE,
-    STAGE_DRAW,
-    STAGE_GREETING,
-    RatonContext,
+from app.services.common.settings import get_setting, set_setting
+from app.services.raton.picker import (
     active_scenarios,
     all_variations,
     art_files,
     draw_pool,
-    home_context,
     line_art,
     line_key,
     line_text,
     missing_art,
     pick_next,
-    record_visit,
-    screen_time_today,
     stage_lines,
 )
+from app.services.raton.scenarios import (
+    ART_DIR,
+    CATALOGUE,
+    CONDITIONS,
+    DEFAULT_SCENARIO,
+    LONG_ABSENCE_DAYS,
+    STAGE_ABSENCE,
+    STAGE_DRAW,
+    STAGE_GREETING,
+    RatonContext,
+)
+from app.services.raton.visits import RATON_SHOWN_KEY, home_context, record_visit, screen_time_today
 
 NOON = datetime(2026, 10, 10, 15, 0).astimezone()
 
@@ -371,7 +370,7 @@ def test_new_count_ignores_channels_without_a_bell(db):
             )
         )
     db.commit()
-    from app.web.raton import build_context
+    from app.services.raton.visits import build_context
 
     assert build_context(db, NOON).new_count == 1
 

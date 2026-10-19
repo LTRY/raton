@@ -5,13 +5,17 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
-from app.services.embeddings import EMBEDDING_DIMENSIONS
+
+# Size of the Voyage vectors stored in `embedding`; app/services/rag/embeddings.py asks the API for
+# this size (voyage-3.5 accepts 256/512/1024/2048). Changing it needs a migration of the column and
+# a re-embedding of every chunk.
+EMBEDDING_DIMENSIONS = 1024
 
 
 class VideoNoteChunk(Base):
     """One embedded section of a video's structured notes, for cross-video RAG search.
 
-    Populated by app/services/rag_indexing.py whenever notes are (re)generated in
+    Populated by app/services/rag/indexing.py whenever notes are (re)generated in
     the Markdown-sectioned format produced by build_notes_prompt; a video only
     becomes searchable from the cross-video chat once it has at least one row
     here. Rows are replaced wholesale on regeneration (see

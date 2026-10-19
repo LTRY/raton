@@ -85,23 +85,25 @@ modules ci-dessous l'importent, jamais l'inverse.
 
 ### `app/web/formatting.py`
 
-Formatage pour l'affichage : durees, tailles de stockage et de fichier,
+Formatage pour l'affichage : durees longues, tailles de stockage et de fichier,
 nombre de vues, periodicite de publication d'une chaine. Enregistre les
-globals Jinja de formatage.
+globals Jinja de formatage. Les durees `m:ss` et leur lecture
+(`format_duration`, `format_compact_duration`, `parse_duration_label`) sont
+dans `app/services/common/durations.py`, car le service de lecture les utilise.
 
 ### `app/web/playback.py`
 
-Activite de lecture : vue d'un job `played`/`prompt`
-(`playback_activity_view`), dernieres positions de lecture, statistiques de
-temps d'ecran, regroupement de l'historique par jour, journal d'activite du
-tableau de bord.
+Affichage de l'activite de lecture : couleur et pourcentage des anneaux de
+temps d'ecran (`playback_time_dashboard`), regroupement de l'historique par
+jour (`history_day_groups`). Le calcul est dans `app/services/videos/playback.py`.
 
 ### `app/web/video_library.py`
 
-Helpers de la bibliotheque video : lecture des filtres/tri/recherche depuis
-la requete, correspondance d'une video ou d'une chaine avec ces filtres, etat
-de liste Vu/Ecartee (`video_list_state`), vues sauvegardees, pastilles de
-filtres actifs, construction d'une carte video (`downloaded_video_card`).
+Helpers HTTP de la bibliotheque video : lecture des filtres/tri/recherche
+depuis la requete, liens des vues sauvegardees, pastilles de filtres actifs,
+construction d'une carte video (`downloaded_video_card`), mosaique des shorts.
+Les filtres eux-memes (en Python et en SQL) et l'etat de liste Vu/Ecartee sont
+dans `app/services/videos/`.
 
 ### `app/web/routes/dashboard.py`
 
@@ -130,13 +132,6 @@ ainsi que les payloads JSON associes et les estimations de duree/cout.
 
 Routes `/chat*` de la discussion sur toute la bibliotheque et leur payload.
 
-### `app/services/background_jobs.py`
-
-Fonctions executees via `BackgroundTasks` dans le processus web, chacune avec
-sa propre session DB : `run_manual_download_job`, `run_transcript_retry_job`,
-`run_channel_metadata_import_job`, `run_llm_job`. Contient aussi
-`enqueue_llm_job` (creation d'un `LlmJob` `queued`).
-
 ### `app/web/routes/media.py`
 
 Contient les routes de fichiers locaux :
@@ -161,69 +156,13 @@ Contient :
 
 Expose l'API interne sous `/api`.
 
-### `app/services/yt.py`
+### `app/services/`
 
-Responsable de :
-
-- extraction chaine ;
-- comptage/listing videos de chaine ;
-- extraction metadata video ;
-- telechargement audio/video ;
-- telechargement sous-titres ;
-- detection des fichiers telecharges ;
-- ecriture metadata et transcript.
-
-### `app/services/scanner.py`
-
-Responsable de :
-
-- scan automatique ;
-- import metadata ;
-- telechargement manuel ;
-- staged folders ;
-- merge de fichiers lorsqu'on ajoute audio ou video ;
-- jobs de log.
-
-### `app/services/media_storage.py`
-
-Responsable de :
-
-- detection des 90 % de lecture (`mark_watched_if_complete`) ;
-- purge quotidienne des fichiers media des videos vues (`purge_watched_media`) ;
-- suppression d'un seul format (`delete_video_media_asset`), partagee avec la
-  route media.
-
-### `app/services/storage.py`
-
-Responsable de :
-
-- calcul d'espace utilise ;
-- marge restante sous le quota global pour les telechargements automatiques.
-
-### `app/services/llm.py`
-
-Responsable de :
-
-- interface `LLMProvider` et implementation `AnthropicProvider` appelant
-  directement l'API Anthropic (`LLM_PROVIDER`) ;
-- boucle d'appels d'outils (`AnthropicProvider.complete_with_tools`) pour le
-  chat cross-video ;
-- question/reponse sur transcript ;
-- lecture/ecriture historique chat.
-
-### `app/services/library_chat_tools.py`
-
-Outils que le modele appelle pendant le chat cross-video (recherche de
-chaines, de videos, recherche semantique dans les notes) et extraction des
-chaines/videos citees par sa reponse. Voir
-[09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
-
-### `app/services/search.py`
-
-Recherche textuelle par mots, insensible a la casse et aux accents, et
-classement par pertinence des videos et des chaines. Partagee par les champs
-de recherche de `/videos` et `/channels` et par les outils du chat
-cross-video.
+Les regles metier, rangees en paquets par domaine (`common`, `youtube`,
+`llm`, `media`, `channels`, `ingest`, `playlists`, `videos`, `raton`, `rag`,
+`library_chat`, `jobs`) : role de chaque paquet et de chaque module,
+dependances autorisees et regles de structure dans
+[10 Services](10-services.md).
 
 ## Flux de donnees
 

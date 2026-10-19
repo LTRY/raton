@@ -14,7 +14,7 @@ from app.db.session import Base, get_db
 from app.main import app
 from app.models.channel import Channel
 from app.models.video import Video
-from app.services.thumbnails import (
+from app.services.media.thumbnails import (
     THUMBNAIL_WIDTHS,
     backfill_video_thumbnails,
     ensure_video_thumbnails,
@@ -121,7 +121,7 @@ def test_a_missing_ffmpeg_or_file_never_raises(db, tmp_path, monkeypatch):
     (tmp_path / "cover.jpg").write_bytes(b"not an image")
     video.thumbnail_path = str(tmp_path / "cover.jpg")
     monkeypatch.setattr(
-        "app.services.thumbnails.subprocess.run",
+        "app.services.media.thumbnails.subprocess.run",
         lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("ffmpeg")),
     )
     assert ensure_video_thumbnails(video) is False

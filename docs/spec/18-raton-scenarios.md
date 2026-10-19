@@ -8,7 +8,7 @@ choisit ce qu'il dit et quel dessin il montre, et sert de carnet d'idées : tout
 ce qui est prévu y figure, branché ou non, avec le dessin encore à faire.
 
 La source de vérité du code est le catalogue `CATALOGUE` de
-`app/web/raton.py`. Ce document le reprend ; en cas d'écart, le code et cette
+`app/services/raton/scenarios.py`. Ce document le reprend ; en cas d'écart, le code et cette
 page doivent être corrigés dans le même changement.
 
 ## Place dans l'accueil
@@ -59,8 +59,9 @@ Autres règles :
 | 3. Tirage | `nouveautes` | Au moins une fiche `is_new`, et pas entre 22 h et 5 h | « Il y a du nouveau, Chef. » (`journal.webp`) · « Tes youtubeurs ont bossé pendant que tu dormais. » (`laptop.webp`) · « Le facteur est passé. Il a laissé du contenu. » (`facteur.webp`) ; bouton « Voir les nouveautés » vers `/dashboard/nouveautes` | `journal.webp` |
 | 3. Tirage | `defaut` | Toujours vrai | « Alors, qu'est-ce qu'on s'envoie aujourd'hui ? » | `popcorn.webp` |
 
-Seuils : `LONG_ABSENCE_DAYS`, `CLOSING_RATIO` et `SESSION_GAP` en tête de
-`app/web/raton.py`.
+Seuils : `LONG_ABSENCE_DAYS` et `CLOSING_RATIO` en tête de
+`app/services/raton/scenarios.py`, `SESSION_GAP` en tête de
+`app/services/raton/visits.py`.
 
 Données utilisées :
 
@@ -129,7 +130,7 @@ unie `#2b2018`.
 | `cafetiere.webp` | Raton, tasse à la main, devant une cafetière qui goutte | `matin_tot` |
 | `hamac_dos.webp` | Raton couché dans un hamac, lune derrière | « Les vidéos seront encore là demain… » |
 
-`missing_art()` dans `app/web/raton.py` liste les scénarios sans dessin dédié.
+`missing_art()` dans `app/services/raton/picker.py` liste les scénarios sans dessin dédié.
 Dessins à faire : les idées parquées ci-dessus.
 
 ## Ajouter ou brancher un scénario

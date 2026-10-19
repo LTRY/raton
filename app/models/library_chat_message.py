@@ -13,7 +13,7 @@ class LibraryChatMessage(Base):
     this scope has no natural per-video file to live beside, so it's a DB
     table instead. `sources` and `channel_sources` are comma-separated lists of
     the video ids and channel ids an assistant answer cited (see
-    app/services/library_chat_tools.py), used to render the chips under it;
+    app/services/library_chat/tools.py), used to render the chips under it;
     always null on user messages.
     """
 
