@@ -196,7 +196,7 @@ Elle affiche :
   [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;
 - publication, telechargement, taille, statut transcript ;
 - boutons de telechargement des formats manquants ;
-- une barre d'onglets (informations, segments, transcript, notes, resume,
+- une barre d'onglets (informations, segments, transcript, notes,
   commentaire…), detaillee dans
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) ; l'onglet
   **Segments** est decrit ci-dessous ;
@@ -231,11 +231,11 @@ fichiers presents (voir « Ajouter audio et video » dans
 
 Fonctionnalites :
 
-- afficher 3 documents en onglets (Transcript / Notes structurees / Résumé) ;
+- afficher 2 documents en onglets (Transcript / Notes structurees) ;
 - compter les caracteres du document affiche ;
 - copier le document affiche ;
 - lancer la generation (bouton robot en haut de la fiche) : notes structurees,
-  resume ;
+  resume court et questions suggerees ;
 - les notes structurees (faits, dates, lieux, acteurs, relations
   causales) sont produites a partir du transcript ;
   un label technique **Notes** s'affiche sur la carte video et sur la page
@@ -256,7 +256,6 @@ Les fichiers associes :
 
 - `transcript.txt` : transcript converti depuis les sous-titres ;
 - `transcript.notes.txt` : notes structurees ;
-- `transcript.summary.txt` : resume narratif ;
 - `transcript.summary_short.txt` : resume court (3 lignes) ;
 - `transcript.questions.txt` : questions suggerees par l'IA (une par ligne) ;
 - `transcript.chat.json` : historique de discussion.

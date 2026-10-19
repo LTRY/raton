@@ -63,7 +63,6 @@ Un dossier video peut contenir :
 - sous-titres sources : `.vtt`, `.srt`, `.json3` ;
 - transcript : `transcript.txt` ;
 - notes structurees : `transcript.notes.txt` ;
-- resume narratif : `transcript.summary.txt` ;
 - resume court (3 lignes) : `transcript.summary_short.txt` ;
 - historique chat : `transcript.chat.json`.
 

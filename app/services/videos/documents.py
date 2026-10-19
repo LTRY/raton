@@ -10,7 +10,6 @@ from app.core.config import local_media_path
 from app.models.video import Video
 
 NOTES_FILE = "transcript.notes.txt"
-SUMMARY_FILE = "transcript.summary.txt"
 SHORT_SUMMARY_FILE = "transcript.summary_short.txt"
 QUESTIONS_FILE = "transcript.questions.txt"
 CHAT_FILE = "transcript.chat.json"
@@ -54,7 +53,6 @@ def read_transcript_documents(video: Video) -> dict:
     """Every document of the fiche that exists on disk; None (or empty) for the others."""
     transcript = None
     notes_transcript = None
-    summary_transcript = None
     short_summary = None
     suggested_questions: list[str] = []
     chat_messages = []
@@ -63,13 +61,10 @@ def read_transcript_documents(video: Video) -> dict:
         if path.is_file():
             transcript = path.read_text(encoding="utf-8", errors="replace")
             notes_path = path.with_name(NOTES_FILE)
-            summary_path = path.with_name(SUMMARY_FILE)
             summary_short_path = path.with_name(SHORT_SUMMARY_FILE)
             questions_path = path.with_name(QUESTIONS_FILE)
             if notes_path.is_file():
                 notes_transcript = notes_path.read_text(encoding="utf-8", errors="replace")
-            if summary_path.is_file():
-                summary_transcript = summary_path.read_text(encoding="utf-8", errors="replace")
             if summary_short_path.is_file():
                 short_summary = summary_short_path.read_text(encoding="utf-8", errors="replace")
             if questions_path.is_file():
@@ -84,7 +79,6 @@ def read_transcript_documents(video: Video) -> dict:
     return {
         "transcript": transcript,
         "notes_transcript": notes_transcript,
-        "summary_transcript": summary_transcript,
         "short_summary": short_summary,
         "suggested_questions": suggested_questions,
         "display_transcript": transcript,
@@ -96,7 +90,6 @@ def write_generated_documents(video: Video, generated: dict) -> None:
     """Write the notes, summaries and questions an LLM generated."""
     transcript_path, _, notes_path = get_transcript_paths(video)
     notes_path.write_text(generated["notes_text"], encoding="utf-8")
-    transcript_path.with_name(SUMMARY_FILE).write_text(generated["summary_full"], encoding="utf-8")
     transcript_path.with_name(SHORT_SUMMARY_FILE).write_text(
         generated["summary_short"], encoding="utf-8"
     )

@@ -170,7 +170,7 @@ Videos :
   suivie via `GET /videos/download-jobs/{id}`.
 - `POST /videos/{id}/transcript/chat` : poser question.
 - `POST /videos/{id}/transcript/chat/clear` : effacer chat.
-- `GET /videos/{id}/transcript/jobs/{job_id}` : statut/resolution d'un job LLM asynchrone, tous fournisseurs confondus (traite en tache de fond dans le process web) ; pour un job `generate` en cours, renvoie aussi le résumé deja ecrit (`partial_short_summary`, `partial_summary`).
+- `GET /videos/{id}/transcript/jobs/{job_id}` : statut/resolution d'un job LLM asynchrone, tous fournisseurs confondus (traite en tache de fond dans le process web) ; pour un job `generate` en cours, renvoie aussi le résumé court deja ecrit (`partial_short_summary`).
 - `POST /videos/{id}/sponsors/fetch` : rechercher les segments sponsorises via l'API publique SponsorBlock — **seule source** — pour les categories activees (`/settings`) ; remplace uniquement les lignes `source="sponsorblock"` de la video. Repond en JSON (`{status, message}`) si l'appel porte l'en-tete `X-Requested-With: fetch`, sinon redirige vers `/videos/{id}?message=...#segments-sponsors` (l'ancre ouvre l'onglet Segments ; `level=error` en cas d'echec) — voir [08 Medias et lecteurs](08-medias-et-lecteurs.md). Il n'existe plus de route de detection par IA : `POST /videos/{id}/sponsors/detect` a ete supprimee.
 - `POST /chat` : chat cross-video (le modele cherche chaines, videos et notes via des outils), voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
 - `POST /chat/clear` : effacer le fil du chat cross-video (`library_chat_messages`, fil unique).

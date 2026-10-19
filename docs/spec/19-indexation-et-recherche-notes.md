@@ -143,7 +143,7 @@ déclenche pas** de réindexation : voir « Pistes » ci-dessous.
   sujet, qui occuperaient des places parmi les 50 candidats vectoriels.
 - **Exclure ne retire rien** : un label exclu ajouté plus tard ne supprime pas
   les chunks déjà écrits (l'utilisateur a pu générer ces notes exprès).
-- **Notes + résumé court seulement** : le résumé complet, les questions
+- **Notes + résumé court seulement** : les questions
   sont des aides à la lecture, pas de la matière de recherche ; ils
   restent derrière le bouton robot. Le résumé court coûte ~155 tokens de
   sortie par vidéo.
@@ -153,7 +153,7 @@ déclenche pas** de réindexation : voir « Pistes » ci-dessous.
   deux phases (collecter, puis soumettre) et un état (l'identifiant du lot).
 - **Effort `low`** : l'extraction de notes demande peu de raisonnement, et les
   tokens de réflexion sont facturés comme de la sortie (les jobs `generate`
-  mesurés sur Haiku 5.5 en consomment ~6,8 k en moyenne, résumé complet
+  mesurés sur Haiku 5.5 en consomment ~6,8 k en moyenne, ancien résumé complet
   compris).
 - **Mesuré sur un petit lot** de vidéos ayant déjà des notes : réponses
   exploitables, résumé de 3 lignes à chaque fois, notes généralement plus

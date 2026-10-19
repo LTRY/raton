@@ -621,7 +621,6 @@ GENERATION_RESULT_TEXT = (
     "## Lieux\nAucun élément identifié.\n\n## Acteurs\nAucun élément identifié.\n\n"
     "## Concepts\nAucun élément identifié.\n\n## Relations causales\nAucun élément identifié.\n\n"
     "# Résumé\n## Résumé court\nLigne 1.\nLigne 2.\nLigne 3.\n\n"
-    "## Résumé complet\nRésumé du contenu.\n\n- Point clé 1\n\n"
     "## Questions suggérées\n- Question A ?\n- Question B ?\n\n"
 )
 
@@ -649,7 +648,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
         transcript_routes.transcript_job_status(video_id, job_id, BackgroundTasks(), db).body
     ) == {"status": "pending"}
 
-    streamed = "# Résumé\n## Résumé court\nLigne 1.\n\n## Résumé complet\nDébut du résumé"
+    streamed = "# Résumé\n## Résumé court\nLigne 1."
     polled = []
 
     class FakeProvider:
@@ -676,13 +675,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
 
     llm_jobs.run_llm_job(job_id)
 
-    assert polled == [
-        {
-            "status": "pending",
-            "partial_short_summary": "Ligne 1.",
-            "partial_summary": "Début du résumé",
-        }
-    ]
+    assert polled == [{"status": "pending", "partial_short_summary": "Ligne 1."}]
     assert db.get(LlmJob, job_id).result == GENERATION_RESULT_TEXT
 
 
@@ -760,19 +753,17 @@ def test_video_detail_page_hides_summary_tab_and_blurb_when_absent(tmp_path):
     assert response.status_code == 200
     assert "Générer notes, résumé" in rendered
     assert f'action="/videos/{video.id}/transcript/generate"' in rendered
-    assert 'data-tab="summary" role="tab" aria-selected="false" hidden' in rendered
+    assert 'data-tab="summary"' not in rendered
     assert '<p id="video-short-summary" class="video-short-summary" hidden></p>' in rendered
 
 
-def test_video_detail_page_shows_summary_tab_and_blurb_when_present(tmp_path):
+def test_video_detail_page_shows_the_short_summary_blurb_when_present(tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
     transcript = folder / "transcript.txt"
-    summary = folder / "transcript.summary.txt"
     summary_short = folder / "transcript.summary_short.txt"
     transcript.write_text("Original brut.", encoding="utf-8")
-    summary.write_text("Full summary content is present.", encoding="utf-8")
     summary_short.write_text("Résumé court existant.", encoding="utf-8")
     video = add_video(db)
     video.folder_path = str(folder)
@@ -794,12 +785,11 @@ def test_video_detail_page_shows_summary_tab_and_blurb_when_present(tmp_path):
     rendered = response.body.decode()
 
     assert response.status_code == 200
-    assert "Full summary content is present." in rendered
     assert (
         '<p id="video-short-summary" class="video-short-summary" >Résumé court existant.</p>'
         in rendered
     )
-    assert 'data-tab="summary" role="tab" aria-selected="false" >Résumé</button>' in rendered
+    assert 'data-tab="summary"' not in rendered
 
 
 def test_video_detail_page_opens_with_no_active_tab(tmp_path):
@@ -863,7 +853,7 @@ def test_video_detail_page_tab_order_starts_with_info_segments_raw(tmp_path):
     assert response.status_code == 200
     tab_order = re.findall(r'class="transcript-tab[^"]*" data-tab="([a-z-]+)"', rendered)
     assert tab_order[:3] == ["info", "segments", "raw"]
-    assert tab_order[3:] == ["notes", "summary", "vtt", "personal-notes"]
+    assert tab_order[3:] == ["notes", "vtt", "personal-notes"]
 
 
 def test_video_detail_page_has_personal_notes_tab_and_no_analysis_tab(tmp_path):

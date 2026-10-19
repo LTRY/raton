@@ -5,13 +5,14 @@ title: "09 Transcript et discussion LLM"
 
 ## Emplacement UI
 
-Le transcript, le resume et la discussion sont tous integres sur `/videos/{id}`
+Le transcript, les notes et la discussion sont tous integres sur `/videos/{id}`
 — aucun des documents LLM n'a de page dediee.
 
 En plus de ces documents, un resume court (3 lignes, genere en meme temps que
-le resume complet, voir section Génération ci-dessous) s'affiche directement
-sous le titre de la video (`#video-short-summary`), visible sans ouvrir
-l'onglet Resume.
+les notes, voir section Génération ci-dessous) s'affiche directement sous le
+titre de la video (`#video-short-summary`), visible sans ouvrir d'onglet. Il
+n'existe pas de resume complet : il a ete supprime, et un ancien
+`transcript.summary.txt` laisse sur le disque n'est plus lu.
 
 L'ancienne page `/videos/{id}/transcript` ne doit plus rendre de page dediee.
 Elle redirige vers :
@@ -55,8 +56,6 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
   (`hidden`) si aucun `transcript.txt` n'existe ;
 - `Notes structurees` (`data-tab="notes"`) : onglet masque tant que
   `transcript.notes.txt` n'existe pas ;
-- `Résumé` (`data-tab="summary"`) : onglet masque tant que
-  `transcript.summary.txt` n'existe pas ;
 - `.vtt` (`data-tab="vtt"`) : onglet masque si aucun sous-titre `.vtt` lisible
   n'existe pour la video (`video.subtitle_path`) ; panneau HTML independant
   affichant le contenu brut du fichier `.vtt` dans un `pre.transcript-content` ;
@@ -64,7 +63,7 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
   toujours present ; le formulaire renvoie vers `/videos/{id}#personal-notes`
   pour rouvrir l'onglet apres enregistrement ;
 
-Les trois onglets `Transcript`/`Notes structurees`/`Résumé`
+Les deux onglets `Transcript`/`Notes structurees`
 partagent un seul `pre#transcript-content.transcript-content` (le contenu
 affiche est echange cote client au clic, pas rechargee depuis le serveur), a
 l'interieur d'un conteneur `[data-tab-panel="text"]` qui n'existe dans le DOM
@@ -88,7 +87,7 @@ ouvre l'onglet correspondant cote client au chargement :
 Affichage additionnel dans le panneau `text` :
 
 - longueur en caracteres du document affiche + son libelle (`Transcript` /
-  `Notes structurees` / `Résumé`) ;
+  `Notes structurees`) ;
 - icone de copie discrete en haut a droite de la zone de texte (copie le
   document actuellement affiche ; passe brievement en coche pour confirmer).
 
@@ -104,34 +103,33 @@ visible sans defiler jusqu'a la section transcript :
   rendu que si `transcript.txt` existe ;
 - au survol (ou au focus clavier, via `:hover`/`:focus-within` sur
   `.ai-generate`), une infobulle `#ai-generate-tooltip` resume ce que le
-  bouton produit : notes structurees, résumé (+ résumé court et questions
-  suggerees) ; une passerelle CSS comble l'ecart bouton/infobulle ;
+  bouton produit : notes structurees, résumé court et questions
+  suggerees ; une passerelle CSS comble l'ecart bouton/infobulle ;
 - pendant la generation, le bouton est desactive et son icone est remplacee
   par un spinner (`.ai-generate-loading`) : le libelle ne peut pas etre
   echange comme sur les autres actions LLM, ce qui effacerait le SVG ;
   l'infobulle est masquee tant que le spinner tourne ;
 - **la page n'est jamais rechargee** et ne defile pas : des que le job est en
-  file, l'onglet `Résumé` s'ouvre (meme s'il n'existait pas encore) et le
-  résumé s'y ecrit **mot par mot** au fil de la reponse du LLM ; le résumé
-  court s'ecrit de la meme facon sous le titre (`#video-short-summary`) ;
+  file, le résumé court s'ecrit **mot par mot** sous le titre
+  (`#video-short-summary`) au fil de la reponse du LLM, sans ouvrir d'onglet ;
   - le client interroge `GET /videos/{id}/transcript/jobs/{job_id}` toutes
-    les 400 ms (2 s pour les autres jobs LLM) et lit `partial_short_summary`/
-    `partial_summary` (voir section Jobs LLM asynchrones) ;
+    les 400 ms (2 s pour les autres jobs LLM) et lit `partial_short_summary`
+    (voir section Jobs LLM asynchrones) ;
   - `createWordStream` (script de `video_detail.html`) revele le texte recu a
     un rythme regulier, decouple du rythme des polls : au moins 14 mots/s,
     plus vite quand le retard grandit ; chaque mot est un `span.stream-word`
     qui apparait en fondu, et un curseur clignotant (`.word-stream.is-streaming`)
     marque l'endroit ou le texte s'ecrit ; avec `prefers-reduced-motion`, les
     mots apparaissent sans fondu ;
-  - le spinner du bouton continue de tourner une fois le résumé ecrit, tant
+  - le spinner du bouton continue de tourner une fois le résumé court ecrit, tant
     que les notes (generees ensuite) ne sont pas terminees ;
 - a la fin du job, les onglets textuels, le résumé court et les questions
   suggerees sont mis a jour sur place a partir de la reponse
   (`documents_payload`), sans changer l'onglet affiche ;
 - une notification `.toast` (`window.showToast`, voir
   `11-interface-html.md`) annonce la fin : succes (`Notes et résumé
-  générés par l'IA.`) ou erreur ; en cas d'erreur, l'onglet `Résumé` et le
-  résumé court retrouvent leur contenu d'avant, et le message est aussi
+  générés par l'IA.`) ou erreur ; en cas d'erreur, le résumé court
+  retrouve son contenu d'avant, et le message est aussi
   affiche dans `#generate-status`, sous le bouton, et dans
   `#transcript-action-status`.
 
@@ -150,12 +148,11 @@ navigateur).
 
 ## Génération : notes et résumé
 
-Notes structurées et résumé (+ résumé court + questions suggérées)
-sont les onglets `Notes structurees` et `Résumé` de
-`/videos/{id}` (pas de page dédiée). Un résumé court complémentaire (3 lignes) s'affiche en plus,
-toujours visible sous le titre de la vidéo (`#video-short-summary`, hors des
-onglets), pour donner une idée du contenu sans avoir à ouvrir l'onglet
-Résumé. Un seul bouton (le bouton robot en haut de la page, voir "Bouton robot
+Les notes structurées sont l'onglet `Notes structurees` de `/videos/{id}` (pas de
+page dédiée). Le résumé court (3 lignes) est toujours visible sous le titre de
+la vidéo (`#video-short-summary`, hors des onglets), pour donner une idée du
+contenu sans ouvrir d'onglet, et les questions suggérées s'affichent dans la
+discussion. Un seul bouton (le bouton robot en haut de la page, voir "Bouton robot
 (generation IA)" ci-dessus) déclenche les deux documents à la fois, en un
 seul appel LLM — il n'y a pas de route ni de bouton pour en régénérer un seul
 en isolation.
@@ -175,16 +172,23 @@ en isolation.
   utilisables individuellement) sous deux titres Markdown de **niveau 1**
   exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
   réponse arrive) — chacun suivi des mêmes sous-sections de niveau 2 qu'avant :
+  - La règle « rien d'autre avant le premier titre » n'est énoncée qu'une fois,
+    pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
+    n'en portent pas (deux consignes imbriquées faisaient parfois écrire
+    `## Notes` au lieu de `# Notes`) ;
   - Notes (apres le résumé dans la réponse) : exactement 6 sections (`NOTES_SECTION_NAMES`) — `## Faits`,
     `## Dates`, `## Lieux`, `## Acteurs`, `## Concepts`, `## Relations
     causales` — chacune en puces, sans rien inventer ; une section sans
     élément pertinent contient le texte fixe "Aucun élément identifié."
-    plutôt que d'être omise ;
+    plutôt que d'être omise. Le prompt définit le contenu de chaque section
+    (`NOTES_SECTIONS`) pour qu'un élément n'atterrisse que dans une seule, et
+    impose que chaque puce se comprenne seule, hors du reste des notes (noms
+    propres plutôt que pronoms ou « cette vidéo »), car chaque section est
+    indexée comme un chunk à part ; le transcript étant automatique, un nom
+    propre écrit de plusieurs façons garde sa graphie la plus fréquente ;
   - Résumé : `## Résumé court` (exactement 3 lignes, sujet + conclusion
-    principale), `## Résumé complet` (texte suivi en paragraphes qui
-    restitue sujet/argumentation/conclusions dans un ordre logique, termine
-    par 2 à 4 puces de points clés), `## Questions suggérées` (3 à 5
-    questions concrètes en puces, pas génériques) ;
+    principale), `## Questions suggérées` (3 à 5 questions concrètes en
+    puces, pas génériques) ;
 - `app/services/llm/prompts.py:split_generation_result(text)` découpe
   d'abord la réponse sur les deux titres de niveau 1, puis délègue chaque
   bloc au split_* à usage unique correspondant (`split_notes_sections` en
@@ -193,8 +197,8 @@ en isolation.
   ce seul document, sans deviner, comme chaque split_* individuel ;
 - le client interroge `GET /videos/{id}/transcript/jobs/{job_id}` jusqu'à
   résolution, qui applique le résultat complet en une fois : écrit
-  `transcript.notes.txt`, `transcript.summary.txt` (complet),
-  `transcript.summary_short.txt` (court), `transcript.questions.txt` (une
+  `transcript.notes.txt`, `transcript.summary_short.txt`,
+  `transcript.questions.txt` (une
   question par ligne) ; répond avec
   `app/web/routes/transcript.py:documents_payload`
   (`{"status": "generated", "message": "...", ...}`) ; peut être
@@ -207,11 +211,11 @@ des notes. Un lot nocturne (`auto_notes`, voir
 [13 Jobs, logs et planification](13-jobs-logs-planification.md)) produit, pour
 les vidéos qui n'en ont pas, **les notes structurées et le résumé court
 seulement** (`app/services/llm/prompts.py:build_auto_notes_prompt`, mêmes instructions
-de notes et de résumé court que ci-dessus, sans résumé complet ni questions) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
+de notes et de résumé court que ci-dessus, sans questions) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
 (jamais écrasé s'il existe déjà : un résumé généré à la main prévaut). Le
 résultat est appliqué par le service lui-même, pas par le polling de cette
 route. Le résumé court s'affiche donc sous le titre sans clic ; le bouton robot
-reste le seul moyen d'obtenir le résumé complet et les questions, et il regénère
+reste le seul moyen d'obtenir les questions, et il regénère
 tout, y compris ces deux fichiers.
 
 **Indexation RAG cross-video** : dès que le job `generate` est appliqué, une
@@ -245,9 +249,8 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
   `app/services/jobs/llm_jobs.py:run_llm_job`) ;
 - tant que le job est `queued`/`running`, repond `{"status": "pending"}` ;
   pour un job `generate` dont la reponse a commence a arriver, la reponse
-  porte en plus `partial_short_summary` et `partial_summary` : le résumé court
-  et le résumé complet tels qu'ecrits jusque-la
-  (`app/services/llm/prompts.py:partial_generation_summary`). Ces deux valeurs ne font
+  porte en plus `partial_short_summary` : le résumé court tel qu'ecrit
+  jusque-la (`app/services/llm/prompts.py:partial_generation_summary`). Cette valeur ne fait
   que s'allonger d'un poll au suivant (un titre Markdown en cours d'ecriture
   n'y apparait jamais), ce qui permet au client de n'ajouter que la suite ;
   `run_llm_job` enregistre pour cela le texte recu dans `llm_jobs.result`
@@ -256,7 +259,7 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
 - si le job a echoue, repond en 400 avec un message d'erreur explicite
   (`Génération` ou `Réponse` selon `kind`) ;
 - des que le job est termine (`done`), applique le resultat une seule fois
-  (ecrit `transcript.notes.txt`/`transcript.summary.txt`+`transcript.summary_short.txt`/
+  (ecrit `transcript.notes.txt`/`transcript.summary_short.txt`/
   `transcript.questions.txt` pour
   `generate` ; ajoute question/reponse a `transcript.chat.json` pour `chat` —
   voir sections Génération/Discussion ci-dessus), passe le job a
@@ -264,7 +267,7 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
   (`generate`), ou `chat_payload` (`chat`). Un nouveau poll sur un
   job deja `applied` renvoie l'etat courant sans ré-appliquer (idempotent).
 
-`documents_payload(video)` renvoie l'etat complet des 3 onglets textuels de
+`documents_payload(video)` renvoie l'etat complet des 2 onglets textuels de
 `/videos/{id}` a chaque reponse (generate), pour que le client
 resynchronise tous ses onglets (et le resume court sous le titre) en une fois
 quelle que soit l'action déclenchee :
@@ -273,7 +276,6 @@ quelle que soit l'action déclenchee :
 {
   "transcript": "...", "transcript_length": 0,
   "notes_transcript": "...", "notes_length": 0, "has_notes": false,
-  "summary_transcript": "...", "summary_length": 0, "has_summary": false,
   "short_summary": "..."
 }
 ```

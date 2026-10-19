@@ -1,25 +1,59 @@
 import re
 
-NOTES_SECTION_NAMES = ["Faits", "Dates", "Lieux", "Acteurs", "Concepts", "Relations causales"]
+# Section name -> what belongs in it. The definitions keep the sections apart so one item lands in
+# one section; each section is indexed as its own chunk (see split_notes_sections).
+NOTES_SECTIONS = {
+    "Faits": "affirmations vérifiables, chiffres, résultats, exemples concrets",
+    "Dates": (
+        "dates et périodes, en valeur absolue quand le transcript la donne, sinon telles que "
+        "dites (« l'an dernier »), avec l'événement auquel elles se rapportent"
+    ),
+    "Lieux": "lieux cités, avec ce qui s'y passe ou pourquoi ils sont mentionnés",
+    "Acteurs": "personnes, organisations, produits et œuvres cités, avec leur rôle dans le propos",
+    "Concepts": "notions, termes techniques et méthodes, avec la définition qu'en donne le transcript",
+    "Relations causales": (
+        "liens de cause à effet, conséquences et conditions que le propos avance explicitement, "
+        "formulés « A entraîne B »"
+    ),
+}
+NOTES_SECTION_NAMES = list(NOTES_SECTIONS)
 NOTES_EMPTY_SECTION_MARKER = "Aucun élément identifié."
 _NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _notes_instructions() -> str:
+def _notes_body() -> str:
+    """The notes rules without any role or "nothing before the first title" line, so that the
+    combined prompts can nest them under their own level-1 title."""
     section_headers = "\n".join(f"## {name}" for name in NOTES_SECTION_NAMES)
-    return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
-Produis des notes structurées et exhaustives à partir de ce transcript, avec
-exactement ces sections Markdown, dans cet ordre, chacune précédée de son
-titre exact et rien d'autre avant le premier titre :
+    section_contents = "\n".join(f"- {name} : {text}" for name, text in NOTES_SECTIONS.items())
+    return f"""Les notes sont structurées, exhaustives, et suivent exactement ces sections
+Markdown, dans cet ordre, chacune précédée de son titre exact :
 
 {section_headers}
 
-Sous chaque titre, liste les éléments correspondants sous forme de puces (une
-puce par élément). Si une section n'a aucun élément pertinent, écris
-"{NOTES_EMPTY_SECTION_MARKER}" sous le titre plutôt que d'omettre la section.
+Contenu de chaque section :
+{section_contents}
 
-N'invente rien : si une information ne figure pas dans le transcript, ne
-l'ajoute pas. Base-toi uniquement sur le texte ci-dessous."""
+Sous chaque titre, liste les éléments sous forme de puces (une puce par élément).
+Si une section n'a aucun élément pertinent, écris "{NOTES_EMPTY_SECTION_MARKER}"
+sous le titre plutôt que d'omettre la section.
+
+Règles :
+- Chaque puce se comprend seule, hors du reste des notes : nomme les personnes et
+  les choses (« Marie Curie », pas « elle » ; le sujet traité, pas « cette vidéo »
+  ni « l'orateur »).
+- Place chaque élément dans la seule section où il est le plus utile, sans le répéter.
+- Le transcript est une transcription automatique : si un nom propre est écrit de
+  plusieurs façons, retiens la graphie la plus fréquente.
+- N'invente rien : si une information ne figure pas dans le transcript, ne
+  l'ajoute pas. Base-toi uniquement sur le texte ci-dessous."""
+
+
+def _notes_instructions() -> str:
+    return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
+Produis des notes à partir de ce transcript, sans rien d'autre avant le premier titre.
+
+{_notes_body()}"""
 
 
 def build_notes_prompt(transcript: str) -> str:
@@ -57,26 +91,19 @@ def split_notes_sections(text: str) -> list[tuple[str, str]]:
 
 
 SUMMARY_SHORT_HEADER = "## Résumé court"
-SUMMARY_FULL_HEADER = "## Résumé complet"
 SUMMARY_QUESTIONS_HEADER = "## Questions suggérées"
 _BULLET_LINE_RE = re.compile(r"^\s*[-*]\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _summary_instructions() -> str:
-    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
+SUMMARY_SHORT_DEFINITION = """Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
+vidéo — de quoi se faire une idée sans l'avoir vue."""
 
-Produis trois éléments fidèles et autonomes à propos de cette vidéo, dans cet
-ordre exact, avec ces trois titres Markdown exacts et rien d'autre avant le
-premier titre :
 
-{SUMMARY_SHORT_HEADER}
-Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
-vidéo — de quoi se faire une idée sans l'avoir vue.
-
-{SUMMARY_FULL_HEADER}
-Un texte suivi en paragraphes qui restitue le sujet, l'argumentation et les
-conclusions dans un ordre logique (pas nécessairement chronologique si le
-propos digresse), termine par 2 à 4 points clés (puces).
+def _summary_body() -> str:
+    """The résumé court and the questions with their rules, without any role or "nothing before
+    the first title" line (see _notes_body)."""
+    return f"""{SUMMARY_SHORT_HEADER}
+{SUMMARY_SHORT_DEFINITION}
 
 {SUMMARY_QUESTIONS_HEADER}
 3 à 5 questions, une par ligne en puces, auxquelles un spectateur pourrait
@@ -84,12 +111,17 @@ avoir envie que cette vidéo réponde — des questions concrètes sur le conten
 réellement traité, pas des questions génériques qui iraient pour n'importe
 quelle vidéo.
 
-Règles communes :
-- N'invente rien : base-toi uniquement sur le transcript ci-dessous.
-- Le résumé complet est un texte suivi en paragraphes, pas une liste de faits
-  en vrac.
-- Longueur proportionnée au contenu : reste un résumé, ne cherche pas à tout
-  restituer."""
+Règle commune : n'invente rien, base-toi uniquement sur le transcript ci-dessous."""
+
+
+def _summary_instructions() -> str:
+    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
+
+Produis deux éléments fidèles et autonomes à propos de cette vidéo, dans cet
+ordre exact, avec ces deux titres Markdown exacts et rien d'autre avant le
+premier titre :
+
+{_summary_body()}"""
 
 
 def build_summary_prompt(transcript: str) -> str:
@@ -100,39 +132,56 @@ TRANSCRIPT:
 """
 
 
-def split_summary_result(text: str) -> tuple[str, str, list[str]]:
-    """Split a build_summary_prompt completion into (short, full, questions).
+def split_summary_result(text: str) -> tuple[str, list[str]]:
+    """Split a build_summary_prompt completion into (short, questions).
 
-    Falls back to (empty, whole text as the full summary, []) if the model
-    didn't follow the header format — degrades gracefully instead of guessing.
+    Falls back to (whole text as the short résumé, []) if the model didn't follow the
+    header format — degrades gracefully instead of guessing.
     """
-    full_marker = re.search(
-        rf"^{re.escape(SUMMARY_FULL_HEADER)}\s*$", text, re.IGNORECASE | re.MULTILINE
-    )
-    if full_marker is None:
-        return "", text.strip(), []
-    short = re.sub(
-        rf"^{re.escape(SUMMARY_SHORT_HEADER)}\s*$",
-        "",
-        text[: full_marker.start()],
-        flags=re.IGNORECASE | re.MULTILINE,
-    )
-
     questions_marker = re.search(
         rf"^{re.escape(SUMMARY_QUESTIONS_HEADER)}\s*$", text, re.IGNORECASE | re.MULTILINE
     )
+    before_questions = text if questions_marker is None else text[: questions_marker.start()]
+    short = re.sub(
+        rf"^{re.escape(SUMMARY_SHORT_HEADER)}\s*$",
+        "",
+        before_questions,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
     if questions_marker is None:
-        return short.strip(), text[full_marker.end() :].strip(), []
-    full = text[full_marker.end() : questions_marker.start()].strip()
+        return short.strip(), []
     questions = [
         match.group(1) for match in _BULLET_LINE_RE.finditer(text[questions_marker.end() :])
     ]
-    return short.strip(), full, questions
+    return short.strip(), questions
 
 
 GENERATION_NOTES_HEADER = "# Notes"
 GENERATION_SUMMARY_HEADER = "# Résumé"
 _GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé)\s*$", re.MULTILINE)
+
+
+def _combined_prompt(summary_body: str, transcript: str) -> str:
+    """Résumé + notes under the two level-1 titles that split_generation_result and
+    split_auto_notes_result slice on, with the transcript sent once.
+
+    The bodies carry no "nothing before the first title" line of their own: that rule is stated
+    once here, for the level-1 titles, so the model is never told two different things.
+    """
+    return f"""Tu es un rédacteur rigoureux et un expert en prise de notes efficace. Tu
+produis deux analyses d'une même vidéo à partir de son transcript, en un seul
+appel. Produis exactement ces deux sections, dans cet ordre, chacune introduite
+par son titre Markdown de niveau 1 exact, et rien d'autre avant le premier titre :
+
+{GENERATION_SUMMARY_HEADER}
+{summary_body}
+
+{GENERATION_NOTES_HEADER}
+{_notes_body()}
+
+TRANSCRIPT:
+{transcript}
+"""
 
 
 def build_generation_prompt(transcript: str) -> str:
@@ -146,21 +195,7 @@ def build_generation_prompt(transcript: str) -> str:
     The résumé comes first because it is the part shown to the user while the
     completion streams (see partial_generation_summary).
     """
-    return f"""Tu produis deux analyses d'une même vidéo à partir de son
-transcript en un seul appel, pour éviter d'envoyer ce transcript plusieurs
-fois. Produis exactement ces deux sections, dans cet ordre, chacune
-introduite par son titre Markdown de niveau 1 exact et rien d'autre avant le
-premier titre :
-
-{GENERATION_SUMMARY_HEADER}
-{_summary_instructions()}
-
-{GENERATION_NOTES_HEADER}
-{_notes_instructions()}
-
-TRANSCRIPT:
-{transcript}
-"""
+    return _combined_prompt(_summary_body(), transcript)
 
 
 def split_generation_result(text: str) -> dict:
@@ -179,23 +214,17 @@ def split_generation_result(text: str) -> dict:
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         blocks[match.group(1)] = text[start:end].strip()
 
-    summary_short, summary_full, summary_questions = split_summary_result(blocks.get("Résumé", ""))
+    summary_short, summary_questions = split_summary_result(blocks.get("Résumé", ""))
     return {
         "notes_text": blocks.get("Notes", ""),
         "summary_short": summary_short,
-        "summary_full": summary_full,
         "summary_questions": summary_questions,
     }
 
 
-def _short_summary_instructions() -> str:
-    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
-
-Produis un seul élément, sous ce titre Markdown exact et rien d'autre avant :
-
-{SUMMARY_SHORT_HEADER}
-Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
-vidéo — de quoi se faire une idée sans l'avoir vue.
+def _short_summary_body() -> str:
+    return f"""{SUMMARY_SHORT_HEADER}
+{SUMMARY_SHORT_DEFINITION}
 
 N'invente rien : base-toi uniquement sur le transcript ci-dessous."""
 
@@ -207,19 +236,7 @@ def build_auto_notes_prompt(transcript: str) -> str:
     sliced the same way; the long résumé and the questions are left to the robot
     button (they are reading aids, not what the cross-video search indexes).
     """
-    return f"""Tu produis deux analyses d'une même vidéo à partir de son transcript en un seul
-appel. Produis exactement ces deux sections, dans cet ordre, chacune introduite
-par son titre Markdown de niveau 1 exact et rien d'autre avant le premier titre :
-
-{GENERATION_SUMMARY_HEADER}
-{_short_summary_instructions()}
-
-{GENERATION_NOTES_HEADER}
-{_notes_instructions()}
-
-TRANSCRIPT:
-{transcript}
-"""
+    return _combined_prompt(_short_summary_body(), transcript)
 
 
 # The two sections are asked as level-1 titles, but a model sometimes writes "## Notes" under its
@@ -258,10 +275,10 @@ def _between_headers(text: str, start_header: str, end_header: str) -> str | Non
     return rest[: end.start()] if end else rest
 
 
-def partial_generation_summary(text: str) -> tuple[str, str]:
-    """(short, full) résumé as far as a still-streaming generation has written them.
+def partial_generation_summary(text: str) -> str:
+    """The résumé court as far as a still-streaming generation has written it.
 
-    Each value only ever grows from one call to the next on the same stream,
+    The value only ever grows from one call to the next on the same stream,
     so a client can append what is new. That is why a last line starting with
     `#` is dropped: it is a header still being written, which would otherwise
     show up as résumé text and then vanish.
@@ -276,9 +293,8 @@ def partial_generation_summary(text: str) -> tuple[str, str]:
     head, _, last_line = block.rpartition("\n")
     if last_line.lstrip().startswith("#"):
         block = head + "\n"
-    short = _between_headers(block, SUMMARY_SHORT_HEADER, SUMMARY_FULL_HEADER) or ""
-    full = _between_headers(block, SUMMARY_FULL_HEADER, SUMMARY_QUESTIONS_HEADER) or ""
-    return short.strip(), full.strip()
+    short = _between_headers(block, SUMMARY_SHORT_HEADER, SUMMARY_QUESTIONS_HEADER) or ""
+    return short.strip()
 
 
 def build_chat_prompt(transcript: str, messages: list[dict[str, str]], question: str) -> str:
