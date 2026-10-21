@@ -70,9 +70,10 @@ NOTES_EMPTY_SECTION_MARKER = "Aucun élément identifié."
 _NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _notes_body() -> str:
+def _notes_rules() -> str:
     """The notes rules without any role or "nothing before the first title" line, so that the
-    combined prompts can nest them under their own level-1 title."""
+    combined prompts can nest them under their own level-1 title. `_notes_system` wraps them
+    with a role and that line for the standalone prompt."""
     section_headers = "\n".join(f"## {name}" for name in NOTES_SECTION_NAMES)
     section_contents = "\n".join(f"- {name} : {text}" for name, text in NOTES_SECTIONS.items())
     return f"""Les notes sont structurées, exhaustives, et suivent exactement ces sections
@@ -99,15 +100,16 @@ Règles :
 {_TRANSCRIPT_USAGE_RULE}"""
 
 
-def _notes_instructions() -> str:
+def _notes_system() -> str:
+    """The system prompt of a notes-only completion."""
     return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
 Produis des notes à partir de ce transcript, sans rien d'autre avant le premier titre.
 
-{_notes_body()}"""
+{_notes_rules()}"""
 
 
 def build_notes_prompt(transcript: str) -> Prompt:
-    return Prompt(_notes_instructions(), _transcript_turn(transcript))
+    return Prompt(_notes_system(), _transcript_turn(transcript))
 
 
 def split_notes_sections(text: str) -> list[tuple[str, str]]:
@@ -145,9 +147,9 @@ SUMMARY_SHORT_DEFINITION = """Exactement 3 lignes qui donnent le sujet et la con
 vidéo — de quoi se faire une idée sans l'avoir vue."""
 
 
-def _summary_body() -> str:
+def _summary_rules() -> str:
     """The résumé court and the questions with their rules, without any role or "nothing before
-    the first title" line (see _notes_body)."""
+    the first title" line (see _notes_rules)."""
     return f"""{SUMMARY_SHORT_HEADER}
 {SUMMARY_SHORT_DEFINITION}
 
@@ -161,18 +163,19 @@ Règle commune : n'invente rien, base-toi uniquement sur le contenu de <{TRANSCR
 {_TRANSCRIPT_USAGE_RULE}"""
 
 
-def _summary_instructions() -> str:
+def _summary_system() -> str:
+    """The system prompt of a résumé-only completion."""
     return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
 
 Produis deux éléments fidèles et autonomes à propos de cette vidéo, dans cet
 ordre exact, avec ces deux titres Markdown exacts et rien d'autre avant le
 premier titre :
 
-{_summary_body()}"""
+{_summary_rules()}"""
 
 
 def build_summary_prompt(transcript: str) -> Prompt:
-    return Prompt(_summary_instructions(), _transcript_turn(transcript))
+    return Prompt(_summary_system(), _transcript_turn(transcript))
 
 
 def split_summary_result(text: str) -> tuple[str, list[str]]:
@@ -204,7 +207,7 @@ GENERATION_SUMMARY_HEADER = "# Résumé"
 _GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé)\s*$", re.MULTILINE)
 
 
-def _combined_prompt(summary_body: str, transcript: str) -> Prompt:
+def _combined_prompt(summary_rules: str, transcript: str) -> Prompt:
     """Résumé + notes under the two level-1 titles that split_generation_result and
     split_auto_notes_result slice on, with the transcript sent once.
 
@@ -217,10 +220,10 @@ appel. Produis exactement ces deux sections, dans cet ordre, chacune introduite
 par son titre Markdown de niveau 1 exact, et rien d'autre avant le premier titre :
 
 {GENERATION_SUMMARY_HEADER}
-{summary_body}
+{summary_rules}
 
 {GENERATION_NOTES_HEADER}
-{_notes_body()}"""
+{_notes_rules()}"""
     return Prompt(system, _transcript_turn(transcript))
 
 
@@ -235,7 +238,7 @@ def build_generation_prompt(transcript: str) -> Prompt:
     The résumé comes first because it is the part shown to the user while the
     completion streams (see partial_generation_summary).
     """
-    return _combined_prompt(_summary_body(), transcript)
+    return _combined_prompt(_summary_rules(), transcript)
 
 
 def split_generation_result(text: str) -> dict:
@@ -262,7 +265,7 @@ def split_generation_result(text: str) -> dict:
     }
 
 
-def _short_summary_body() -> str:
+def _short_summary_rules() -> str:
     return f"""{SUMMARY_SHORT_HEADER}
 {SUMMARY_SHORT_DEFINITION}
 
@@ -277,7 +280,7 @@ def build_auto_notes_prompt(transcript: str) -> Prompt:
     sliced the same way; the long résumé and the questions are left to the robot
     button (they are reading aids, not what the cross-video search indexes).
     """
-    return _combined_prompt(_short_summary_body(), transcript)
+    return _combined_prompt(_short_summary_rules(), transcript)
 
 
 # The two sections are asked as level-1 titles, but a model sometimes writes "## Notes" under its
