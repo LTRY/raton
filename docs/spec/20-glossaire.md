@@ -159,7 +159,7 @@ Telechargement video ou audio demande par la personne.
 
 Panneau de verre ouvert par le bouton rond (trois points verticaux) en haut a
 droite des pages Chaines, Playlists et Bibliotheque. Elle ne porte que l'import
-de la page : video, playlist ou abonnements.
+de la page : video, playlist, ou chaine et abonnements.
 
 - **Code** : `front/templates/_import_sheet.html`
 - **A ne pas confondre avec** : La feuille « Idees de Raton » du chat, ou la

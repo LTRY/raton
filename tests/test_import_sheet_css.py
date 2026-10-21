@@ -15,10 +15,3 @@ def test_closed_sheet_is_out_of_the_layout():
         r"\.import-fab:not\(\[open\]\) > \.import-sheet\s*\{\s*display:\s*none;",
         CSS,
     )
-
-
-def test_backdrop_paints_nothing():
-    # iOS Safari tints the status bar from fixed elements at the top: a painted veil stayed grey there.
-    for block in re.findall(r"\.import-backdrop\s*\{(.*?)\}", CSS, re.DOTALL):
-        assert "background" not in block
-        assert "animation" not in block

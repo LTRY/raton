@@ -13,7 +13,8 @@ sont ceux de [00 Vision](00-vision.md).
 
 ### Ajouter une chaine
 
-1. L'utilisateur ouvre `/channels`.
+1. L'utilisateur ouvre `/channels`, puis la feuille d'import (bouton rond en
+   haut a droite).
 2. Il saisit l'URL ou le `@handle` de la chaine, ou son nom : pour un nom,
    l'application liste les chaines YouTube correspondantes et il choisit
    laquelle ajouter.

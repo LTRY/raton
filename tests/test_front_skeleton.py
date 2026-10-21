@@ -98,7 +98,7 @@ def test_records_turn_iso_datetimes_into_datetimes_and_keep_plain_dates():
 def test_import_sheet_carries_only_the_import_of_its_page(front_client):
     client = front_client(make_session())
     expected = {
-        "/channels": {"/channels/import-csv"},
+        "/channels": {"/channels", "/channels/import-csv"},
         "/playlists": {"/playlists", "/playlists/import-url", "/playlists/import-csv"},
         "/videos": {"/videos/download", "/videos/upload"},
         "/dashboard/nouveautes": {"/videos/download", "/videos/upload"},

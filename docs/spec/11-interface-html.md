@@ -253,8 +253,11 @@ de liste) : le formulaire s'affiche directement sous le titre.
   aucune autre page ne paie cet appel ;
 - **Playlists** : « Ajouter une playlist », creation manuelle, import par URL
   YouTube (avec apercu) et import du CSV Google Takeout (voir « Playlists ») ;
-- **Chaines** : « Importer des abonnements », la zone de depot du CSV, dont
-  l'analyse s'affiche sur `/channels` (voir « Chaines »).
+- **Chaines** : « Ajouter des chaînes », le formulaire d'ajout d'une chaine
+  (nom, URL ou `@handle`, categories par le meme `<turbo-frame>` paresseux que
+  la Bibliotheque) puis la zone de depot du CSV d'abonnements, dont l'analyse
+  s'affiche sur `/channels` (voir « Chaines »). La page n'a plus d'autre bouton
+  d'ajout.
 
 Les formulaires sont ceux qui etaient dans les pages, deplaces ici et retires de
 ces pages. Sur ordinateur, la feuille est un panneau de verre sous le bouton
@@ -269,12 +272,14 @@ redescend en 260 ms a la fermeture et se
 rabat en glissant la poignee ou le titre vers le bas (elle suit le doigt, se
 ferme au-dela de 110 px) ; sans animation avec `prefers-reduced-motion`.
 Toute fermeture (✕, clic dehors, Echap, bouton d'import, glisse) joue
-l'animation de fermeture avant de refermer le `<details>` (`app.js`). Le voile
-est l'ombre portee de la feuille, pas un calque fixe : Safari iOS teinte la
-barre d'etat d'apres les elements fixes du haut de l'ecran et y gardait le gris
-du voile apres la fermeture. Feuille et calque de clic sont en `display: none`
-quand le `<details>` est ferme (sinon le navigateur les garde en page et ne
-rejoue pas l'animation a la reouverture).
+l'animation de fermeture (le voile s'efface en fondu) avant de refermer le
+`<details>` (`app.js`). Le voile est un calque fixe peint : Safari iOS teinte
+la barre d'etat d'apres les elements fixes du haut de l'ecran, elle s'assombrit
+donc avec le voile. Feuille et voile sont en `display: none` quand le
+`<details>` est ferme : sinon le navigateur les garde en page, la barre d'etat
+restait grise apres la fermeture et l'animation ne rejouait pas a la
+reouverture. Le contenu de la feuille s'empile en haut (`align-content:
+start`), sans s'etirer sur la hauteur de l'ecran.
 
 `?import=<page>` (`video`, `playlist` ou `abonnements`) ouvre la feuille des le
 rendu si c'est l'import de la page ; `app.js` retire ensuite le parametre de
@@ -787,8 +792,9 @@ Template : `channels.html`
 
 Contenu :
 
-- formulaire ajout chaine (avec categories) : une URL ou un `@handle` ajoute
-  la chaine directement ; tout autre texte est un nom a chercher ;
+- formulaire ajout chaine (avec categories), dans la feuille d'import (voir
+  « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
+  tout autre texte est un nom a chercher ;
 - panneau "Chaines YouTube pour « nom »" quand `/channels` recoit
   `?youtube_q=<nom>` : une ligne par candidate (avatar, nom, handle, nombre
   d'abonnes, debut de description) avec un bouton "Ajouter" qui poste son URL

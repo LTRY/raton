@@ -13,36 +13,6 @@
 <section>
   <div class="section-heading">
     <h1>Chaînes</h1>
-    <details class="page-actions-menu">
-      <summary>+ Ajouter</summary>
-      <div class="page-actions-panel">
-        <details class="page-action">
-          <summary>Ajouter une chaîne</summary>
-          <form class="download-form channel-create-form" action="/channels" method="post">
-            <label>
-              Chaîne YouTube
-              <input name="url" type="text" placeholder="Nom ou URL de la chaîne" required>
-            </label>
-            <div class="category-editor video-import-category-editor">
-              <span class="category-editor-title">Catégories</span>
-              <span class="category-filter-options" aria-label="Catégories prédéfinies">
-                {% for category in category_filter_options %}
-                <label class="asset-filter-chip">
-                  <input name="preset_categories" type="checkbox" value="{{ category.label }}">
-                  <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
-                </label>
-                {% endfor %}
-              </span>
-              <label class="custom-category-field">
-                <span>Custom</span>
-                <input name="custom_categories" type="text" placeholder="ex. histoire, interview">
-              </label>
-            </div>
-            <button type="submit">Ajouter</button>
-          </form>
-        </details>
-      </div>
-    </details>
   </div>
 
   {% if youtube_search %}
