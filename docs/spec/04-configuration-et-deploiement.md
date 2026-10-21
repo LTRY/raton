@@ -302,9 +302,10 @@ Regles :
 - ces regles sont verifiees par `scripts/check_pr_title.py` (workflow
   `pr-title.yml`) ;
 - le commit principal de la branche reprend le meme resume sans etiquette ;
-- la description suit `.github/pull_request_template.md` et reste courte et
-  concrete : « Quoi » (1 a 3 puces sur ce qui change : page, bouton, route,
-  comportement), « Pourquoi » (une phrase), et les captures d'ecran pour tout
+- la description est en anglais (les termes du glossaire restent tels quels),
+  suit `.github/pull_request_template.md` et reste courte et concrete :
+  « What » (1 a 3 puces sur ce qui change : page, bouton, route,
+  comportement), « Why » (une phrase), et les captures d'ecran pour tout
   `[FRONT]` (bureau et telephone si la mise en page differe) ; pas de
   checklist, pas de liste de fichiers ou de tests, pas de compte rendu de
   `make ci` (la CI l'affiche) ;

@@ -1,9 +1,9 @@
-## Quoi
+## What
 
-<!-- 1 à 3 puces concrètes : la page, le bouton, la route ou le comportement qui change. Pas de contexte général, pas de liste de fichiers ni de tests. -->
+<!-- 1 to 3 concrete bullets: the page, button, route or behavior that changes. No background, no list of files or tests. -->
 
-## Pourquoi
+## Why
 
-<!-- Une phrase : le problème ou la demande. -->
+<!-- One sentence: the problem or the request. -->
 
-<!-- PR [FRONT] : captures d'écran bureau et téléphone ici. -->
+<!-- [FRONT] PR: desktop and phone screenshots here. -->
