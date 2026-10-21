@@ -214,7 +214,30 @@ A chaque pull request et a chaque push sur `main`, `make ci` tourne sur un
 runner GitHub (`ubuntu-latest`) : CSS, lint `ruff`, tests et validation
 Compose. Un second job construit l'image du site de documentation
 (`make docs-build`), un troisieme scanne l'historique a la recherche de
-secrets (gitleaks). Le deploiement se fait a la main avec `make up`.
+secrets (gitleaks). Le deploiement se fait a la main (voir « Deploiement de
+main » ci-dessous).
+
+## Deploiement de main
+
+Le merge d'une PR ne deploie rien : la vraie instance se met a jour a la main,
+soit avec `make up` dans le depot, soit avec le bouton **Deployer main en
+production** en haut de la page des previews (voir « Previews des PR »), qui
+lance `scripts/deploy.sh` en tache de fond. Ce script :
+
+- refuse de deployer si le depot n'est pas sur la branche `main` ou si des
+  fichiers suivis sont modifies (`make up` construit ce dossier : il livrerait
+  ce travail non commite) ;
+- met `main` a jour sur `origin/main` en avance rapide seulement (refus si
+  `main` a diverge) ;
+- lance `make up`.
+
+Le bouton demande une confirmation, est desactive pendant un deploiement, et la
+sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
+**Production** affiche l'etat du dernier deploiement lance depuis la page
+(« Deploiement en cours… », « Deployee », « Echec du deploiement ») ; il
+s'oublie quand la page redemarre. Comme le reste de la page, ce bouton n'a pas
+d'authentification : toute machine du reseau local peut redeployer la vraie
+instance (voir [15 Securite](15-securite.md), « Hypothese LAN »).
 
 Un workflow separe, `pr-title.yml`, valide le titre de chaque PR avec
 `scripts/check_pr_title.py` (regles de « Conventions de nommage des PR »
@@ -250,7 +273,9 @@ le merge ne deploie rien.
   liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
-  et les boutons **Deployer**/**Redeployer**, **Ouvrir** et **Retirer**. Les
+  et les boutons **Deployer**/**Redeployer**, **Ouvrir** et **Retirer**. En
+  haut de la page : **Rafraichir** et la carte **Production** (« Deploiement de
+  main » ci-dessus). Les
   previews dont la PR est fermee restent listees pour etre retirees, et
   **Retirer les previews des PR fermees** les supprime toutes. La sortie de
   chaque action est dans `.local/previews/logs/pr-<N>.log` (lien **Journal**).
