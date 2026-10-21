@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from app.services.llm.prompts import Prompt
-from app.services.llm.provider import CompletionResult
+from back.services.llm.prompts import Prompt
+from back.services.llm.provider import CompletionResult
 from scripts.eval_prompts import (
     Answer,
     answer_for,
