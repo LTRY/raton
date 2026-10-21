@@ -10958,10 +10958,16 @@ body::before {
   outline-offset: 2px;
 }
 
+.import-backdrop {
+  display: none;
+}
+
 .import-sheet {
   background: var(--glass-fill-opaque);
   border-radius: var(--radius-lg);
   box-sizing: border-box;
+  display: grid;
+  gap: 8px;
   max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px));
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -10972,38 +10978,123 @@ body::before {
   width: min(460px, calc(100vw - 28px));
 }
 
-.import-tabs {
-  background: var(--color-tint);
-  border-radius: var(--radius-pill);
-  display: grid;
-  gap: 2px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 10px;
-  padding: 3px;
+.import-grip {
+  display: none;
 }
 
-.import-tabs button {
-  background: transparent;
-  border: 0;
+.import-head {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+  position: relative;
+}
+
+.import-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.import-close {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   color: var(--color-text);
   cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  min-width: 0;
-  padding: 8px 6px;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  left: 0;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  width: 44px;
 }
 
-.import-tabs button[aria-selected="true"] {
-  background: var(--color-white);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-shadow-warm) 22%, transparent);
+.import-close svg {
+  height: 18px;
+  width: 18px;
+}
+
+.import-list {
+  display: grid;
+  gap: 8px;
+}
+
+/* One row per import, like the lines of the chat's "+" sheet: a tap opens that
+   import's form under its row, the others fold. */
+.import-item {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-lg);
+  /* Reset the global `section` margin/max-width. */
+  margin: 0;
+  max-width: none;
+  min-width: 0;
+}
+
+.import-item-head {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.import-item-head:hover,
+.import-item-head:focus-visible {
+  background: var(--color-tint);
+  outline: none;
+}
+
+.import-item-icon {
+  align-items: center;
+  background: var(--color-tint);
+  border-radius: var(--radius-md);
   color: var(--color-primary);
+  display: flex;
+  flex: none;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.import-item-icon svg {
+  height: 20px;
+  width: 20px;
+}
+
+.import-item-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-item-chevron {
+  color: var(--color-text-soft);
+  flex: none;
+  height: 18px;
+  transition: transform 160ms ease;
+  width: 18px;
+}
+
+.import-item-head[aria-expanded="true"] .import-item-chevron {
+  transform: rotate(180deg);
 }
 
 .import-pane {
   display: grid;
   gap: 12px;
+  padding: 4px 8px 12px;
 }
 
 .import-pane[hidden] {
@@ -11042,9 +11133,39 @@ body::before {
     padding-right: 56px;
   }
 
-  .import-sheet {
+  /* The same bottom sheet as the chat's "+": pinned to the screen over a veil,
+     grip, round close button and title, above the tab bar and everything else. */
+  .import-fab[open] {
+    z-index: 1000;
+  }
+
+  .import-backdrop {
+    background: rgba(43, 32, 24, 0.45);
+    display: block;
+    inset: 0;
     position: fixed;
-    right: 14px;
-    top: calc(76px + env(safe-area-inset-top, 0px));
+  }
+
+  .import-sheet {
+    animation: chat-suggest-rise 0.28s ease-out;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: 8px;
+    margin-inline: auto;
+    max-height: 78dvh;
+    max-width: 560px;
+    padding: 10px 14px 18px;
+    position: fixed;
+    right: 8px;
+    top: auto;
+    width: auto;
+  }
+
+  .import-grip {
+    background: var(--color-border-strong);
+    border-radius: 3px;
+    display: block;
+    height: 5px;
+    justify-self: center;
+    width: 48px;
   }
 }

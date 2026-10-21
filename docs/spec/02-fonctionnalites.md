@@ -31,7 +31,7 @@ stockage) et le temps de lecture par type de media sont dans `/settings`.
 
 ### Import d'un fichier local
 
-L'onglet **Vidéo** de la feuille d'import (telechargement manuel d'une video
+La ligne **Une vidéo** de la feuille d'import (telechargement manuel d'une video
 par URL, avec le choix des formats et de la qualite) accepte aussi un fichier video ou audio depose depuis
 l'appareil (glisser-deposer ou selecteur). Il est range sous la chaine
 `Fichiers locaux`, sans transcript ni metadonnees YouTube ; un contenu deja

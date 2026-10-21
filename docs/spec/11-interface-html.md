@@ -236,25 +236,33 @@ Navigation principale :
 - Logs `/logs` (sur telephone, sans barre du haut ni onglet : par le lien
   « Voir tous les logs » de `/settings`)
 
-Bouton d'import (`.import-fab`, `_import_sheet.html` inclus par `base.html`,
-toutes les pages) : un bouton rond de 44 px en verre liquide (classe `lg` +
+Bouton d'import (`.import-fab`, `_import_sheet.html` inclus par `base.html`
+sur les seules pages **Chaines**, **Playlists** et **Bibliotheque** —
+`/channels*`, `/playlists*`, `/videos` et `/dashboard/*`, pas la fiche d'une
+video ni les autres pages) : un bouton rond de 44 px en verre liquide (classe `lg` +
 `data-glass-light`), trois points verticaux, fixe en haut a droite — sur
 telephone aussi, ou la barre du haut est masquee. Il ouvre la **feuille
-d'import** (`details[data-import-fab]`, ferme par Echap ou un clic dehors),
-une feuille de verre (460 px au plus, defilement interne) a trois onglets
-**Vidéo**, **Playlist**, **Abonnements**. Les formulaires d'import sont ceux qui
+d'import** (`details[data-import-fab]`, ferme par Echap, un clic dehors ou le
+bouton ✕ rond), sans bascule d'onglets : trois lignes, **Une vidéo**,
+**Une playlist**, **Des abonnements**, comme les lignes du « + » de la barre de
+chat ; toucher une ligne deplie son formulaire dessous et replie les autres
+(accordeon). Sur ordinateur, une feuille de verre sous le bouton (460 px au
+plus, defilement interne). Sur **telephone (≤ 800 px)**, la meme feuille
+basse que le « + » du chat : collee au bas de l'ecran sur un voile sombre,
+poignee, bouton ✕ rond, titre **Importer**, au-dessus de la barre d'onglets.
+Les formulaires d'import sont ceux qui
 etaient dans les pages, deplaces ici et retires de ces pages :
 
-- **Vidéo** : le formulaire de telechargement par URL et la zone de depot d'un
+- **Une vidéo** : le formulaire de telechargement par URL et la zone de depot d'un
   fichier local (voir « Bibliotheque » plus bas). Les pastilles de categories
   sont un `<turbo-frame>` paresseux (`GET /import/categories`), charge a
   l'ouverture : aucune autre page ne paie cet appel ;
-- **Playlist** : creation manuelle, import par URL YouTube (avec apercu) et import
+- **Une playlist** : creation manuelle, import par URL YouTube (avec apercu) et import
   du CSV Google Takeout (voir « Playlists ») ;
-- **Abonnements** : la zone de depot du CSV d'abonnements, dont l'analyse
+- **Des abonnements** : la zone de depot du CSV d'abonnements, dont l'analyse
   s'affiche sur `/channels` (voir « Chaines »).
 
-`?import=video|playlist|abonnements` ouvre la feuille sur cet onglet des le
+`?import=video|playlist|abonnements` ouvre la feuille sur cette ligne des le
 rendu ; `app.js` retire ensuite le parametre de l'URL. `GET /videos/import`
 (cible du repli sans JavaScript) renvoie vers `/videos?import=video` en gardant
 `message`/`level`. Un import reussi recharge la page courante avec le message du
@@ -494,7 +502,7 @@ Parametres.
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
 
-**Import** (onglet **Vidéo** de la feuille d'import) : le formulaire de
+**Import** (ligne **Une vidéo** de la feuille d'import) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
 tuiles a cocher **Video** (MP4) et **Audio** (M4A), qualite video (segment
 `360p` a `4K`/`Max`, visible seulement quand « Video » est coche), categories
@@ -787,8 +795,8 @@ Contenu :
   par ajout recent (option « Ajoutees recemment » du menu de tri), la chaine
   ajoutee en tete. L'import CSV fait de meme avec `?message=...` (plusieurs
   chaines, pas de lien unique) ;
-- l'import du CSV d'abonnements YouTube (export Google Takeout) est l'onglet
-  **Abonnements** de la feuille d'import (zone de depot, drag & drop ou clic) ; apres analyse, affiche la liste des
+- l'import du CSV d'abonnements YouTube (export Google Takeout) est la ligne
+  **Des abonnements** de la feuille d'import (zone de depot, drag & drop ou clic) ; apres analyse, affiche la liste des
   chaines trouvees avec une case a cocher par chaine (decochee et grisee
   "Deja importee" pour celles existantes, cochee par defaut pour les
   nouvelles, decochables individuellement, boutons "Tout selectionner"/"Tout
@@ -832,7 +840,7 @@ detail dans `front/static/js/playlist-player.js`.
 
 La page ne porte que la grille des playlists et sa recherche : les trois
 formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
-**Playlist** de la feuille d'import.
+**Une playlist** de la feuille d'import.
 
 - Grille : une carte par playlist — vignette 16:9 de la premiere video (ou
   degrade neutre s'il n'y en a pas) posee sur deux couches decalees (effet de
@@ -847,7 +855,7 @@ formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
   au survol la carte monte de 4 px et les deux couches s'ecartent ; les trois
   formulaires du panneau arrivent l'un apres l'autre. Tout est coupe avec
   `prefers-reduced-motion`.
-- Onglet Playlist de la feuille d'import, trois formulaires independants : creation manuelle (titre
+- Ligne Une playlist de la feuille d'import, trois formulaires independants : creation manuelle (titre
   seul) ; import par URL YouTube (`data-async-job`, meme contrat fetch/poll que
   l'import metadata de chaine, precede d'une etape d'apercu : le bouton
   **Prévisualiser** (ou Entree dans le champ) appelle `POST /api/playlists/preview`

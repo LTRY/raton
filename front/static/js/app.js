@@ -3642,9 +3642,10 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
   const tabs = fab.querySelectorAll("[data-import-tab]");
   tabs.forEach((tab) =>
     tab.addEventListener("click", () => {
-      tabs.forEach((other) => other.setAttribute("aria-selected", String(other === tab)));
+      const opening = tab.getAttribute("aria-expanded") !== "true";
+      tabs.forEach((other) => other.setAttribute("aria-expanded", String(opening && other === tab)));
       fab.querySelectorAll("[data-import-pane]").forEach((pane) => {
-        pane.hidden = pane.dataset.importPane !== tab.dataset.importTab;
+        pane.hidden = !(opening && pane.dataset.importPane === tab.dataset.importTab);
       });
     }),
   );
@@ -3661,7 +3662,7 @@ if (!window.__importFabBound) {
   window.__importFabBound = true;
   const closeImportFab = () => document.querySelectorAll("[data-import-fab][open]").forEach((fab) => fab.removeAttribute("open"));
   document.addEventListener("click", (event) => {
-    if (!event.target.closest("[data-import-fab]")) closeImportFab();
+    if (!event.target.closest("[data-import-fab]") || event.target.closest("[data-import-close]")) closeImportFab();
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeImportFab();

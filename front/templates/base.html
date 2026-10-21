@@ -23,7 +23,9 @@
         <span class="pull-refresh-spinner" aria-hidden="true"></span>
       </span>
     </div>
+    {% if current_path.startswith('/channels') or current_path.startswith('/playlists') or current_path == '/videos' or current_path.startswith('/dashboard') %}
     {% include "_import_sheet.html" %}
+    {% endif %}
     <header class="topbar lg">
       <a class="brand" href="/">Raton</a>
       <nav>

@@ -111,9 +111,24 @@ def test_import_sheet_holds_the_three_imports_on_every_page(front_client):
 def test_import_query_opens_the_sheet_on_its_tab(front_client):
     html = front_client(make_session()).get("/playlists?import=playlist").text
     assert "data-import-fab open" in html
-    assert 'data-import-tab="playlist" aria-selected="true"' in html
+    assert 'data-import-tab="playlist" aria-expanded="true"' in html
+    assert 'data-import-tab="video" aria-expanded="false"' in html
 
 
 def test_import_categories_frame(front_client):
     html = front_client(make_session()).get("/import/categories").text
     assert '<turbo-frame id="import-categories">' in html
+
+
+def test_import_button_only_on_chaines_playlists_and_bibliotheque(front_client):
+    client = front_client(make_session())
+    for path in (
+        "/channels",
+        "/playlists",
+        "/videos",
+        "/dashboard/nouveautes",
+        "/dashboard/historique",
+    ):
+        assert "data-import-fab" in client.get(path).text, path
+    for path in ("/settings", "/", "/stats"):
+        assert "data-import-fab" not in client.get(path).text, path

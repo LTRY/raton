@@ -1,4 +1,4 @@
-{# Import sheet: the three imports (video, playlist, subscriptions CSV) behind the round button at the top right of every page.
+{# Import sheet: the three imports (video, playlist, subscriptions CSV) behind the round button at the top right of the Chaînes, Playlists and Bibliothèque pages (base.html includes it there only).
    The forms are the same ones the pages used to carry; app.js binds them on `document`, so they work from any page. #}
 {% set import_tab = request.query_params.get("import", "") if request is defined else "" %}
 {% if import_tab not in ("video", "playlist", "abonnements") %}{% set import_tab = "" %}{% endif %}
@@ -6,13 +6,23 @@
   <summary class="import-fab-button lg" data-glass-light aria-label="Importer" title="Importer">
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
   </summary>
+  <div class="import-backdrop" data-import-close></div>
   <div class="import-sheet lg" role="dialog" aria-label="Importer">
-    <div class="import-tabs" role="tablist">
-      <button type="button" role="tab" data-import-tab="video" aria-selected="{{ 'true' if import_tab in ('', 'video') else 'false' }}">Vidéo</button>
-      <button type="button" role="tab" data-import-tab="playlist" aria-selected="{{ 'true' if import_tab == 'playlist' else 'false' }}">Playlist</button>
-      <button type="button" role="tab" data-import-tab="abonnements" aria-selected="{{ 'true' if import_tab == 'abonnements' else 'false' }}">Abonnements</button>
+    <span class="import-grip" aria-hidden="true"></span>
+    <div class="import-head">
+      <button type="button" class="import-close" data-import-close aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+      <span class="import-title">Importer</span>
     </div>
-    <div class="import-pane" data-import-pane="video" {% if import_tab not in ('', 'video') %}hidden{% endif %}>
+    <div class="import-list">
+      <section class="import-item" data-import-item="video">
+        <button type="button" class="import-item-head" data-import-tab="video" aria-expanded="{{ 'true' if import_tab == 'video' else 'false' }}">
+          <span class="import-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9.5 5 2.5-5 2.5z"/></svg></span>
+          <span class="import-item-label">Une vidéo</span>
+          <svg class="import-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="import-pane" data-import-pane="video" {% if import_tab != 'video' %}hidden{% endif %}>
   <form class="download-form import-form" action="/videos/download" data-api-action="/api/videos/import" data-api-body="manualDownload" method="post" data-async-download data-download-format-form data-turbo="false" data-pending-message="Import en file d'attente...">
     <label>
       URL YouTube
@@ -66,8 +76,15 @@
       <progress data-dropzone-progress max="100" value="0" hidden></progress>
     </label>
   </form>
-    </div>
-    <div class="import-pane import-pane-playlist" data-import-pane="playlist" {% if import_tab != 'playlist' %}hidden{% endif %}>
+        </div>
+      </section>
+      <section class="import-item" data-import-item="playlist">
+        <button type="button" class="import-item-head" data-import-tab="playlist" aria-expanded="{{ 'true' if import_tab == 'playlist' else 'false' }}">
+          <span class="import-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h12M4 12h12M4 17h6"/><path d="M15 15.5v5l4.5-2.5z"/></svg></span>
+          <span class="import-item-label">Une playlist</span>
+          <svg class="import-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="import-pane import-pane-playlist" data-import-pane="playlist" {% if import_tab != 'playlist' %}hidden{% endif %}>
     <form class="pl-add-card" action="/playlists" method="post">
       <label class="pl-facet" for="playlist-new-title">Nouvelle playlist</label>
       <input id="playlist-new-title" name="title" type="text" placeholder="Titre de la playlist" required>
@@ -107,8 +124,15 @@
       <input name="title" type="text" placeholder="Titre (optionnel, déduit du nom du fichier)" aria-label="Titre (optionnel)" data-playlist-csv-title>
       <button class="pl-btn-secondary" type="submit">Importer</button>
     </form>
-    </div>
-    <div class="import-pane" data-import-pane="abonnements" {% if import_tab != 'abonnements' %}hidden{% endif %}>
+        </div>
+      </section>
+      <section class="import-item" data-import-item="abonnements">
+        <button type="button" class="import-item-head" data-import-tab="abonnements" aria-expanded="{{ 'true' if import_tab == 'abonnements' else 'false' }}">
+          <span class="import-item-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="m8 3 4 4 4-4"/></svg></span>
+          <span class="import-item-label">Des abonnements</span>
+          <svg class="import-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="import-pane" data-import-pane="abonnements" {% if import_tab != 'abonnements' %}hidden{% endif %}>
           <p class="csv-import-hint">Exporte tes abonnements YouTube (Google Takeout) et dépose le fichier CSV ici.</p>
           <form class="csv-dropzone-form" action="/channels/import-csv" method="post" enctype="multipart/form-data" data-csv-dropzone-form data-turbo="false">
             <label class="csv-dropzone" data-csv-dropzone for="csv-file-input">
@@ -118,6 +142,8 @@
             </label>
             <button type="submit">Analyser le fichier</button>
           </form>
+        </div>
+      </section>
     </div>
   </div>
 </details>
