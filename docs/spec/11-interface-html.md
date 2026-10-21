@@ -258,9 +258,13 @@ de liste) : le formulaire s'affiche directement sous le titre.
 
 Les formulaires sont ceux qui etaient dans les pages, deplaces ici et retires de
 ces pages. Sur ordinateur, la feuille est un panneau de verre sous le bouton
-(460 px au plus, defilement interne). Sur **telephone (≤ 800 px)**, c'est la
-meme feuille basse que le « + » du chat : collee au bas de l'ecran sur un voile
-sombre, poignee, bouton ✕ rond, titre, au-dessus de la barre d'onglets.
+(460 px au plus, defilement interne). Sur **telephone (≤ 800 px)**, c'est une
+**languette tiree depuis le bas** qui prend toute la largeur et tout l'ecran,
+sauf une bande en haut (48 px + zone sure) ou la page precedente reste visible
+sous un voile sombre : coins hauts arrondis, poignee, bouton ✕ rond, titre,
+au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu) et se
+rabat en glissant la poignee ou le titre vers le bas (elle suit le doigt, se
+ferme au-dela de 110 px) ; sans animation avec `prefers-reduced-motion`.
 
 `?import=<page>` (`video`, `playlist` ou `abonnements`) ouvre la feuille des le
 rendu si c'est l'import de la page ; `app.js` retire ensuite le parametre de

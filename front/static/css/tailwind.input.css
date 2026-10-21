@@ -11042,6 +11042,25 @@ body::before {
   margin: 0;
 }
 
+@keyframes import-sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes import-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-sheet,
+  .import-backdrop {
+    animation: none;
+  }
+}
+
 /* The button floats over the first row of a phone page: keep its titles and
    actions out from under it. */
 @media (max-width: 800px) {
@@ -11055,13 +11074,15 @@ body::before {
     padding-right: 56px;
   }
 
-  /* The same bottom sheet as the chat's "+": pinned to the screen over a veil,
-     grip, round close button and title, above the tab bar and everything else. */
+  /* A full-width sheet pulled up from the bottom edge, like an iOS sheet: it
+     takes the whole phone except a strip at the top where the previous page
+     stays visible over its veil. Above the tab bar and everything else. */
   .import-fab[open] {
     z-index: 1000;
   }
 
   .import-backdrop {
+    animation: import-veil-in 0.3s ease-out;
     background: rgba(43, 32, 24, 0.45);
     display: block;
     inset: 0;
@@ -11069,17 +11090,29 @@ body::before {
   }
 
   .import-sheet {
-    animation: chat-suggest-rise 0.28s ease-out;
-    bottom: max(8px, env(safe-area-inset-bottom));
-    left: 8px;
-    margin-inline: auto;
-    max-height: 78dvh;
-    max-width: 560px;
-    padding: 10px 14px 18px;
+    animation: import-sheet-rise 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+    border-radius: var(--radius-22) var(--radius-22) 0 0;
+    bottom: 0;
+    left: 0;
+    max-height: none;
+    padding: 10px 16px calc(24px + env(safe-area-inset-bottom, 0px));
     position: fixed;
-    right: 8px;
-    top: auto;
+    right: 0;
+    top: calc(env(safe-area-inset-top, 0px) + 48px);
     width: auto;
+  }
+
+  /* While a finger drags the sheet down, it follows without the animation. */
+  .import-sheet.is-dragging {
+    animation: none;
+    transition: none;
+  }
+
+  .import-grip,
+  .import-head {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .import-grip {

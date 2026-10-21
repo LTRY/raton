@@ -3647,6 +3647,36 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
   }
 });
 
+// Phone sheet: pulled down by its grip or title, it follows the finger and closes past a threshold.
+document.querySelectorAll("[data-import-fab]").forEach((fab) => {
+  const sheet = fab.querySelector(".import-sheet");
+  let startY = null;
+  let delta = 0;
+  fab.querySelectorAll(".import-grip, .import-head").forEach((handle) => {
+    handle.addEventListener("pointerdown", (event) => {
+      if (!mobileViewport.matches || event.target.closest("[data-import-close]")) return;
+      startY = event.clientY;
+      delta = 0;
+      sheet.classList.add("is-dragging");
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (startY === null) return;
+      delta = Math.max(0, event.clientY - startY);
+      sheet.style.transform = `translateY(${delta}px)`;
+    });
+    const release = () => {
+      if (startY === null) return;
+      startY = null;
+      sheet.classList.remove("is-dragging");
+      sheet.style.transform = "";
+      if (delta > 110) fab.removeAttribute("open");
+    };
+    handle.addEventListener("pointerup", release);
+    handle.addEventListener("pointercancel", release);
+  });
+});
+
 if (!window.__importFabBound) {
   // Bound once on `document` (see the pull-to-refresh note below); Turbo swaps the <details> itself.
   window.__importFabBound = true;
