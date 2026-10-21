@@ -10,7 +10,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -314,7 +314,6 @@ def toggle_channel_auto_metadata_form(
 
 @router.post("/channels/{channel_id}/import-metadata")
 def import_channel_metadata_form(
-    request: Request,
     background_tasks: BackgroundTasks,
     channel_id: int,
     page: int = Form(1),
@@ -322,29 +321,16 @@ def import_channel_metadata_form(
     return_to: str = Form("/videos", alias="next"),
     db: Session = Depends(get_db),
 ):
+    """The no-JS fallback of a channel's exploration, which app.js sends to /api."""
     target = internal_return_path(return_to)
-    page = max(page, 1)
     channel = db.get(Channel, channel_id)
     if channel is None:
-        message = "Chaîne introuvable."
-        if request.headers.get("x-requested-with") == "fetch":
-            return JSONResponse({"status": "failed", "message": message}, status_code=404)
-        return redirect(append_query(target, {"level": "error", "message": message}))
-
+        return redirect(append_query(target, {"level": "error", "message": "Chaîne introuvable."}))
     section = bell_section(section)
     job = queue_channel_metadata_import(db, channel, section)
-    background_tasks.add_task(run_channel_metadata_import_job, job.id, channel.id, page, section)
-
-    if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse(
-            {
-                "job_id": job.id,
-                "status": job.status,
-                "message": job.message,
-                "status_url": f"/jobs/{job.id}",
-                "return_to": target,
-            }
-        )
+    background_tasks.add_task(
+        run_channel_metadata_import_job, job.id, channel.id, max(page, 1), section
+    )
     return redirect(
         append_query(target, {"message": "Import des métadonnées lancé en arrière-plan."})
     )

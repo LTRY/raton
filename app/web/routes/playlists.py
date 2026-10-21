@@ -8,7 +8,7 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -31,7 +31,6 @@ from app.services.playlists.editing import (
     PlaylistItemNotFoundError,
     PlaylistNotInLibraryError,
     add_video_to_playlist,
-    apply_item_order,
     create_manual_playlist,
     create_playlist,
     delete_playlist,
@@ -48,7 +47,6 @@ from app.services.playlists.editing import (
 from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
-    preview_playlist,
 )
 from app.services.playlists.listing import (
     list_playlists,
@@ -67,7 +65,6 @@ from app.web.shared import (
     internal_return_path,
     redirect,
     templates,
-    wants_json,
 )
 
 router = APIRouter()
@@ -102,86 +99,46 @@ def create_playlist_manual(title: str = Form(...), db: Session = Depends(get_db)
     return redirect(f"/playlists/{playlist.id}")
 
 
-@router.post("/playlists/preview")
-def preview_playlist_url(url: str = Form(...), db: Session = Depends(get_db)):
-    """Summary of a playlist URL, shown before `import-url` is confirmed. Writes nothing."""
-    try:
-        info = preview_playlist(db, url)
-    except PlaylistNotFoundError as exc:
-        return JSONResponse({"status": "failed", "message": str(exc)}, status_code=404)
-    return JSONResponse(
-        {
-            "status": "ok",
-            **info,
-            "duration_label": format_long_duration(info["duration_seconds"]),
-        }
-    )
-
-
 @router.post("/playlists/import-url")
 def import_playlist_url(
-    request: Request,
     background_tasks: BackgroundTasks,
     url: str = Form(...),
     title: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    """The no-JS fallback of the URL import, which app.js sends to /api."""
     try:
         playlist, job = queue_playlist_url_import(db, url, form_text_value(title))
     except PlaylistNotFoundError as exc:
-        message = str(exc)
-        if wants_json(request):
-            return JSONResponse({"status": "failed", "message": message}, status_code=404)
-        return redirect(append_query("/playlists", {"level": "error", "message": message}))
+        return redirect(append_query("/playlists", {"level": "error", "message": str(exc)}))
     background_tasks.add_task(run_playlist_url_import_job, job.id, playlist.id)
-
-    target = f"/playlists/{playlist.id}"
-    if wants_json(request):
-        return JSONResponse(
-            {
-                "job_id": job.id,
-                "status": job.status,
-                "message": job.message,
-                "status_url": f"/jobs/{job.id}",
-                "return_to": target,
-            }
-        )
     return redirect(
-        append_query(target, {"message": "Import de la playlist lancé en arrière-plan."})
+        append_query(
+            f"/playlists/{playlist.id}", {"message": "Import de la playlist lancé en arrière-plan."}
+        )
     )
 
 
 @router.post("/playlists/import-csv")
 def import_playlist_csv(
-    request: Request,
     background_tasks: BackgroundTasks,
-    csv_file: UploadFile = File(...),
+    file: UploadFile = File(...),
     title: str = Form(""),
     db: Session = Depends(get_db),
 ):
+    """The no-JS fallback of the CSV import, which app.js sends to /api."""
     try:
         playlist, job, rows = queue_playlist_csv_import(
-            db, csv_file.file.read(), csv_file.filename, form_text_value(title)
+            db, file.file.read(), file.filename, form_text_value(title)
         )
     except PlaylistCsvError as exc:
-        message = str(exc)
-        if wants_json(request):
-            return JSONResponse({"status": "failed", "message": message}, status_code=400)
-        return redirect(append_query("/playlists", {"level": "error", "message": message}))
+        return redirect(append_query("/playlists", {"level": "error", "message": str(exc)}))
     background_tasks.add_task(run_playlist_csv_import_job, job.id, playlist.id, rows)
-
-    target = f"/playlists/{playlist.id}"
-    if wants_json(request):
-        return JSONResponse(
-            {
-                "job_id": job.id,
-                "status": job.status,
-                "message": job.message,
-                "status_url": f"/jobs/{job.id}",
-                "return_to": target,
-            }
+    return redirect(
+        append_query(
+            f"/playlists/{playlist.id}", {"message": "Import du CSV lancé en arrière-plan."}
         )
-    return redirect(append_query(target, {"message": "Import du CSV lancé en arrière-plan."}))
+    )
 
 
 @router.get("/playlists/{playlist_id}", response_class=HTMLResponse)
@@ -269,27 +226,11 @@ def update_playlist_categories(
 
 @router.post("/playlists/{playlist_id}/free-listening")
 def set_playlist_free_listening(
-    request: Request, playlist_id: int, enabled: str = Form("0"), db: Session = Depends(get_db)
+    playlist_id: int, enabled: str = Form("0"), db: Session = Depends(get_db)
 ):
+    """The no-JS fallback of the switch, which playlist-player.js saves with PUT /api/..."""
     playlist = _get_playlist(db, playlist_id)
     set_free_listening(db, playlist, enabled == "1")
-    if wants_json(request):
-        return JSONResponse({"status": "ok", "free_listening": playlist.free_listening})
-    return redirect(f"/playlists/{playlist_id}")
-
-
-@router.post("/playlists/{playlist_id}/reorder")
-def reorder_playlist(
-    request: Request, playlist_id: int, item_ids: str = Form(""), db: Session = Depends(get_db)
-):
-    playlist = _get_playlist(db, playlist_id)
-    try:
-        ordered = [int(value) for value in item_ids.split(",") if value.strip()]
-    except ValueError:
-        ordered = []
-    ok = apply_item_order(db, playlist, ordered)
-    if wants_json(request):
-        return JSONResponse({"status": "ok" if ok else "stale"}, status_code=200 if ok else 409)
     return redirect(f"/playlists/{playlist_id}")
 
 

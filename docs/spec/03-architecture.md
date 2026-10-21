@@ -175,6 +175,7 @@ Contient :
 
 L'API JSON sous `/api`, un module par sujet : `channels.py` (chaines et
 import CSV des abonnements), `videos.py` (fiches et leurs actions),
+`imports.py` (telechargement manuel et import de fichier),
 `library.py` (`GET /api/library`), `playlists.py`, `llm.py` (demandes au LLM
 et leurs jobs), `jobs.py` (journal et etat des jobs de telechargement et
 d'import), `stats.py` (`/stats` et `/rag`), `settings.py`. `__init__.py` les
@@ -182,7 +183,14 @@ assemble en un seul routeur, inclus par `app/main.py` ; chaque module a son
 tag OpenAPI, et le schema (`/docs`) ne decrit que `/api` (les routes HTML en
 sont exclues). `lookups.py` trouve l'enregistrement qu'un chemin designe
 (fiche, chaine, playlist, element) ou repond `404` avec le message du
-service. Chaque route appelle le meme service que son equivalent HTML.
+service, `errors.py` le format d'erreur commun. Chaque route appelle le meme
+service que son equivalent HTML.
+
+Le JavaScript des pages (`app.js`, `playlist-player.js`) n'appelle que
+`/api` : un formulaire porte son jumeau dans `data-api-action`, et son
+`action` HTML reste le repli sans JavaScript, qui ne fait que rediriger. Les
+routes HTML ne repondent jamais en JSON (seule exception :
+`POST /videos/share-import`, appelee par le raccourci iOS).
 
 ### `app/services/`
 

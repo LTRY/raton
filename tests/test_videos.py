@@ -29,7 +29,7 @@ from app.services.channels import manage as channel_manage
 from app.services.common import search
 from app.services.common.settings import get_sponsor_skip_enabled
 from app.services.ingest.identity import channel_values_from_info
-from app.services.jobs import backfills, downloads, llm_jobs
+from app.services.jobs import backfills, download_requests, downloads, llm_jobs
 from app.services.jobs.scheduler import record_scan_result
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from app.services.videos import editing as videos_editing
@@ -1380,19 +1380,9 @@ def test_delete_video_media_removes_file_and_keeps_audio(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
+        video.id, "video", return_to=f"/videos/{video.id}", db=db
     )
 
     assert response.status_code == 303
@@ -1405,7 +1395,7 @@ def test_delete_video_media_removes_file_and_keeps_audio(tmp_path):
     assert video.file_size_bytes == len(b"audio bytes")
 
 
-def test_delete_video_media_fetch_returns_json(tmp_path):
+def test_api_delete_media_removes_the_file(tmp_path):
     db = make_session()
     folder = tmp_path / "media"
     folder.mkdir()
@@ -1422,29 +1412,14 @@ def test_delete_video_media_fetch_returns_json(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
-    )
+    api_videos.delete_media(video.id, "video", db)
 
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "deleted"
     assert not video_file.exists()
     assert video.video_path is None
 
 
-def test_delete_video_media_fetch_returns_json_error_when_already_missing(tmp_path):
+def test_api_delete_media_refuses_a_missing_file(tmp_path):
     db = make_session()
     folder = tmp_path / "media"
     folder.mkdir()
@@ -1458,24 +1433,11 @@ def test_delete_video_media_fetch_returns_json_error_when_already_missing(tmp_pa
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
-    )
+    with pytest.raises(HTTPException) as refused:
+        api_videos.delete_media(video.id, "video", db)
 
-    assert response.status_code == 400
-    payload = json.loads(response.body)
-    assert payload["status"] == "failed"
+    assert refused.value.status_code == 400
 
 
 def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
@@ -1498,19 +1460,9 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/audio/delete",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = media_routes.delete_video_media_form(
-        request, video.id, "audio", return_to=f"/videos/{video.id}", db=db
+        video.id, "audio", return_to=f"/videos/{video.id}", db=db
     )
 
     assert response.status_code == 303
@@ -1523,128 +1475,41 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
     assert video.file_size_bytes == len(b"video bytes")
 
 
-def test_download_video_media_queues_job_and_returns_json(monkeypatch):
+def test_download_video_media_form_queues_job_and_redirects(monkeypatch):
     db = make_session()
     video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", lambda *args, **kwargs: None)
+    background_tasks = BackgroundTasks()
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/audio/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = videos_routes.download_video_media_form(
-        request, BackgroundTasks(), video.id, "audio", db=db
-    )
+    response = videos_routes.download_video_media_form(background_tasks, video.id, "audio", db=db)
 
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
-    assert payload["status_url"] == f"/videos/download-jobs/{payload['job_id']}"
-    job = db.get(DownloadJob, payload["job_id"])
-    assert job is not None
-    assert job.video_id == video.id
+    job = db.scalar(select(DownloadJob))
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/videos/{video.id}?message=")
+    assert (job.status, job.video_id) == ("queued", video.id)
+    assert background_tasks.tasks[0].args == (job.id, video.url, "audio", "1080")
 
 
-def test_download_video_media_returns_internal_next_as_return_to(monkeypatch):
+def test_download_video_media_form_returns_to_an_internal_next_only():
     db = make_session()
     video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", lambda *args, **kwargs: None)
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
+    inside = videos_routes.download_video_media_form(
+        BackgroundTasks(), video.id, "video", "1080", "/videos?channel_id=1&section=shorts", db=db
     )
-    response = videos_routes.download_video_media_form(
-        request,
-        BackgroundTasks(),
-        video.id,
-        "video",
-        "1080",
-        "/videos?channel_id=1&section=shorts",
-        db=db,
+    outside = videos_routes.download_video_media_form(
+        BackgroundTasks(), video.id, "video", "1080", "https://evil.example/", db=db
     )
-    assert json.loads(response.body)["return_to"] == "/videos?channel_id=1&section=shorts"
 
-    response = videos_routes.download_video_media_form(
-        request, BackgroundTasks(), video.id, "video", "1080", "https://evil.example/", db=db
-    )
-    assert "return_to" not in json.loads(response.body)
+    assert inside.headers["location"].startswith("/videos?channel_id=1&section=shorts&message=")
+    assert outside.headers["location"].startswith(f"/videos/{video.id}?message=")
 
 
 def test_download_video_media_rejects_invalid_format():
     db = make_session()
     video = add_video(db)
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/subtitles/download",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     with pytest.raises(HTTPException):
-        videos_routes.download_video_media_form(
-            request, BackgroundTasks(), video.id, "subtitles", db=db
-        )
-
-
-def test_retry_video_transcript_queues_job_and_returns_json(monkeypatch):
-    db = make_session()
-    video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_transcript_retry_job", lambda *args, **kwargs: None)
-
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = videos_routes.retry_video_transcript_form(
-        request, BackgroundTasks(), video.id, db=db
-    )
-
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
-    assert payload["status_url"] == f"/videos/download-jobs/{payload['job_id']}"
-    job = db.get(DownloadJob, payload["job_id"])
-    assert job is not None
-    assert job.video_id == video.id
-
-
-def test_retry_video_transcript_rejects_missing_video():
-    db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/999/transcript/download",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    with pytest.raises(HTTPException):
-        videos_routes.retry_video_transcript_form(request, BackgroundTasks(), 999, db=db)
+        videos_routes.download_video_media_form(BackgroundTasks(), video.id, "subtitles", db=db)
 
 
 def test_run_transcript_retry_job_marks_job_downloaded_on_success(monkeypatch):
@@ -1938,16 +1803,6 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     # A forced language asks YouTube for an auto-translation (HTTP 429): the form leaves the track choice to the server.
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -1956,7 +1811,6 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=en123",
         media_type=["metadata"],
@@ -1965,7 +1819,7 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
         db=db,
     )
 
-    assert '"return_to":"/videos/import"' in response.body.decode()
+    assert response.headers["location"].startswith("/videos/import?message=")
     assert scheduled[0][1][5] is None
 
 
@@ -2028,19 +1882,9 @@ def test_import_page_route_is_not_shadowed_by_video_detail():
     assert 'action="/videos/download"' in response.text
 
 
-def test_download_form_queues_ajax_job(monkeypatch):
+def test_download_form_queues_job(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2049,7 +1893,6 @@ def test_download_form_queues_ajax_job(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=abc123",
         media_type=["audio"],
@@ -2058,12 +1901,9 @@ def test_download_form_queues_ajax_job(monkeypatch):
         db=db,
     )
 
-    payload = response.body.decode()
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert job.status == "queued"
-    assert f'"job_id":{job.id}' in payload
-    assert f"/videos/download-jobs/{job.id}" in payload
     assert scheduled == [
         (
             downloads.run_manual_download_job,
@@ -2075,29 +1915,20 @@ def test_download_form_queues_ajax_job(monkeypatch):
                 None,
                 None,
                 "both",
+                "1080",
             ),
             {},
         )
     ]
 
-    status = videos_routes.download_job_status(job.id, db)
+    status = download_requests.job_status(db, job.id)
     assert status["status"] == "queued"
     assert status["done"] is False
 
 
-def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
+def test_download_form_accepts_metadata_only_job(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2106,7 +1937,6 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=meta123",
         media_type=["metadata"],
@@ -2116,12 +1946,21 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     )
 
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert job.status == "queued"
     assert scheduled == [
         (
             downloads.run_manual_download_job,
-            (job.id, "https://youtube.com/watch?v=meta123", ["metadata"], True, None, None, "both"),
+            (
+                job.id,
+                "https://youtube.com/watch?v=meta123",
+                ["metadata"],
+                True,
+                None,
+                None,
+                "both",
+                "1080",
+            ),
             {},
         )
     ]
@@ -2130,16 +1969,6 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
 def test_download_form_queues_category_labels(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2148,7 +1977,6 @@ def test_download_form_queues_category_labels(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=cat123",
         media_type=["metadata"],
@@ -2160,7 +1988,7 @@ def test_download_form_queues_category_labels(monkeypatch):
     )
 
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert scheduled == [
         (
             downloads.run_manual_download_job,
@@ -2172,6 +2000,7 @@ def test_download_form_queues_category_labels(monkeypatch):
                 "maker,science,interview",
                 None,
                 "both",
+                "1080",
             ),
             {},
         )
@@ -2990,22 +2819,12 @@ def test_videos_page_accepts_empty_channel_filter(monkeypatch):
     assert video.title in rendered
 
 
-def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
+def test_channel_metadata_import_form_queues_the_job_and_redirects(monkeypatch):
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne test")
     db.add(channel)
     db.commit()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/channels/{channel.id}/import-metadata",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -3014,7 +2833,6 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
     )
 
     response = channels_routes.import_channel_metadata_form(
-        request,
         background_tasks,
         channel.id,
         page=2,
@@ -3022,18 +2840,16 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
         db=db,
     )
 
-    payload = response.body.decode()
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/videos?channel_id={channel.id}&message=")
     assert job.status == "queued"
     assert job.channel_id == channel.id
-    assert f'"job_id":{job.id}' in payload
-    assert f"/jobs/{job.id}" in payload
     assert scheduled == [
         (downloads.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
     ]
 
-    status = videos_routes.job_status(job.id, db)
+    status = download_requests.job_status(db, job.id)
     assert status["status"] == "queued"
     assert status["done"] is False
 
@@ -6327,7 +6143,7 @@ def test_share_import_waits_for_the_import_and_returns_the_video_url(monkeypatch
         job.status, job.video_id = "downloaded", video.id
         db.commit()
 
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", fake_run)
+    monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
     request = Request(
         {
             "type": "http",
@@ -6356,7 +6172,7 @@ def test_share_import_reports_a_failed_import_and_rejects_other_hosts(monkeypatc
         job.status, job.message = "failed", "Vidéo indisponible"
         db.commit()
 
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", fake_run)
+    monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
     request = Request(
         {
             "type": "http",

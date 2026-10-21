@@ -228,7 +228,7 @@
       </details>
       <button class="visually-hidden" type="submit">Filtrer</button>
     </form>
-    <form class="channel-refresh-form" action="/channels/{{ channel.id }}/import-metadata" method="post" data-async-job data-turbo="false" data-pending-message="Recherche des nouveautés en file d'attente...">
+    <form class="channel-refresh-form" action="/channels/{{ channel.id }}/import-metadata" data-api-action="/api/channels/{{ channel.id }}/import-metadata" data-api-body="channelImport" method="post" data-async-job data-turbo="false" data-pending-message="Recherche des nouveautés en file d'attente...">
       <input type="hidden" name="page" value="1">
       <input type="hidden" name="section" value="{{ selected_channel_section }}">
       <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">
@@ -277,7 +277,7 @@
   </turbo-frame>
 
   {% set channel_is_empty = not video_cards and not search_query %}
-  <form class="channel-explore" action="/channels/{{ channel.id }}/import-metadata" method="post" data-explore data-turbo="false" data-channel-id="{{ channel.id }}" data-channel-name="{{ channel.name }}" data-section="{{ selected_channel_section }}" data-expected="{{ channel_page_size }}">
+  <form class="channel-explore" action="/channels/{{ channel.id }}/import-metadata" data-api-action="/api/channels/{{ channel.id }}/import-metadata" method="post" data-explore data-turbo="false" data-channel-id="{{ channel.id }}" data-channel-name="{{ channel.name }}" data-section="{{ selected_channel_section }}" data-expected="{{ channel_page_size }}">
     <input type="hidden" name="page" value="{{ next_import_page }}">
     <input type="hidden" name="section" value="{{ selected_channel_section }}">
     <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">

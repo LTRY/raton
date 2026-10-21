@@ -61,7 +61,7 @@
       <button class="pl-btn-primary" type="submit">Créer</button>
     </form>
 
-    <form class="pl-add-card" action="/playlists/import-url" method="post" data-async-job data-turbo="false" data-pending-message="Import de la playlist en file d'attente...">
+    <form class="pl-add-card" action="/playlists/import-url" data-api-action="/api/playlists/import-url" data-api-body="playlistUrl" method="post" data-async-job data-turbo="false" data-pending-message="Import de la playlist en file d'attente...">
       <label class="pl-facet" for="playlist-url">Depuis une URL YouTube</label>
       <input id="playlist-url" name="url" type="text" placeholder="https://www.youtube.com/playlist?list=..." required>
       <input name="title" type="text" placeholder="Titre (optionnel, sinon celui de YouTube)" aria-label="Titre (optionnel)">
@@ -85,11 +85,11 @@
       </div>
     </form>
 
-    <form class="pl-add-card" action="/playlists/import-csv" method="post" enctype="multipart/form-data" data-async-job data-turbo="false" data-pending-message="Import du CSV en file d'attente..." data-playlist-csv-form>
+    <form class="pl-add-card" action="/playlists/import-csv" data-api-action="/api/playlists/import-csv" method="post" enctype="multipart/form-data" data-async-job data-turbo="false" data-pending-message="Import du CSV en file d'attente..." data-playlist-csv-form>
       <span class="pl-facet">Depuis un CSV Google Takeout</span>
       <label class="pl-drop">
         <span data-playlist-csv-label>Glisse un CSV ici<br><small>ou choisis un fichier · un fichier = une playlist</small></span>
-        <input name="csv_file" type="file" accept=".csv,text/csv" required data-playlist-csv-input aria-label="Fichier CSV">
+        <input name="file" type="file" accept=".csv,text/csv" required data-playlist-csv-input aria-label="Fichier CSV">
       </label>
       <input name="title" type="text" placeholder="Titre (optionnel, déduit du nom du fichier)" aria-label="Titre (optionnel)" data-playlist-csv-title>
       <button class="pl-btn-secondary" type="submit">Importer</button>
@@ -124,6 +124,13 @@
       const card = urlForm.querySelector("[data-playlist-preview]");
       const field = (name) => card.querySelector(`[data-preview-${name}]`);
       const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+      // "21 h 40 min" or "40 min", like the playlist header (format_long_duration).
+      const longDuration = (seconds) => {
+        const minutes = Math.floor((seconds || 0) / 60);
+        if (minutes <= 0) return null;
+        const hours = Math.floor(minutes / 60);
+        return hours ? `${hours} h ${String(minutes % 60).padStart(2, "0")} min` : `${minutes} min`;
+      };
 
       const reset = () => {
         card.hidden = true;
@@ -144,19 +151,14 @@
         previewButton.disabled = true;
         showStatus("Analyse de la playlist…");
         try {
-          const response = await fetch("/playlists/preview", {
-            method: "POST",
-            body: new URLSearchParams({ url }),
-            headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.message || "Playlist introuvable.");
+          // The helper lives in app.js.
+          const data = await window.ratonApi("POST", "/api/playlists/preview", { url });
 
           field("title").textContent = data.title;
           field("channel").textContent = data.channel_name || "";
           field("count").textContent = data.truncated ? `${data.video_count}+` : String(data.video_count);
-          const duration = data.duration_label || "—";
-          field("duration").textContent = data.unknown_duration_count && data.duration_label ? `≥ ${duration}` : duration;
+          const label = longDuration(data.duration_seconds);
+          field("duration").textContent = data.unknown_duration_count && label ? `≥ ${label}` : label || "—";
           field("known").textContent = `${data.known_in_library_count} / ${data.video_count}`;
           const notes = [];
           if (data.unavailable_count) notes.push(plural(data.unavailable_count, "vidéo indisponible ou privée", "vidéos indisponibles ou privées"));

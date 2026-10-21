@@ -222,7 +222,7 @@
 <article class="video-row{{ ' video-row-watched' if list_state == 'watched' else '' }}{{ ' video-row-hidden' if list_state == 'hidden' else '' }}{{ ' video-row-channel' if channel_mode else '' }}{{ ' video-row-feature' if feature else '' }}" data-video-id="{{ card.video.id }}"{% if channel_mode %} style="--i: {{ index }}"{% endif %}>
   <span class="video-row-thumb-wrap">
     {% if short_download %}
-    <form class="video-row-download" action="/videos/{{ card.video.id }}/media/video/download" method="post" data-async-job data-turbo="false" data-pending-message="Téléchargement 1080p…">
+    <form class="video-row-download" action="/videos/{{ card.video.id }}/media/video/download" data-api-action="/api/videos/{{ card.video.id }}/media/video/download" data-api-body="mediaDownload" method="post" data-async-job data-turbo="false" data-pending-message="Téléchargement 1080p…">
       <input type="hidden" name="video_quality" value="1080">
       <input type="hidden" name="next" value="{{ next_path }}">
       <button class="video-row-thumb" type="submit" aria-label="Télécharger {{ card.title }} en 1080p" title="Télécharger en 1080p">

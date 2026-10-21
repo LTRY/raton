@@ -432,38 +432,15 @@
     pendingDownloads.add(key);
     refreshRows();
     try {
-      const response = await fetch(button.dataset.url, {
-        method: "POST",
-        headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Téléchargement impossible.");
-      await pollJob(payload.status_url, row, kind, key);
-    } catch (error) {
-      pendingDownloads.delete(key);
-      nowSub.textContent = error.message;
-      refreshRows();
-    }
-  }
-
-  async function pollJob(statusUrl, row, kind, key) {
-    const response = await fetch(statusUrl, { headers: { Accept: "application/json" } });
-    const job = await response.json();
-    if (job.status === "failed") {
-      pendingDownloads.delete(key);
-      nowSub.textContent = job.message || "Le téléchargement a échoué.";
-      refreshRows();
-      return;
-    }
-    if (job.done) {
-      pendingDownloads.delete(key);
+      // The helpers live in app.js.
+      const job = await window.ratonApi("POST", button.dataset.url);
+      await window.ratonWaitForJob(job.status_url, { interval: 3000, failure: "Le téléchargement a échoué." });
       row.dataset[kind === "audio" ? "hasAudio" : "hasVideo"] = "1";
-      refreshRows();
-      return;
+    } catch (error) {
+      nowSub.textContent = error.message;
     }
-    window.setTimeout(() => {
-      pollJob(statusUrl, row, kind, key).catch(() => pendingDownloads.delete(key));
-    }, 3000);
+    pendingDownloads.delete(key);
+    refreshRows();
   }
 
   // ---- Free listening switch -----------------------------------------------
@@ -474,13 +451,9 @@
       const input = freeForm.querySelector("[data-free-input]");
       const next = input.value === "1";
       try {
-        const response = await fetch(freeForm.action, {
-          method: "POST",
-          body: new FormData(freeForm),
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        if (!response.ok) throw new Error("save failed");
+        await window.ratonApi("PUT", `/api/playlists/${playlistId}/free-listening`, { enabled: next });
       } catch {
+        // The form's own action (no-JS fallback) saves it with a page load.
         freeForm.submit();
         return;
       }
@@ -509,17 +482,12 @@
   }
 
   async function saveOrder() {
-    const body = new FormData();
-    body.set("item_ids", rows().map((row) => row.dataset.itemId).join(","));
     try {
-      const response = await fetch(`/playlists/${playlistId}/reorder`, {
-        method: "POST",
-        body,
-        headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+      await window.ratonApi("PUT", `/api/playlists/${playlistId}/order`, {
+        item_ids: rows().map((row) => Number(row.dataset.itemId)),
       });
-      // 409: the list changed elsewhere since this page loaded.
-      if (response.status === 409) window.location.reload();
     } catch {
+      // 409: the list changed elsewhere since this page loaded; any other failure, same remedy.
       window.location.reload();
     }
   }

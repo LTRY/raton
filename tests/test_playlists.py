@@ -409,7 +409,6 @@ def test_import_playlist_url_route_schedules_background_job(monkeypatch):
     )
 
     response = playlists_routes.import_playlist_url(
-        make_request(),
         background_tasks,
         url="https://www.youtube.com/playlist?list=PL123",
         title="",
@@ -434,9 +433,7 @@ def test_import_playlist_url_route_reports_not_found(monkeypatch):
 
     monkeypatch.setattr(playlists_jobs, "extract_playlist_info", fail)
 
-    response = playlists_routes.import_playlist_url(
-        make_request(), BackgroundTasks(), url="bad", title="", db=db
-    )
+    response = playlists_routes.import_playlist_url(BackgroundTasks(), url="bad", title="", db=db)
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
@@ -454,9 +451,7 @@ def test_import_playlist_csv_route_schedules_background_job_and_derives_title():
     background_tasks.add_task = capture
     upload = UploadFile(file=io.BytesIO(CSV_SAMPLE), filename="Vidéos de Tech.csv")
 
-    response = playlists_routes.import_playlist_csv(
-        make_request(), background_tasks, csv_file=upload, title="", db=db
-    )
+    response = playlists_routes.import_playlist_csv(background_tasks, file=upload, title="", db=db)
 
     playlist = db.scalars(select(Playlist)).one()
     assert playlist.title == "Tech"
@@ -470,9 +465,7 @@ def test_import_playlist_csv_route_rejects_bad_csv():
     db = make_session()
     upload = UploadFile(file=io.BytesIO(b"nope"), filename="bad.csv")
 
-    response = playlists_routes.import_playlist_csv(
-        make_request(), BackgroundTasks(), csv_file=upload, title="", db=db
-    )
+    response = playlists_routes.import_playlist_csv(BackgroundTasks(), file=upload, title="", db=db)
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
@@ -509,30 +502,6 @@ def ordered_titles(db, playlist):
     return [item.video.title for item in items]
 
 
-def test_reorder_playlist_applies_new_order_and_rejects_stale_ids():
-    db = make_session()
-    playlist, _ = make_playlist_with_videos(db)
-    ids = [item.id for item in playlist.items]
-
-    response = playlists_routes.reorder_playlist(
-        make_request(headers=[(b"x-requested-with", b"fetch")]),
-        playlist.id,
-        item_ids=",".join(str(i) for i in [ids[2], ids[0], ids[1]]),
-        db=db,
-    )
-    assert response.status_code == 200
-    assert ordered_titles(db, playlist) == ["Video A", "Video C", "Video B"]
-
-    stale = playlists_routes.reorder_playlist(
-        make_request(headers=[(b"x-requested-with", b"fetch")]),
-        playlist.id,
-        item_ids=f"{ids[0]},{ids[1]}",
-        db=db,
-    )
-    assert stale.status_code == 409
-    assert ordered_titles(db, playlist) == ["Video A", "Video C", "Video B"]
-
-
 def test_sort_playlist_by_title_and_reverse():
     db = make_session()
     playlist, _ = make_playlist_with_videos(db)
@@ -555,10 +524,8 @@ def test_rename_and_free_listening_toggle():
     playlists_routes.rename_playlist_route(playlist.id, title="  Chill  ", db=db)
     assert db.get(Playlist, playlist.id).title == "Chill"
 
-    response = playlists_routes.set_playlist_free_listening(
-        make_request(headers=[(b"x-requested-with", b"fetch")]), playlist.id, enabled="1", db=db
-    )
-    assert response.status_code == 200
+    response = playlists_routes.set_playlist_free_listening(playlist.id, enabled="1", db=db)
+    assert response.status_code == 303
     assert db.get(Playlist, playlist.id).free_listening is True
 
 
@@ -690,27 +657,6 @@ def test_preview_playlist_rejects_unreadable_url(monkeypatch):
         playlists_service.preview_playlist(db, "https://example.com/nope")
     with pytest.raises(PlaylistNotFoundError):
         playlists_service.preview_playlist(db, "   ")
-
-
-def test_preview_route_returns_json_and_404(monkeypatch):
-    db = make_session()
-    monkeypatch.setattr(
-        playlists_routes,
-        "preview_playlist",
-        lambda db, url: {"title": "T", "video_count": 2, "duration_seconds": 5400},
-    )
-    response = playlists_routes.preview_playlist_url(
-        url="https://www.youtube.com/playlist?list=PL1", db=db
-    )
-    assert response.status_code == 200
-    assert b'"duration_label":"1 h 30 min"' in response.body
-
-    def fail(db, url):
-        raise PlaylistNotFoundError("Playlist introuvable pour bad")
-
-    monkeypatch.setattr(playlists_routes, "preview_playlist", fail)
-    response = playlists_routes.preview_playlist_url(url="bad", db=db)
-    assert response.status_code == 404
 
 
 # --- playlist labels, inherited by the videos like a channel's ------------

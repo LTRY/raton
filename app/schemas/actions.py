@@ -92,3 +92,20 @@ class SkipSegmentsRead(BaseModel):
 class SponsorSegmentsFetchRead(SkipSegmentsRead):
     # Segments SponsorBlock returned for the enabled categories, before merging.
     count: int
+
+
+class ManualDownloadCreate(BaseModel):
+    """`POST /api/videos/import`: the import page's download, by YouTube URL."""
+
+    url: str
+    # Run in this order; "metadata" alone imports the fiche without a media file.
+    media_types: list[str] = ["metadata"]
+    download_transcript: bool = True
+    video_quality: str = "1080"
+    categories: list[str] = []
+
+
+class UploadRead(BaseModel):
+    video_id: int
+    # False when the same file (same content) was already in the library.
+    created: bool

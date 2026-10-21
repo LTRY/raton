@@ -483,7 +483,7 @@ importe seulement la fiche (metadonnees + transcript, sans fichier media). Il n'
 de sous-titres** : la piste est toujours choisie par `choose_subtitle_track`
 (voir [07 YouTube et telechargements](07-youtube-et-telechargements.md),
 « Sous-titres : jamais de traduction automatique »). Le formulaire poste vers
-`POST /videos/download` en asynchrone ; au succes, la page se recharge avec le
+`POST /api/videos/import` en asynchrone (`POST /videos/download` sans JavaScript) ; au succes, la page se recharge avec le
 message du job.
 
 Sous le formulaire, une **zone de depot** (`.import-dropzone`,
@@ -828,7 +828,7 @@ ouvrir).
 - Panneau Ajouter, trois formulaires independants : creation manuelle (titre
   seul) ; import par URL YouTube (`data-async-job`, meme contrat fetch/poll que
   l'import metadata de chaine, precede d'une etape d'apercu : le bouton
-  **Prévisualiser** (ou Entree dans le champ) appelle `POST /playlists/preview`
+  **Prévisualiser** (ou Entree dans le champ) appelle `POST /api/playlists/preview`
   et deplie une carte — titre, chaine, nombre de videos, duree, deja en
   bibliotheque, notes (indisponibles, sans duree, plafond), premiers titres —
   avec **Importer** (soumet le formulaire) et **Annuler** ; modifier l'URL
@@ -851,7 +851,7 @@ Deux colonnes : panneau lecteur a gauche, file de lecture a droite.
   `aria-pressed`). En mode Audio la piste est une pochette carree (la vignette
   recadree) ; en mode Video, un `<video>` 16:9. Les deux modes partagent le meme
   element media (`/videos/{id}/audio` ou `/videos/{id}/video`). La lecture
-  journalise l'activite via `POST /videos/{id}/activity` (comme la page d'une
+  journalise l'activite via `POST /api/videos/{id}/activity` (comme la page d'une
   video), sauf en **ecoute libre**.
 - **Infos et options** sous le lecteur : titre, labels de categories, source,
   duree totale et nombre de vues ; « Télécharger l'audio / la vidéo de tout » (formulaires POST ;
@@ -872,12 +872,12 @@ Deux colonnes : panneau lecteur a gauche, file de lecture a droite.
 - **Lignes** : un clic (ou un toucher) n'importe ou sur la ligne lit la piste ;
   il n'y a ni numero ni bouton lecture. Elle contient : poignee `⋮⋮` (desktop :
   glisser au pointeur, ou fleches haut/bas au clavier une fois la poignee
-  focalisee ; l'ordre est enregistre par `POST /playlists/{id}/reorder`),
+  focalisee ; l'ordre est enregistre par `PUT /api/playlists/{id}/order`),
   vignette (badge « Ignorée » en haut a gauche, duree en bas a droite, `✓` en
   bas a gauche pour une video deja vue hors ecoute libre), titre
   (lien vers la page de la video sur desktop), deux boutons de telechargement
   audio/video (plein = fichier present, vide = clic pour le telecharger via
-  `POST /videos/{id}/media/{audio|video}/download`, avec suivi du job) et `✕`.
+  `POST /api/videos/{id}/media/{audio|video}/download`, avec suivi du job) et `✕`.
   La piste en cours a la ligne teintee ; le compteur « N vues sur M » de
   l'en-tete reste. Un clic sur le remplissage du menu ou sur une ligne en
   attente de confirmation de retrait ne lit rien.
@@ -1151,7 +1151,7 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   Raton (`#explorer-raton`, element `data-turbo-permanent` de `base.html`,
   image `laptop.webp`) apparait fixe en bas de la page avec la bulle
   « Je m'en occupe ! » puis le compteur « n/25 ». Le script interroge
-  `GET /jobs/{id}` : pour un job d'import de chaine, la reponse porte aussi
+  `GET /api/jobs/{id}` : pour un job d'import de chaine, la reponse porte aussi
   `videos` (`id`, `title` des fiches deja importees, posterieures a la ligne de
   file du job) ; les cartes correspondantes sont recuperees en HTML par
   `GET /videos/cards?ids=…&section=…` (gabarit `_video_cards.html`, macro
@@ -1162,7 +1162,7 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   page a l'autre (navigation Turbo) mais Raton n'est affiche que sur la page de
   la chaine explorée. La page ne bouge pas quand une carte arrive
   (`overflow-anchor: none` + position de scroll restauree). La bulle porte un
-  bouton **×** : `POST /jobs/{id}/cancel` passe le job en `cancelled`, l'import
+  bouton **×** : `POST /api/jobs/{id}/cancel` passe le job en `cancelled`, l'import
   s'arrete avant la fiche suivante et ce qui est deja importe reste. Un
   rechargement de la page reprend le suivi (etat dans `sessionStorage`, 30 min
   max) ; les cartes deja affichees (`data-video-id`) ne sont pas dupliquees. Pas de notification
@@ -1211,7 +1211,7 @@ deux paliers : **Vu** applique le grisage existant (`.video-row-watched`),
 **Écartée** une teinte de noir nettement plus forte (`.video-row-hidden`), avec
 la vignette desaturee. Les deux ecrivent `videos.list_state` (voir
 [05 Modele de donnees](05-modele-de-donnees.md)) via
-`POST /videos/{id}/list-state` en `fetch`, sans rechargement : la ligne et les
+`PUT /api/videos/{id}/list-state` en `fetch`, sans rechargement : la ligne et les
 deux boutons sont repeints immediatement.
 
 Une carte de la liste ne change jamais de couleur au survol ni au toucher
@@ -1253,8 +1253,8 @@ Les cartes video n'exposent aucun bouton Audio/Video : le telechargement et la
 suppression d'un format se font depuis la page detail video
 (`video_detail.html`, macro `format_actions`). Cote client (`app/static/js/app.js`),
 une file traite ces telechargements en arriere-plan **sequentiellement** (un
-seul a la fois) ; `POST /videos/{id}/media/{type}/download` reutilise la meme
-file de jobs et le meme `GET /videos/download-jobs/{id}` que le formulaire de
+seul a la fois) ; `POST /api/videos/{id}/media/{type}/download` reutilise la meme
+file de jobs et le meme `GET /api/jobs/{id}` que le formulaire de
 telechargement manuel.
 
 ## Detail video

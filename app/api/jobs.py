@@ -12,7 +12,7 @@ from app.schemas.actions import (
     RecentJobRead,
 )
 from app.services.common.job_log import JOB_DONE_STATUSES, recent_jobs
-from app.services.jobs.download_requests import JobNotFoundError, job_status
+from app.services.jobs.download_requests import JobNotFoundError, cancel_job, job_status
 
 router = APIRouter(prefix="/api", tags=["Jobs"])
 
@@ -45,5 +45,19 @@ def list_jobs(
 def get_job(job_id: int, db: Session = Depends(get_db)) -> dict:
     try:
         return job_status(db, job_id)
+    except JobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post(
+    "/jobs/{job_id}/cancel",
+    response_model=JobStatusRead,
+    response_model_exclude_none=True,
+    responses=error_responses(404, 422),
+)
+def cancel(job_id: int, db: Session = Depends(get_db)) -> dict:
+    """Stop a channel exploration: it stops before its next video."""
+    try:
+        return cancel_job(db, job_id)
     except JobNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

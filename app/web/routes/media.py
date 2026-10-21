@@ -2,7 +2,7 @@ import mimetypes
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import local_media_path
@@ -221,26 +221,19 @@ def video_file_head(video_id: int, request: Request, db: Session = Depends(get_d
 
 @router.post("/videos/{video_id}/media/{media_type}/delete")
 def delete_video_media_form(
-    request: Request,
     video_id: int,
     media_type: str,
     return_to: str = Form("/videos", alias="next"),
     db: Session = Depends(get_db),
 ):
+    """The no-JS fallback of a format's deletion, which app.js sends to DELETE /api/..."""
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-
-    is_fetch = request.headers.get("x-requested-with") == "fetch"
     target = internal_return_path(return_to, f"/videos/{video_id}")
     try:
         delete_video_media_file(db, video, media_type)
     except ValueError as exc:
-        if is_fetch:
-            return JSONResponse({"status": "failed", "message": str(exc)}, status_code=400)
         return redirect(append_query(target, {"level": "error", "message": str(exc)}))
-
     label = "vidéo" if media_type == "video" else "audio"
-    if is_fetch:
-        return JSONResponse({"status": "deleted", "message": f"Fichier {label} supprimé."})
     return redirect(append_query(target, {"message": f"Fichier {label} supprimé."}))

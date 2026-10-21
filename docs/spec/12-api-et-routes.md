@@ -32,10 +32,9 @@ Chaines :
   `yt_channel_id`/`url`) ; ne fait aucun appel yt-dlp pendant la requete, les
   infos viennent directement du CSV. Si au moins une chaine est creee, le job
   de rattrapage du profil est lance en arriere-plan.
-- `POST /channels/{id}/rating` : note de 0 à 5. Redirige (303) vers `next` ;
-  avec l'en-tete `X-Requested-With: fetch`, repond en JSON `{"rating": N}`
-  (`404` si la chaine n'existe pas). Appelee en `fetch` par les étoiles, sans
-  rechargement de page.
+- `POST /channels/{id}/rating` : note de 0 à 5, redirige (303) vers `next`.
+  Repli sans JavaScript : les étoiles appellent `PUT /api/channels/{id}/rating`
+  sans rechargement de page.
 - `POST /channels/{id}/categories` : modifier les categories de la chaine.
 - `POST /channels/{id}/auto-metadata` : bascule une cloche de suivi quotidien
   selon le champ de formulaire `section` — `videos` (defaut,
@@ -59,21 +58,14 @@ Playlists :
 
 - `GET /playlists` : page playlists (grille de cartes + panneau d'ajout a trois formulaires).
 - `POST /playlists` : creation manuelle (titre seul).
-- `POST /playlists/preview` : apercu d'une URL de playlist avant import
-  (formulaire `url`) ; lecture `yt-dlp` seule, **rien n'est cree dans la DB**.
-  Repond en JSON `{status, title, channel_name, video_count,
-  unavailable_count, duration_seconds, duration_label,
-  unknown_duration_count, known_in_library_count, sample_titles,
-  truncated}`, ou 404 `{status: "failed", message}` si la playlist est
-  introuvable.
 - `POST /playlists/import-url` : import depuis une URL de playlist YouTube ;
   cree la playlist tout de suite (resolution synchrone) puis lance
-  l'import des videos (metadonnees seules) en arriere-plan. Repond en JSON
-  (`{job_id, status, message, status_url, return_to}`) si l'appel porte
-  l'en-tete `X-Requested-With: fetch`, sinon redirige.
+  l'import des videos (metadonnees seules) en arriere-plan, puis redirige vers
+  la playlist. Repli sans JavaScript de `POST /api/playlists/import-url`, que le
+  formulaire appelle pour suivre le job dans la page.
 - `POST /playlists/import-csv` : import depuis un CSV Google Takeout (un
-  fichier `Vidéos de <Titre>.csv` a la fois) ; meme contrat synchrone/JSON que
-  l'import par URL. Pas d'etape de previsualisation/confirmation
+  fichier `Vidéos de <Titre>.csv` a la fois, champ `file`) ; meme contrat que
+  l'import par URL, repli de `POST /api/playlists/import-csv`. Pas d'etape de previsualisation/confirmation
   (contrairement a `/channels/import-csv`).
 - `GET /playlists/{id}` : detail playlist (lecteur video/audio, file de
   lecture ordonnee, retrait/reordonnancement).
@@ -82,10 +74,9 @@ Playlists :
   (`preset_categories`, `custom_categories`, comme `POST /channels/{id}/categories`)
   et les copie sur ses videos qui n'ont aucun label ;
 - `POST /playlists/{id}/free-listening` : active/desactive l'ecoute libre
-  (`enabled=1|0`) ; repond en JSON avec `X-Requested-With: fetch`.
-- `POST /playlists/{id}/reorder` : applique un nouvel ordre
-  (`item_ids=1,2,3`, tous les items de la playlist exactement) ; `409`
-  (`{"status":"stale"}`) si la liste a change entre-temps.
+  (`enabled=1|0`) puis redirige ; le lecteur appelle
+  `PUT /api/playlists/{id}/free-listening`. Le glisser-deposer de la file
+  appelle `PUT /api/playlists/{id}/order` (il n'y a pas de route HTML).
 - `POST /playlists/{id}/sort` : trie et reecrit les positions
   (`by=added|duration|title|reverse`).
 - `POST /playlists/{id}/duplicate` : copie en playlist manuelle
@@ -124,15 +115,11 @@ Videos :
   d'une chaine) au lieu de `videos.html`.
 - `POST /videos/{id}/categories` : modifier les categories de la video.
 - `POST /videos/{id}/comment` : commentaire libre (texte, champ `comment`).
-- `POST /videos/{id}/rating` : note de 0 à 5. Redirige (303) vers `next` ;
-  avec l'en-tete `X-Requested-With: fetch`, repond en JSON `{"rating": N}`
-  (`404` si la video n'existe pas). Appelee en `fetch` par les étoiles, sans
-  rechargement de page.
-- `POST /videos/{id}/list-state` : etat de grisage de la carte dans les listes.
-  Champ `state` valant `watched`, `unwatched`, `hidden` ou `clear` (retour a la
-  detection automatique). Repond en JSON `{"state": <valeur stockee ou null>}`,
-  `400` si `state` est inconnu, `404` si la video n'existe pas. Appelee en
-  `fetch` par les boutons **Vu** / **Écartée**, sans rechargement de page.
+- `POST /videos/{id}/rating` : note de 0 à 5, redirige (303) vers `next`.
+  Repli sans JavaScript : les étoiles appellent `PUT /api/videos/{id}/rating`.
+  Les boutons **Vu** / **Écartée** appellent `PUT /api/videos/{id}/list-state`
+  et la lecture est rapportee par `POST /api/videos/{id}/activity` : ni l'un ni
+  l'autre n'a de route HTML.
 - `GET /videos/{id}` : detail video.
 - `GET /videos/{id}/thumbnail` : vignette.
 - `GET /videos/{id}/subtitles` : sous-titres bruts.
@@ -143,31 +130,19 @@ Videos :
 - `POST /videos/{id}/media/{media_type}/download` : telecharger le format
   manquant (`audio` ou `video`) pour une fiche existante, sans passer par
   l'URL cote client (elle est relue depuis `video.url` dans la DB). Cree un
-  `DownloadJob` et le lance en arriere-plan comme `/videos/download` ; repond
-  en JSON (`{job_id, status, message, status_url}`) si l'appel porte l'en-tete
-  `X-Requested-With: fetch`, sinon redirige. Le champ optionnel `next`
-  (chemin interne) est renvoye en `return_to` dans la reponse JSON et sert de
-  cible a la redirection ; `video_quality` vaut 1080 par defaut. Utilisee par
-  la barre d'actions de la page detail video, par la file de telechargement
-  des playlists et par le clic sur une tuile de short sans fichier local.
-- `POST /videos/{id}/activity` : enregistrer une activite de lecture
-  (`played`/`prompt`).
+  `DownloadJob` et le lance en arriere-plan comme `/videos/download`, puis
+  redirige vers `next` (chemin interne) ; `video_quality` vaut 1080 par
+  defaut. Repli sans JavaScript : la barre d'actions de la page detail video,
+  la file de telechargement des playlists et le clic sur une tuile de short
+  sans fichier local appellent `POST /api/videos/{id}/media/{kind}/download`
+  et suivent le job par `GET /api/jobs/{id}`.
 - `GET /videos/cards?ids=…&section=…` : HTML des cartes (`_video_cards.html`)
   des fiches indiquees, pour l'exploration d'une chaine (voir « Page d'une
   chaine » dans [11 Interface HTML](11-interface-html.md)).
-- `POST /jobs/{id}/cancel` : passe un job d'import de chaine en `cancelled`
-  (bouton × de la bulle de Raton) ; l'import s'arrete avant la fiche suivante.
 - `GET /raton/variations` : toutes les repliques de Raton, sans condition
   (voir [18 Raton](18-raton-scenarios.md)).
 - `GET /videos/{id}/transcript` : redirection vers detail ancre transcript.
 - `POST /videos/{id}/transcript/generate` : generer les notes structurees, le resume (+ resume court + questions suggerees) en un seul appel LLM, a partir de `transcript.txt` — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
-- `POST /videos/{id}/transcript/download` : retenter la recuperation du
-  transcript (FR en priorite, repli EN) pour une video dont le transcript est
-  manquant/en echec — voir "Recuperation manuelle du transcript" dans
-  [07 YouTube et telechargements](07-youtube-et-telechargements.md). Cree un
-  `DownloadJob` et le lance en arriere-plan comme les telechargements de
-  format ; meme reponse JSON/redirection que `/videos/{id}/media/{media_type}/download`,
-  suivie via `GET /videos/download-jobs/{id}`.
 - `POST /videos/{id}/transcript/chat` : poser question.
 - `POST /videos/{id}/transcript/chat/clear` : effacer chat.
 - `GET /videos/{id}/transcript/jobs/{job_id}` : statut/resolution d'un job LLM asynchrone, tous fournisseurs confondus (traite en tache de fond dans le process web) ; pour un job `generate` en cours, renvoie aussi le résumé court deja ecrit (`partial_short_summary`).
@@ -177,7 +152,7 @@ Videos :
 - `GET /chat/jobs/{job_id}` : statut/resolution d'un job `kind="library_chat"` (equivalent cross-video de `GET /videos/{id}/transcript/jobs/{job_id}`) ; `pending` porte aussi `tool_calls` (appels d'outils deja faits).
 - `GET /videos/import` : page du formulaire de telechargement manuel (entree Import du menu Bibliotheque).
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
-- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`app/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Repond en JSON (`status`, `message`, `video_id`, `return_to`) avec `X-Requested-With: fetch`, sinon redirige vers la fiche. Pas de transcript ni de metadonnees YouTube.
+- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`app/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Redirige vers la fiche ; repli sans JavaScript de `POST /api/videos/upload`, qu'appelle la page d'import. Pas de transcript ni de metadonnees YouTube.
 - `POST /videos/share-import` : point d'entree du raccourci iOS de la feuille de
   partage (Safari/YouTube). Champ de formulaire `url` ; seuls les liens
   YouTube (`youtube.com`, `m.`/`music.`, `youtu.be`) sont acceptes (400 JSON
@@ -188,9 +163,7 @@ Videos :
   avec l'hote utilise par l'appelant). Echec de l'import : 502 JSON avec
   `message`. Jamais de redirection. Sans authentification : reseau local /
   WireGuard uniquement.
-- `GET /videos/download-jobs/{id}` : statut job telechargement.
 - `POST /videos/import-metadata` : import metadata video.
-- `GET /jobs/{id}` : statut job generique.
 
 Parametres et divers :
 
@@ -391,8 +364,10 @@ created_at}`.
   playlist.
 - `POST /api/playlists/{id}/duplicate` : copie manuelle, `201`.
 - `POST /api/playlists/preview` `{url}` : apercu d'une URL de playlist, rien
-  n'est ecrit (memes champs que `POST /playlists/preview`, sans
-  `duration_label`) ; `404` si introuvable.
+  n'est ecrit : `{title, channel_name, video_count, unavailable_count,
+  duration_seconds, unknown_duration_count, known_in_library_count,
+  sample_titles, truncated}` ; `404` si introuvable. Il n'y a pas de route
+  HTML : le bouton **Prévisualiser** de `/playlists` l'appelle.
 - `POST /api/playlists/import-url` `{url, title}` et `POST
   /api/playlists/import-csv` (multipart : `file`, `title` facultatif) : creent
   la playlist tout de suite et importent ses videos (metadonnees seules) en
@@ -447,7 +422,7 @@ watched_at}`.
   sort des Nouveautes (`GET /api/videos/{id}`, lui, ne change rien).
 - `PUT /api/videos/{id}/list-state` `{state}` : `watched`, `unwatched`,
   `hidden`, ou `clear` pour revenir a l'etat deduit de la lecture ; `400`
-  sinon. Equivalent de `POST /videos/{id}/list-state`.
+  sinon. Appelee par les boutons **Vu** / **Écartée**.
 - `PUT /api/videos/{id}/categories` `{categories: [...]}` : remplace les
   categories de la fiche (normalisees, ajoutees a la liste des categories).
 - `PUT /api/videos/{id}/comment` `{comment}` : une chaine vide efface le
@@ -455,7 +430,7 @@ watched_at}`.
 - `POST /api/videos/{id}/activity` `{media_type, position_seconds,
   duration_seconds, watched_seconds}` : rapport de lecture d'un lecteur, peut
   passer la fiche en Vu ; `media_type` vaut `video` ou `audio` (`400`
-  sinon). Equivalent de `POST /videos/{id}/activity`.
+  sinon). Appelee par les lecteurs de la fiche, des playlists et des shorts.
 - `POST /api/videos/{id}/media/{audio|video}/download` `{video_quality}`
   (facultatif, `1080` par defaut) : `202 {job_id, status, message,
   status_url}`, le telechargement tourne en arriere-plan ; `400` pour un
@@ -463,7 +438,11 @@ watched_at}`.
 - `DELETE /api/videos/{id}/media/{audio|video}` : `204` ; `400` si le
   format est refuse (meme regle que `POST /videos/{id}/media/{type}/delete`).
 - `POST /api/videos/{id}/transcript/download` : nouvelle tentative de
-  recuperation du transcript, `202` comme un telechargement.
+  recuperation du transcript (FR en priorite, repli EN) d'une fiche dont le
+  transcript est manquant ou en echec, `202` comme un telechargement ; voir
+  "Recuperation manuelle du transcript" dans
+  [07 YouTube et telechargements](07-youtube-et-telechargements.md). Il n'y a
+  pas de route HTML : le bouton de la page detail l'appelle.
 - `POST /api/videos/{id}/sponsor-segments/fetch` : interroge SponsorBlock et
   remplace les segments `sponsorblock` de la fiche ; repond `{count,
   skip_enabled, segments}` (comme `GET /api/videos/{id}/sponsor-segments`),
@@ -471,7 +450,22 @@ watched_at}`.
 - `GET /api/jobs/{id}` : etat d'un job lance par ces actions, a interroger
   jusqu'a `done` : `{id, status, message, video_id, done}`, plus `videos`
   (fiches deja importees) pour une exploration de chaine ; `404 Job
-  introuvable`. Meme contenu que `GET /jobs/{id}`.
+  introuvable`. `GET /api/jobs?status=…` liste les jobs recents (les erreurs
+  de la bulle de Raton). `POST /api/jobs/{id}/cancel` passe un job d'import de
+  chaine en `cancelled` (bouton × de la bulle) : l'import s'arrete avant la
+  fiche suivante ; repond l'etat du job.
+
+### Import de fiches
+
+- `POST /api/videos/import` `{url, media_types, download_transcript,
+  video_quality, categories}` (facultatifs : `["metadata"]`, `true`,
+  `1080`, `[]`) : telechargement manuel d'une URL, comme le formulaire de
+  `/videos/import` ; `202 {job_id, status, message, status_url}`, `400` pour
+  une URL ou une option refusee.
+- `POST /api/videos/upload` (multipart, champ `file`) : importe un fichier
+  video ou audio comme `POST /videos/upload` ; `201 {video_id, created}`
+  (`created` vaut `false` si le meme contenu etait deja importe), `400` pour
+  une extension refusee.
 
 Les messages d'erreur de `/api` (champ `detail`) sont en francais, comme
 ceux des pages HTML : une erreur levee par un service renvoie son propre

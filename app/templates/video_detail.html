@@ -973,31 +973,14 @@
     });
   }
 
-  async function pollTranscriptRetryJob(statusUrl) {
-    for (;;) {
-      const response = await fetch(statusUrl, { headers: { Accept: "application/json" }, cache: "no-store" });
-      if (!response.ok) throw new Error("Suivi de la récupération impossible.");
-      const job = await response.json();
-      if (job.done) {
-        if (job.status !== "downloaded") throw new Error(job.message || "Aucun transcript n'a pu être récupéré.");
-        return;
-      }
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-  }
-
   if (transcriptRetryButton) {
     transcriptRetryButton.addEventListener("click", async () => {
       setTranscriptRetryBusy(true);
       setTranscriptRetryStatus("Récupération du transcript en cours...", "loading");
       try {
-        const response = await fetch(`/videos/${videoId}/transcript/download`, {
-          method: "POST",
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Récupération impossible.");
-        await pollTranscriptRetryJob(payload.status_url);
+        // The helpers live in app.js.
+        const job = await window.ratonApi("POST", `/api/videos/${videoId}/transcript/download`);
+        await window.ratonWaitForJob(job.status_url, { failure: "Aucun transcript n'a pu être récupéré." });
         window.location.reload();
       } catch (error) {
         setTranscriptRetryStatus(error.message, "error");
