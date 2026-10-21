@@ -18,7 +18,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.library import router as api_library_router
 from app.api.routes import router as api_router
+from app.api.video_actions import router as api_video_actions_router
 from app.core.config import get_settings
 from app.core.logging import configure_app_logging, log_event
 from app.db.session import Base, engine, get_db
@@ -89,6 +91,8 @@ app.add_middleware(RequestTimingMiddleware)
 # registration order and the first match wins, so the order below is the route
 # resolution order: do not reorder without checking that no path shadows another.
 app.include_router(api_router)
+app.include_router(api_library_router)
+app.include_router(api_video_actions_router)
 app.include_router(media_router)
 app.include_router(settings_router)
 app.include_router(stats_router)

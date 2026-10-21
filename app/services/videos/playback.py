@@ -49,6 +49,13 @@ def mark_watched_if_complete(
     return True
 
 
+PLAYBACK_MEDIA_TYPES = ("video", "audio")
+
+
+class InvalidPlaybackMediaError(ValueError):
+    pass
+
+
 def record_playback_activity(
     db: Session,
     video: Video,
@@ -61,6 +68,8 @@ def record_playback_activity(
 
     The JSON shape of the job is the one `playback_activity_payload_view` reads back.
     """
+    if media_type not in PLAYBACK_MEDIA_TYPES:
+        raise InvalidPlaybackMediaError("Type de média invalide")
     mark_watched_if_complete(video, position_seconds, duration_seconds)
     position_seconds = max(position_seconds, 0)
     duration_seconds = max(duration_seconds, 0)

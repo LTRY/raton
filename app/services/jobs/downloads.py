@@ -1,23 +1,88 @@
-"""Background jobs of a download: manual download, transcript retry, metadata import of a channel."""
+"""Background jobs of a download: manual download, transcript retry, metadata import of a channel.
+
+`queue_*` create the queued job a route answers with; the route then hands the matching `run_*`
+to its background tasks. `job_status` is what a client polls afterwards.
+"""
 
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.logging import logged_job
 from app.db.session import SessionLocal
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
+from app.services.common.job_log import JOB_DONE_STATUSES, log_job
+from app.services.ingest.channel_exploration import channel_exploration_videos
 from app.services.ingest.manual_download import download_manual_media
 from app.services.ingest.metadata_import import import_video_metadata
 from app.services.ingest.scanner import scan_channel_section
 from app.services.ingest.transcript_retry import retry_transcript_download
+from app.services.videos.download_options import normalize_video_quality
 
 logger = logging.getLogger(__name__)
 
 
 CHANNEL_VIDEO_PAGE_SIZE = 25
+
+# Formats a fiche can download on its own (`queue_media_download`).
+FICHE_MEDIA_TYPES = ("audio", "video")
+
+
+class InvalidMediaFormatError(ValueError):
+    pass
+
+
+class JobNotFoundError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Job introuvable")
+
+
+def queue_media_download(
+    db: Session, video: Video, media_type: str, video_quality: str = "1080"
+) -> DownloadJob:
+    """The queued job of a missing format of a fiche; run it with `run_media_download_job`."""
+    if media_type not in FICHE_MEDIA_TYPES:
+        raise InvalidMediaFormatError("Le format doit être vidéo ou audio.")
+    try:
+        normalize_video_quality(video_quality)
+    except ValueError as exc:
+        raise InvalidMediaFormatError(str(exc)) from exc
+    return log_job(db, "queued", "Téléchargement en file d'attente.", video_id=video.id)
+
+
+def run_media_download_job(
+    job_id: int, video_url: str, media_type: str, video_quality: str = "1080"
+) -> None:
+    # The fiche's metadata is refreshed along the way; its transcript is left alone.
+    run_manual_download_job(
+        job_id, video_url, [media_type, "metadata"], False, video_quality=video_quality
+    )
+
+
+def queue_transcript_retry(db: Session, video: Video) -> DownloadJob:
+    """The queued job of a new transcript attempt; run it with `run_transcript_retry_job`."""
+    return log_job(db, "queued", "Récupération du transcript en file d'attente.", video_id=video.id)
+
+
+def job_status(db: Session, job_id: int) -> dict:
+    """What a client polls while a job runs; a channel exploration adds the fiches it imported."""
+    job = db.get(DownloadJob, job_id)
+    if job is None:
+        raise JobNotFoundError()
+    payload = {
+        "id": job.id,
+        "status": job.status,
+        "message": job.message,
+        "video_id": job.video_id,
+        "done": job.status in JOB_DONE_STATUSES,
+    }
+    imported = channel_exploration_videos(db, job)
+    if imported is not None:
+        payload["videos"] = imported
+    return payload
 
 
 @logged_job("manual_download")

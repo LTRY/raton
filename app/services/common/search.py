@@ -7,6 +7,11 @@ from app.models.channel import Channel
 from app.models.video import Video
 
 
+def normalized_search_query(value: str | None) -> str:
+    """The query as typed, whitespace collapsed — also what the search field echoes back."""
+    return " ".join((value or "").split())
+
+
 def fold_search_text(value: str) -> str:
     """Case- and accent-insensitive form, so "ecole" finds "École"."""
     decomposed = unicodedata.normalize("NFKD", value.casefold())

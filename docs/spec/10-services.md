@@ -59,10 +59,10 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `settings` | Réglages stockés en DB (`app_settings`) : lecture avec valeur par défaut, enregistrement du formulaire `/settings` partagé avec `/api` |
 | `categories` | Catégories des chaînes, fiches et playlists et leurs couleurs : normalisation, lecture, écriture |
-| `library_views` | Vues enregistrées de la bibliothèque : forme stockée, lecture, normalisation |
+| `library_views` | Vues enregistrées de la bibliothèque : forme stockée, lecture, normalisation ; types de fichiers filtrables (`VIDEO_ASSET_KINDS`) |
 | `ratings` | Note en étoiles (0 à 5) d'une chaîne ou d'une fiche |
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
-| `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
+| `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; nettoyage de la saisie (`normalized_search_query`) ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
 | `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/errors`) et les statuts après lesquels un job ne change plus |
 
@@ -74,7 +74,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `channel_info` | Ce que yt-dlp dit d'une chaîne : résolution d'une URL ou d'un handle, profil, liste des vidéos |
 | `downloads` | Téléchargement du média, des sous-titres et de la miniature, fichiers écrits à côté (`metadata.json`, transcript) |
 | `sponsorblock` | Appel à l'API SponsorBlock |
-| `sponsor_segments` | Segments sponsors d'une fiche : récupération, enregistrement, segments actifs |
+| `sponsor_segments` | Segments sponsors d'une fiche : récupération, enregistrement, segments actifs ; recherche à la demande avec son message d'échec (`refresh_sponsor_segments`) |
 | `url_guard` | Refus des URL qui visent la machine locale ou un réseau privé (SSRF) |
 | `view_counts` | Nombre de vues et durée d'une fiche, lus depuis `metadata.json` |
 
@@ -134,9 +134,9 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
 | `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
-| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives |
+| `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`, construit et validé par `library_filters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives ; sert `/videos` et `GET /api/library` |
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
-| `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %), positions, temps d'écran, historique |
+| `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
@@ -181,7 +181,7 @@ web ; chacune ouvre sa propre session DB.
 
 | Module | Responsabilité |
 |---|---|
-| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne |
+| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
