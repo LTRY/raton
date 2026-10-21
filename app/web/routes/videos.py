@@ -32,17 +32,19 @@ from app.services.ingest.channel_exploration import (
 from app.services.ingest.identity import ensure_video_channel
 from app.services.ingest.local_upload import LocalUploadError, import_local_media
 from app.services.ingest.metadata_import import import_video_metadata
-from app.services.jobs.downloads import (
-    CHANNEL_VIDEO_PAGE_SIZE,
+from app.services.jobs.download_requests import (
     InvalidMediaFormatError,
     JobNotFoundError,
     queue_media_download,
     queue_transcript_retry,
+)
+from app.services.jobs.download_requests import job_status as read_job_status
+from app.services.jobs.downloads import (
+    CHANNEL_VIDEO_PAGE_SIZE,
     run_manual_download_job,
     run_media_download_job,
     run_transcript_retry_job,
 )
-from app.services.jobs.downloads import job_status as read_job_status
 from app.services.videos.detail_view import VideoNotFoundError, open_video_detail
 from app.services.videos.download_options import (
     normalize_download_media_types,

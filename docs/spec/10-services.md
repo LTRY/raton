@@ -182,7 +182,8 @@ web ; chacune ouvre sa propre session DB.
 
 | Module | Responsabilité |
 |---|---|
-| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) ou une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`), formats manquants d'une playlist (`queue_playlist_downloads`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
+| `downloads` | Tâches de fond : téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne |
+| `download_requests` | Côté requête de ces tâches, partagé par les formulaires et `/api` : validation et mise en file depuis la page d'import (`queue_manual_download`), une fiche (`queue_media_download`, `queue_transcript_retry`), une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) ou les formats manquants d'une playlist (`queue_playlist_downloads`) ; import synchrone du partage iOS (`import_shared_video`) ; état (`job_status`) et arrêt (`cancel_job`) d'un job |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
 | `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), partagés par les routes HTML et `/api` |

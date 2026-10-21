@@ -17,11 +17,8 @@ from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels
 from app.services.common.durations import format_duration
 from app.services.common.settings import get_video_category_label_styles
-from app.services.jobs.downloads import (
-    InvalidMediaFormatError,
-    queue_playlist_downloads,
-    run_media_download_job,
-)
+from app.services.jobs.download_requests import InvalidMediaFormatError, queue_playlist_downloads
+from app.services.jobs.downloads import run_media_download_job
 from app.services.jobs.playlists import (
     PlaylistNotRefreshableError,
     queue_playlist_csv_import,

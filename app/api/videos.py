@@ -38,13 +38,12 @@ from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.common.settings import (
     get_sponsor_skip_enabled,
 )
-from app.services.jobs.downloads import (
+from app.services.jobs.download_requests import (
     InvalidMediaFormatError,
     queue_media_download,
     queue_transcript_retry,
-    run_media_download_job,
-    run_transcript_retry_job,
 )
+from app.services.jobs.downloads import run_media_download_job, run_transcript_retry_job
 from app.services.media.media_storage import delete_video_media_file
 from app.services.videos.detail_view import (
     VideoDetail,

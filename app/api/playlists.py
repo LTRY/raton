@@ -42,11 +42,8 @@ from app.schemas.playlist import (
     PlaylistUrlImport,
 )
 from app.services.common.categories import parse_video_category_labels
-from app.services.jobs.downloads import (
-    InvalidMediaFormatError,
-    queue_playlist_downloads,
-    run_media_download_job,
-)
+from app.services.jobs.download_requests import InvalidMediaFormatError, queue_playlist_downloads
+from app.services.jobs.downloads import run_media_download_job
 from app.services.jobs.playlists import (
     PlaylistNotRefreshableError,
     queue_playlist_csv_import,

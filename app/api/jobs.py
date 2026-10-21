@@ -12,10 +12,7 @@ from app.schemas.actions import (
     RecentJobRead,
 )
 from app.services.common.job_log import JOB_DONE_STATUSES, recent_jobs
-from app.services.jobs.downloads import (
-    JobNotFoundError,
-    job_status,
-)
+from app.services.jobs.download_requests import JobNotFoundError, job_status
 
 router = APIRouter(prefix="/api", tags=["Jobs"])
 

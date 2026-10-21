@@ -44,11 +44,11 @@ from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
-from app.services.jobs.downloads import (
+from app.services.jobs.download_requests import (
     queue_channel_catalog_sync,
     queue_channel_metadata_import,
-    run_channel_metadata_import_job,
 )
+from app.services.jobs.downloads import run_channel_metadata_import_job
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,
