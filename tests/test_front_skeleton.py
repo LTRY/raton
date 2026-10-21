@@ -93,3 +93,16 @@ def test_records_turn_iso_datetimes_into_datetimes_and_keep_plain_dates():
     assert data.items[0].at == datetime(2026, 10, 21, 8, 30, tzinfo=UTC)
     assert data["day"] == "2026-10-21"
     assert data.get("missing", 1) == 1
+
+
+def test_import_button_is_on_every_page_with_the_three_imports(front_client):
+    html = front_client(make_session()).get("/channels").text
+    assert "data-import-fab" in html
+    for href in ("/videos/import", "/playlists#pl-add", "/channels?import=abonnements"):
+        assert f'href="{href}"' in html
+
+
+def test_channels_import_link_opens_the_csv_menu(front_client):
+    html = front_client(make_session()).get("/channels?import=abonnements").text
+    assert 'class="page-actions-menu" open' in html
+    assert 'class="page-action" open' in html

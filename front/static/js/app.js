@@ -3539,6 +3539,19 @@ function initExplorer() {
 
 initExplorer();
 
+// Import button (base.html): a <details> menu closed by Escape, a click outside or a chosen entry.
+// Bound once on `document` (see the pull-to-refresh note below); Turbo swaps the <details> itself.
+if (!window.__importFabBound) {
+  window.__importFabBound = true;
+  const closeImportFab = () => document.querySelectorAll("[data-import-fab][open]").forEach((fab) => fab.removeAttribute("open"));
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-import-fab]") || event.target.closest(".import-fab-menu a")) closeImportFab();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeImportFab();
+  });
+}
+
 initToasts();
 initMiniPlayer();
 bindPlayTrackButtons();

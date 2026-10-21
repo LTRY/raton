@@ -10947,3 +10947,94 @@ body::before {
     color: var(--color-primary);
   }
 }
+
+/* Import button: one round liquid-glass control at the top right of every page
+   (video, playlist, subscriptions CSV). Fixed, so it also exists on a phone
+   where the top bar is hidden. Below the toasts (z-index 70). */
+.import-fab {
+  position: fixed;
+  right: max(16px, calc(28px + env(safe-area-inset-right, 0px)));
+  top: calc(22px + env(safe-area-inset-top, 0px));
+  z-index: 60;
+}
+
+.import-fab-button {
+  align-items: center;
+  border-radius: 50%;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: flex;
+  height: 44px;
+  justify-content: center;
+  list-style: none;
+  transition: transform 160ms ease;
+  width: 44px;
+}
+
+.import-fab-button::-webkit-details-marker {
+  display: none;
+}
+
+.import-fab-button svg {
+  height: 22px;
+  width: 22px;
+}
+
+.import-fab-button:active {
+  transform: scale(0.94);
+}
+
+.import-fab-button:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.import-fab-menu {
+  background: var(--glass-fill-opaque);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: 2px;
+  min-width: 260px;
+  padding: 8px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+}
+
+.import-fab-menu a {
+  align-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  display: flex;
+  font-size: 15px;
+  font-weight: 700;
+  gap: 12px;
+  padding: 11px 12px;
+  white-space: nowrap;
+}
+
+.import-fab-menu a:hover,
+.import-fab-menu a:focus-visible {
+  background: var(--color-tint);
+  color: var(--color-primary);
+}
+
+.import-fab-menu svg {
+  flex: none;
+  height: 20px;
+  width: 20px;
+}
+
+/* The button floats over the first row of a phone page: keep its titles and
+   actions out from under it. */
+@media (max-width: 800px) {
+  .import-fab {
+    right: 14px;
+  }
+
+  main > section > h1:first-child,
+  main .section-heading,
+  main .pl-head {
+    padding-right: 56px;
+  }
+}

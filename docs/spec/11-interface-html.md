@@ -236,6 +236,16 @@ Navigation principale :
 - Logs `/logs` (sur telephone, sans barre du haut ni onglet : par le lien
   « Voir tous les logs » de `/settings`)
 
+Bouton d'import (`.import-fab`, `base.html`, toutes les pages) : un bouton rond
+de 44 px en verre liquide (classe `lg` + `data-glass-light`), trois points
+verticaux, fixe en haut a droite — sur telephone aussi, ou la barre du haut est
+masquee. Il ouvre un menu en verre (`details[data-import-fab]`, ferme par
+Echap, un clic dehors ou le choix d'une entree) avec les trois imports :
+**Ajouter une vidéo** (`/videos/import`), **Ajouter une playlist**
+(`/playlists#pl-add`, le panneau Ajouter) et **Importer des abonnements**
+(`/channels?import=abonnements`, qui deplie le menu « + Ajouter » et
+l'import CSV). Il passe sous les notifications (`z-index` 60 contre 70).
+
 Barre d'onglets mobile (`.mobile-tabbar`, `front/templates/base.html`, visible
 sous 800 px) : cinq onglets avec icone SVG seule (pas de libelle visible ; le nom de la page
 est dans `aria-label`) — Accueil `/`, Chaines `/channels`,
