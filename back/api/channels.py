@@ -100,6 +100,7 @@ def list_channels(
         page=listed.page,
         total_pages=listed.total_pages,
         total=listed.total,
+        channel_count=listed.channel_count,
     )
 
 

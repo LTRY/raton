@@ -277,6 +277,169 @@ h2 {
   padding: 6px 10px;
 }
 
+/* Title row of a page: the h1 (with its optional .page-count) on the left, the page's search or
+   actions pushed to the right. */
+.page-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* As tall as the Playlists search field: the title sits at the same height on every page, whether
+   its row holds a field, a button or nothing, and also when the row wraps on a phone. */
+.page-head h1 {
+  align-items: center;
+  column-gap: 4px;
+  display: flex;
+  flex-grow: 1;
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 0;
+  min-height: 44px;
+}
+
+.page-count {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 6px;
+  padding: 3px 10px;
+  vertical-align: middle;
+}
+
+.page-search {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  color: var(--color-text-muted);
+  display: flex;
+  gap: 8px;
+  height: 44px;
+  /* One width on every page (Chaînes, Playlists, Bibliothèque); full width on a phone. */
+  max-width: 100%;
+  padding: 0 16px;
+  width: 240px;
+}
+
+.page-search:focus-within {
+  border-color: var(--color-primary);
+}
+
+.page-search input {
+  background: transparent;
+  border: 0;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  outline: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* The page's search field and filters, on the title row: they wrap under the title on a phone. */
+.page-tools {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+/* A filter switched on or off with one tap: a quiet pill, tinted when on. */
+.page-toggle {
+  cursor: pointer;
+  display: inline-flex;
+  position: relative;
+}
+
+.page-toggle input {
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.page-toggle span,
+.page-sort {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+  white-space: nowrap;
+}
+
+.page-toggle:hover span,
+.page-sort:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.page-toggle input:checked + span {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+
+.page-toggle input:focus-visible + span,
+.page-sort:focus-within {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* The sort menu: a native select (keyboard, phone picker, no-JS submit) dressed as a text button. */
+.page-sort {
+  cursor: pointer;
+  min-width: 0;
+}
+
+.page-sort svg {
+  flex: none;
+}
+
+.page-sort select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+  padding: 0;
+  text-overflow: ellipsis;
+  /* As wide as the chosen option rather than the longest one, where the browser supports it. */
+  field-sizing: content;
+}
+
+/* Below 16px, iOS Safari zooms into the page when the field gets the focus. */
+@media (pointer: coarse) {
+  .page-search input,
+  .page-sort select {
+    font-size: 16px;
+  }
+}
+
 .metrics {
   display: grid;
   gap: 16px;
@@ -2975,63 +3138,6 @@ button.secondary {
 .pl-main {
   flex: 999 1 560px;
   min-width: 0;
-}
-
-.pl-head {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-
-.pl-head h1 {
-  flex-grow: 1;
-  font-size: 24px;
-  line-height: 1.2;
-  margin: 0;
-}
-
-.pl-count {
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  margin-left: 6px;
-  padding: 3px 10px;
-  vertical-align: middle;
-}
-
-.pl-search {
-  align-items: center;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  box-sizing: border-box;
-  color: var(--color-text-muted);
-  display: flex;
-  gap: 8px;
-  height: 44px;
-  min-width: 220px;
-  padding: 0 16px;
-}
-
-.pl-search:focus-within {
-  border-color: var(--color-primary);
-}
-
-.pl-search input {
-  background: transparent;
-  border: 0;
-  color: var(--color-text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  min-width: 0;
-  outline: 0;
-  padding: 0;
-  width: 100%;
 }
 
 .pl-grid {
@@ -7882,6 +7988,19 @@ turbo-frame {
     flex-direction: column;
   }
 
+  /* The search takes the full row, the filters share the next one. */
+  .page-tools {
+    width: 100%;
+  }
+
+  .page-search {
+    width: 100%;
+  }
+
+  .page-toggle span {
+    font-size: 14px;
+  }
+
   .search-field input[type="search"] {
     box-sizing: border-box;
     min-width: 0;
@@ -11040,7 +11159,7 @@ body::before {
 
   main > section > h1:first-child,
   main .section-heading,
-  main .pl-head {
+  main .page-head > h1 {
     padding-right: 56px;
   }
 

@@ -65,6 +65,7 @@ class ChannelPageRead(BaseModel):
     page: int
     total_pages: int
     total: int
+    channel_count: int
 
 
 class ChannelDetailRead(ChannelRead):

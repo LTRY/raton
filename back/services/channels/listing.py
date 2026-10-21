@@ -25,6 +25,8 @@ class ChannelPage:
     total_pages: int
     total: int
     sort: str
+    # Every channel of the library, whatever the filter and search: the count next to the title.
+    channel_count: int
 
 
 def channel_entries(db: Session, sort: str, rated_only: bool, search_query: str) -> list[dict]:
@@ -106,7 +108,12 @@ def channel_page(
     for entry in page_entries:
         entry["video_count"] = counts.get(entry["channel"].id, 0)
     return ChannelPage(
-        entries=page_entries, page=page, total_pages=total_pages, total=len(entries), sort=sort
+        entries=page_entries,
+        page=page,
+        total_pages=total_pages,
+        total=len(entries),
+        sort=sort,
+        channel_count=db.scalar(select(func.count(Channel.id))) or 0,
     )
 
 
