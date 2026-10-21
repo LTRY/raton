@@ -16,9 +16,7 @@ from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.library_chat.history import add_chat_exchange
 from app.services.library_chat.schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from app.services.library_chat.tools import LibraryChatToolbox
-from app.services.llm.prompts import (
-    split_generation_result,
-)
+from app.services.llm.prompts import LIBRARY_CHAT_SYSTEM, split_generation_result
 from app.services.llm.provider import CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
 from app.services.rag.indexing import index_video_notes
@@ -66,7 +64,11 @@ def run_llm_job(job_id: int) -> None:
                 toolbox = LibraryChatToolbox(db, on_progress=save_tool_calls)
                 added_channel_ids = toolbox.added_channel_ids
                 completion = provider_instance.complete_with_tools(
-                    job.prompt, LIBRARY_CHAT_TOOLS, toolbox.run, MAX_TOOL_TURNS
+                    json.loads(job.prompt),
+                    LIBRARY_CHAT_TOOLS,
+                    toolbox.run,
+                    MAX_TOOL_TURNS,
+                    system=LIBRARY_CHAT_SYSTEM,
                 )
                 completion.text, sources = toolbox.extract_sources(completion.text)
                 job.sources = json.dumps(sources)

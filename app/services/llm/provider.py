@@ -133,10 +133,11 @@ class LLMProvider(Protocol):
 
     def complete_with_tools(
         self,
-        prompt: str,
+        messages: list[dict],
         tools: list[dict],
         run_tool: Callable[[str, dict], str],
         max_tool_turns: int,
+        system: str | None = None,
     ) -> CompletionResult: ...
 
 
@@ -190,12 +191,16 @@ class AnthropicProvider:
 
     def complete_with_tools(
         self,
-        prompt: str,
+        messages: list[dict],
         tools: list[dict],
         run_tool: Callable[[str, dict], str],
         max_tool_turns: int,
+        system: str | None = None,
     ) -> CompletionResult:
         """Let the model call `run_tool(name, arguments)` until it answers.
+
+        `messages` is the conversation so far (alternating turns, ending with the user's), `system`
+        the instructions. The caller's list is left as it is: the loop works on a copy.
 
         Tokens and cost are summed over every API call of the loop, so the job's
         recorded cost covers the whole exchange.
@@ -205,13 +210,15 @@ class AnthropicProvider:
         client = anthropic.Anthropic(
             api_key=self.api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES
         )
-        messages: list[dict] = [{"role": "user", "content": prompt}]
+        messages = list(messages)
+        system_argument = {"system": system} if system else {}
         tally = UsageTally(self.model)
         logger.info(
-            "boucle d'outils modèle=%s outils=%s\n--- prompt ---\n%s",
+            "boucle d'outils modèle=%s outils=%s\n--- system ---\n%s\n--- messages ---\n%s",
             self.model,
             ", ".join(tool["name"] for tool in tools),
-            prompt,
+            system or "(aucun)",
+            "\n\n".join(f"{message['role']}: {message['content']}" for message in messages),
         )
         for turn in range(max_tool_turns + 1):
             # Once the budget is spent the model must answer from what it already
@@ -224,6 +231,7 @@ class AnthropicProvider:
                 tools=tools,
                 tool_choice=tool_choice,
                 messages=messages,
+                **system_argument,
             ) as stream:
                 response = stream.get_final_message()
             tally.add(response.usage)

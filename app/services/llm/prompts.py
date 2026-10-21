@@ -333,18 +333,7 @@ QUESTION:
 """
 
 
-def build_library_chat_prompt(messages: list[dict[str, str]], question: str) -> str:
-    """Build the cross-video ("whole library") chat prompt.
-
-    It carries no library content: the model fetches what it needs through the
-    tools of app/services/library_chat/tools.py, whose reference format this
-    prompt tells it to cite.
-    """
-    history = "\n\n".join(
-        f"{'UTILISATEUR' if message['role'] == 'user' else 'ASSISTANT'}: {message['content']}"
-        for message in messages[-10:]
-    )
-    return f"""Tu es l'assistant de recherche de la bibliothèque vidéo personnelle de
+LIBRARY_CHAT_SYSTEM = """Tu es l'assistant de recherche de la bibliothèque vidéo personnelle de
 l'utilisateur : des chaînes YouTube suivies, leurs vidéos, et des notes
 structurées tirées des transcripts.
 
@@ -389,11 +378,28 @@ tout.
 Réponds en français, de façon précise et concise, en vouvoyant l'utilisateur.
 Écris en texte brut : la réponse est affichée telle quelle, sans mise en forme,
 donc pas de Markdown (ni astérisques, ni titres, ni liens). Pour une liste, un
-élément par ligne commençant par un tiret.
+élément par ligne commençant par un tiret."""
 
-HISTORIQUE:
-{history or "(aucun échange précédent)"}
+_LIBRARY_CHAT_HISTORY_LIMIT = 10
 
-QUESTION:
-{question}
-"""
+
+def build_library_chat_messages(
+    history: list[dict[str, str]], question: str
+) -> list[dict[str, str]]:
+    """The messages of a cross-video ("whole library") chat turn, ready for the API.
+
+    The instructions live in LIBRARY_CHAT_SYSTEM and carry no library content: the model fetches
+    what it needs through the tools of app/services/library_chat/tools.py, whose reference format
+    the instructions tell it to cite. The last exchanges are sent as real turns, then the question.
+
+    The API wants turns that alternate and start with the user, and the question is a user turn:
+    a message that breaks the alternation (a question left without answer) is skipped.
+    """
+    turns: list[dict[str, str]] = []
+    for message in history[-_LIBRARY_CHAT_HISTORY_LIMIT:]:
+        expected = "user" if len(turns) % 2 == 0 else "assistant"
+        if message["role"] == expected:
+            turns.append({"role": message["role"], "content": message["content"]})
+    if turns and turns[-1]["role"] == "user":
+        turns.pop()
+    return [*turns, {"role": "user", "content": question}]

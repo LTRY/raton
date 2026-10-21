@@ -452,8 +452,8 @@ ou essayer autrement.
 ### References et puces
 
 Chaque chaine ou video renvoyee par un outil porte une reference
-`[chaine:ID]` ou `[video:ID]`. Le prompt
-(`app/services/llm/prompts.py:build_library_chat_prompt`) demande au modele d'ecrire,
+`[chaine:ID]` ou `[video:ID]`. Les consignes
+(`app/services/llm/prompts.py:LIBRARY_CHAT_SYSTEM`, envoyées en `system`) demandent au modele d'ecrire,
 a l'endroit ou il en parle, le nom de chaque chaine ou video qu'il retient
 sous la forme `[[chaine:ID|Nom]]` / `[[video:ID|Titre]]` : le texte affiche
 est le nom, la syntaxe disparait a l'affichage (voir
@@ -496,9 +496,16 @@ chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
   `{"status":"queued","job_id":...}`, meme mecanique asynchrone
   (`BackgroundTasks`) que les autres jobs LLM.
 
+Les messages envoyes au modele sont construits par
+`prompts.py:build_library_chat_messages` : les 10 derniers messages de la
+discussion en vrais tours `user`/`assistant`, puis la question. L'API exige des
+tours qui alternent et commencent par `user` : un message qui rompt
+l'alternance (question restee sans reponse) est ignore. `llm_jobs.prompt`
+contient ces messages en JSON (le `system` est une constante, pas stocke).
+
 Execution (`app/services/jobs/llm_jobs.py:run_llm_job`) : pour
 `kind="library_chat"`, le job passe par
-`AnthropicProvider.complete_with_tools`, qui boucle tant que le modele
+`AnthropicProvider.complete_with_tools(messages, ..., system=LIBRARY_CHAT_SYSTEM)`, qui boucle tant que le modele
 demande un outil. Au-dela de `MAX_TOOL_TURNS` (4) tours d'outils, l'appel
 suivant interdit les outils (`tool_choice: none`) pour forcer une reponse.
 Chaque tour est un appel API complet : les tokens de tous les appels sont

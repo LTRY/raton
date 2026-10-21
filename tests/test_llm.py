@@ -3,11 +3,13 @@ import pytest
 
 from app.services.llm import provider as llm
 from app.services.llm.prompts import (
+    LIBRARY_CHAT_SYSTEM,
     NOTES_SECTION_NAMES,
     NOTES_SECTIONS,
     build_auto_notes_prompt,
     build_chat_prompt,
     build_generation_prompt,
+    build_library_chat_messages,
     build_notes_prompt,
     build_summary_prompt,
     partial_generation_summary,
@@ -177,6 +179,48 @@ def test_notes_prompt_defines_every_section_and_keeps_bullets_self_contained():
     for name, definition in NOTES_SECTIONS.items():
         assert f"- {name} : {definition}" in prompt
     assert "se comprend seule" in prompt
+
+
+def test_library_chat_messages_send_the_history_as_real_turns():
+    history = [
+        {"role": "user", "content": "Q1"},
+        {"role": "assistant", "content": "R1"},
+    ]
+
+    assert build_library_chat_messages(history, "Q2") == [
+        {"role": "user", "content": "Q1"},
+        {"role": "assistant", "content": "R1"},
+        {"role": "user", "content": "Q2"},
+    ]
+    assert build_library_chat_messages([], "Q") == [{"role": "user", "content": "Q"}]
+
+
+def test_library_chat_messages_keep_the_turns_alternating():
+    # The API refuses a conversation that starts with the assistant or repeats a role.
+    cut = [{"role": "assistant", "content": "R0"}, {"role": "user", "content": "Q1"}]
+    unanswered = [{"role": "user", "content": "Q1"}]
+
+    assert build_library_chat_messages(cut, "Q2") == [{"role": "user", "content": "Q2"}]
+    assert build_library_chat_messages(unanswered, "Q2") == [{"role": "user", "content": "Q2"}]
+
+
+def test_library_chat_messages_keep_only_the_last_ten_turns():
+    history = [
+        {"role": "user" if index % 2 == 0 else "assistant", "content": f"m{index}"}
+        for index in range(14)
+    ]
+
+    messages = build_library_chat_messages(history, "Q")
+
+    assert [message["content"] for message in messages] == [f"m{i}" for i in range(4, 14)] + ["Q"]
+
+
+def test_library_chat_instructions_live_in_the_system_prompt_only():
+    messages = build_library_chat_messages([], "Ma question ?")
+
+    assert "[[chaine:12|Nom de la chaîne]]" in LIBRARY_CHAT_SYSTEM
+    assert "HISTORIQUE" not in LIBRARY_CHAT_SYSTEM and "QUESTION:" not in LIBRARY_CHAT_SYSTEM
+    assert "bibliothèque" not in messages[0]["content"]
 
 
 def test_every_prompt_wraps_the_transcript_in_xml_tags():
@@ -383,10 +427,12 @@ class _ScriptedMessages:
         self.final_text = final_text
         self.tool_choices = []
         self.last_messages = None
+        self.last_system = None
 
     def stream(self, **kwargs):
         self.tool_choices.append(kwargs["tool_choice"]["type"])
         self.last_messages = kwargs["messages"]
+        self.last_system = kwargs.get("system")
         if kwargs["tool_choice"]["type"] == "none":
             return _FakeStream(
                 _FakeAnthropicResponse(self.final_text, input_tokens=5, output_tokens=7)
@@ -419,7 +465,11 @@ def test_complete_with_tools_feeds_tool_results_back_and_stops_at_the_turn_budge
 
     provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
     result = provider.complete_with_tools(
-        "Une question.", [{"name": "chercher_chaines"}], run_tool, max_tool_turns=2
+        [{"role": "user", "content": "Une question."}],
+        [{"name": "chercher_chaines"}],
+        run_tool,
+        max_tool_turns=2,
+        system="Tu es un assistant.",
     )
 
     # The model would call tools forever: the third call forbids them.
@@ -432,6 +482,7 @@ def test_complete_with_tools_feeds_tool_results_back_and_stops_at_the_turn_budge
         "role": "user",
         "content": [{"type": "tool_result", "tool_use_id": "call-2", "content": "résultat 2"}],
     }
+    assert scripted.last_system == "Tu es un assistant."
     assert result.text == "Réponse finale."
     assert (result.input_tokens, result.output_tokens) == (15, 21)
     # The exchange is traced so it can be followed in the container logs.

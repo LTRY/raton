@@ -49,8 +49,10 @@ def fake_provider(answer, tool_calls=()):
 
     class FakeProvider:
         tool_outputs = []
+        calls = []
 
-        def complete_with_tools(self, prompt, tools, run_tool, max_tool_turns):
+        def complete_with_tools(self, messages, tools, run_tool, max_tool_turns, system=None):
+            self.calls.append((messages, system))
             self.tool_outputs.extend(run_tool(name, arguments) for name, arguments in tool_calls)
             return CompletionResult(
                 text=answer, model="claude-haiku-4-5", input_tokens=40, output_tokens=12
@@ -131,7 +133,7 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     job = db.get(LlmJob, job_id)
     assert job.kind == "library_chat"
     assert job.video_id is None
-    assert "Qu'est-ce que le stoïcisme ?" in job.prompt
+    assert json.loads(job.prompt) == [{"role": "user", "content": "Qu'est-ce que le stoïcisme ?"}]
     assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     llm_jobs.run_llm_job(job_id)
