@@ -177,7 +177,8 @@ L'API interne sous `/api` : `routes.py` pour les chaines, fiches,
 statistiques et parametres, `library.py` pour `GET /api/library`,
 `video_actions.py` pour les actions sur une fiche et l'etat de leurs jobs,
 `channel_actions.py` pour les actions sur une chaine et l'import CSV des
-abonnements, `playlists.py` pour les playlists.
+abonnements, `playlists.py` pour les playlists, `llm.py` pour les demandes au
+LLM (notes, discussion d'une fiche, chat bibliotheque) et leurs jobs.
 
 ### `app/services/`
 

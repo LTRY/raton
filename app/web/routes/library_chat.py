@@ -1,20 +1,18 @@
-import json
-
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models.llm_job import LlmJob
-from app.services.common.settings import get_llm_provider_name
-from app.services.jobs.llm_jobs import apply_library_chat_result, enqueue_llm_job, run_llm_job
-from app.services.library_chat.history import (
-    chat_history,
-    chat_messages,
-    clear_chat,
-    total_video_count,
+from app.services.jobs.llm_jobs import run_llm_job
+from app.services.jobs.llm_requests import (
+    LlmJobFailedError,
+    LlmJobNotFoundError,
+    LlmRequestError,
+    find_library_chat_job,
+    queue_library_question,
+    resolve_llm_job,
 )
-from app.services.llm.prompts import build_library_chat_prompt
+from app.services.library_chat.history import chat_messages, clear_chat, total_video_count
 from app.services.rag.retrieval import count_indexed_videos
 
 router = APIRouter()
@@ -65,29 +63,12 @@ def chat_about_library(
     question: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    question = question.strip()
-    if not question:
-        return JSONResponse(
-            {"status": "failed", "message": "La question est vide."}, status_code=400
-        )
-    provider = get_llm_provider_name()
     try:
-        history = chat_history(db)
-        prompt = build_library_chat_prompt(history, question)
-        job = enqueue_llm_job(
-            db,
-            kind="library_chat",
-            provider=provider,
-            video_id=None,
-            prompt=prompt,
-            question=question,
-        )
-        background_tasks.add_task(run_llm_job, job.id)
-        return JSONResponse({"status": "queued", "job_id": job.id})
-    except Exception as exc:
-        return JSONResponse(
-            {"status": "failed", "message": f"Réponse impossible : {exc}"}, status_code=400
-        )
+        job = queue_library_question(db, question)
+    except LlmRequestError as exc:
+        return JSONResponse({"status": "failed", "message": str(exc)}, status_code=400)
+    background_tasks.add_task(run_llm_job, job.id)
+    return JSONResponse({"status": "queued", "job_id": job.id})
 
 
 @router.post("/chat/clear")
@@ -98,28 +79,12 @@ def clear_library_chat(db: Session = Depends(get_db)):
 
 @router.get("/chat/jobs/{job_id}")
 def library_chat_job_status(job_id: int, db: Session = Depends(get_db)):
-    job = db.get(LlmJob, job_id)
-    if job is None or job.kind != "library_chat" or job.video_id is not None:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-
-    if job.status in ("queued", "running"):
-        return JSONResponse(
-            {
-                "status": "pending",
-                "tool_calls": json.loads(job.tool_calls) if job.tool_calls else [],
-            }
-        )
-
-    if job.status == "failed":
-        return JSONResponse(
-            {"status": "failed", "message": f"Réponse impossible : {job.error}"}, status_code=400
-        )
-
     try:
-        apply_library_chat_result(db, job)
-        return JSONResponse(library_chat_payload(db, "Réponse ajoutée."))
-    except Exception as exc:
-        return JSONResponse(
-            {"status": "failed", "message": f"Application du résultat impossible : {exc}"},
-            status_code=400,
-        )
+        outcome = resolve_llm_job(db, find_library_chat_job(db, job_id))
+    except LlmJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except LlmJobFailedError as exc:
+        return JSONResponse({"status": "failed", "message": str(exc)}, status_code=400)
+    if outcome.pending:
+        return JSONResponse({"status": "pending", "tool_calls": outcome.tool_calls})
+    return JSONResponse(library_chat_payload(db, "Réponse ajoutée."))

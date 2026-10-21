@@ -356,6 +356,35 @@ created_at}`. L'export CSV reste `GET /playlists/{id}/export.csv`.
   fiche qui n'a pas encore ce format, `202 {jobs: [...]}` (vide si rien ne
   manque) ; `400` pour un autre format.
 
+### Demandes au LLM
+
+Memes services que les routes HTML de
+[09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) ; corps
+en JSON. Une demande repond `202 {job_id, status, status_url}` et tourne en
+arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
+
+- `POST /api/videos/{id}/notes/generate` : notes structurees, resume court et
+  questions suggerees depuis le transcript, en un appel ; `400` si la fiche
+  n'a pas de transcript (`Génération impossible : …`).
+- `POST /api/videos/{id}/chat` `{question}` : question sur le transcript de
+  la fiche, a la suite de sa discussion ; `400 La question est vide.`.
+  `DELETE /api/videos/{id}/chat` efface la discussion (`204`). La discussion
+  elle-meme se lit dans `GET /api/videos/{id}` (`documents.chat_messages`).
+- `GET /api/chat` : la conversation du chat bibliotheque (`messages`, chaque
+  reponse avec les `channels` et `citations` qu'elle cite) et
+  `indexed_video_count`/`total_video_count`. `POST /api/chat` `{question}` :
+  pose une question (`202`) ; `DELETE /api/chat` efface la conversation
+  (`204`).
+- `GET /api/llm-jobs/{id}` : `{id, kind, video_id, status}` avec `status`
+  `pending`, `done` ou `failed`. En attente : `partial_short_summary` (job
+  `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).
+  Le premier poll apres la fin ecrit le resultat (une seule fois, comme le
+  poll de la page) et repond `documents` (`generate`, avec les nouvelles
+  notes), `chat_messages` (`chat`) ou `library_chat` (`library_chat`) ;
+  apres une generation, l'indexation des notes part en arriere-plan. Un job
+  echoue repond `200` avec `status: failed` et `message` (`Génération
+  impossible : …`, `Réponse impossible : …`). `404 Tâche introuvable`.
+
 ### Actions sur une fiche
 
 Corps en JSON. Chaque route appelle le meme service que son formulaire HTML

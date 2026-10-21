@@ -82,6 +82,17 @@ class VideoDocumentsRead(BaseModel):
     suggested_questions: list[str]
     chat_messages: list[ChatMessageRead]
 
+    @classmethod
+    def from_documents(cls, documents: dict) -> VideoDocumentsRead:
+        """From `read_transcript_documents`."""
+        return cls(
+            transcript=documents["transcript"],
+            notes=documents["notes_transcript"],
+            short_summary=documents["short_summary"],
+            suggested_questions=documents["suggested_questions"],
+            chat_messages=documents["chat_messages"],
+        )
+
 
 class SponsorSegmentRead(BaseModel):
     category: str
