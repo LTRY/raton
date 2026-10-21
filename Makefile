@@ -1,4 +1,4 @@
-.PHONY: uninstall install test lint format compose-config ci up down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews
+.PHONY: uninstall install test lint format compose-config ci up down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews previews-down
 
 # Shell environment first, then MEDIA_HOST_ROOT from .env, then the default.
 MEDIA_HOST_ROOT ?= $(shell sed -n 's/^MEDIA_HOST_ROOT=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
@@ -25,6 +25,7 @@ compose-config:
 	docker compose config
 	docker compose -f docker-compose.docs.yml config
 	PREVIEW_PR=0 PREVIEW_PORT=9000 PREVIEW_SRC=. docker compose -f docker-compose.preview.yml config
+	RATON_REPO=. docker compose -f docker-compose.previews.yml config
 
 css:
 	./scripts/build_css.sh
@@ -62,10 +63,17 @@ demo: css
 	mkdir -p .local "$(MEDIA_HOST_ROOT)"
 	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
 
-# The page that deploys the PR previews (scripts/previews.py), on the interface of APP_BIND in .env.
+# The page that deploys the PR previews (scripts/previews.py), in its own container (docker-compose.previews.yml).
+# The gh token of the host lets it list the PRs; a GH_TOKEN in the environment or in .env wins.
 previews:
-	PREVIEWS_BIND="$${PREVIEWS_BIND:-$$(sed -n 's/^APP_BIND=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")}" \
-	  uv run --python 3.14 python scripts/previews.py
+	@token="$${GH_TOKEN:-$$(gh auth token 2>/dev/null || true)}"; \
+	if [ -n "$$token" ]; then export GH_TOKEN="$$token"; fi; \
+	RATON_REPO="$(CURDIR)" docker compose -p raton-previews -f docker-compose.previews.yml up --build -d
+	@echo "Page des previews sur http://$$(RATON_REPO="$(CURDIR)" docker compose -p raton-previews -f docker-compose.previews.yml port previews 8999 | sed 's/^0\.0\.0\.0:/localhost:/')"
+
+# Stops the page only: the previews it started keep running (Retirer on the page, or scripts/preview.sh down).
+previews-down:
+	RATON_REPO="$(CURDIR)" docker compose -p raton-previews -f docker-compose.previews.yml down
 
 uninstall:
 	./scripts/uninstall.sh $(ARGS)

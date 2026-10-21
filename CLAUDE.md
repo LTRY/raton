@@ -17,7 +17,7 @@ Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`
 3. Run `make ci` before opening the PR. If it fails, fix the issue and re-run it — never open a PR on a red `make ci`.
 4. Push the branch and open a pull request against `main` (`gh pr create`), without waiting to be asked. Don't merge the branch into `main` locally.
 
-Do **not** run `make up`, `make uninstall`, `make previews`, `scripts/preview.sh` or `scripts/docs.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
+Do **not** run `make up`, `make uninstall`, `make previews`, `make previews-down`, `scripts/preview.sh` or `scripts/docs.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
 
 Migrations: write the revision by hand in `alembic/versions/`, named `NNNN_short_slug` (`down_revision` = the previous id, working `downgrade()`), id of 32 characters at most (`tests/test_migration_revisions.py`). The PR title takes `[DB]`.
 
@@ -75,7 +75,7 @@ make ci             # css + lint + test + compose-config (run before opening a P
 make format         # ruff fix + format (also run on every edited .py by the PostToolUse hook)
 make demo           # back (API, :8001) + front (pages, :8000) with --reload on a local sqlite db (no Postgres needed)
 make upgrade-ytdlp  # yt-dlp only moves when uv.lock does: the Docker image installs from the lock
-make previews       # page (:8999) that deploys a PR's preview on port 9000 + its number (scripts/preview.sh)
+make previews       # container serving the page (:8999) that deploys a PR's preview on port 9000 + its number
 ```
 
 Other targets (`install`, `test`, `lint`, `css`, `migrate`, `docs-dev`, `docs-build`, `up`...) are in the Makefile; `make up` is the deploy and is not part of the task workflow.

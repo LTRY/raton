@@ -38,3 +38,9 @@ services:
       - "${APP_BIND:-127.0.0.1}:${PREVIEW_PORT:?set by scripts/preview.sh}:8000"
     environment:
       RATON_API_URL: http://api:8001
+    # `preview.sh up` waits on it (`--wait`); the front's home page also needs the back up.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')"]
+      interval: 3s
+      timeout: 5s
+      retries: 40

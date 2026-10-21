@@ -1,0 +1,38 @@
+# The previews page (scripts/previews.py) in its own compose project, raton-previews: `make previews`
+# starts it, `make previews-down` stops it; neither `make up` nor `make down` touch it.
+# It drives the host's Docker through its socket to build and run the previews
+# (docker-compose.preview.yml), so the repository is mounted at the SAME absolute path as on the
+# host: the paths preview.sh hands to Docker (build context, the scripts/ mount) are resolved by
+# the host's daemon, not inside this container.
+# See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+services:
+  previews:
+    container_name: raton-previews
+    image: raton-previews:local
+    build:
+      context: scripts
+      dockerfile_inline: |
+        FROM docker:29-cli AS docker-cli
+        FROM python:3.14-slim
+        RUN apt-get update \
+            && apt-get install -y --no-install-recommends git gh ca-certificates \
+            && rm -rf /var/lib/apt/lists/*
+        COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+        COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
+        # The repository belongs to the host's user; fetch over HTTPS with the gh token, even
+        # when origin is an SSH URL (no SSH key in here).
+        RUN git config --system --add safe.directory '*' \
+            && git config --system url."https://github.com/".insteadOf "git@github.com:" \
+            && git config --system credential."https://github.com".helper '!gh auth git-credential'
+    working_dir: ${RATON_REPO:?set by make previews}
+    command: ["python", "scripts/previews.py", "--host", "0.0.0.0", "--port", "8999"]
+    volumes:
+      - ${RATON_REPO}:${RATON_REPO}
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # `gh` reads the PRs with it; `make previews` takes it from `gh auth token` on the host.
+      GH_TOKEN: ${GH_TOKEN:-}
+    ports:
+      # Same interface as the real stack (APP_BIND in .env): loopback unless opened to the LAN.
+      - "${APP_BIND:-127.0.0.1}:${PREVIEWS_PORT:-8999}:8999"
+    restart: unless-stopped

@@ -244,10 +244,22 @@ partir d'une PR ouverte, pour l'essayer avant le merge sans toucher a la pile
 reelle. Elle se deploie a la main, depuis une page web ou en ligne de commande ;
 le merge ne deploie rien.
 
-- **Page des previews** : `make previews` (`scripts/previews.py`, bibliotheque
-  standard Python seulement) sert une page sur le port `8999` (`PREVIEWS_PORT`),
-  sur l'interface d'`APP_BIND` du `.env` (`PREVIEWS_BIND` la remplace). Elle
-  liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
+- **Page des previews** : `make previews` lance `scripts/previews.py`
+  (bibliotheque standard Python seulement) dans le conteneur `raton-previews`
+  (projet compose `raton-previews`, `docker-compose.previews.yml`,
+  `restart: unless-stopped`) ; `make previews-down` l'arrete sans toucher aux
+  previews ni a la pile reelle. La page est servie sur le port `8999`
+  (`PREVIEWS_PORT`), sur l'interface d'`APP_BIND` du `.env`. Le conteneur
+  pilote le Docker de l'hote par sa socket (`/var/run/docker.sock`) et monte le
+  depot au **meme chemin absolu** que sur l'hote, parce que les chemins que
+  `preview.sh` donne a Docker (contexte de build, montage de `scripts/`) sont
+  resolus par le daemon de l'hote. `gh` s'y authentifie avec `GH_TOKEN`, que
+  `make previews` prend de `gh auth token` sur l'hote (un `GH_TOKEN` de
+  l'environnement ou du `.env` passe avant) ; git y recupere les PR en HTTPS
+  avec ce jeton, meme si `origin` est une URL SSH. Le conteneur tourne en root :
+  `preview.sh` rend ensuite `.git` et `.local/previews` au proprietaire du
+  depot. Elle
+  liste les PR ouvertes (via `gh`), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
   et les boutons **Deployer**/**Redeployer**, **Ouvrir** et **Retirer**. Les
@@ -259,7 +271,8 @@ le merge ne deploie rien.
 - **Script** : `scripts/preview.sh up <N>` recupere la tete de la PR
   (`refs/pull/<N>/head`) dans un worktree git `.local/previews/pr-<N>`, puis
   construit et lance le projet compose `raton-pr-<N>`
-  (`docker-compose.preview.yml`) ; `down <N>` supprime conteneurs, images et
+  (`docker-compose.preview.yml`), et attend que le healthcheck du front reponde
+  (`--wait`, 180 s au plus) ; `down <N>` supprime conteneurs, images et
   worktree ; `list` liste les previews ; `sweep` retire celles des PR fermees.
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
 - **Isolement** : DB SQLite dans le conteneur `api`, remplie par les donnees de
@@ -270,7 +283,8 @@ le merge ne deploie rien.
 - **PR de fork refusees** : la machine construit et execute le code de la PR,
   donc seules les PR du depot lui-meme ont une preview.
 
-`make compose-config` valide aussi `docker-compose.preview.yml`. Les fonctions
+`make compose-config` valide aussi `docker-compose.preview.yml` et
+`docker-compose.previews.yml`. Les fonctions
 de la page sont testees dans `tests/test_previews_page.py`.
 
 ## Conventions de nommage des PR

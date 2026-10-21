@@ -34,7 +34,7 @@ compose() {
 
 cmd_up() {
   require_pr "${1:-}"
-  local pr="$1" info state cross sha src address
+  local pr="$1" info state cross sha src
   info="$(gh pr view "$pr" --json state,isCrossRepository --jq '.state + " " + (.isCrossRepository | tostring)')"
   state="${info%% *}"
   cross="${info#* }"
@@ -57,23 +57,15 @@ cmd_up() {
   echo "preview $pr : commit ${sha:0:7}, construction..."
 
   export PREVIEW_SHA="$sha"
-  if ! compose "$pr" up -d --build --force-recreate --remove-orphans; then
-    echo "preview.sh: la construction de la preview $pr a échoué" >&2; exit 1
+  # --wait relies on the app's healthcheck rather than on calling the published port: run from
+  # the previews page's container, the host's ports are not on its loopback.
+  if ! compose "$pr" up -d --build --force-recreate --remove-orphans --wait --wait-timeout 180; then
+    compose "$pr" logs --tail 50 >&2 || true
+    echo "preview.sh: la preview $pr n'a pas démarré" >&2; exit 1
   fi
-  # Inside the host, 0.0.0.0 (APP_BIND opened to the LAN) is reached on loopback.
-  address="$(compose "$pr" port app 8000 | sed 's/^0\.0\.0\.0:/127.0.0.1:/')"
-  for _ in $(seq 1 60); do
-    if curl -fs -o /dev/null "http://$address/"; then
-      # A rebuild moves the image tags and leaves the previous build dangling.
-      docker image prune -f >/dev/null
-      echo "preview $pr en ligne sur le port $(port_for "$pr") (commit ${sha:0:7})"
-      return 0
-    fi
-    sleep 2
-  done
-  compose "$pr" logs --tail 50 >&2 || true
-  echo "preview.sh: la preview $pr ne répond pas sur le port $(port_for "$pr") après 120 s" >&2
-  exit 1
+  # A rebuild moves the image tags and leaves the previous build dangling.
+  docker image prune -f >/dev/null
+  echo "preview $pr en ligne sur le port $(port_for "$pr") (commit ${sha:0:7})"
 }
 
 cmd_down() {
@@ -106,10 +98,25 @@ cmd_sweep() {
   done
 }
 
+# Run as root by the previews page's container, git and the logs would leave root-owned files in
+# the host user's checkout (.git objects, worktrees): give them back to the checkout's owner.
+give_back_ownership() {
+  local owner
+  [ "$(id -u)" = 0 ] || return 0
+  owner="$(stat -c %u:%g "$REPO")"
+  [ "$owner" != "0:0" ] || return 0
+  chown -R "$owner" "$REPO/.git" 2>/dev/null || true
+  # Not all of .local: the real stack's media and journal may live there, with their own owner.
+  if [ -d "$REPO/.local/previews" ]; then
+    chown "$owner" "$REPO/.local" 2>/dev/null || true
+    chown -R "$owner" "$REPO/.local/previews" 2>/dev/null || true
+  fi
+}
+
 case "${1:-}" in
-  up) cmd_up "${2:-}" ;;
-  down) cmd_down "${2:-}" ;;
+  up) trap give_back_ownership EXIT; cmd_up "${2:-}" ;;
+  down) trap give_back_ownership EXIT; cmd_down "${2:-}" ;;
   list) cmd_list ;;
-  sweep) cmd_sweep ;;
+  sweep) trap give_back_ownership EXIT; cmd_sweep ;;
   *) echo "usage: preview.sh up <pr> | down <pr> | list | sweep" >&2; exit 2 ;;
 esac

@@ -1,6 +1,7 @@
 """The previews page: lists the open PRs and deploys or removes their preview with one click.
 
-Usage: python3 scripts/previews.py [--host 127.0.0.1] [--port 8999]   (or `make previews`)
+`make previews` runs it in its own container (docker-compose.previews.yml); on the host,
+`python3 scripts/previews.py [--host 127.0.0.1] [--port 8999]` works too.
 
 A small standard-library server, outside Raton (no import of back/ or front/): it reads the
 open PRs with `gh` and runs scripts/preview.sh, which does the work. Each action runs in
