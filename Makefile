@@ -1,4 +1,4 @@
-.PHONY: uninstall install test lint format compose-config ci up down logs migrate demo css docs-dev docs-build upgrade-ytdlp
+.PHONY: uninstall install test lint format compose-config ci up down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews
 
 # Shell environment first, then MEDIA_HOST_ROOT from .env, then the default.
 MEDIA_HOST_ROOT ?= $(shell sed -n 's/^MEDIA_HOST_ROOT=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
@@ -24,6 +24,7 @@ format:
 compose-config:
 	docker compose config
 	docker compose -f docker-compose.docs.yml config
+	PREVIEW_PR=0 PREVIEW_PORT=9000 PREVIEW_SRC=. docker compose -f docker-compose.preview.yml config
 
 css:
 	./scripts/build_css.sh
@@ -60,6 +61,11 @@ upgrade-ytdlp:
 demo: css
 	mkdir -p .local "$(MEDIA_HOST_ROOT)"
 	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
+
+# The page that deploys the PR previews (scripts/previews.py), on the interface of APP_BIND in .env.
+previews:
+	PREVIEWS_BIND="$${PREVIEWS_BIND:-$$(sed -n 's/^APP_BIND=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")}" \
+	  uv run --python 3.14 python scripts/previews.py
 
 uninstall:
 	./scripts/uninstall.sh $(ARGS)
