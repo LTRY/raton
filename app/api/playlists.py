@@ -1,10 +1,18 @@
 """`/api/playlists`: reading, importing and editing playlists.
 
-Each route calls the service its HTML twin calls (`app/web/routes/playlists.py`). The CSV export
-stays `GET /playlists/{id}/export.csv`, already a plain file.
+Each route calls the service its HTML twin calls (`app/web/routes/playlists.py`).
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -66,6 +74,7 @@ from app.services.playlists.imports import PlaylistCsvError, PlaylistNotFoundErr
 from app.services.playlists.listing import (
     list_playlists,
     load_playlist,
+    playlist_csv_export,
     playlist_row,
     playlist_stats,
     playlist_summary,
@@ -198,6 +207,20 @@ def get_playlist(playlist_id: int, db: Session = Depends(get_db)) -> PlaylistDet
         return playlist_detail_read(load_playlist(db, playlist_id))
     except PlaylistNotInLibraryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/playlists/{playlist_id}/export.csv")
+def export_csv(playlist_id: int, db: Session = Depends(get_db)) -> Response:
+    """The Google Takeout per-playlist layout, which `import-csv` reads back."""
+    try:
+        filename, content = playlist_csv_export(db, playlist_id)
+    except PlaylistNotInLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.delete("/playlists/{playlist_id}", status_code=204)

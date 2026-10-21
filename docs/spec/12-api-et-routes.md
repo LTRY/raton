@@ -322,7 +322,7 @@ la suppression sont plus haut.
 Corps en JSON, memes services que les pages `/playlists` ; `404 Playlist
 introuvable` si la playlist n'existe pas. Une playlist se lit `{id, title,
 source, source_url, yt_playlist_id, categories, free_listening,
-created_at}`. L'export CSV reste `GET /playlists/{id}/export.csv`.
+created_at}`.
 
 - `GET /api/playlists` : toutes les playlists, la plus recente d'abord, plus
   `item_count` et `cover_video_id` (premiere fiche, `null` si vide). Nombre de
@@ -333,6 +333,9 @@ created_at}`. L'export CSV reste `GET /playlists/{id}/export.csv`.
   total_duration_seconds, seen_count, missing_audio, missing_video}` et
   `items` dans l'ordre (`{item_id, position, added_at, video_id, title,
   channel_name, duration_seconds, has_audio, has_video, seen}`).
+- `GET /api/playlists/{id}/export.csv` : meme fichier que `GET
+  /playlists/{id}/export.csv` (`playlist-<id>.csv`, format Takeout par
+  playlist, relisible par `POST /api/playlists/import-csv`).
 - `DELETE /api/playlists/{id}` : `204`, ne supprime jamais les fiches.
 - `PUT /api/playlists/{id}/title` `{title}`, `PUT .../free-listening`
   `{enabled}` : repondent la playlist.

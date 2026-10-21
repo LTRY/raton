@@ -1,4 +1,5 @@
-"""What the playlist pages show, as raw values: the list with its covers, a playlist's rows.
+"""What the playlist pages show, as raw values: the list with its covers, a playlist's rows,
+its CSV export.
 
 Shared by `/playlists`, `/playlists/{id}` and their `/api` twins; labels are the caller's.
 """
@@ -10,6 +11,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
 from app.services.playlists.editing import PlaylistNotInLibraryError
+from app.services.playlists.imports import playlist_to_csv
 
 
 def list_playlists(db: Session) -> list[Playlist]:
@@ -90,3 +92,9 @@ def playlist_stats(rows: list[dict]) -> dict[str, int]:
         "missing_audio": sum(1 for row in rows if not row["has_audio"]),
         "missing_video": sum(1 for row in rows if not row["has_video"]),
     }
+
+
+def playlist_csv_export(db: Session, playlist_id: int) -> tuple[str, str]:
+    """(file name, content) of the playlist's Takeout CSV, items and videos loaded up front."""
+    playlist = load_playlist(db, playlist_id)
+    return f"playlist-{playlist.id}.csv", playlist_to_csv(playlist)

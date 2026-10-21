@@ -340,3 +340,38 @@ def test_adding_an_unknown_fiche_is_refused(client, db):
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Vidéo introuvable"}
+
+
+def test_export_csv_is_the_takeout_layout_import_csv_reads_back(client, db, tasks):
+    videos = add_videos(db, 2)
+    playlist = add_playlist(db, videos)
+
+    response = client.get(f"/api/playlists/{playlist.id}/export.csv")
+    imported = client.post(
+        "/api/playlists/import-csv",
+        files={"file": ("Vidéos de Copie.csv", response.content, "text/csv")},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.headers["content-disposition"] == (
+        f'attachment; filename="playlist-{playlist.id}.csv"'
+    )
+    assert imported.json()["playlist"]["title"] == "Copie"
+    rows = tasks[0][3]
+    assert [row["yt_video_id"] for row in rows] == [video.yt_video_id for video in videos]
+    assert client.get("/api/playlists/999/export.csv").status_code == 404
+
+
+@pytest.mark.parametrize("path", ["/playlists/{id}/export.csv", "/api/playlists/{id}/export.csv"])
+def test_export_csv_cost_does_not_grow_with_the_playlist(client, db, path):
+    small = add_playlist(db, add_videos(db, 2, "s"))
+    large = add_playlist(db, add_videos(db, 40, "l"))
+    counts = []
+    for playlist in (small, large):
+        db.expunge_all()
+        db.statements.clear()
+        assert client.get(path.format(id=playlist.id)).status_code == 200
+        counts.append(len(db.statements))
+
+    assert counts[0] == counts[1]

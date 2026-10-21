@@ -51,12 +51,12 @@ from app.services.playlists.editing import (
 from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
-    playlist_to_csv,
     preview_playlist,
 )
 from app.services.playlists.listing import (
     list_playlists,
     load_playlist,
+    playlist_csv_export,
     playlist_row,
     playlist_stats,
     playlist_summary,
@@ -322,11 +322,14 @@ def duplicate_playlist_route(playlist_id: int, db: Session = Depends(get_db)):
 
 @router.get("/playlists/{playlist_id}/export.csv")
 def export_playlist_csv(playlist_id: int, db: Session = Depends(get_db)):
-    playlist = _get_playlist(db, playlist_id)
+    try:
+        filename, content = playlist_csv_export(db, playlist_id)
+    except PlaylistNotInLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return Response(
-        playlist_to_csv(playlist),
+        content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="playlist-{playlist.id}.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
