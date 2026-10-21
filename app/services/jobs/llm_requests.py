@@ -76,7 +76,11 @@ def queue_notes_generation(db: Session, video: Video) -> LlmJob:
             transcript_path.read_text(encoding="utf-8", errors="replace")
         )
         return enqueue_llm_job(
-            db, kind="generate", provider=get_llm_provider_name(), video_id=video.id, prompt=prompt
+            db,
+            kind="generate",
+            provider=get_llm_provider_name(),
+            video_id=video.id,
+            prompt=prompt.to_json(),
         )
     except Exception as exc:
         raise LlmRequestError(f"Génération impossible : {exc}") from exc
@@ -97,7 +101,7 @@ def queue_video_question(db: Session, video: Video, question: str) -> LlmJob:
             kind="chat",
             provider=get_llm_provider_name(),
             video_id=video.id,
-            prompt=prompt,
+            prompt=prompt.to_json(),
             question=question,
         )
     except Exception as exc:
@@ -114,7 +118,7 @@ def queue_library_question(db: Session, question: str) -> LlmJob:
             kind="library_chat",
             provider=get_llm_provider_name(),
             video_id=None,
-            prompt=prompt,
+            prompt=prompt.to_json(),
             question=question,
         )
     except Exception as exc:

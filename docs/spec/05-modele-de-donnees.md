@@ -236,7 +236,7 @@ Champs :
 - `video_id` : FK `videos.id`, cascade delete, **nullable** — null uniquement
   pour `kind="library_chat"` (le chat cross-video n'est rattache a aucune
   video precise, voir `library_chat_messages` ci-dessous) ;
-- `prompt` : prompt complet envoye au fournisseur ;
+- `prompt` : le `Prompt` envoye au fournisseur, en JSON `{"system": ..., "messages": [...]}` (`app/services/llm/prompts.py:Prompt`) ; un job cree avant ce format porte une simple chaine, lue comme un message `user` sans `system` ;
 - `question` : question brute (pour `kind="chat"`/`"library_chat"`), reutilisee
   pour reconstituer l'historique une fois la reponse obtenue ;
 - `status` : `queued`, `running`, `done`, `failed`, `applied` (resultat deja

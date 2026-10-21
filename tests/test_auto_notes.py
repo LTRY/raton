@@ -20,7 +20,7 @@ from app.services.common.settings import (
     get_setting,
     set_setting,
 )
-from app.services.llm.prompts import build_auto_notes_prompt, split_auto_notes_result
+from app.services.llm.prompts import Prompt, build_auto_notes_prompt, split_auto_notes_result
 from app.services.llm.provider import AnthropicProvider, BatchEntry
 from app.services.rag import auto_notes
 from app.services.rag import indexing as rag_indexing
@@ -96,7 +96,7 @@ class FakeProvider(AnthropicProvider):
 
     def __init__(self):
         super().__init__("key", "claude-haiku-5-5")
-        self.submitted: list[dict[str, str]] = []
+        self.submitted: list[dict[str, Prompt]] = []
         self.results: dict[str, list[BatchEntry] | None] = {}
         self.fail_submit = False
 
@@ -133,9 +133,11 @@ def entries_for(provider, answer=ANSWER, **overrides):
 def test_prompt_asks_for_notes_and_a_short_summary_only():
     prompt = build_auto_notes_prompt("LE TRANSCRIPT")
 
-    assert "## Résumé court" in prompt and "## Faits" in prompt
-    assert "Résumé complet" not in prompt and "Questions suggérées" not in prompt
-    assert prompt.endswith("<transcript>\nLE TRANSCRIPT\n</transcript>\n")
+    assert "## Résumé court" in prompt.system and "## Faits" in prompt.system
+    assert "Résumé complet" not in prompt.system and "Questions suggérées" not in prompt.system
+    assert prompt.messages == [
+        {"role": "user", "content": "<transcript>\nLE TRANSCRIPT\n</transcript>"}
+    ]
 
 
 def test_split_auto_notes_result_returns_notes_and_summary():
@@ -251,7 +253,7 @@ def test_first_sweep_submits_a_batch_and_records_it(db):
 
     assert result.submitted == 2
     assert len(provider.submitted[0]) == 2
-    assert all("# Notes" in prompt for prompt in provider.submitted[0].values())
+    assert all("# Notes" in prompt.system for prompt in provider.submitted[0].values())
     jobs = db.scalars(select(LlmJob)).all()
     assert {job.status for job in jobs} == {"running"} and {job.kind for job in jobs} == {
         AUTO_NOTES_KIND
@@ -448,7 +450,10 @@ def test_submit_batch_sends_one_low_effort_request_per_prompt(monkeypatch):
     created = fake_anthropic(monkeypatch)
 
     batch_id = AnthropicProvider("key", "claude-haiku-5-5").submit_batch(
-        {"job-1": "P1", "job-2": "P2"}
+        {
+            "job-1": Prompt("S", [{"role": "user", "content": "P1"}]),
+            "job-2": Prompt("S", [{"role": "user", "content": "P2"}]),
+        }
     )
 
     assert batch_id == "msgbatch_1"
@@ -457,6 +462,7 @@ def test_submit_batch_sends_one_low_effort_request_per_prompt(monkeypatch):
     params = requests[0]["params"]
     assert params["model"] == "claude-haiku-5-5"
     assert params["output_config"] == {"effort": "low"}
+    assert params["system"] == "S"
     assert params["messages"] == [{"role": "user", "content": "P1"}]
     assert params["max_tokens"] > 4096
 
