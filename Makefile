@@ -14,12 +14,12 @@ test:
 	uv run --python 3.14 --extra dev pytest
 
 lint:
-	uv run --python 3.14 --extra dev ruff check app tests alembic
-	uv run --python 3.14 --extra dev ruff format --check app tests alembic
+	uv run --python 3.14 --extra dev ruff check back front tests alembic
+	uv run --python 3.14 --extra dev ruff format --check back front tests alembic
 
 format:
-	uv run --python 3.14 --extra dev ruff check --fix app tests alembic
-	uv run --python 3.14 --extra dev ruff format app tests alembic
+	uv run --python 3.14 --extra dev ruff check --fix back front tests alembic
+	uv run --python 3.14 --extra dev ruff format back front tests alembic
 
 compose-config:
 	docker compose config
@@ -59,7 +59,7 @@ upgrade-ytdlp:
 
 demo: css
 	mkdir -p .local "$(MEDIA_HOST_ROOT)"
-	DATABASE_URL=sqlite+pysqlite:///.local/raton.db MEDIA_ROOT="$(MEDIA_HOST_ROOT)" APP_AUTO_CREATE_TABLES=true uv run --python 3.14 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
 
 uninstall:
 	./scripts/uninstall.sh $(ARGS)

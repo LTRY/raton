@@ -3,21 +3,21 @@
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api import playlists as playlists_api
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.playlist import Playlist, PlaylistItem
-from app.models.video import Video
-from app.services.jobs import playlists as playlists_jobs
-from app.services.playlists import imports as playlists_imports
+from back.api import playlists as playlists_api
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.playlist import Playlist, PlaylistItem
+from back.models.video import Video
+from back.services.jobs import playlists as playlists_jobs
+from back.services.playlists import imports as playlists_imports
+from tests.site import site_client
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -40,7 +40,7 @@ def db():
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return site_client()
 
 
 @pytest.fixture

@@ -10,48 +10,90 @@ import pytest
 from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
-from app import main
-from app.api import channels as api_channels
-from app.api import llm as llm_api
-from app.api import settings as api_settings
-from app.api import videos as api_videos
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.llm_job import LlmJob
-from app.models.setting import AppSetting
-from app.models.video import TranscriptStatus, Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.schemas.llm import QuestionCreate
-from app.schemas.settings import SettingsUpdate
-from app.services.channels import manage as channel_manage
-from app.services.common import search
-from app.services.common.settings import get_sponsor_skip_enabled
-from app.services.ingest.identity import channel_values_from_info
-from app.services.jobs import backfills, download_requests, downloads, llm_jobs
-from app.services.jobs.scheduler import record_scan_result
-from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
-from app.services.videos import editing as videos_editing
-from app.services.videos import list_state as videos_list_state
-from app.services.videos import playback as videos_playback
-from app.services.youtube import channel_info, sponsor_segments
-from app.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
-from app.web import formatting, playback, shared
-from app.web.routes import channels as channels_routes
-from app.web.routes import dashboard as dashboard_routes
-from app.web.routes import media as media_routes
-from app.web.routes import settings as settings_routes
-from app.web.routes import transcript as transcript_routes
-from app.web.routes import videos as videos_routes
+from back import main
+from back.api import channels as api_channels
+from back.api import imports as api_imports
+from back.api import llm as llm_api
+from back.api import media as api_media
+from back.api import settings as api_settings
+from back.api import videos as api_videos
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.llm_job import LlmJob
+from back.models.setting import AppSetting
+from back.models.video import TranscriptStatus, Video
+from back.models.video_sponsor_segment import VideoSponsorSegment
+from back.schemas.llm import QuestionCreate
+from back.schemas.settings import SettingsUpdate
+from back.services.channels import listing as channel_listing
+from back.services.channels import manage as channel_manage
+from back.services.common import search
+from back.services.common.settings import (
+    get_sponsor_skip_enabled,
+    get_video_category_label_styles,
+)
+from back.services.ingest.identity import channel_values_from_info
+from back.services.jobs import backfills, download_requests, downloads, llm_jobs
+from back.services.jobs.scheduler import record_scan_result
+from back.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
+from back.services.videos import editing as videos_editing
+from back.services.videos import list_state as videos_list_state
+from back.services.videos import playback as videos_playback
+from back.services.videos.filters import video_badges
+from back.services.youtube import channel_info, sponsor_segments
+from back.services.youtube.channel_info import ChannelNotFoundError, resolve_channel_url
+from front import cards as front_cards
+from front import formatting
+from front import main as front_main
+from front.records import record
+from front.routes import videos as front_videos_routes
+from tests.site import site_client
 
 
 def make_session():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    # StaticPool + check_same_thread: the back serves the front's calls from another thread.
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)()
+
+
+@pytest.fixture(autouse=True)
+def reset_back_db():
+    yield
+    main.app.dependency_overrides.pop(get_db, None)
+
+
+def site(db, **kwargs):
+    """The site (front + back in-process) with the back serving `db`."""
+    main.app.dependency_overrides[get_db] = lambda: db
+    return site_client(**kwargs)
+
+
+@pytest.fixture
+def no_profile_backfill(monkeypatch):
+    """Adding a channel queues the profile backfill, which opens its own (Postgres) session."""
+    return record_calls(monkeypatch, api_channels, "run_channel_profile_backfill_job")
+
+
+def record_calls(monkeypatch, target, name):
+    """Replaces a background job with a recorder of its arguments."""
+    calls = []
+    monkeypatch.setattr(target, name, lambda *args: calls.append(args))
+    return calls
+
+
+def post_form(db, url, data=None, **kwargs):
+    """A no-JS form posted to the front; the redirect is returned, not followed."""
+    return site(db).post(url, data=data or {}, follow_redirects=False, **kwargs)
 
 
 def add_video(db):
@@ -75,97 +117,44 @@ def add_video(db):
 
 
 def test_video_card_has_local_title_without_youtube_or_transcript_link():
-    template = shared.templates.env.get_template("videos.html")
-    video = type(
-        "VideoView",
-        (),
-        {
-            "id": 42,
-            "title": "Titre local",
-            "url": "https://youtube.com/watch?v=abc",
-            "media_type": "video",
-            "channel": type("ChannelView", (), {"id": 7, "name": "Chaîne locale"})(),
-            "published_at": None,
-            "transcript_path": "/media/transcript.txt",
-            "transcript_status": type("Status", (), {"value": "downloaded"})(),
-            "video_path": "/media/video.mp4",
-            "audio_path": None,
-            "thumbnail_path": "/media/thumbnail.webp",
-            "rating": 0,
-            "file_size_bytes": 0,
-            "list_state": None,
-        },
-    )()
-
-    rendered = template.render(
-        videos=[video],
-        video_cards=[
-            {
-                "downloaded": True,
-                "video": video,
-                "title": video.title,
-                "channel_id": 7,
-                "channel_name": "Chaîne locale",
-                "published_at": None,
-                "media_type": "video",
-                "labels": [
-                    {"text": "Vidéo", "kind": "video"},
-                    {"text": "Métadonnées", "kind": "metadata"},
-                    {"text": "Transcript", "kind": "transcript"},
-                ],
-                "file_size_bytes": 0,
-                "view_count": "12 345",
-                "duration": "2:03",
-                "transcript_path": video.transcript_path,
-                "transcript_status": video.transcript_status,
-                "video_path": video.video_path,
-                "audio_path": video.audio_path,
-                "thumbnail_path": video.thumbnail_path,
-            }
-        ],
-        channels=[],
-        selected_channel=None,
-        selected_channel_id=None,
-        selected_channel_section=None,
-        asset_filter_options=[
-            {"text": "Vidéo", "kind": "video"},
-            {"text": "Métadonnées", "kind": "metadata"},
-            {"text": "Transcript", "kind": "transcript"},
-            {"text": "Audio", "kind": "audio"},
-        ],
-        selected_asset_filters={"audio", "video"},
-        selected_excluded_asset_filters=set(),
-        category_filter_options=[],
-        category_style_map={},
-        selected_category_filters=set(),
-        selected_excluded_category_filters=set(),
-        selected_asset_filter_mode="or",
-        selected_category_filter_mode="or",
-        selected_rated_only=False,
-        selected_sort="imported",
-        search_query="",
-        active_filter_pills=[],
-        category_filter_count=0,
-        filters_clear_href="/videos?asset_filters=1",
-        library_views=[],
-        current_videos_path="/videos",
-        channel_entries_error=None,
-        message=None,
-        channel_page=1,
-        next_import_page=1,
+    db = make_session()
+    channel = Channel(url="https://example.test/locale", name="Chaîne locale")
+    video = Video(
+        channel=channel,
+        yt_video_id="abc",
+        title="Titre local",
+        url="https://youtube.com/watch?v=abc",
+        media_type="video",
+        folder_path="/media",
+        transcript_path="/media/transcript.txt",
+        transcript_status=TranscriptStatus.downloaded,
+        video_path="/media/video.mp4",
+        thumbnail_path="/media/thumbnail.webp",
+        metadata_path="/media/metadata.json",
+        rating=0,
+        file_size_bytes=0,
+        view_count=12345,
+        duration_seconds=123,
     )
+    db.add(video)
+    db.commit()
+
+    rendered = site(db).get("/videos").text
 
     card = rendered[rendered.index('<article class="video-row"') :]
     assert (
-        '<a class="video-title" href="/videos/42?next=/videos" title="Titre local">Titre local</a>'
+        f'<a class="video-title" href="/videos/{video.id}?next=/videos" title="Titre local">Titre local</a>'
         in card
     )
-    assert '<a class="video-meta-link" href="/videos?channel_id=7">Chaîne locale</a>' in card
-    assert "Téléchargement manuel" not in card
-    assert card.index('<a class="video-title" href="/videos/42?next=/videos"') < card.index(
-        'action="/videos/42/rating"'
+    assert (
+        f'<a class="video-meta-link" href="/videos?channel_id={channel.id}">Chaîne locale</a>'
+        in card
     )
-    assert card.index('<p class="video-meta">') < card.index('action="/videos/42/rating"')
+    assert "Téléchargement manuel" not in card
+    assert card.index(
+        f'<a class="video-title" href="/videos/{video.id}?next=/videos"'
+    ) < card.index(f'action="/videos/{video.id}/rating"')
+    assert card.index('<p class="video-meta">') < card.index(f'action="/videos/{video.id}/rating"')
     assert "video-row-rating" in card
     assert 'class="rating-control rating-control-minimal video-row-rating rating-tier-0"' in card
     assert "rating-star-empty" in card
@@ -174,7 +163,7 @@ def test_video_card_has_local_title_without_youtube_or_transcript_link():
     assert "Voir les détails" not in card
     assert "youtube.com" not in card.lower()
     assert ">YouTube<" not in card
-    assert 'href="/videos/42/transcript"' not in card
+    assert f'href="/videos/{video.id}/transcript"' not in card
     assert 'class="asset-label asset-label-video">Vidéo</span>' not in card
     assert 'class="asset-label asset-label-metadata">Métadonnées</span>' not in card
     assert 'class="asset-label asset-label-transcript">Transcript</span>' not in card
@@ -183,7 +172,7 @@ def test_video_card_has_local_title_without_youtube_or_transcript_link():
     assert "data-video-format-actions" not in card
     assert "format-toggle" not in card
     assert 'class="video-thumbnail-popover"' not in card
-    assert 'src="/videos/42/thumbnail"' not in card
+    assert f'src="/api/videos/{video.id}/thumbnail"' not in card
     assert "Transcript :" not in card
 
 
@@ -204,7 +193,7 @@ def test_video_thumbnail_serves_file_from_video_folder(tmp_path):
     db.add(video)
     db.commit()
 
-    response = media_routes.video_thumbnail(video.id, db)
+    response = api_media.video_thumbnail(video.id, db)
 
     assert response.path == thumbnail
     assert response.headers["cache-control"] == "public, max-age=86400"
@@ -228,7 +217,7 @@ def test_video_thumbnail_rejects_file_outside_video_folder(tmp_path):
     db.commit()
 
     with pytest.raises(HTTPException) as exc_info:
-        media_routes.video_thumbnail(video.id, db)
+        api_media.video_thumbnail(video.id, db)
 
     assert exc_info.value.status_code == 404
 
@@ -239,19 +228,9 @@ def test_video_detail_page_renders_internal_page_without_youtube_action(monkeypa
     video.thumbnail_path = "/media/video/thumbnail.webp"
     video.comment = "À revoir pour le passage sur les exemples."
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert "Une vidéo à lire localement" in rendered
@@ -260,9 +239,9 @@ def test_video_detail_page_renders_internal_page_without_youtube_action(monkeypa
     assert ">YouTube<" not in rendered
     assert 'class="video-detail-thumbnail"' not in rendered
     assert 'class="video-player-panel"' in rendered
-    assert f'poster="/videos/{video.id}/thumbnail"' in rendered
+    assert f'poster="/api/videos/{video.id}/thumbnail"' in rendered
     assert f'data-resume-key="raton:media-position:{video.id}:video"' in rendered
-    assert f'<source src="/videos/{video.id}/video">' in rendered
+    assert f'<source src="/api/videos/{video.id}/video">' in rendered
     assert "Commentaire" in rendered
     assert f'action="/videos/{video.id}/comment"' in rendered
     assert "À revoir pour le passage sur les exemples." in rendered
@@ -278,8 +257,10 @@ def test_video_comment_form_updates_comment():
     db = make_session()
     video = add_video(db)
 
-    response = videos_routes.update_video_comment_form(
-        video.id, comment="  Note perso\nsur deux lignes  ", return_to="/videos/1#notes", db=db
+    response = post_form(
+        db,
+        f"/videos/{video.id}/comment",
+        {"comment": "  Note perso\nsur deux lignes  ", "next": "/videos/1#notes"},
     )
 
     assert response.status_code == 303
@@ -293,9 +274,7 @@ def test_video_comment_form_clears_blank_comment():
     video.comment = "Ancienne note"
     db.commit()
 
-    videos_routes.update_video_comment_form(
-        video.id, comment="   ", return_to="/videos/1#notes", db=db
-    )
+    post_form(db, f"/videos/{video.id}/comment", {"comment": "   ", "next": "/videos/1#notes"})
 
     assert video.comment is None
 
@@ -312,19 +291,9 @@ def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_pat
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert 'id="transcript"' in rendered
@@ -358,12 +327,12 @@ def test_video_asset_labels_includes_notes_only_when_notes_file_exists(tmp_path)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
 
-    labels_without_notes = shared.video_asset_labels(video)
+    labels_without_notes = front_cards.badge_labels(video_badges(video))
     assert not any(label["kind"] == "notes" for label in labels_without_notes)
 
     (folder / "transcript.notes.txt").write_text("- Fait 1", encoding="utf-8")
 
-    labels_with_notes = shared.video_asset_labels(video)
+    labels_with_notes = front_cards.badge_labels(video_badges(video))
     assert {"text": "Notes", "kind": "notes"} in labels_with_notes
 
 
@@ -380,19 +349,9 @@ def test_video_detail_page_shows_notes_label_when_notes_generated(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert '<span class="asset-label asset-label-notes">Notes</span>' in rendered
 
@@ -409,20 +368,9 @@ def test_videos_page_hides_labels_on_card(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos")
+    rendered = response.text
 
     card = rendered[rendered.index('<article class="video-row') :]
     card = card[: card.index("</article>")]
@@ -469,7 +417,7 @@ def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
         ],
     )
 
-    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
+    response = post_form(db, f"/videos/{video.id}/sponsors/fetch")
 
     assert response.status_code == 303
     assert response.headers["location"] == (
@@ -492,7 +440,7 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
 
     monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
-    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
+    response = post_form(db, f"/videos/{video.id}/sponsors/fetch")
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
@@ -504,11 +452,9 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
 
 
 def test_sponsors_detect_route_is_gone():
-    assert not hasattr(videos_routes, "detect_video_sponsor_segments")
-    assert not any(
-        getattr(route, "path", "") == "/videos/{video_id}/sponsors/detect"
-        for route in main.app.routes
-    )
+    assert not hasattr(front_videos_routes, "detect_video_sponsor_segments")
+    for app in (main.app, front_main.app):
+        assert not any("sponsors/detect" in getattr(route, "path", "") for route in app.routes)
 
 
 def test_api_sponsor_segments_returns_normalized_payload():
@@ -591,7 +537,7 @@ def test_api_sponsor_segments_reports_skip_disabled():
     payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     # La route renvoie toujours les segments : c'est le client qui décide de les
-    # armer ou non à partir de `skip_enabled` (app/static/js/app.js).
+    # armer ou non à partir de `skip_enabled` (front/static/js/app.js).
     assert payload["skip_enabled"] is False
     assert payload["segments"] == [{"start": 30.0, "end": 60.0}]
 
@@ -718,19 +664,9 @@ def test_video_detail_page_hides_summary_tab_and_blurb_when_absent(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert "Générer notes, résumé" in rendered
@@ -752,19 +688,9 @@ def test_video_detail_page_shows_the_short_summary_blurb_when_present(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert (
@@ -785,19 +711,9 @@ def test_video_detail_page_opens_with_no_active_tab(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert "transcript-tab active" not in rendered
@@ -818,19 +734,9 @@ def test_video_detail_page_tab_order_starts_with_info_segments_raw(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     tab_order = re.findall(r'class="transcript-tab[^"]*" data-tab="([a-z-]+)"', rendered)
@@ -849,19 +755,9 @@ def test_video_detail_page_has_personal_notes_tab_and_no_analysis_tab(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert 'data-tab="personal-notes"' in rendered
@@ -900,20 +796,9 @@ def test_video_detail_page_renders_sponsor_segments(tmp_path):
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert "Segments détectés" in rendered
     assert "Rechercher les segments sponsors" in rendered
@@ -934,19 +819,8 @@ def test_video_detail_page_renders_segments_tab_and_skip_payload():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert 'data-tab="segments"' in rendered
     assert 'data-tab-panel="segments"' in rendered
@@ -973,19 +847,8 @@ def test_video_detail_page_skip_payload_disabled_by_setting():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert '"enabled": false' in rendered
 
@@ -994,19 +857,8 @@ def test_video_detail_page_shows_segments_tab_without_any_segment():
     db = make_session()
     video = add_video(db)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     # L'onglet est le seul point d'entrée du bouton de recherche : il doit rester
     # atteignable même sans segment stocké.
@@ -1189,19 +1041,8 @@ def test_clearing_the_video_chat_deletes_its_file(tmp_path):
 def test_video_transcript_page_redirects_to_video_detail_anchor():
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}/transcript",
-            "query_string": b"message=ok",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = transcript_routes.video_transcript_page(request, video.id, db)
+    response = site(db).get(f"/videos/{video.id}/transcript?message=ok", follow_redirects=False)
 
     assert response.status_code == 303
     assert response.headers["location"] == f"/videos/{video.id}?message=ok#transcript"
@@ -1225,33 +1066,23 @@ def test_audio_only_video_detail_renders_mini_player_trigger(monkeypatch, tmp_pa
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert 'class="audio-player-panel audio-player-panel-trigger"' in rendered
     assert 'class="video-player-panel media-thumbnail-panel"' in rendered
     assert 'class="audio-player-thumbnail"' in rendered
-    assert f'src="/videos/{video.id}/thumbnail"' in rendered
+    assert f'src="/api/videos/{video.id}/thumbnail"' in rendered
     assert "data-play-track" in rendered
     assert f'data-track-id="{video.id}"' in rendered
-    assert f'data-track-src="/videos/{video.id}/audio"' in rendered
-    assert f'data-track-thumb="/videos/{video.id}/thumbnail"' in rendered
+    assert f'data-track-src="/api/videos/{video.id}/audio"' in rendered
+    assert f'data-track-thumb="/api/videos/{video.id}/thumbnail"' in rendered
     assert f'data-track-resume-key="raton:media-position:{video.id}:audio"' in rendered
     assert f'data-track-activity-url="/api/videos/{video.id}/activity"' in rendered
     assert f'data-track-detail-url="/videos/{video.id}"' in rendered
-    assert '<audio controls preload="metadata" src="/videos/' not in rendered
+    assert '<audio controls preload="metadata" src="/api/videos/' not in rendered
     assert "Supprimer l’audio ?" in rendered
     assert "Supprimer la vidéo ?" not in rendered
 
@@ -1274,25 +1105,15 @@ def test_audio_and_video_detail_keeps_native_audio_player(monkeypatch, tmp_path)
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert response.status_code == 200
     assert 'class="audio-player-panel"' in rendered
     assert 'class="audio-player-panel audio-player-panel-trigger"' not in rendered
-    assert '<audio controls preload="metadata" src="/videos/' in rendered
-    assert f'src="/videos/{video.id}/audio"' in rendered
+    assert '<audio controls preload="metadata" src="/api/videos/' in rendered
+    assert f'src="/api/videos/{video.id}/audio"' in rendered
     assert f'data-resume-key="raton:media-position:{video.id}:audio"' in rendered
     assert "data-play-track" not in rendered
 
@@ -1318,8 +1139,8 @@ def test_delete_video_media_removes_file_and_keeps_audio(tmp_path):
     db.add(video)
     db.commit()
 
-    response = media_routes.delete_video_media_form(
-        video.id, "video", return_to=f"/videos/{video.id}", db=db
+    response = post_form(
+        db, f"/videos/{video.id}/media/video/delete", {"next": f"/videos/{video.id}"}
     )
 
     assert response.status_code == 303
@@ -1398,8 +1219,8 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
     db.add(video)
     db.commit()
 
-    response = media_routes.delete_video_media_form(
-        video.id, "audio", return_to=f"/videos/{video.id}", db=db
+    response = post_form(
+        db, f"/videos/{video.id}/media/audio/delete", {"next": f"/videos/{video.id}"}
     )
 
     assert response.status_code == 303
@@ -1415,38 +1236,42 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
 def test_download_video_media_form_queues_job_and_redirects(monkeypatch):
     db = make_session()
     video = add_video(db)
-    background_tasks = BackgroundTasks()
+    calls = record_calls(monkeypatch, api_videos, "run_media_download_job")
 
-    response = videos_routes.download_video_media_form(background_tasks, video.id, "audio", db=db)
+    response = post_form(db, f"/videos/{video.id}/media/audio/download")
 
     job = db.scalar(select(DownloadJob))
     assert response.status_code == 303
     assert response.headers["location"].startswith(f"/videos/{video.id}?message=")
     assert (job.status, job.video_id) == ("queued", video.id)
-    assert background_tasks.tasks[0].args == (job.id, video.url, "audio", "1080")
+    assert calls == [(job.id, video.url, "audio", "1080")]
 
 
-def test_download_video_media_form_returns_to_an_internal_next_only():
+def test_download_video_media_form_returns_to_an_internal_next_only(monkeypatch):
     db = make_session()
     video = add_video(db)
+    record_calls(monkeypatch, api_videos, "run_media_download_job")
+    url = f"/videos/{video.id}/media/video/download"
 
-    inside = videos_routes.download_video_media_form(
-        BackgroundTasks(), video.id, "video", "1080", "/videos?channel_id=1&section=shorts", db=db
+    inside = post_form(
+        db, url, {"video_quality": "1080", "next": "/videos?channel_id=1&section=shorts"}
     )
-    outside = videos_routes.download_video_media_form(
-        BackgroundTasks(), video.id, "video", "1080", "https://evil.example/", db=db
-    )
+    outside = post_form(db, url, {"video_quality": "1080", "next": "https://evil.example/"})
 
     assert inside.headers["location"].startswith("/videos?channel_id=1&section=shorts&message=")
     assert outside.headers["location"].startswith(f"/videos/{video.id}?message=")
 
 
-def test_download_video_media_rejects_invalid_format():
+def test_download_video_media_rejects_invalid_format(monkeypatch):
     db = make_session()
     video = add_video(db)
+    calls = record_calls(monkeypatch, api_videos, "run_media_download_job")
 
-    with pytest.raises(HTTPException):
-        videos_routes.download_video_media_form(BackgroundTasks(), video.id, "subtitles", db=db)
+    response = post_form(db, f"/videos/{video.id}/media/subtitles/download")
+
+    assert response.status_code == 400
+    assert calls == []
+    assert db.scalar(select(DownloadJob)) is None
 
 
 def test_run_transcript_retry_job_marks_job_downloaded_on_success(monkeypatch):
@@ -1494,20 +1319,11 @@ def test_run_transcript_retry_job_marks_job_failed_when_no_subtitles_found(monke
 def test_video_detail_back_link_returns_to_channel_page(monkeypatch):
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "query_string": f"next=/videos%3Fchannel_id%3D{video.channel_id}%26page%3D2".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(
+        f"/videos/{video.id}?next=/videos%3Fchannel_id%3D{video.channel_id}%26page%3D2"
+    )
+    rendered = response.text
 
     assert response.status_code == 200
     assert f'href="/videos?channel_id={video.channel_id}&amp;page=2"' in rendered
@@ -1517,20 +1333,9 @@ def test_video_detail_back_link_returns_to_channel_page(monkeypatch):
 def test_video_detail_back_link_returns_to_playlist_page(monkeypatch):
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "query_string": b"next=/playlists/7",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}?next=/playlists/7")
+    rendered = response.text
 
     assert response.status_code == 200
     assert 'href="/playlists/7"' in rendered
@@ -1566,14 +1371,14 @@ def test_video_audio_supports_range_requests_for_safari(tmp_path):
         {
             "type": "http",
             "method": "GET",
-            "path": f"/videos/{video.id}/audio",
+            "path": f"/api/videos/{video.id}/audio",
             "headers": [(b"range", b"bytes=2-5")],
             "scheme": "http",
             "server": ("testserver", 80),
         }
     )
 
-    response = media_routes.video_audio(video.id, request, db)
+    response = api_media.video_audio(video.id, request, db)
 
     assert response.status_code == 206
     assert response.headers["accept-ranges"] == "bytes"
@@ -1605,14 +1410,14 @@ def test_video_file_supports_range_requests_for_safari(tmp_path):
         {
             "type": "http",
             "method": "GET",
-            "path": f"/videos/{video.id}/video",
+            "path": f"/api/videos/{video.id}/video",
             "headers": [(b"range", b"bytes=1-4")],
             "scheme": "http",
             "server": ("testserver", 80),
         }
     )
 
-    response = media_routes.video_file(video.id, request, db)
+    response = api_media.video_file(video.id, request, db)
 
     assert response.status_code == 206
     assert response.headers["accept-ranges"] == "bytes"
@@ -1639,18 +1444,19 @@ def test_video_file_head_exposes_media_headers_for_safari(tmp_path):
     )
     db.add(video)
     db.commit()
+
     request = Request(
         {
             "type": "http",
             "method": "HEAD",
-            "path": f"/videos/{video.id}/video",
+            "path": f"/api/videos/{video.id}/video",
             "headers": [],
             "scheme": "http",
             "server": ("testserver", 80),
         }
     )
 
-    response = media_routes.video_file_head(video.id, request, db)
+    response = api_media.video_file_head(video.id, request, db)
 
     assert response.status_code == 200
     assert response.headers["accept-ranges"] == "bytes"
@@ -1676,23 +1482,13 @@ def test_metadata_video_detail_exposes_audio_and_video_download_actions(monkeypa
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.video_detail_page(request, video.id, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos/{video.id}")
+    rendered = response.text
 
     assert "Métadonnées" in rendered
     assert 'class="video-player-panel media-thumbnail-panel"' in rendered
-    assert f'src="/videos/{video.id}/thumbnail"' in rendered
+    assert f'src="/api/videos/{video.id}/thumbnail"' in rendered
     assert "data-video-format-actions" in rendered
     assert f'data-video-id="{video.id}"' in rendered
     assert 'data-allow-delete="true"' in rendered
@@ -1712,24 +1508,14 @@ def test_video_detail_exposes_subtitle_track_and_route(tmp_path):
     video.folder_path = str(folder)
     video.subtitle_path = str(subtitle)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
-    response = media_routes.video_subtitles(video.id, db)
+    rendered = site(db).get(f"/videos/{video.id}").text
+    response = api_media.video_subtitles(video.id, db)
 
     # Pas d'attribut `default` : il forcerait l'affichage à chaque chargement,
     # même quand les sous-titres sont désactivés dans le lecteur (iPhone).
     assert (
-        f'<track kind="subtitles" src="/videos/{video.id}/subtitles" label="Sous-titres">'
+        f'<track kind="subtitles" src="/api/videos/{video.id}/subtitles" label="Sous-titres">'
         in rendered
     )
     assert str(response.path) == str(subtitle)
@@ -1739,41 +1525,27 @@ def test_video_detail_exposes_subtitle_track_and_route(tmp_path):
 def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     # A forced language asks YouTube for an auto-translation (HTTP 429): the form leaves the track choice to the server.
     db = make_session()
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
+    scheduled = record_calls(monkeypatch, api_imports, "run_manual_download_job")
 
-    response = videos_routes.download_video_form(
-        background_tasks,
-        url="https://youtube.com/watch?v=en123",
-        media_type=["metadata"],
-        download_transcript=True,
-        return_to="/videos/import",
-        db=db,
+    response = post_form(
+        db,
+        "/videos/download",
+        {
+            "url": "https://youtube.com/watch?v=en123",
+            "media_type": ["metadata"],
+            "download_transcript": "true",
+            "next": "/videos/import",
+        },
     )
 
     assert response.headers["location"].startswith("/videos/import?message=")
-    assert scheduled[0][1][5] is None
+    assert scheduled[0][5] is None
 
 
 def test_import_page_has_form_without_subtitle_language_and_menu_entry():
     db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos/import",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.import_video_page(request, db).body.decode()
+    rendered = site(db).get("/videos/import").text
 
     assert 'action="/videos/download"' in rendered
     assert 'name="url"' in rendered
@@ -1797,23 +1569,7 @@ def test_import_page_has_form_without_subtitle_language_and_menu_entry():
 
 
 def test_import_page_route_is_not_shadowed_by_video_detail():
-    from fastapi.testclient import TestClient
-    from sqlalchemy.pool import StaticPool
-
-    from app.db.session import get_db
-
-    engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    db = sessionmaker(bind=engine, expire_on_commit=False)()
-    main.app.dependency_overrides[get_db] = lambda: db
-    try:
-        response = TestClient(main.app).get("/videos/import")
-    finally:
-        main.app.dependency_overrides.pop(get_db, None)
+    response = site(make_session()).get("/videos/import")
 
     assert response.status_code == 200
     assert 'action="/videos/download"' in response.text
@@ -1821,21 +1577,17 @@ def test_import_page_route_is_not_shadowed_by_video_detail():
 
 def test_download_form_queues_job(monkeypatch):
     db = make_session()
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
+    scheduled = record_calls(monkeypatch, api_imports, "run_manual_download_job")
 
-    response = videos_routes.download_video_form(
-        background_tasks,
-        url="https://youtube.com/watch?v=abc123",
-        media_type=["audio"],
-        download_transcript=True,
-        return_to="/videos",
-        db=db,
+    response = post_form(
+        db,
+        "/videos/download",
+        {
+            "url": "https://youtube.com/watch?v=abc123",
+            "media_type": ["audio"],
+            "download_transcript": "true",
+            "next": "/videos",
+        },
     )
 
     job = db.scalar(select(DownloadJob))
@@ -1843,18 +1595,14 @@ def test_download_form_queues_job(monkeypatch):
     assert job.status == "queued"
     assert scheduled == [
         (
-            downloads.run_manual_download_job,
-            (
-                job.id,
-                "https://youtube.com/watch?v=abc123",
-                ["audio", "metadata"],
-                True,
-                None,
-                None,
-                "both",
-                "1080",
-            ),
-            {},
+            job.id,
+            "https://youtube.com/watch?v=abc123",
+            ["audio", "metadata"],
+            True,
+            None,
+            None,
+            "both",
+            "1080",
         )
     ]
 
@@ -1865,21 +1613,17 @@ def test_download_form_queues_job(monkeypatch):
 
 def test_download_form_accepts_metadata_only_job(monkeypatch):
     db = make_session()
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
+    scheduled = record_calls(monkeypatch, api_imports, "run_manual_download_job")
 
-    response = videos_routes.download_video_form(
-        background_tasks,
-        url="https://youtube.com/watch?v=meta123",
-        media_type=["metadata"],
-        download_transcript=True,
-        return_to="/videos",
-        db=db,
+    response = post_form(
+        db,
+        "/videos/download",
+        {
+            "url": "https://youtube.com/watch?v=meta123",
+            "media_type": ["metadata"],
+            "download_transcript": "true",
+            "next": "/videos",
+        },
     )
 
     job = db.scalar(select(DownloadJob))
@@ -1887,59 +1631,46 @@ def test_download_form_accepts_metadata_only_job(monkeypatch):
     assert job.status == "queued"
     assert scheduled == [
         (
-            downloads.run_manual_download_job,
-            (
-                job.id,
-                "https://youtube.com/watch?v=meta123",
-                ["metadata"],
-                True,
-                None,
-                None,
-                "both",
-                "1080",
-            ),
-            {},
+            job.id,
+            "https://youtube.com/watch?v=meta123",
+            ["metadata"],
+            True,
+            None,
+            None,
+            "both",
+            "1080",
         )
     ]
 
 
 def test_download_form_queues_category_labels(monkeypatch):
     db = make_session()
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
+    scheduled = record_calls(monkeypatch, api_imports, "run_manual_download_job")
 
-    response = videos_routes.download_video_form(
-        background_tasks,
-        url="https://youtube.com/watch?v=cat123",
-        media_type=["metadata"],
-        download_transcript=False,
-        preset_categories=["maker", "science"],
-        custom_categories="Interview, maker",
-        return_to="/videos",
-        db=db,
+    response = post_form(
+        db,
+        "/videos/download",
+        {
+            "url": "https://youtube.com/watch?v=cat123",
+            "media_type": ["metadata"],
+            "preset_categories": ["maker", "science"],
+            "custom_categories": "Interview, maker",
+            "next": "/videos",
+        },
     )
 
     job = db.scalar(select(DownloadJob))
     assert response.status_code == 303
     assert scheduled == [
         (
-            downloads.run_manual_download_job,
-            (
-                job.id,
-                "https://youtube.com/watch?v=cat123",
-                ["metadata"],
-                False,
-                "maker,science,interview",
-                None,
-                "both",
-                "1080",
-            ),
-            {},
+            job.id,
+            "https://youtube.com/watch?v=cat123",
+            ["metadata"],
+            False,
+            "maker,science,interview",
+            None,
+            "both",
+            "1080",
         )
     ]
     assert "interview" in [
@@ -1949,21 +1680,10 @@ def test_download_form_queues_category_labels(monkeypatch):
 
 def test_video_detail_page_returns_404_for_unknown_video():
     db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos/999",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    with pytest.raises(HTTPException) as exc_info:
-        videos_routes.video_detail_page(request, 999, db)
+    response = site(db).get("/videos/999")
 
-    assert exc_info.value.status_code == 404
+    assert response.status_code == 404
 
 
 def test_videos_page_shows_only_local_channel_videos(monkeypatch):
@@ -1982,20 +1702,9 @@ def test_videos_page_shows_only_local_channel_videos(monkeypatch):
     )
     db.add(metadata)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": f"channel_id={video.channel_id}".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, video.channel_id, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos?channel_id={video.channel_id}")
+    rendered = response.text
 
     # The channel name is the link to YouTube; the counts live in the "⋯" menu.
     assert '<h1 class="channel-name">' in rendered
@@ -2043,20 +1752,9 @@ def test_videos_page_searches_titles_and_channels(monkeypatch):
     )
     db.add(other)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"q=architecture",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?q=architecture")
+    rendered = response.text
 
     assert "Cours architecture locale" in rendered
     assert "Cuisine rapide" not in rendered
@@ -2093,27 +1791,14 @@ def test_videos_page_search_ranks_title_matches_first_and_searches_notes(monkeyp
     )
     db.add(by_title)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"q=ete+Jardinage",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos?q=ete+Jardinage").text
 
     assert "Episode 12" not in rendered
     assert "Jardinage d&#39;été" in rendered
     assert 'name="q" type="search" value="ete Jardinage"' in rendered
 
-    rendered = videos_routes.videos_page(
-        Request({**request.scope, "query_string": b"q=jardinage"}), None, 1, db
-    ).body.decode()
+    rendered = site(db).get("/videos?q=jardinage").text
     frame = rendered[
         rendered.index('<turbo-frame id="library-results"') : rendered.index("</turbo-frame>")
     ]
@@ -2125,19 +1810,8 @@ def test_videos_page_search_ranks_title_matches_first_and_searches_notes(monkeyp
 def test_videos_page_search_without_result_names_the_query(monkeypatch):
     db = make_session()
     add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"q=introuvable",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos?q=introuvable").text
 
     assert "Aucun résultat pour « introuvable »." in rendered
     assert 'data-live-search="library-results"' in rendered
@@ -2169,37 +1843,15 @@ def test_videos_page_filters_by_selected_assets(monkeypatch):
     db.add_all([audio, metadata])
     db.commit()
 
-    default_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    default_response = videos_routes.videos_page(default_request, None, 1, db)
-    default_rendered = default_response.body.decode()
+    default_response = site(db).get("/videos")
+    default_rendered = default_response.text
 
     assert "Une vidéo à lire localement" in default_rendered
     assert "Audio local" in default_rendered
     assert "Métadonnées seules" not in default_rendered
 
-    metadata_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset=metadata",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    metadata_response = videos_routes.videos_page(metadata_request, None, 1, db)
-    metadata_rendered = metadata_response.body.decode()
+    metadata_response = site(db).get("/videos?asset_filters=1&asset=metadata")
+    metadata_rendered = metadata_response.text
 
     assert "Métadonnées seules" in metadata_rendered
     assert "Une vidéo à lire localement" not in metadata_rendered
@@ -2227,54 +1879,21 @@ def test_videos_page_sorts_by_import_date_by_default_and_channel_by_publication(
     db.add(recent_publication_older_import)
     db.commit()
 
-    default_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    default_rendered = videos_routes.videos_page(default_request, None, 1, db).body.decode()
+    default_rendered = site(db).get("/videos").text
     default_list = default_rendered[default_rendered.index('<div class="video-row-list">') :]
 
     assert default_list.index("Import récent") < default_list.index("Publication récente")
     assert '<option value="imported" selected>Import récent</option>' in default_rendered
 
-    published_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"sort=published",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    published_rendered = videos_routes.videos_page(published_request, None, 1, db).body.decode()
+    published_rendered = site(db).get("/videos?sort=published").text
     published_list = published_rendered[published_rendered.index('<div class="video-row-list">') :]
 
     assert published_list.index("Publication récente") < published_list.index("Import récent")
     assert '<option value="published" selected>Publication récente</option>' in published_rendered
 
-    channel_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": f"channel_id={older_publication_recent_import.channel_id}".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
+    channel_rendered = (
+        site(db).get(f"/videos?channel_id={older_publication_recent_import.channel_id}").text
     )
-    channel_rendered = videos_routes.videos_page(
-        channel_request, str(older_publication_recent_import.channel_id), 1, db
-    ).body.decode()
     channel_list = channel_rendered[
         channel_rendered.index('<div class="video-row-list channel-video-grid"') :
     ]
@@ -2301,20 +1920,9 @@ def test_videos_page_filters_manual_imports(monkeypatch):
     )
     db.add(auto)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset=imported",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&asset=imported")
+    rendered = response.text
 
     assert "Manuelles" in rendered
     assert "Manuelle" in rendered
@@ -2340,20 +1948,9 @@ def test_videos_page_does_not_treat_manual_media_on_channel_metadata_as_form_imp
     )
     db.add(channel_metadata)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset=imported",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&asset=imported")
+    rendered = response.text
 
     assert "Fiche issue de chaîne" not in rendered
 
@@ -2375,20 +1972,9 @@ def test_videos_page_filters_by_rated_videos(monkeypatch):
     )
     db.add(regular)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&filter_mode=and&asset=video&rated=1",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&filter_mode=and&asset=video&rated=1")
+    rendered = response.text
 
     assert response.status_code == 200
     assert rated.title in rendered
@@ -2414,20 +2000,11 @@ def test_videos_page_renders_default_rated_sub_library(monkeypatch):
     rated = add_video(db)
     rated.rating = 4
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset_filter_mode=or&category_filter_mode=or&rated=1",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(
+        "/videos?asset_filters=1&asset_filter_mode=or&category_filter_mode=or&rated=1"
+    )
+    rendered = response.text
 
     assert rated.title in rendered
     assert '<nav class="library-subnav" aria-label="Sous-bibliothèques">' in rendered
@@ -2440,20 +2017,9 @@ def test_videos_page_renders_default_rated_sub_library(monkeypatch):
 def test_videos_page_empty_sub_library_filters_show_all_videos(monkeypatch):
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset_filter_mode=or&category_filter_mode=or",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&asset_filter_mode=or&category_filter_mode=or")
+    rendered = response.text
 
     assert video.title in rendered
 
@@ -2477,20 +2043,9 @@ def test_videos_page_or_filter_mode_matches_any_selected_condition(monkeypatch):
     )
     db.add(regular_video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&filter_mode=or&asset=video&rated=1",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&filter_mode=or&asset=video&rated=1")
+    rendered = response.text
 
     assert rated_metadata.title in rendered
     assert regular_video.title in rendered
@@ -2512,20 +2067,9 @@ def test_videos_page_excludes_selected_asset_labels(monkeypatch):
     )
     db.add(metadata)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&exclude_asset=metadata",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&exclude_asset=metadata")
+    rendered = response.text
 
     assert local_video.title in rendered
     assert "Fiche métadonnées seule" not in rendered
@@ -2549,20 +2093,11 @@ def test_videos_page_filters_by_category_labels(monkeypatch):
     )
     db.add(cooking)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&filter_mode=and&category=maker&category=science",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(
+        "/videos?asset_filters=1&filter_mode=and&category=maker&category=science"
+    )
+    rendered = response.text
 
     assert maker.title in rendered
     assert "Cuisine locale" not in rendered
@@ -2591,20 +2126,9 @@ def test_videos_page_excludes_selected_category_labels(monkeypatch):
     )
     db.add(cooking)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&asset=video&exclude_category=maker",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&asset=video&exclude_category=maker")
+    rendered = response.text
 
     assert maker.title not in rendered
     assert "Cuisine locale" in rendered
@@ -2628,20 +2152,9 @@ def test_videos_page_filters_category_without_shorts(monkeypatch):
     )
     db.add(short)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&category=cuisine&exclude_asset=shorts",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&category=cuisine&exclude_asset=shorts")
+    rendered = response.text
 
     assert regular.title in rendered
     assert "Short cuisine" not in rendered
@@ -2678,23 +2191,11 @@ def test_videos_page_uses_separate_asset_and_category_filter_modes(monkeypatch):
     )
     db.add_all([maker_only, metadata_match])
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": (
-                b"asset_filters=1&asset_filter_mode=or&category_filter_mode=and"
-                b"&asset=video&category=maker&category=science"
-            ),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(
+        "/videos?asset_filters=1&asset_filter_mode=or&category_filter_mode=and&asset=video&category=maker&category=science"
+    )
+    rendered = response.text
 
     assert "Vidéo maker science" in rendered
     assert "Vidéo maker seule" not in rendered
@@ -2707,12 +2208,14 @@ def test_video_categories_form_saves_presets_and_custom_labels():
     db = make_session()
     video = add_video(db)
 
-    response = videos_routes.update_video_categories_form(
-        video.id,
-        preset_categories=["maker", "science"],
-        custom_categories="Interview, maker",
-        return_to=f"/videos/{video.id}",
-        db=db,
+    response = post_form(
+        db,
+        f"/videos/{video.id}/categories",
+        {
+            "preset_categories": ["maker", "science"],
+            "custom_categories": "Interview, maker",
+            "next": f"/videos/{video.id}",
+        },
     )
 
     assert response.headers["location"] == f"/videos/{video.id}"
@@ -2725,20 +2228,9 @@ def test_video_categories_form_saves_presets_and_custom_labels():
 def test_videos_page_accepts_empty_channel_filter(monkeypatch):
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"asset_filters=1&channel_id=&asset=video",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, "", 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos?asset_filters=1&channel_id=&asset=video")
+    rendered = response.text
 
     assert response.status_code == 200
     assert "Bibliothèque" in rendered
@@ -2750,20 +2242,12 @@ def test_channel_metadata_import_form_queues_the_job_and_redirects(monkeypatch):
     channel = Channel(url="https://example.test/channel", name="Chaîne test")
     db.add(channel)
     db.commit()
-    scheduled = []
-    background_tasks = BackgroundTasks()
-    monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
-    )
+    scheduled = record_calls(monkeypatch, api_channels, "run_channel_metadata_import_job")
 
-    response = channels_routes.import_channel_metadata_form(
-        background_tasks,
-        channel.id,
-        page=2,
-        return_to=f"/videos?channel_id={channel.id}",
-        db=db,
+    response = post_form(
+        db,
+        f"/channels/{channel.id}/import-metadata",
+        {"page": "2", "next": f"/videos?channel_id={channel.id}"},
     )
 
     job = db.scalar(select(DownloadJob))
@@ -2771,9 +2255,7 @@ def test_channel_metadata_import_form_queues_the_job_and_redirects(monkeypatch):
     assert response.headers["location"].startswith(f"/videos?channel_id={channel.id}&message=")
     assert job.status == "queued"
     assert job.channel_id == channel.id
-    assert scheduled == [
-        (downloads.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
-    ]
+    assert scheduled == [(job.id, channel.id, 2, "videos")]
 
     status = download_requests.job_status(db, job.id)
     assert status["status"] == "queued"
@@ -2828,20 +2310,9 @@ def test_channel_next_import_button_uses_next_youtube_page(monkeypatch):
             )
         )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": f"channel_id={channel.id}".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, channel.id, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos?channel_id={channel.id}")
+    rendered = response.text
 
     assert 'name="section" value="videos"' in rendered
     assert f'<input type="hidden" name="channel_id" value="{channel.id}">' in rendered
@@ -2877,20 +2348,9 @@ def test_channel_shorts_page_filters_local_videos_and_imports_shorts(monkeypatch
     )
     db.add_all([channel, regular, short])
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": f"channel_id={channel.id}&section=shorts".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, channel.id, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get(f"/videos?channel_id={channel.id}&section=shorts")
+    rendered = response.text
 
     assert "Short vertical" in rendered
     assert "Vidéo longue" not in rendered
@@ -2949,19 +2409,8 @@ def test_channel_page_default_section_follows_shorts_bell(
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": f"channel_id={channel.id}{query}".encode(),
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, channel.id, 1, db).body.decode()
+    rendered = site(db).get(f"/videos?channel_id={channel.id}{query}").text
 
     assert ("Short vertical" in rendered) == (expected == "shorts")
     assert ("Vidéo longue" in rendered) == (expected == "videos")
@@ -2972,60 +2421,12 @@ def test_content_views_only_link_to_raton_pages():
     video = add_video(db)
     channel = video.channel
 
-    dashboard = shared.templates.env.get_template("dashboard_history.html").render(
-        channel_count=1,
-        rated_channel_count=1,
-        video_count=1,
-        regular_video_count=1,
-        short_count=0,
-        downloaded_media_count=1,
-        transcript_count=0,
-        history_days=playback.history_day_groups(
-            [
-                DownloadJob(
-                    status="played",
-                    message=json.dumps(
-                        {
-                            "type": "playback",
-                            "action": "Lecture",
-                            "media_label": "vidéo",
-                            "position_seconds": 12,
-                            "duration_seconds": 120,
-                            "watched_seconds": 12,
-                        }
-                    ),
-                    video=video,
-                    channel=channel,
-                    created_at=datetime(2026, 7, 1, tzinfo=UTC),
-                )
-            ]
-        ),
-        playback_time_stats=videos_playback.empty_playback_stats(),
-        category_style_map={},
-        chat_widget_config={
-            "defaultScope": "library",
-            "llmProviderLabel": "Anthropic",
-            "scopes": {
-                "library": {
-                    "askUrl": "/chat",
-                    "clearUrl": "/chat/clear",
-                    "jobUrlTemplate": "/chat/jobs/{job_id}",
-                    "messages": [],
-                    "coverageNote": None,
-                }
-            },
-        },
-    )
-    channels = shared.templates.env.get_template("channels.html").render(channels=[channel])
-    detail = shared.templates.env.get_template("video_detail.html").render(
-        video=video,
-        back_path="/videos",
-        back_label="Retour à la bibliothèque",
-        message=None,
-        message_level="success",
-        display_transcript=None,
-        chat_messages=[],
-    )
+    videos_playback.record_playback_activity(db, video, "video", 12, 120, 12)
+    client = site(db)
+
+    dashboard = client.get("/dashboard/historique").text
+    channels = client.get("/channels?rated=false").text
+    detail = client.get(f"/videos/{video.id}").text
 
     assert f'href="/videos/{video.id}"' in dashboard
     assert f'href="/videos?channel_id={channel.id}"' in dashboard
@@ -3061,17 +2462,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
         "at_ms": int((base + timedelta(minutes=1)).timestamp() * 1000),
     }
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert 'data-resume-server-position="252.5"' in rendered
     assert f'data-resume-server-at="{positions["video"]["at_ms"]}"' in rendered
@@ -3080,18 +2471,8 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
 def test_video_detail_omits_server_resume_position_without_playback():
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert videos_playback.latest_playback_positions(db, video.id) == {}
     assert "data-resume-server-position" not in rendered
@@ -3129,19 +2510,8 @@ def test_video_activity_sets_watched_at_at_ninety_percent():
 
 def test_library_pages_share_the_nouveautes_historique_exploration_subnav():
     db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/nouveautes").text
 
     assert 'class="library-subnav"' in rendered
     assert (
@@ -3182,22 +2552,11 @@ def test_dashboard_new_videos_page_paginates_by_channel_ten_at_a_time():
     for channel_index, channel in enumerate(channels):
         make_new_video(db, channel, channel_index)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    page_one = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db)
-    rendered_one = page_one.body.decode()
-    page_two = dashboard_routes.dashboard_new_videos_page(request, page=2, db=db)
-    rendered_two = page_two.body.decode()
+    page_one = site(db).get("/dashboard/nouveautes")
+    rendered_one = page_one.text
+    page_two = site(db).get("/dashboard/nouveautes?page=2")
+    rendered_two = page_two.text
 
     assert rendered_one.count('class="video-stack"') == 10
     assert "Chaîne 14" in rendered_one
@@ -3216,19 +2575,8 @@ def test_dashboard_new_videos_page_stack_caps_at_ten_most_recent_videos():
     for index in range(15):
         make_new_video(db, channel, index)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/nouveautes").text
 
     assert rendered.count('<article class="video-row') == 10
     assert "Nouveauté 14" in rendered
@@ -3246,19 +2594,8 @@ def test_dashboard_new_videos_page_still_shows_already_visited_videos():
     db.add(channel)
     make_new_video(db, channel, 0, is_new=False)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/nouveautes").text
 
     assert "Nouveauté 0" in rendered
 
@@ -3273,19 +2610,8 @@ def test_dashboard_new_videos_page_excludes_channels_without_the_bell():
     make_new_video(db, followed, 0)
     make_new_video(db, not_followed, 0)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/nouveautes").text
 
     assert "Chaîne suivie" in rendered
     assert "Chaîne de playlist" not in rendered
@@ -3314,19 +2640,8 @@ def test_dashboard_new_videos_page_lists_only_the_kinds_whose_bell_is_on():
         short.title = f"{prefix}-short"
         short.url = f"https://www.youtube.com/shorts/{short.yt_video_id}"
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/nouveautes",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_new_videos_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/nouveautes").text
 
     for shown in ("V-video", "S-short", "B-video", "B-short"):
         assert shown in rendered
@@ -3337,18 +2652,8 @@ def test_dashboard_new_videos_page_lists_only_the_kinds_whose_bell_is_on():
 def test_history_row_drops_the_dates_and_moves_the_file_size_next_to_the_stars():
     db = make_session()
     history_playback_jobs(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
     history = rendered
     footer = history.split('<div class="video-card-footer">')[1]
 
@@ -3359,19 +2664,7 @@ def test_history_row_drops_the_dates_and_moves_the_file_size_next_to_the_stars()
 
 
 def test_old_reprises_url_redirects_to_historique_keeping_the_page():
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/reprises",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"page=3",
-        }
-    )
-
-    response = dashboard_routes.dashboard_resume_page_redirect(request)
+    response = site(make_session()).get("/dashboard/reprises?page=3", follow_redirects=False)
 
     assert response.status_code == 302
     assert response.headers["location"] == "/dashboard/historique?page=3"
@@ -3407,22 +2700,11 @@ def test_dashboard_history_page_paginates_beyond_dashboard_limit():
             )
         )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/historique",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    page_one = dashboard_routes.dashboard_history_page(request, page=1, db=db)
-    rendered_one = page_one.body.decode()
-    page_two = dashboard_routes.dashboard_history_page(request, page=2, db=db)
-    rendered_two = page_two.body.decode()
+    page_one = site(db).get("/dashboard/historique")
+    rendered_one = page_one.text
+    page_two = site(db).get("/dashboard/historique?page=2")
+    rendered_two = page_two.text
 
     assert rendered_one.count('<article class="dashboard-media-row') == 50
     assert "Reprise 59" in rendered_one
@@ -3460,15 +2742,20 @@ def test_history_day_groups_splits_activity_per_day_with_relative_labels():
         played_job(now - timedelta(days=1)),
         played_job(now - timedelta(days=3)),
     ]
+    # The rows as `GET /api/historique` sends them: the back cuts the days (server's local day).
+    rows = [
+        record({"job_id": index, "day": job.created_at.date().isoformat(), "playback": None})
+        for index, job in enumerate(jobs)
+    ]
 
-    groups = playback.history_day_groups(jobs, now)
+    groups = front_cards.history_days(rows, {}, now.date())
 
     assert [group["label"] for group in groups] == ["Aujourd’hui", "Hier", "Mar. 17 juin 2025"]
-    assert [len(group["jobs"]) for group in groups] == [2, 1, 1]
+    assert [len(group["rows"]) for group in groups] == [2, 1, 1]
     assert groups[0]["full_label"] == "Ven. 20 juin 2025"
     assert groups[1]["full_label"] == "Jeu. 19 juin 2025"
     assert groups[2]["label"] == groups[2]["full_label"]
-    assert groups[0]["jobs"] == jobs[:2]
+    assert groups[0]["rows"] == rows[:2]
     assert [group["seconds"] for group in groups] == [0.0, 0.0, 0.0]
 
 
@@ -3499,10 +2786,14 @@ def test_history_day_groups_carries_reading_time_counting_every_playback():
     jobs = [played_job(now - timedelta(hours=1), 600), played_job(now - timedelta(hours=2), 300)]
     seconds_by_day = videos_playback.playback_seconds_by_day(jobs, now)
 
-    groups = playback.history_day_groups(jobs[:1], now, seconds_by_day)
+    rows = [record({"job_id": 1, "day": now.date().isoformat(), "playback": None})]
+
+    groups = front_cards.history_days(
+        rows, {day.isoformat(): seconds for day, seconds in seconds_by_day.items()}, now.date()
+    )
 
     assert groups[0]["seconds"] == 900.0
-    assert len(groups[0]["jobs"]) == 1
+    assert len(groups[0]["rows"]) == 1
 
 
 def history_playback_jobs(db) -> None:
@@ -3544,18 +2835,8 @@ def history_playback_jobs(db) -> None:
 def test_dashboard_history_renders_one_collapsible_block_per_day():
     db = make_session()
     history_playback_jobs(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert (
         '<a class="lg" href="/dashboard/historique" aria-current="page">Historique</a>' in rendered
@@ -3569,19 +2850,8 @@ def test_dashboard_history_renders_one_collapsible_block_per_day():
 def test_dashboard_history_page_groups_by_day_and_opens_every_block():
     db = make_session()
     history_playback_jobs(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/historique",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert (
         '<a class="lg" href="/dashboard/historique" aria-current="page">Historique</a>' in rendered
@@ -3653,19 +2923,8 @@ def test_dashboard_history_page_renders_novideo_job_and_styled_category_label():
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/historique",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-            "query_string": b"",
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     # A job whose video is gone keeps showing the title it recorded, once per video.
     assert rendered.count('<span class="video-title">Vidéo supprimée depuis</span>') == 1
@@ -3703,18 +2962,8 @@ def test_dashboard_renders_media_playback_as_progress_bar():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert "Reprise vidéo pendant 0:11 à 0:11" not in rendered
     assert "dashboard-media-row" in rendered
@@ -3729,18 +2978,8 @@ def test_dashboard_renders_media_playback_as_progress_bar():
 
 def test_base_template_disables_turbo_hover_prefetch():
     db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard(request, db).body.decode()
+    rendered = site(db).get("/").text
 
     assert '<meta name="turbo-prefetch" content="false">' in rendered
 
@@ -3767,19 +3006,8 @@ def test_videos_page_renders_playback_progress_without_percent_label():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert "4:35 / 20:42" in rendered
     assert 'class="video-card-progress"' in rendered
@@ -3809,19 +3037,8 @@ def test_videos_page_hides_progress_bar_and_dims_fully_watched_video():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert 'class="video-card-progress"' not in rendered
     assert 'class="video-row video-row-watched"' in rendered
@@ -3850,19 +3067,8 @@ def test_videos_page_hides_progress_bar_without_dimming_for_musique_category():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert 'class="video-card-progress"' not in rendered
     assert 'class="video-row video-row-watched"' not in rendered
@@ -3881,18 +3087,8 @@ def test_dashboard_renders_legacy_media_playback_as_progress_bar():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert "Reprise vidéo pendant 0:11 à 0:11: France Suède" not in rendered
     assert "dashboard-media-row" in rendered
@@ -3924,18 +3120,8 @@ def test_dashboard_shows_one_resume_card_per_media():
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert rendered.count('<article class="dashboard-media-row') == 1
     assert "0:11 / 0:11" in rendered
@@ -4086,20 +3272,10 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    dashboard_rendered = settings_routes.settings_page(request, db).body.decode()
-    history_rendered = dashboard_routes.dashboard_history_page(request, page=1, db=db).body.decode()
-    logs_rendered = settings_routes.logs_page(request, db).body.decode()
+    dashboard_rendered = site(db).get("/settings").text
+    history_rendered = site(db).get("/dashboard/historique").text
+    logs_rendered = site(db).get("/logs").text
 
     assert "Historique" in history_rendered
     assert "Temps de lecture" in dashboard_rendered
@@ -4161,19 +3337,8 @@ def test_channels_page_shows_rated_channels_by_default():
     db.add_all([rated, unrated])
     db.commit()
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = channels_routes.channels_page(request, db=db)
-    rendered = response.body.decode()
+    response = site(db).get("/channels")
+    rendered = response.text
 
     assert "Rated" in rendered
     assert "Unrated" not in rendered
@@ -4204,19 +3369,8 @@ def test_channels_page_shows_last_played_activity_without_video_title():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = site(db).get("/channels").text
 
     assert "Dernière activité" in rendered
     assert "Jeu. 02 juil. 2026 14:30" in rendered
@@ -4247,19 +3401,8 @@ def test_channels_page_sorts_by_last_played_activity():
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"sort=activity",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = site(db).get("/channels?sort=activity").text
 
     assert rendered.index("Newer") < rendered.index("Older")
     assert rendered.index("Older") < rendered.index("Inactive")
@@ -4290,19 +3433,8 @@ def test_channels_page_sorts_by_last_played_activity_by_default():
         ]
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = site(db).get("/channels").text
 
     assert rendered.index("Newer") < rendered.index("Older")
     assert rendered.index("Older") < rendered.index("Inactive")
@@ -4315,19 +3447,8 @@ def test_channels_page_sorts_alphabetically():
     alpha = Channel(url="https://example.test/alpha", name="Alpha", rating=1)
     db.add_all([beta, alpha])
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"sort=alpha",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = site(db).get("/channels?sort=alpha").text
 
     assert rendered.index("Alpha") < rendered.index("Beta")
     assert '<option value="alpha" selected>A-Z</option>' in rendered
@@ -4340,19 +3461,8 @@ def test_channels_page_can_show_all_channels():
     db.add_all([rated, unrated])
     db.commit()
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"rated=false",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = channels_routes.channels_page(request, db=db)
-    rendered = response.body.decode()
+    response = site(db).get("/channels?rated=false")
+    rendered = response.text
 
     assert "Rated" in rendered
     assert "Unrated" in rendered
@@ -4370,35 +3480,13 @@ def test_channels_page_searches_visible_channels():
     db.add_all([rated, unrated])
     db.commit()
 
-    rated_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"q=maker",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    rated_rendered = channels_routes.channels_page(rated_request, db=db).body.decode()
+    rated_rendered = site(db).get("/channels?q=maker").text
 
     assert "Rated" in rated_rendered
     assert "Cinema" not in rated_rendered
     assert 'name="q" type="search" value="maker"' in rated_rendered
 
-    all_request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"rated=false&q=cinema",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    all_rendered = channels_routes.channels_page(all_request, db=db).body.decode()
+    all_rendered = site(db).get("/channels?rated=false&q=cinema").text
 
     assert "Cinema" in all_rendered
     assert "Rated" not in all_rendered
@@ -4414,19 +3502,8 @@ def test_channels_page_search_ignores_accents_and_ranks_names_first():
     by_name = Channel(url="https://example.test/z", name="Zoom Cinéma", rating=0)
     db.add_all([by_label, by_name])
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"rated=false&sort=alpha&q=CINEMA",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = site(db).get("/channels?rated=false&sort=alpha&q=CINEMA").text
     frame = rendered[
         rendered.index('<turbo-frame id="channel-results"') : rendered.index("</turbo-frame>")
     ]
@@ -4461,12 +3538,14 @@ def test_channel_categories_form_saves_defaults_and_updates_uncategorized_videos
     db.add_all([channel, empty_video, custom_video])
     db.commit()
 
-    response = channels_routes.update_channel_categories_form(
-        channel.id,
-        preset_categories=["maker"],
-        custom_categories="Science, maker",
-        return_to="/channels",
-        db=db,
+    response = post_form(
+        db,
+        f"/channels/{channel.id}/categories",
+        {
+            "preset_categories": ["maker"],
+            "custom_categories": "Science, maker",
+            "next": "/channels",
+        },
     )
 
     assert response.headers["location"] == "/channels"
@@ -4485,20 +3564,9 @@ def test_channels_page_renders_channel_category_picker_and_badges():
     )
     db.add(channel)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = channels_routes.channels_page(request, db=db)
-    rendered = response.body.decode()
+    response = site(db).get("/channels")
+    rendered = response.text
 
     assert 'class="download-form channel-create-form" action="/channels" method="post"' in rendered
     assert 'name="preset_categories" type="checkbox" value="maker"' in rendered
@@ -4517,8 +3585,8 @@ def test_channel_rating_updates_channel_and_returns_to_filter():
     db.add(channel)
     db.commit()
 
-    response = channels_routes.rate_channel_form(
-        channel.id, rating=2, return_to="/channels?rated=true", db=db
+    response = post_form(
+        db, f"/channels/{channel.id}/rating", {"rating": "2", "next": "/channels?rated=true"}
     )
 
     assert channel.rating == 2
@@ -4528,7 +3596,7 @@ def test_channel_rating_updates_channel_and_returns_to_filter():
 def test_rating_forms_hand_the_stars_to_the_api():
     # app.js saves a note with PUT {rating} on data-rating-url; `action` stays the no-JS fallback.
     for template in ("_macros.html", "channels.html", "channel_videos.html", "video_detail.html"):
-        source = (pathlib.Path("app/templates") / template).read_text(encoding="utf-8")
+        source = (pathlib.Path("front/templates") / template).read_text(encoding="utf-8")
         for form in re.findall(r'<form class="rating-control[^>]*>', source):
             action = re.search(r'action="([^"]+)"', form).group(1)
             assert f'data-rating-url="/api{action}"' in form, form
@@ -4537,7 +3605,7 @@ def test_rating_forms_hand_the_stars_to_the_api():
 def test_base_layout_keeps_scroll_position_on_page_refresh():
     # Without this meta a form that redirects to its own page scrolls back to
     # the top; app.js relies on it (see the turbo:before-fetch-response hook).
-    source = pathlib.Path("app/templates/base.html").read_text(encoding="utf-8")
+    source = pathlib.Path("front/templates/base.html").read_text(encoding="utf-8")
     assert '<meta name="turbo-refresh-scroll" content="preserve">' in source
 
 
@@ -4545,13 +3613,13 @@ def test_rating_forms_opt_out_of_turbo_navigation():
     # The stars are repainted in place by app.js; a Turbo submission would
     # follow the redirect and reload the whole page on top of it.
     for template in ("_macros.html", "channels.html", "channel_videos.html", "video_detail.html"):
-        source = (pathlib.Path("app/templates") / template).read_text(encoding="utf-8")
+        source = (pathlib.Path("front/templates") / template).read_text(encoding="utf-8")
         forms = re.findall(r'<form class="rating-control[^>]*>', source)
         assert forms, template
         assert all('data-turbo="false"' in form for form in forms), template
 
 
-def test_new_channels_are_rated_by_default(monkeypatch):
+def test_new_channels_are_rated_by_default(monkeypatch, no_profile_backfill):
     db = make_session()
     monkeypatch.setattr(
         channel_manage,
@@ -4559,7 +3627,7 @@ def test_new_channels_are_rated_by_default(monkeypatch):
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )
 
-    response = channels_routes.add_channel("https://example.test/channel", db)
+    response = post_form(db, "/channels", {"url": "https://example.test/channel"})
     channel = db.scalar(select(Channel).where(Channel.url == "https://example.test/channel"))
 
     assert response.headers["location"] == f"/channels?sort=added&added_channel_id={channel.id}"
@@ -4567,18 +3635,8 @@ def test_new_channels_are_rated_by_default(monkeypatch):
     assert channel.rating == 1
 
 
-def channels_request(query_string: bytes = b"") -> Request:
-    return Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/channels",
-            "query_string": query_string,
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
+def channels_page(db, query: str = "") -> str:
+    return site(db).get(f"/channels?{query}" if query else "/channels").text
 
 
 def test_channels_page_shows_added_channel_toast_with_link():
@@ -4587,8 +3645,7 @@ def test_channels_page_shows_added_channel_toast_with_link():
     db.add(channel)
     db.commit()
 
-    request = channels_request(f"added_channel_id={channel.id}&sort=alpha".encode())
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = channels_page(db, f"added_channel_id={channel.id}&sort=alpha")
 
     assert "data-toast" in rendered
     assert "Chaîne <strong>Nouvelle chaîne</strong> ajoutée." in rendered
@@ -4605,10 +3662,8 @@ def test_channels_page_ignores_unknown_added_channel_id():
     db.add(Channel(url="https://example.test/channel", name="Nouvelle chaîne", rating=1))
     db.commit()
 
-    for query_string in (b"", b"added_channel_id=9999", b"added_channel_id=abc"):
-        rendered = channels_routes.channels_page(
-            channels_request(query_string), db=db
-        ).body.decode()
+    for query in ("", "added_channel_id=9999", "added_channel_id=abc"):
+        rendered = channels_page(db, query)
         assert "data-toast" not in rendered
 
 
@@ -4618,9 +3673,7 @@ def test_redirect_message_is_rendered_as_a_toast_not_an_inline_notice():
     db.commit()
 
     message = "25 fiches vidéos importées pour Léo Duff."
-    rendered = channels_routes.channels_page(
-        channels_request(urlencode({"message": message}).encode()), db=db
-    ).body.decode()
+    rendered = channels_page(db, urlencode({"message": message}))
 
     assert f'<p class="toast-text">{message}</p>' in rendered
     assert 'class="toast" role="status" data-toast data-toast-param="message level"' in rendered
@@ -4630,10 +3683,7 @@ def test_redirect_message_is_rendered_as_a_toast_not_an_inline_notice():
 def test_redirect_error_message_is_rendered_as_an_error_toast():
     db = make_session()
 
-    rendered = channels_routes.channels_page(
-        channels_request(urlencode({"level": "error", "message": "Import impossible."}).encode()),
-        db=db,
-    ).body.decode()
+    rendered = channels_page(db, urlencode({"level": "error", "message": "Import impossible."}))
 
     assert (
         'class="toast error" role="alert" data-toast data-toast-param="message level"' in rendered
@@ -4644,7 +3694,7 @@ def test_redirect_error_message_is_rendered_as_an_error_toast():
 def test_redirect_messages_are_rendered_by_the_base_layout_only():
     # A page that renders `message` itself would show it twice, and away from
     # the toast stack.
-    for template in pathlib.Path("app/templates").glob("*.html"):
+    for template in pathlib.Path("front/templates").glob("*.html"):
         if template.name == "base.html":
             continue
         assert "{% if message %}" not in template.read_text(encoding="utf-8"), template.name
@@ -4658,7 +3708,7 @@ def test_add_channel_with_a_name_shows_youtube_candidates_instead_of_guessing(mo
         lambda value: pytest.fail("must not resolve a name"),
     )
 
-    response = channels_routes.add_channel("Léo Duff", db, preset_categories=["tech"])
+    response = post_form(db, "/channels", {"url": "Léo Duff", "preset_categories": ["tech"]})
 
     assert (
         response.headers["location"] == "/channels?youtube_q=L%C3%A9o+Duff&youtube_categories=tech"
@@ -4691,7 +3741,7 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
     db.add(known)
     db.commit()
     monkeypatch.setattr(
-        channels_routes,
+        channel_listing,
         "search_channels",
         lambda query: [
             youtube_candidate(),
@@ -4699,8 +3749,7 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
         ],
     )
 
-    request = channels_request("youtube_q=Léo Duff&youtube_categories=tech&sort=alpha".encode())
-    rendered = channels_routes.channels_page(request, db=db).body.decode()
+    rendered = channels_page(db, "youtube_q=Léo Duff&youtube_categories=tech&sort=alpha")
 
     assert "@LeoDuff · 822 000 abonnés" in rendered
     assert '<input type="hidden" name="url" value="https://www.youtube.com/@LeoDuff">' in rendered
@@ -4717,19 +3766,17 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
 def test_channels_page_reports_a_failed_youtube_search(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        channels_routes,
+        channel_listing,
         "search_channels",
         lambda query: (_ for _ in ()).throw(RuntimeError("réseau")),
     )
 
-    rendered = channels_routes.channels_page(
-        channels_request(b"youtube_q=test"), db=db
-    ).body.decode()
+    rendered = channels_page(db, "youtube_q=test")
 
     assert "Recherche YouTube impossible : réseau" in rendered
 
 
-def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch):
+def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch, no_profile_backfill):
     db = make_session()
     db.add(
         Channel(
@@ -4750,7 +3797,7 @@ def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch):
         },
     )
 
-    response = channels_routes.add_channel("@deja-la", db)
+    response = post_form(db, "/channels", {"url": "@deja-la"})
 
     assert "level=error" in response.headers["location"]
     assert db.query(Channel).count() == 1
@@ -4846,19 +3893,21 @@ def test_imported_video_channel_name_does_not_fall_back_to_channel_id():
     assert yt_channel_id == "UCoejzfiaEjCusdpdX9W8jBQ"
 
 
-def test_add_channel_returns_not_found_for_missing_handle(monkeypatch):
+def test_add_channel_returns_not_found_for_missing_handle(monkeypatch, no_profile_backfill):
     db = make_session()
     monkeypatch.setattr(
         channel_manage,
         "extract_channel_info",
-        lambda channel_input: (_ for _ in ()).throw(ChannelNotFoundError("missing")),
+        lambda channel_input: (_ for _ in ()).throw(
+            ChannelNotFoundError("Chaîne introuvable pour @missing-handle")
+        ),
     )
 
-    with pytest.raises(HTTPException) as exc:
-        channels_routes.add_channel("@missing-handle", db)
+    response = post_form(db, "/channels", {"url": "@missing-handle"})
 
-    assert exc.value.status_code == 404
-    assert exc.value.detail == "Chaîne introuvable"
+    assert response.status_code == 404
+    # The form answers like `POST /api/channels`: the service's French message.
+    assert response.json()["detail"] == "Chaîne introuvable pour @missing-handle"
 
 
 def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
@@ -4873,8 +3922,10 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
         },
     )
 
+    # A free-text name is refused by `ChannelCreate` (it goes through the YouTube search);
+    # a handle is resolved, and the URL YouTube gives back is the one saved.
     channel = api_channels.create_channel(
-        api_channels.ChannelCreate(url="Chaîne API"), BackgroundTasks(), db
+        api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db
     )
 
     assert channel.name == "Chaîne API"
@@ -4923,7 +3974,7 @@ def test_api_and_form_delete_a_channel_with_its_profile_files(monkeypatch):
     db.commit()
 
     api_channels.delete_channel(first.id, db)
-    channels_routes.delete_channel_form(second.id, "/channels", db)
+    post_form(db, f"/channels/{second.id}/delete", {"next": "/channels"})
 
     assert removed == ["UCA", "UCB"]
     assert db.scalar(select(func.count(Channel.id))) == 0
@@ -4949,7 +4000,7 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     assert exc.value.detail == "Chaîne introuvable pour @missing-handle"
 
 
-def test_add_channel_saves_category_labels(monkeypatch):
+def test_add_channel_saves_category_labels(monkeypatch, no_profile_backfill):
     db = make_session()
     monkeypatch.setattr(
         channel_manage,
@@ -4957,11 +4008,14 @@ def test_add_channel_saves_category_labels(monkeypatch):
         lambda url: {"name": "Nouvelle chaîne", "yt_channel_id": "UC123"},
     )
 
-    response = channels_routes.add_channel(
-        "https://example.test/channel",
+    response = post_form(
         db,
-        preset_categories=["maker"],
-        custom_categories="Science, maker",
+        "/channels",
+        {
+            "url": "https://example.test/channel",
+            "preset_categories": ["maker"],
+            "custom_categories": "Science, maker",
+        },
     )
     channel = db.scalar(select(Channel).where(Channel.url == "https://example.test/channel"))
 
@@ -4977,26 +4031,31 @@ def test_rating_returns_to_internal_origin_and_rejects_external_redirect():
     db = make_session()
     video = add_video(db)
 
-    detail_response = videos_routes.rate_video_form(video.id, 4, f"/videos/{video.id}", db)
-    external_response = videos_routes.rate_video_form(
-        video.id, 3, "https://youtube.com/watch?v=abc123", db
+    url = f"/videos/{video.id}/rating"
+    detail_response = post_form(db, url, {"rating": "4", "next": f"/videos/{video.id}"})
+    external_response = post_form(
+        db, url, {"rating": "3", "next": "https://youtube.com/watch?v=abc123"}
     )
 
     assert detail_response.headers["location"] == f"/videos/{video.id}"
     assert external_response.headers["location"] == "/videos"
 
 
+def post_settings(db, media_root, **fields):
+    """The no-JS settings form, with the fields a test cares about (quota 2.5 Go by default)."""
+    return post_form(db, "/settings", {"media_root": str(media_root), "quota_gb": "2.5", **fields})
+
+
 def test_settings_form_updates_media_root_and_quota(tmp_path):
     db = make_session()
 
-    response = settings_routes.settings_form(
-        str(tmp_path), 2.5, "Maker\nScience\nmaker\nHistoire", db
-    )
+    response = post_settings(db, tmp_path, video_category_labels="Maker\nScience\nmaker\nHistoire")
 
     assert response.headers["location"] == "/settings"
     assert db.get(AppSetting, "media_root").value == str(tmp_path)
     assert db.get(AppSetting, "global_quota_bytes").value == str(int(2.5 * 1024 * 1024 * 1024))
-    assert json.loads(db.get(AppSetting, "video_category_labels").value) == [
+    # The plain list is stored as bare labels; their colours are assigned when read.
+    assert get_video_category_label_styles(db) == [
         {"label": "maker", "color": "#16a34a"},
         {"label": "science", "color": "#2563eb"},
         {"label": "histoire", "color": "#7c3aed"},
@@ -5013,7 +4072,7 @@ def test_settings_form_saves_category_label_colors(tmp_path):
         ]
     )
 
-    response = settings_routes.settings_form(str(tmp_path), 2.5, "", db, category_styles)
+    response = post_settings(db, tmp_path, video_category_styles=category_styles)
 
     assert response.headers["location"] == "/settings"
     assert json.loads(db.get(AppSetting, "video_category_labels").value) == [
@@ -5039,8 +4098,8 @@ def test_settings_form_saves_video_library_views(tmp_path):
         ]
     )
 
-    response = settings_routes.settings_form(
-        str(tmp_path), 2.5, "Maker\nScience", db, "", library_views
+    response = post_settings(
+        db, tmp_path, video_category_labels="Maker\nScience", video_library_views=library_views
     )
 
     assert response.headers["location"] == "/settings"
@@ -5075,19 +4134,9 @@ def test_settings_page_renders_custom_category_labels(tmp_path):
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Labels de catégories vidéo" in rendered
     assert "data-initial-labels=" in rendered
@@ -5120,19 +4169,9 @@ def test_settings_page_renders_no_progress_category_checkboxes(tmp_path):
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Catégories sans barre de progression" in rendered
     assert 'value="maker"' in rendered
@@ -5143,7 +4182,7 @@ def test_settings_page_renders_no_progress_category_checkboxes(tmp_path):
 
 
 def test_ensure_default_settings_seeds_defaults_without_llm_provider():
-    from app.services.common.settings import ensure_default_settings
+    from back.services.common.settings import ensure_default_settings
 
     db = make_session()
 
@@ -5156,7 +4195,7 @@ def test_ensure_default_settings_seeds_defaults_without_llm_provider():
 def test_settings_form_saves_no_progress_categories(tmp_path):
     db = make_session()
 
-    response = settings_routes.settings_form(str(tmp_path), 2.5, "", db, "", "", ["musique"])
+    response = post_settings(db, tmp_path, no_progress_categories=["musique"])
 
     assert response.headers["location"] == "/settings"
     assert db.get(AppSetting, "no_progress_category_labels").value == "musique"
@@ -5165,9 +4204,7 @@ def test_settings_form_saves_no_progress_categories(tmp_path):
 def test_settings_form_saves_sponsor_segment_categories(tmp_path):
     db = make_session()
 
-    response = settings_routes.settings_form(
-        str(tmp_path), 2.5, "", db, "", "", [], 120, 30, 120, 180, ["sponsor", "intro"]
-    )
+    response = post_settings(db, tmp_path, sponsor_segment_categories=["sponsor", "intro"])
 
     assert response.headers["location"] == "/settings"
     assert db.get(AppSetting, "sponsor_segment_categories").value == "sponsor,intro"
@@ -5179,19 +4216,9 @@ def test_settings_page_renders_sponsor_segment_category_checkboxes(tmp_path):
     db.add(AppSetting(key="global_quota_bytes", value=str(2 * 1024 * 1024 * 1024)))
     db.add(AppSetting(key="sponsor_segment_categories", value="sponsor,outro"))
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Segments sponsorisés" in rendered
     assert 'name="sponsor_segment_categories" value="sponsor" checked' in rendered
@@ -5200,7 +4227,7 @@ def test_settings_page_renders_sponsor_segment_category_checkboxes(tmp_path):
 
 
 def test_get_sponsor_segment_categories_defaults_to_all():
-    from app.services.common.settings import (
+    from back.services.common.settings import (
         SPONSOR_SEGMENT_CATEGORY_CHOICES,
         get_sponsor_segment_categories,
     )
@@ -5210,7 +4237,7 @@ def test_get_sponsor_segment_categories_defaults_to_all():
 
 
 def test_get_sponsor_segment_categories_filters_unknown_values():
-    from app.services.common.settings import get_sponsor_segment_categories
+    from back.services.common.settings import get_sponsor_segment_categories
 
     db = make_session()
     db.add(AppSetting(key="sponsor_segment_categories", value="sponsor,bogus,outro"))
@@ -5235,20 +4262,10 @@ def test_get_sponsor_skip_enabled_reads_stored_value():
 def test_settings_form_persists_sponsor_skip_enabled(tmp_path):
     db = make_session()
 
-    settings_routes.settings_form(
-        media_root=str(tmp_path),
-        quota_gb=10.0,
-        db=db,
-        sponsor_skip_enabled="on",
-    )
+    post_settings(db, tmp_path, quota_gb="10.0", sponsor_skip_enabled="on")
     assert get_sponsor_skip_enabled(db) is True
 
-    settings_routes.settings_form(
-        media_root=str(tmp_path),
-        quota_gb=10.0,
-        db=db,
-        sponsor_skip_enabled="",
-    )
+    post_settings(db, tmp_path, quota_gb="10.0", sponsor_skip_enabled="")
     assert get_sponsor_skip_enabled(db) is False
 
 
@@ -5268,20 +4285,9 @@ def test_settings_page_shows_llm_usage_costs(tmp_path):
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Coûts LLM" in rendered
     assert "Notes structurées" in rendered
@@ -5290,20 +4296,9 @@ def test_settings_page_shows_llm_usage_costs(tmp_path):
 
 def test_settings_page_shows_never_scanned_when_no_auto_scan_recorded(tmp_path):
     db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Suivi automatique" in rendered
     assert "Aucun scan automatique n'a encore tourné." in rendered
@@ -5312,20 +4307,9 @@ def test_settings_page_shows_never_scanned_when_no_auto_scan_recorded(tmp_path):
 def test_settings_page_shows_last_auto_scan_result(tmp_path):
     db = make_session()
     record_scan_result(db, {"status": "completed", "downloaded": 5, "deleted": 0})
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/settings",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = settings_routes.settings_page(request, db)
-    rendered = response.body.decode()
+    response = site(db).get("/settings")
+    rendered = response.text
 
     assert "Dernier scan :" in rendered
     assert "5 nouvelles fiches importées." in rendered
@@ -5346,20 +4330,9 @@ def test_videos_page_uses_custom_category_options_from_settings(monkeypatch):
     )
     db.commit()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = videos_routes.videos_page(request, None, 1, db)
-    rendered = response.body.decode()
+    response = site(db).get("/videos")
+    rendered = response.text
 
     assert video.title in rendered
     assert 'name="category" type="checkbox" value="histoire"' in rendered
@@ -5570,19 +4543,8 @@ def test_videos_page_hide_hidden_excludes_only_hidden_videos():
     )
     db.add_all([hidden, marked_watched])
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"hide_hidden=1",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos?hide_hidden=1").text
 
     assert kept.title in rendered
     assert marked_watched.title in rendered
@@ -5605,19 +4567,8 @@ def test_videos_page_without_hide_hidden_keeps_hidden_videos():
     )
     db.add(hidden)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert hidden.title in rendered
     assert 'class="video-row video-row-hidden"' in rendered
@@ -5628,19 +4579,8 @@ def test_video_card_renders_list_state_buttons():
     video = add_video(db)
     video.list_state = "watched"
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert f'data-list-state-toggle data-video-id="{video.id}"' in rendered
     assert 'data-list-state-target="watched"' in rendered
@@ -5678,19 +4618,8 @@ def test_video_card_exposes_auto_list_state_for_unhiding():
         )
     )
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert 'data-list-state="hidden" data-list-state-auto="watched"' in rendered
 
@@ -5698,39 +4627,14 @@ def test_video_card_exposes_auto_list_state_for_unhiding():
 def test_list_state_buttons_are_icon_only_with_accessible_labels():
     db = make_session()
     add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.videos_page(request, None, 1, db).body.decode()
+    rendered = site(db).get("/videos").text
 
     assert 'aria-label="Marquer comme vu"' in rendered
     assert 'aria-label="Écarter cette vidéo"' in rendered
     assert "list-state-icon" in rendered
     assert ">Lu</button>" not in rendered
     assert ">Écartée</button>" not in rendered
-
-
-def resume_request():
-    return Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/dashboard/historique",
-            "query_string": b"",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
 
 def add_playback_job(db, video, position=5, duration=600):
@@ -5760,7 +4664,7 @@ def test_resume_page_renders_list_state_buttons():
     video = add_video(db)
     add_playback_job(db, video)
 
-    rendered = dashboard_routes.dashboard_history_page(resume_request(), 1, db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert f'data-list-state-toggle data-video-id="{video.id}"' in rendered
     assert 'aria-label="Marquer comme vu"' in rendered
@@ -5774,7 +4678,7 @@ def test_resume_page_greys_hidden_video_more_strongly():
     db.commit()
     add_playback_job(db, video)
 
-    rendered = dashboard_routes.dashboard_history_page(resume_request(), 1, db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert 'class="dashboard-media-row video-card dashboard-media-row-hidden"' in rendered
     assert 'class="dashboard-media-row video-card dashboard-media-row-completed"' not in rendered
@@ -5787,7 +4691,7 @@ def test_resume_page_greys_manually_watched_video():
     db.commit()
     add_playback_job(db, video)
 
-    rendered = dashboard_routes.dashboard_history_page(resume_request(), 1, db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert 'class="dashboard-media-row video-card dashboard-media-row-completed"' in rendered
     assert 'class="dashboard-media-row video-card dashboard-media-row-hidden"' not in rendered
@@ -5797,7 +4701,7 @@ def test_resume_page_has_no_list_state_buttons_without_a_video():
     db = make_session()
     add_playback_job(db, None)
 
-    rendered = dashboard_routes.dashboard_history_page(resume_request(), 1, db).body.decode()
+    rendered = site(db).get("/dashboard/historique").text
 
     assert "data-list-state-toggle" not in rendered
 
@@ -5807,7 +4711,7 @@ def test_css_hides_progress_bar_inside_watched_and_hidden_rows():
     la bascule cote client, ou la ligne change de classe sans rechargement."""
     css = (
         pathlib.Path(__file__).resolve().parent.parent
-        / "app"
+        / "front"
         / "static"
         / "css"
         / "tailwind.input.css"
@@ -5827,7 +4731,7 @@ def test_css_hides_topbar_on_phone():
     hauteur du chat de l'accueil en tient compte."""
     css = (
         pathlib.Path(__file__).resolve().parent.parent
-        / "app"
+        / "front"
         / "static"
         / "css"
         / "tailwind.input.css"
@@ -5857,18 +4761,8 @@ def test_video_detail_explains_purged_media():
     video.video_path = None
     video.watched_at = datetime(2026, 6, 3, tzinfo=UTC)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert "retirés automatiquement du serveur" in rendered
 
@@ -5880,18 +4774,8 @@ def test_video_detail_has_no_purge_message_for_archived_video():
     video.watched_at = datetime(2026, 6, 3, tzinfo=UTC)
     video.rating = 5
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert "retirés automatiquement du serveur" not in rendered
 
@@ -5908,18 +4792,8 @@ def test_video_detail_wraps_players_in_media_pager():
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert "data-media-pager" in rendered
     assert 'data-initial="video"' in rendered
@@ -5927,7 +4801,7 @@ def test_video_detail_wraps_players_in_media_pager():
     assert 'data-media-slide="video" data-state="idle"' in rendered
     assert 'data-media-slide="audio" data-state="idle"' in rendered
     assert rendered.count("data-media-download") == 2
-    assert f'data-track-src="/videos/{video.id}/audio"' in rendered
+    assert f'data-track-src="/api/videos/{video.id}/audio"' in rendered
     assert rendered.count('data-quality="') >= 7 + 7  # pager picker + action bar popover
     assert len(re.findall(r"data-media-seek[\s>]", rendered)) == 1
     assert 'role="slider"' in rendered
@@ -5958,18 +4832,8 @@ def test_video_detail_more_popover_hides_retry_when_transcript_exists(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert 'class="video-more"' in rendered
     assert 'type="button" class="secondary" data-click-proxy' not in rendered
@@ -5990,18 +4854,8 @@ def test_video_detail_pager_opens_on_audio_for_audio_only_video():
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert 'data-initial="audio"' in rendered
     assert 'data-media-slide="video" data-state="idle"' in rendered
@@ -6024,18 +4878,8 @@ def test_video_detail_pager_marks_both_slides_ready_when_formats_coexist():
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": f"/videos/{video.id}",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    rendered = videos_routes.video_detail_page(request, video.id, db).body.decode()
+    rendered = site(db).get(f"/videos/{video.id}").text
 
     assert 'data-initial="video"' in rendered
     assert 'data-media-slide="video" data-state="ready"' in rendered
@@ -6044,7 +4888,7 @@ def test_video_detail_pager_marks_both_slides_ready_when_formats_coexist():
 
 def test_base_mini_player_is_one_link_to_the_audio_pane():
     base = (
-        pathlib.Path(__file__).resolve().parent.parent / "app" / "templates" / "base.html"
+        pathlib.Path(__file__).resolve().parent.parent / "front" / "templates" / "base.html"
     ).read_text()
     start = base.index("data-mini-player-open")
     link = base[start : base.index("</a>", start)]
@@ -6070,20 +4914,13 @@ def test_share_import_waits_for_the_import_and_returns_the_video_url(monkeypatch
         db.commit()
 
     monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/share-import",
-            "headers": [(b"host", b"pt.lan:8000")],
-            "scheme": "http",
-            "server": ("pt.lan", 8000),
-        }
+
+    # The Shortcut reaches the site under the address set on the phone (LAN or WireGuard).
+    response = site(db, base_url="http://pt.lan:8000").post(
+        "/videos/share-import", data={"url": " https://youtu.be/abc123 "}
     )
 
-    response = videos_routes.share_import_video(request, url=" https://youtu.be/abc123 ", db=db)
-
-    payload = json.loads(response.body)
+    payload = response.json()
     assert response.status_code == 200
     assert calls == [("https://youtu.be/abc123", ["metadata"], True)]
     assert payload["video_id"] == video.id
@@ -6099,22 +4936,11 @@ def test_share_import_reports_a_failed_import_and_rejects_other_hosts(monkeypatc
         db.commit()
 
     monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/share-import",
-            "headers": [],
-            "scheme": "http",
-            "server": ("pt.lan", 8000),
-        }
-    )
 
-    failed = videos_routes.share_import_video(request, url="https://youtu.be/abc123", db=db)
-    rejected = videos_routes.share_import_video(
-        request, url="https://evil.test/watch?v=abc123", db=db
-    )
+    client = site(db)
+    failed = client.post("/videos/share-import", data={"url": "https://youtu.be/abc123"})
+    rejected = client.post("/videos/share-import", data={"url": "https://evil.test/watch?v=abc123"})
 
     assert failed.status_code == 502
-    assert json.loads(failed.body)["message"] == "Vidéo indisponible"
+    assert failed.json()["message"] == "Vidéo indisponible"
     assert rejected.status_code == 400

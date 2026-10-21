@@ -16,9 +16,11 @@ mkdir -p "$out_dir"
 out_dir="$(cd "$out_dir" && pwd)"
 port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
 server_pid=""
+back_pid=""
 
 cleanup() {
   if [ -n "$server_pid" ]; then kill "$server_pid" 2>/dev/null || true; fi
+  if [ -n "$back_pid" ]; then kill "$back_pid" 2>/dev/null || true; fi
   rm -rf "$scratch"
 }
 trap cleanup EXIT
@@ -30,9 +32,17 @@ mkdir -p "$MEDIA_ROOT"
 
 cd "$repo"
 uv run --python 3.14 python -m scripts.demo_seed
-uv run --python 3.14 uvicorn app.main:app --host 127.0.0.1 --port "$port" --log-level warning &
+# The back (API) on its own port, the front (the pages, what is shot) on `$port`.
+back_port="$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')"
+uv run --python 3.14 uvicorn back.main:app --host 127.0.0.1 --port "$back_port" --log-level warning &
+back_pid=$!
+for _ in $(seq 1 120); do
+  curl -fs "http://127.0.0.1:$back_port/api/stats" -o /dev/null && break
+  sleep 0.5
+done
+RATON_API_URL="http://127.0.0.1:$back_port" uv run --python 3.14 uvicorn front.main:app --host 127.0.0.1 --port "$port" --log-level warning &
 server_pid=$!
-for _ in $(seq 1 60); do
+for _ in $(seq 1 120); do
   curl -fs "http://127.0.0.1:$port/" -o /dev/null && break
   sleep 0.5
 done

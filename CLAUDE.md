@@ -73,7 +73,7 @@ Comments must stay true when code elsewhere changes, because a stale comment mis
 ```bash
 make ci             # css + lint + test + compose-config (run before opening a PR; also run by .github/workflows/ci.yml)
 make format         # ruff fix + format (also run on every edited .py by the PostToolUse hook)
-make demo           # uvicorn --reload on a local sqlite db with auto-created tables (no Postgres needed)
+make demo           # back (API, :8001) + front (pages, :8000) with --reload on a local sqlite db (no Postgres needed)
 make upgrade-ytdlp  # yt-dlp only moves when uv.lock does: the Docker image installs from the lock
 ```
 
@@ -81,26 +81,33 @@ Other targets (`install`, `test`, `lint`, `css`, `migrate`, `docs-dev`, `docs-bu
 
 Single test: `uv run --python 3.14 pytest tests/test_videos.py::test_name -v`
 
-The FastAPI app expects a reachable Postgres via `DATABASE_URL` unless you use `make demo` (sqlite, `APP_AUTO_CREATE_TABLES=true`).
+The back expects a reachable Postgres via `DATABASE_URL` unless you use `make demo` (sqlite, `APP_AUTO_CREATE_TABLES=true`); the front only needs `RATON_API_URL` (default `http://127.0.0.1:8001`).
 
 ## Architecture
 
 Stack: Python 3.14, FastAPI, Jinja2 (server-rendered, no frontend framework), SQLAlchemy, Alembic, PostgreSQL 16 (Docker Compose), yt-dlp + ffmpeg, APScheduler, Anthropic API for the LLM features. The layout, data model, data flow and jobs are described in `docs/spec/03-architecture.md`, `05-modele-de-donnees.md` and `13-jobs-logs-planification.md`; the structure rules are enforced by `tests/test_code_structure.py` (see "Code layout" below).
 
+### Two apps: `back/` and `front/`
+
+- **`back/`** is the JSON API under `/api` (`back/api/`) and everything behind it: services, models, DB, migrations, jobs, scheduler, media files. Only the back reads the DB, the media folder and the secrets.
+- **`front/`** is the server-rendered pages (Jinja templates, CSS, JS) and the no-JavaScript form fallbacks. It reads and writes **only through the back's `/api`, over HTTP** (`front/api.py`), the way another front (SPA, native app) or an MCP server would. It also relays the browser's `/api/*` calls to the back (`front/proxy.py`), so pages and API share one origin.
+- **Never import across**: `front/` imports nothing from `back/` and vice versa, and only `front/api.py` and `front/proxy.py` speak HTTP (`tests/test_code_structure.py`). A page that needs a value the API does not give gets a new API field or endpoint, computed by a back service — never a copy of the rule in the front. The front only formats (French dates and durations, colors, links, grouping) what the API decides.
+- Front tests use `tests/site.py` (`site_client()`, fixture `front_client`): a front TestClient wired to the back in-process.
+
 ### Code layout: routes call services
 
 Where each kind of code lives is in `docs/spec/03-architecture.md`; the service packages, their modules and which package may import which are in `docs/spec/10-services.md`. `tests/test_code_structure.py` enforces the rules. Read `10-services.md` before adding a service module.
 
-- **A business rule is written once, in `app/services/`.** A route (`app/web/routes/`, `app/api/`) only reads the request, calls a service, turns the service's errors into an HTTP response, queues background tasks and renders. It does not query-and-update rows itself, and an HTML route and its `/api` twin call the same service function instead of keeping two copies. Nothing under `app/web/` or `app/api/` writes to the DB (`db.add`, `db.commit`, `db.delete`...); the structure test fails otherwise.
-- **Services never import `app/web/`**, and service packages only import in the direction the structure test allows. A new dependency between packages is a design decision: change the test's map and the spec on purpose, never to silence it, and never create a cycle.
-- **Before writing a helper, look for it in `app/services/`.** Two copies of the same rule drift apart (this is how `/api` came to accept a channel the form refused).
+- **A business rule is written once, in `back/services/`.** An API route (`back/api/`) only reads the request, calls a service, turns the service's errors into an HTTP response and queues background tasks; a front route (`front/routes/`) calls the API and renders or redirects. Neither queries-and-updates rows itself. Nothing under `back/api/` writes to the DB (`db.add`, `db.commit`, `db.delete`...); the structure test fails otherwise.
+- Service packages only import in the direction the structure test allows. A new dependency between packages is a design decision: change the test's map and the spec on purpose, never to silence it, and never create a cycle.
+- **Before writing a helper, look for it in `back/services/`.** Two copies of the same rule drift apart (this is how `/api` came to accept a channel the form refused).
 - **A service signals a refused action with an exception** (a `ValueError` subclass whose message is the French text shown to the user); the route maps it to 400/404/409 or an error message. Services commit their own writes.
 - **One subject per module.** Split a module that mixes subjects or grows past ~400 lines; don't import another module's `_private` names — make the name public or move the code.
 - **Moving code moves the test patches with it**: `monkeypatch.setattr` must target the module where the name is looked up. A module-level setting that tests patch (the pauses of `ingest/throttle.py`) is read through its module (`throttle.PAUSE_...`), never copied in with `from ... import`.
 
 Traps:
 
-- Tests that fake the DB session of a background job runner patch `SessionLocal` in the module of that runner (`app/services/jobs/downloads.py`, `llm_jobs.py`, `backfills.py`): each runner opens its own session, and `run_llm_job` also runs the profile backfill, so its tests patch both modules.
+- Tests that fake the DB session of a background job runner patch `SessionLocal` in the module of that runner (`back/services/jobs/downloads.py`, `llm_jobs.py`, `backfills.py`): each runner opens its own session, and `run_llm_job` also runs the profile backfill, so its tests patch both modules.
 - `video_path` and `audio_path` can coexist: always check the path columns, never `media_type` alone.
 - The Docker stack ignores `DATABASE_URL`/`MEDIA_ROOT` from `.env` (the compose file hardcodes them); nothing outside Docker reads them. Spec: `04-configuration-et-deploiement.md`.
 
@@ -108,4 +115,4 @@ Traps:
 
 - Raton runs on a trusted LAN. The HTML and API routes are **intentionally unauthenticated** — not an accidental vulnerability. A change that exposes the app beyond the LAN makes authentication, CSRF, CORS/cookie review and Postgres hardening required.
 - Never commit `.env`, Claude Code auth (`~/.claude/`), or `ANTHROPIC_API_KEY`.
-- Redirects built from a form `next`/`return_to` go through `internal_return_path` (`app/web/shared.py`).
+- Redirects built from a form `next`/`return_to` go through `internal_return_path` (`front/pages.py`).

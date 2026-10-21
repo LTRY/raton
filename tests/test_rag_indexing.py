@@ -1,13 +1,13 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.video import TranscriptStatus, Video
-from app.models.video_note_chunk import VideoNoteChunk
-from app.services.rag import indexing as rag_indexing
-from app.services.rag.retrieval import count_indexed_videos
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.video import TranscriptStatus, Video
+from back.models.video_note_chunk import VideoNoteChunk
+from back.services.rag import indexing as rag_indexing
+from back.services.rag.retrieval import count_indexed_videos
 
 
 def make_session():

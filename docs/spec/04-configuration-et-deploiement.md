@@ -5,13 +5,13 @@ title: "04 Configuration et deploiement"
 
 ## CSS (Tailwind)
 
-`app/static/css/app.css` est un artefact compile, plus verse en Git
-(`.gitignore`). La source versionnee est `app/static/css/tailwind.input.css`
+`front/static/css/app.css` est un artefact compile, plus verse en Git
+(`.gitignore`). La source versionnee est `front/static/css/tailwind.input.css`
 (directives Tailwind v4 + tokens `@theme` + le CSS ecrit a la main, migre
 page par page - voir [11 Interface HTML](11-interface-html.md)). Compilation
 via le CLI standalone Tailwind (pas de Node/npm) : `scripts/build_css.sh`
 telecharge le binaire pour la plateforme courante dans `.local/bin/`
-(gitignore, comme `.local/media`) puis compile vers `app/static/css/app.css`.
+(gitignore, comme `.local/media`) puis compile vers `front/static/css/app.css`.
 
 Preflight (le reset CSS de base de Tailwind) est desactive intentionnellement
 (`tailwind.input.css` importe uniquement `theme.css` et `utilities.css`, pas
@@ -23,7 +23,7 @@ migrees.
 `make css` (aussi un prerequis de `make demo` et `make ci`)
 lance ce script. L'image Docker compile le CSS dans une etape de build
 dediee (`css-builder` dans le `Dockerfile`) et copie uniquement le fichier
-compile dans l'image finale : le conteneur de prod n'a jamais besoin
+compile dans l'image du front : le conteneur de prod n'a jamais besoin
 d'acces reseau pour le CSS.
 
 ## Docker Compose
@@ -37,14 +37,25 @@ Services :
   elle sert de socle au RAG cross-video sur les notes structurees (voir
   [05 Modele de donnees](05-modele-de-donnees.md) et
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
-- `app` : FastAPI + Uvicorn + Alembic + ffmpeg.
+- `api` : le back (`back/`) — FastAPI + Uvicorn + Alembic + ffmpeg, image
+  `raton-api:local` (etape `back` du `Dockerfile`). Seul conteneur qui joint
+  PostgreSQL, monte le dossier media et le journal, et recoit les secrets
+  (`ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`). Le scheduler y tourne : une seule
+  instance de `api` a la fois ;
+- `app` : le front (`front/`) — les pages, image `raton:local` (etape
+  `front`). Ni DB, ni media, ni secret : il appelle l'API du conteneur `api`
+  (`RATON_API_URL=http://api:8001`) et relaie vers lui les appels `/api/*`
+  du navigateur.
 
-Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app` et
-`raton-db` pour `db`, au lieu de `raton-app-1` / `raton-db-1`. Une seule
-instance de la pile peut donc tourner par machine.
+Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app`,
+`raton-api` pour `api` et `raton-db` pour `db`, au lieu de `raton-app-1`...
+Une seule instance de la pile peut donc tourner par machine.
 
-Port publie : `8000` (app), sur `127.0.0.1` par defaut ; `APP_BIND=0.0.0.0` l'ouvre au LAN. Le service `db` ne publie aucun port : seul
-le conteneur `app` joint PostgreSQL, par le reseau interne de Compose.
+Port publie : `8000` (`app`, le front), sur `127.0.0.1` par defaut ;
+`APP_BIND=0.0.0.0` l'ouvre au LAN. Ni `api` ni `db` ne publient de port : le
+navigateur, un raccourci iOS ou un client MCP passent par le front, dont le
+relais `/api/*` atteint le back sur le reseau interne de Compose. Seul `api`
+joint PostgreSQL.
 
 Volumes :
 
@@ -56,7 +67,7 @@ Volumes :
   « Journal applicatif »).
 
 Les jobs LLM (generation et chat, table `llm_jobs`) sont traites
-par le conteneur `app` lui-meme, qui appelle directement l'API du fournisseur
+par le conteneur `api` lui-meme, qui appelle directement l'API du fournisseur
 configure en tache de fond (voir plus bas et
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)). Il
 n'y a pas de worker separe hors Docker.
@@ -72,10 +83,10 @@ make up
 Elle doit :
 
 - creer le dossier media hote ;
-- reconstruire l'image Docker ;
+- reconstruire les deux images (back et front) ;
 - lancer PostgreSQL ;
-- appliquer les migrations Alembic au demarrage de l'app ;
-- relancer FastAPI ;
+- appliquer les migrations Alembic au demarrage du back ;
+- relancer le back puis le front ;
 - supprimer l'image precedente devenue orpheline (`docker image prune -f`),
   pour que les builds ne s'empilent pas ; le cache BuildKit est conserve.
 
@@ -86,7 +97,7 @@ changement de code :
 
 - les dependances Python sont installees avec `uv` depuis `uv.lock`
   (`uv sync --frozen --no-dev --no-install-project`) dans une couche dediee,
-  placee **avant** la copie de `app/`. Cette couche n'est reconstruite que si
+  placee **avant** la copie de `back/` et `front/`. Cette couche n'est reconstruite que si
   `pyproject.toml` ou `uv.lock` changent ;
 - un cache BuildKit (`/root/.cache/uv`) conserve les wheels deja telechargees
   : meme quand une dependance change, seules les nouvelles versions sont
@@ -94,13 +105,15 @@ changement de code :
 - le binaire Tailwind de l'etape `css-builder` est conserve dans un cache
   BuildKit (`.local/bin`) et n'est pas retelecharge a chaque modification de
   template ;
-- l'image finale est multi-etapes (`css-builder`, `deps`, image finale) : ni
-  `uv`, ni les caches de build, ni `curl` n'y sont embarques ;
+- le `Dockerfile` est multi-etapes (`css-builder`, `deps`, `base`, puis les
+  deux images finales `back` et `front`) : ni `uv`, ni les caches de build, ni
+  `curl` n'y sont embarques ; seule l'image `back` a ffmpeg, Alembic et le
+  code du back, seule l'image `front` a le code du front et le CSS compile ;
 - le conteneur tourne avec l'utilisateur non privilegie `raton` (uid/gid 1000
   par defaut, `--build-arg APP_UID=... APP_GID=...` pour un autre uid). Sous
   Linux, les dossiers montes (media, journal) doivent etre accessibles en
   ecriture a cet uid ;
-- le code de l'app n'est pas installe comme paquet : il est copie dans `/app`
+- le code n'est pas installe comme paquet : il est copie dans `/app`
   et execute depuis ce dossier avec le virtualenv `/app/.venv`.
 
 Consequence : les versions deployees sont exactement celles de `uv.lock`.
@@ -121,6 +134,11 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
 
 ### Base
 
+Toutes ces variables sont celles du back (conteneur `api`), sauf mention.
+
+- `RATON_API_URL` (front) : adresse du back que le front appelle et vers
+  laquelle il relaie `/api/*` (`http://127.0.0.1:8001` par defaut, `http://api:8001`
+  dans le compose). Le front n'a besoin d'aucune autre variable.
 - `DATABASE_URL` : URL SQLAlchemy.
 - `MEDIA_ROOT` : racine media vue par l'application.
 - `POSTGRES_PASSWORD` : mot de passe du role PostgreSQL du service `db`
@@ -128,22 +146,23 @@ Les commandes de test sont dans [16 Tests et criteres d'acceptation](16-tests-et
   le `DATABASE_URL` de l'application. Il n'est applique qu'a la creation du
   volume `postgres_data` ; caracteres sans danger dans une URL uniquement.
 - `MEDIA_ROOT_REMOTE_PREFIX` / `MEDIA_ROOT_LOCAL_PREFIX` : remapping de chemin
-  cote lecture seule (`app/core/config.py:local_media_path()`), utilise quand
+  cote lecture seule (`back/core/config.py:local_media_path()`), utilise quand
   une autre machine accede par un point de montage local different a la meme
   bibliotheque media que celle qui a fait les telechargements (ex. prefixe
   `/media/youtube` du conteneur Docker remplace par un montage reseau local). Ne modifie rien dans la DB ; s'applique uniquement au moment de lire
-  les fichiers (`app/web/routes/media.py`, `app/services/ingest/identity.py`,
-  `app/services/media/media_storage.py`) et, pour les profils de chaines
+  les fichiers (`back/api/media.py`, `back/services/ingest/identity.py`,
+  `back/services/media/media_storage.py`) et, pour les profils de chaines
   (`_channels/`), aussi a leur ecriture et suppression
-  (`app/services/channels/profile.py:local_media_root`).
+  (`back/services/channels/profile.py:local_media_root`).
 - `GLOBAL_QUOTA_BYTES` : quota global.
 - `APP_AUTO_CREATE_TABLES` : creation automatique de tables hors Alembic.
 - `LOG_DIR` : dossier du journal applicatif (`app.jsonl`). Vide : pas de
   fichier, seulement stderr (dev, demo). Le compose de prod le fixe
   a `/var/log/raton`.
-- `APP_TRUSTED_ORIGINS` : hotes (`host[:port]`, separes par des virgules)
-  acceptes en plus du `Host` de la requete pour les ecritures, derriere un
-  reverse proxy (voir [15 Securite](15-securite.md)). Vide par defaut.
+- `APP_TRUSTED_ORIGINS` (back et front) : hotes (`host[:port]`, separes par
+  des virgules) acceptes en plus du `Host` de la requete pour les ecritures,
+  derriere un reverse proxy (voir [15 Securite](15-securite.md)). Vide par
+  defaut.
 - `APP_SCHEDULER_ENABLED` : active/desactive le scheduler (aucun job
   enregistre, ni scan, ni purge, ni backfill, quand elle vaut `false`).
 
@@ -176,7 +195,7 @@ explicite plutot que de degrader silencieusement.
 
 `DATABASE_URL` est une configuration d'infrastructure : l'`engine` SQLAlchemy
 est cree une seule fois au demarrage du process, avant qu'aucune session DB
-n'existe (`app/db/session.py`). Elle ne peut donc pas etre exposee comme un
+n'existe (`back/db/session.py`). Elle ne peut donc pas etre exposee comme un
 reglage editable depuis `/settings`, qui stocke ses valeurs dans la table
 `app_settings` de cette meme base : ce serait circulaire (il faut deja etre
 connecte a la DB pour lire un reglage qui indiquerait comment s'y
@@ -185,7 +204,9 @@ connecter).
 Le Docker Compose code `DATABASE_URL` et `MEDIA_ROOT` en dur vers le service
 `db` local : `make up` ignore ces deux variables du `.env`. Il n'y a pas de
 cible Make pour lancer l'application hors Docker sur une base PostgreSQL ;
-`make demo` utilise une base SQLite jetable.
+`make demo` (`scripts/demo.sh`) lance le back sur une base SQLite jetable
+(port 8001) et le front qui l'appelle (port 8000), tous deux rechargés a
+chaque modification du code.
 
 ## Integration continue (`ci.yml`)
 

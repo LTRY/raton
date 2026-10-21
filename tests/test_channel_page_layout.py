@@ -5,19 +5,19 @@ import re
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.web.shared import LIBRARY_PAGE_SIZE
-from app.web.video_library import shorts_feature_flags
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.services.videos.library_view import LIBRARY_PAGE_SIZE
+from front.library import shorts_feature_flags
+from tests.site import site_client
 
 NOW = datetime(2026, 6, 1, tzinfo=UTC)
 
@@ -40,7 +40,7 @@ def make_client(keywords=None):
     db.flush()
     db.commit()
     app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app), db, channel
+    return site_client(), db, channel
 
 
 def add_video(db, channel, key, *, rating=0, is_new=False, short=False, age_days=0, **extra):
@@ -208,7 +208,7 @@ def test_shorts_mosaic_still_has_big_tiles_without_new_or_top_rated():
 def test_shorts_feature_flags_mix_priority_and_rhythm_with_a_minimum_gap():
     def cards(*states):
         return [
-            {"video": SimpleNamespace(is_new=state == "new", rating=5 if state == "star" else 2)}
+            SimpleNamespace(is_new=state == "new", rating=5 if state == "star" else 2)
             for state in states
         ]
 
@@ -257,7 +257,7 @@ def test_channel_page_opts_out_of_turbo_preview():
 
 
 def test_empty_channel_shows_the_raccoon_with_a_known_message():
-    from app.web.shared import CHANNEL_EMPTY_MESSAGES
+    from front.routes.videos import CHANNEL_EMPTY_MESSAGES
 
     client, db, channel = make_client()
 

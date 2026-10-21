@@ -3,24 +3,24 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.setting import AppSetting
-from app.models.video import Video
-from app.services.videos.library_view import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.setting import AppSetting
+from back.models.video import Video
+from back.services.videos.library_view import (
     LIBRARY_PAGE_SIZE,
     LibraryFilters,
     library_cards,
     library_listing,
     library_saved_views,
 )
+from tests.site import site_client
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -137,7 +137,7 @@ def test_videos_page_reads_its_filters_from_the_query_string(db):
     add_video(db, "unrated", channel, minutes=1)
     db.commit()
 
-    page = TestClient(app).get("/videos?asset_filters=1&asset=video&rated=1")
+    page = site_client().get("/videos?asset_filters=1&asset=video&rated=1")
 
     assert page.status_code == 200
     assert ">kept<" in page.text

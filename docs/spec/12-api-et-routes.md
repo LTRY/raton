@@ -3,7 +3,15 @@ title: "12 API et routes"
 ---
 # 12 API et routes
 
-## Routes HTML principales
+## Pages et formulaires du front (`front/routes/`)
+
+Toutes les routes de cette section sont celles du front (`front/`) : une
+page lit ses donnees par `/api`, une route de formulaire (repli sans
+JavaScript) appelle `/api` puis redirige (303). Le front relaie aussi vers le
+back tous les appels `/api/*` du navigateur (`front/proxy.py`), si bien que
+les adresses `/api` ci-dessous valent pour les deux ports. Une erreur de
+l'API sur une page (fiche, chaine ou playlist inconnue) est repondue avec le
+meme statut et le meme `detail`.
 
 Chaines :
 
@@ -45,10 +53,6 @@ Chaines :
   recuperation du profil de la chaine (`run_channel_profile_refresh_job`),
   redirige (303) vers `next` avec un message (`404` si la chaine n'existe
   pas).
-- `GET /channels/{id}/avatar` et `GET /channels/{id}/banner` : servent l'image
-  de profil (`Cache-Control: public, max-age=86400`) ; `404` si la chaine ou
-  l'image n'existe pas, ou si le chemin stocke sort de `_channels/` (garde
-  `is_relative_to`, comme les routes media des videos).
 - `POST /channels/{id}/delete` : supprimer la chaine et ses fiches (cascade en
   base ; les fichiers des videos sur disque ne sont pas effaces, seul le
   dossier de profil `_channels/<yt_channel_id>/` l'est). Declenchee depuis la page
@@ -123,10 +127,6 @@ Videos :
   et la lecture est rapportee par `POST /api/videos/{id}/activity` : ni l'un ni
   l'autre n'a de route HTML.
 - `GET /videos/{id}` : detail video.
-- `GET /videos/{id}/thumbnail` : vignette.
-- `GET /videos/{id}/subtitles` : sous-titres bruts.
-- `GET /videos/{id}/audio` : stream audio.
-- `GET /videos/{id}/video` : stream video.
 - `POST /videos/{id}/media/{media_type}/delete` : supprimer un format local
   (`audio` ou `video`) ; utilisee uniquement depuis la page detail video.
 - `POST /videos/{id}/media/{media_type}/download` : telecharger le format
@@ -154,7 +154,7 @@ Videos :
 - `POST /videos/{id}/sponsors/fetch` : rechercher les segments sponsorises via l'API publique SponsorBlock — **seule source** — pour les categories activees (`/settings`) ; remplace uniquement les lignes `source="sponsorblock"` de la video. Redirige vers `/videos/{id}?message=...#segments-sponsors` (l'ancre ouvre l'onglet Segments ; `level=error` en cas d'echec) — voir [08 Medias et lecteurs](08-medias-et-lecteurs.md). Meme recherche : `POST /api/videos/{id}/sponsor-segments/fetch`.
 - `GET /videos/import` : page du formulaire de telechargement manuel (entree Import du menu Bibliotheque).
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
-- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`app/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Redirige vers la fiche ; repli sans JavaScript de `POST /api/videos/upload`, qu'appelle la page d'import. Pas de transcript ni de metadonnees YouTube.
+- `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`back/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Redirige vers la fiche ; repli sans JavaScript de `POST /api/videos/upload`, qu'appelle la page d'import. Pas de transcript ni de metadonnees YouTube.
 - `POST /videos/share-import` : point d'entree du raccourci iOS de la feuille de
   partage (Safari/YouTube). Champ de formulaire `url` ; seuls les liens
   YouTube (`youtube.com`, `m.`/`music.`, `youtu.be`) sont acceptes (400 JSON
@@ -165,7 +165,6 @@ Videos :
   avec l'hote utilise par l'appelant). Echec de l'import : 502 JSON avec
   `message`. Jamais de redirection. Sans authentification : reseau local /
   WireGuard uniquement.
-- `POST /videos/import-metadata` : import metadata video.
 
 Parametres et divers :
 
@@ -185,13 +184,18 @@ categories d'une chaine, d'une fiche ou d'une playlist se lisent toujours
 ne sort pas de l'API).
 
 Erreurs : toute erreur de `/api` repond `{"detail": "<message en francais>"}`
-(`ErrorRead`, `app/api/errors.py`). Un refus metier porte le message du
+(`ErrorRead`, `back/api/errors.py`). Un refus metier porte le message du
 service (`400`, `404`, `409`, `502`) ; une requete invalide repond `422` avec
 un `detail` lisible (`Requête invalide : state : champ obligatoire.`) et
-`errors`, la liste `{field, message}` des champs en cause (les routes HTML
-gardent la reponse `422` par defaut de FastAPI). Chaque route declare dans le
-schema OpenAPI les codes d'erreur qu'elle peut repondre, et toutes ses
-reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
+`errors`, la liste `{field, message}` des champs en cause (les routes du
+front gardent la reponse `422` par defaut de FastAPI). Chaque route declare
+dans le schema OpenAPI les codes d'erreur qu'elle peut repondre, et toutes
+ses reponses sont typees ; le schema est servi par le back (`/docs`, port
+8001), le front n'en a pas.
+
+Les dates-heures sont en ISO 8601, les durees en secondes, les tailles en
+octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
+« 1,2 Go ») est l'affaire de chaque client.
 `tests/test_api_contract.py` verifie ces regles.
 
 - `GET /api/channels?sort=…&rated=true|false&q=…&page=N` : une page de 50
@@ -201,14 +205,23 @@ reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
   sont listees sauf `rated=true`. Repond `{items, sort, page, total_pages,
   total}` ; chaque chaine `{id, url, name, yt_channel_id, rating,
   categories, auto_metadata_enabled, auto_shorts_enabled, created_at,
-  video_count, last_played_at}` (`last_played_at` : derniere lecture d'une de
-  ses fiches, `null` sinon). Le nombre de requetes ne depend pas du nombre de
+  avatar_url, banner_url, metadata_fetched_at, video_count, last_played_at}`
+  (`last_played_at` : derniere lecture d'une de ses fiches, `null` sinon). Le nombre de requetes ne depend pas du nombre de
   chaines affichees.
 - `GET /api/channels/{id}` : la chaine plus son profil : `description`,
-  `keywords` (liste), `avatar_url` et `banner_url` (`/channels/{id}/avatar`,
-  `/channels/{id}/banner`, `null` sans image), `metadata_fetched_at`,
+  `keywords` (liste), `avatar_url` et `banner_url` (`/api/channels/{id}/avatar`,
+  `/api/channels/{id}/banner`, `null` sans image), `metadata_fetched_at`,
   `last_scanned_at`, `video_count`.
-- `POST /api/channels` `{url, rating}` (`rating` facultatif, `1`) : lance aussi
+- `GET /api/channels/names` : toutes les chaines `{id, name}` par nom (le
+  selecteur de chaine de `/videos`).
+- `GET /api/youtube/channels?q=<nom>` : les chaines YouTube qui
+  correspondent a un nom, `{yt_channel_id, name, handle, url,
+  subscriber_count, description, thumbnail_url, existing}` (`existing` :
+  `{id, name}` de la chaine si elle est deja dans la bibliotheque) ; `502
+  Recherche YouTube impossible : …` si YouTube echoue.
+- `POST /api/channels` `{url, rating, categories}` (`rating` facultatif, `1` ;
+  `categories` facultatives) : `url` doit etre une URL ou un `@handle` (`422`
+  sinon : un nom se cherche avec `GET /api/youtube/channels`) ; lance aussi
   le rattrapage du profil en arriere-plan ; `409` si la chaine est deja dans
   la bibliotheque, reconnue par son identifiant YouTube quelle que soit l'URL
   donnee (meme regle que le formulaire de `/channels`) ; `400 La note doit
@@ -221,7 +234,8 @@ reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
   liste `/videos`). Repond `{items: [...], page, total_pages, total}` ; une
   `page` au-dela de la derniere renvoie la derniere, `page=0` donne `422`.
 - `GET /api/videos/{id}` : ce que montre la page de la fiche, en valeurs
-  brutes (meme service `detail_view` que `GET /videos/{id}`) : les champs de
+  brutes (meme service `detail_view` ; la page `GET /videos/{id}` du front
+  la lit) : les champs de
   `GET /api/videos`, plus `is_new`, `list_state` (choix enregistre, pas
   l'etat deduit de la lecture), `comment`, `duration_seconds`, `watched_at`,
   `media_urls` (`video`, `audio`, `thumbnail`, `subtitles` : la route qui sert
@@ -232,8 +246,12 @@ reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
   `documents` (`transcript`, `notes`, `short_summary`, `suggested_questions`,
   `chat_messages`), `sponsor_segments` (segments actifs), `skip_segments` et
   `sponsor_skip_enabled` (comme `GET /api/videos/{id}/sponsor-segments`),
-  `resume_positions` (`{video|audio: {position_seconds, at_ms}}`) et
-  `playlists` (`{playlist_id, title, item_id}`). Lecture seule :
+  `resume_positions` (`{video|audio: {position_seconds, at_ms}}`),
+  `playlists` (`{playlist_id, title, item_id}`), `channel` (`{id, name}`),
+  `badges` (ce que contient la fiche, dans l'ordre des badges : `new`,
+  `audio`, `video`, `metadata`, `transcript`, `notes`, `imported`),
+  `has_transcript` (un transcript est enregistre) et `subtitles_vtt` (le
+  fichier `.vtt`, `null` sans sous-titres). Lecture seule :
   contrairement a la page, ne sort pas la fiche des Nouveautes. `404` si la
   fiche n'existe pas.
 - `GET /api/library` : la liste de la bibliotheque (ou la page d'une chaine)
@@ -252,9 +270,20 @@ reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
   cartes (champs de `GET /api/videos` plus `channel_name`,
   `duration_seconds`, `view_count`, `is_new`, `list_state`, `has_video`,
   `has_audio`, `has_thumbnail`, `playback` `{position_seconds,
-  duration_seconds, progress_percent, is_completed}` ou `null`),
-  `saved_views` les vues enregistrees avec `active`. `404` si `channel_id`
-  ne designe aucune chaine. Le nombre de requetes SQL ne depend pas de la
+  duration_seconds, progress_percent, is_completed}` ou `null`, et ce que la
+  carte affiche : `shown_state` (`normal`, `watched`, `hidden` : le choix
+  enregistre, sinon deduit de la lecture), `auto_state` (l'etat deduit de la
+  lecture seule, ce que « clear » ramene), `replay_category` (fiche d'une
+  categorie « sans barre de progression » : ni barre ni Vu automatique)),
+  `saved_views` les vues enregistrees avec `active`, et pour la page d'une
+  chaine `publication_interval_days` (jours medians entre deux publications,
+  `null` sous deux jours), `explore_next_page` (la page du catalogue YouTube
+  qu'« Explorer la suite » importe) et `explore_page_size`. Une fiche
+  ancienne sans chaine recoit la sienne (et ses labels) en etant listee.
+  `404` si `channel_id` ne designe aucune chaine.
+- `GET /api/library/cards?ids=1,2,3` : les cartes de ces fiches (memes
+  champs que `items`), dans cet ordre, les inconnues ignorees (au plus 200) :
+  la page d'une chaine y ajoute les fiches qu'une exploration importe. Le nombre de requetes SQL ne depend pas de la
   taille de la bibliotheque.
 - `PUT /api/videos/{id}/rating` `{rating}` : note de 0 a 5, repond l'etat de
   la fiche (voir Actions sur une fiche) ; `400 La note doit être comprise
@@ -267,28 +296,50 @@ reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
   activees et la meme normalisation (tri/fusion/rejet des segments < 1 s) que
   la page detail — voir [05 Modele de donnees](05-modele-de-donnees.md) et
   [08 Medias et lecteurs](08-medias-et-lecteurs.md).
-- `GET /api/stats` : `{channels, videos, used_bytes, quota_bytes}`, memes
-  compteurs que la page `/settings`.
+- `GET /api/stats` : `{channels, rated_channels, videos, regular_videos,
+  shorts, downloaded_media, transcripts, used_bytes, quota_bytes,
+  storage_percent}`, les compteurs de la page `/settings`.
 - `GET /api/stats/charts` : memes donnees que la page `/stats` (stockage et
   fiches par chaine, par format, par mois) — voir
   [11 Interface HTML](11-interface-html.md). Chaque type de stockage et chaque
   format porte sa part (`percent`) ; plus `purged` (fiches purgees par mois),
   `spend` (depense LLM par mois), `quota_bytes` et `quota_percent`. `monthly`
   garde toute la fenetre de 12 mois : la page, elle, en retire les premiers
-  mois vides et en tire son dessin (`monthly_view`).
+  mois vides et en tire son dessin (`front/charts.py:monthly_view`).
 - `GET /api/rag` : ce que montre `/rag` (`rag_dashboard_data`) : `buckets`
   (etape de chaque fiche), `pipeline` (etat du balayage, lot en cours,
   prochain passage), `next_batch`, `in_flight_videos`, `jobs`, `history`,
   `chunks`, `channels`, `failures`, `parameters`. Dates en ISO 8601,
-  `pipeline.next_sweep_in` en duree ISO 8601 (`PT17H35M…`) ; les libelles et
+  `pipeline.next_sweep_in_seconds` en secondes ; les libelles et
   `family` (couleur) des etapes sont ceux de la page.
-- `GET /api/settings`
-- `PUT /api/settings`
+- `GET /api/auto-notes` : le dernier lot de notes automatiques,
+  `{last_run_at, last_run_summary}`.
+- `GET /api/settings` : les reglages de `/settings` (`media_root`,
+  `global_quota_bytes`, `video_category_labels`,
+  `video_category_label_styles`, `video_library_views`,
+  `no_progress_category_labels`, `auto_notes_enabled`,
+  `auto_notes_excluded_category_labels`, `sponsor_segment_categories`,
+  `sponsor_skip_enabled`, `screen_time_limits` en minutes par type et par
+  periode), plus `sponsor_segment_category_choices` (`{value, label}` de
+  chaque categorie SponsorBlock) et `llm_provider_label` (qui repond aux
+  demandes au LLM, fixe par l'environnement).
+- `PUT /api/settings` : memes champs (sauf les deux derniers), chacun
+  facultatif ; `screen_time_today_minutes` `{video, short, podcast, music}`
+  fixe les limites du jour. Les listes sont normalisees ; une liste vide de
+  categories ou de vues enregistrees ramene les valeurs par defaut.
+- `GET /api/categories` : les categories et leurs couleurs `{label, color}`,
+  dans leur ordre, sans lire les autres reglages : ce qu'il faut a une page
+  pour colorer ses labels.
 - `GET /api/jobs?status=…` : les 100 derniers jobs du journal
   (`download_jobs`, comme `/logs`), le plus recent d'abord : `{id, status,
   message, channel_id, video_id, created_at, done}` ; `status` (repetable)
-  ne garde que ces statuts. Remplace `GET /api/errors`, qui listait deja tous
-  les statuts.
+  ne garde que ces statuts.
+- `GET /api/logs?filter=all|errors|warnings|running&q=…&page=N` : le journal
+  page par page (50), le plus recent d'abord, ce que montre `/logs` : `{rows,
+  page, total_pages, total, filter_counts, last_24h_counts}`, chaque ligne
+  comme `GET /api/jobs` plus `video` `{id, title}` et `channel` `{id, name}`.
+  `q` cherche dans le message, le titre de la fiche et le nom de la chaine ;
+  les compteurs (par filtre, et sur 24 h) ignorent `q`.
 
 ### Actions sur une chaine
 
@@ -327,15 +378,17 @@ introuvable` si la playlist n'existe pas. Une playlist se lit `{id, title,
 source, source_url, yt_playlist_id, categories, free_listening,
 created_at}`.
 
-- `GET /api/playlists` : toutes les playlists, la plus recente d'abord, plus
-  `item_count` et `cover_video_id` (premiere fiche, `null` si vide). Nombre de
+- `GET /api/playlists[?sort=title]` : toutes les playlists, la plus recente
+  d'abord (ou par titre), plus `item_count`, `cover_video_id` (premiere
+  fiche, `null` si vide) et `cover_has_thumbnail`. Nombre de
   requetes constant.
 - `POST /api/playlists` `{title}` : creation manuelle, `201` ; `400 Le titre
   est obligatoire.` pour un titre vide.
 - `GET /api/playlists/{id}` : la playlist plus `stats` `{count,
   total_duration_seconds, seen_count, missing_audio, missing_video}` et
   `items` dans l'ordre (`{item_id, position, added_at, video_id, title,
-  channel_name, duration_seconds, has_audio, has_video, seen}`).
+  channel_name, duration_seconds, has_audio, has_video, has_thumbnail, url,
+  seen}`).
 - `GET /api/playlists/{id}/export.csv` : meme fichier que `GET
   /playlists/{id}/export.csv` (`playlist-<id>.csv`, format Takeout par
   playlist, relisible par `POST /api/playlists/import-csv`).
@@ -448,15 +501,58 @@ watched_at}`.
   chaine en `cancelled` (bouton × de la bulle) : l'import s'arrete avant la
   fiche suivante ; repond l'etat du job.
 
+### Tableau de bord
+
+- `GET /api/nouveautes?page=N` : `{stacks, page, total_pages}`, une pile par
+  chaine suivie, 10 chaines par page (`page` compte des chaines) ; chaque pile
+  `{channel: {id, name}, items}` avec les 10 fiches les plus recentes des
+  types que suivent ses cloches, en cartes de `GET /api/library`.
+- `GET /api/historique?page=N` : la derniere lecture de chaque media, la plus
+  recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds}` ;
+  chaque ligne `{job_id, created_at, day, video, channel, playback,
+  shown_state, auto_state, replay_category}`, `day` etant le jour local sous
+  lequel elle se range, `video` `{id, title, rating, file_size_bytes,
+  list_state, categories, badges}` (`null` si la fiche a ete supprimee) et
+  `playback` `{action, media_label, title, position_seconds,
+  duration_seconds, watched_seconds, progress_percent, is_completed}`.
+  `day_seconds` : le temps de lecture de chaque jour de la page, toutes les
+  lectures du jour comptees.
+- `GET /api/screen-time` : `{periods}`, le temps de lecture par periode
+  (`today`, `week`, `month`) et par type (`video`, `short`, `podcast`,
+  `music`) : `{seconds, count, limit_minutes}`.
+- `POST /api/raton/visit` : une visite de l'accueil, enregistree ; repond la
+  replique a afficher `{id, line, art, cta_label, cta_href, closing}` (`art` :
+  un fichier de `front/static/img/raton/`). Voir [18 Raton](18-raton-scenarios.md).
+- `GET /api/raton/variations` : toutes les repliques de chaque scenario,
+  sans condition ni comptage de visite.
+
+### Medias
+
+Les fichiers d'une fiche ou d'une chaine, lus sur le volume media du back
+(`back/api/media.py`) ; voir « Reponses media » plus bas et
+[15 Securite](15-securite.md).
+
+- `GET /api/videos/{id}/thumbnail[?w=320|640]` : la vignette (copie reduite si
+  elle existe), `Cache-Control: public, max-age=86400`.
+- `GET /api/videos/{id}/subtitles` : le `.vtt`.
+- `GET|HEAD /api/videos/{id}/audio` et `/api/videos/{id}/video` : le flux,
+  avec `Range` (`206`, `416`).
+- `GET /api/channels/{id}/avatar` et `/api/channels/{id}/banner` : l'image de
+  profil (`Cache-Control: public, max-age=86400`) ; `404` si la chaine ou
+  l'image n'existe pas, ou si le chemin stocke sort de `_channels/`.
+
 ### Scan
 
+- `GET /api/scan` : `{running, last_event_id, last_at, last_status,
+  last_imported}` : un scan tourne-t-il, ou reprendre le flux d'evenements,
+  et le resultat du dernier scan.
 - `POST /api/scan` : lance le scan des chaines suivies (meme traitement que le
   cron de 3h, via `scheduled_scan`) en tache de fond ; `202 {after}` (`after` :
   dernier identifiant d'evenement emis avant ce scan), `409 Un scan est déjà
   en cours.` si un scan tourne.
 - `GET /api/scan/events?after=N` : evenements du scan emis apres `N`,
   `{events: [{id, level, message, final}], last_id, running}`. Flux en memoire
-  du processus (`app/services/ingest/scan_events.py`), pas une table.
+  du processus (`back/services/ingest/scan_events.py`), pas une table.
 
 ### Import de fiches
 
@@ -469,6 +565,12 @@ watched_at}`.
   video ou audio comme `POST /videos/upload` ; `201 {video_id, created}`
   (`created` vaut `false` si le meme contenu etait deja importe), `400` pour
   une extension refusee.
+- `POST /api/videos/share-import` `{url}` : importe tout de suite un lien
+  YouTube partage depuis le telephone (metadonnees et transcript, sans
+  media) et attend la fin : `{job_id, status, message, video_id}` ; `400` si
+  le lien n'est pas YouTube, `502` si l'import echoue (le message dit
+  pourquoi). La route `POST /videos/share-import` du front l'appelle pour le
+  raccourci iOS.
 
 Les messages d'erreur de `/api` (champ `detail`) sont en francais, comme
 ceux des pages HTML : une erreur levee par un service renvoie son propre

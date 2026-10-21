@@ -8,7 +8,7 @@ choisit ce qu'il dit et quel dessin il montre, et sert de carnet d'idées : tout
 ce qui est prévu y figure, branché ou non, avec le dessin encore à faire.
 
 La source de vérité du code est le catalogue `CATALOGUE` de
-`app/services/raton/scenarios.py`. Ce document le reprend ; en cas d'écart, le code et cette
+`back/services/raton/scenarios.py`. Ce document le reprend ; en cas d'écart, le code et cette
 page doivent être corrigés dans le même changement.
 
 ## Place dans l'accueil
@@ -60,8 +60,8 @@ Autres règles :
 | 3. Tirage | `defaut` | Toujours vrai | « Alors, qu'est-ce qu'on s'envoie aujourd'hui ? » | `popcorn.webp` |
 
 Seuils : `LONG_ABSENCE_DAYS` et `CLOSING_RATIO` en tête de
-`app/services/raton/scenarios.py`, `SESSION_GAP` en tête de
-`app/services/raton/visits.py`.
+`back/services/raton/scenarios.py`, `SESSION_GAP` en tête de
+`back/services/raton/visits.py`.
 
 Données utilisées :
 
@@ -110,7 +110,7 @@ réseau local : à trancher avant tout développement.
 
 ## Dessins
 
-Fichiers dans `app/static/img/raton/`, en WebP **encre sur fond transparent**
+Fichiers dans `front/static/img/raton/`, en WebP **encre sur fond transparent**
 (l'opacité vient de l'obscurité du trait) pour que le dessin se pose sur le
 fond crème de la page. Un nouveau dessin (fond blanc cassé en entrée) se
 convertit de la même façon : niveau de gris inversé en canal alpha, couleur
@@ -130,7 +130,9 @@ unie `#2b2018`.
 | `cafetiere.webp` | Raton, tasse à la main, devant une cafetière qui goutte | `matin_tot` |
 | `hamac_dos.webp` | Raton couché dans un hamac, lune derrière | « Les vidéos seront encore là demain… » |
 
-`missing_art()` dans `app/services/raton/picker.py` liste les scénarios sans dessin dédié.
+`missing_art()` dans `back/services/raton/picker.py` liste les scénarios sans dessin dédié ;
+les dessins sont des fichiers du front (`front/static/img/raton/`), et un test vérifie que
+chaque dessin déclaré y est.
 Dessins à faire : les idées parquées ci-dessus.
 
 ## Ajouter ou brancher un scénario
@@ -139,7 +141,7 @@ Dessins à faire : les idées parquées ci-dessus.
 2. Pour l'activer : `active=True`, une `stage` (absence, accueil ou tirage) et une
    fonction dans `CONDITIONS` portant le même `id` (un test vérifie que les deux
    listes coïncident).
-3. Déposer le dessin dans `app/static/img/raton/` et renseigner `art` ; une phrase
+3. Déposer le dessin dans `front/static/img/raton/` et renseigner `art` ; une phrase
    qui a son propre dessin s'écrit `("texte", "fichier.webp")`.
 4. Mettre à jour les tableaux ci-dessus.
 

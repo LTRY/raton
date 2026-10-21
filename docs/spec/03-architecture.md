@@ -7,7 +7,8 @@ title: "03 Architecture"
 
 - Python 3.14
 - FastAPI
-- Jinja2 templates
+- Jinja2 templates (front)
+- httpx (front -> API)
 - SQLAlchemy ORM
 - Alembic migrations
 - PostgreSQL 16 en Docker Compose
@@ -16,31 +17,128 @@ title: "03 Architecture"
 - APScheduler pour scans planifies
 - API Anthropic pour generation des documents et chat
 
-## Modules applicatifs
+## Deux dossiers : `back/` et `front/`
 
-### `app/main.py`
+Raton est decoupe en deux applications FastAPI, chacune dans son dossier, qui
+peuvent tourner dans deux conteneurs (voir
+[04 Configuration et deploiement](04-configuration-et-deploiement.md)) :
 
-Contient uniquement :
+- **`back/`** : l'API JSON sous `/api` et tout ce qui la sert — services
+  (regles metier), modeles, DB, migrations, jobs de fond, scheduler, fichiers
+  medias. Seul le back lit la DB, le dossier media et les secrets.
+- **`front/`** : les pages HTML (Jinja, rendues cote serveur), leurs
+  feuilles de style et scripts, et les replis sans JavaScript des
+  formulaires. Le front n'importe **jamais** le back : il lit et ecrit tout
+  par l'API, en HTTP (`front/api.py`, adresse `RATON_API_URL`), comme le ferait
+  un autre front (une SPA, une app native) ou un serveur MCP.
 
-- composition FastAPI ;
-- lifespan ;
-- inclusion des routers API et Web ;
-- montage des fichiers statiques.
+`tests/test_code_structure.py` verifie la frontiere : `front/` n'importe
+rien de `back/`, `back/` rien de `front/`, et seuls `front/api.py` et
+`front/proxy.py` parlent HTTP.
 
-`app/main.py` ne doit recevoir ni route ni helper : une nouvelle route va
-dans le module `app/web/routes/` correspondant (a creer s'il n'existe pas),
-un helper dans `app/web/` ou `app/services/`.
+Ce qui decide d'un comportement (un filtre, un etat Vu/Ecartee deduit de la
+lecture, la categorie « sans barre de progression », la pagination, un tri)
+est calcule par le back et arrive tout fait dans la reponse de l'API ; le
+front ne fait que le mettre en forme (dates et durees en francais, couleurs,
+regroupement par jour, liens) et l'afficher.
 
-L'ordre des `include_router` est l'ordre de resolution des routes : API,
-media, parametres, playlists, puis tableau de bord, chaines, videos,
-transcript et chat bibliotheque.
+## Modules du back
 
-### `app/templates/_macros.html`
+### `back/main.py`
 
-Macro Jinja partagee `video_card(card, next_path, category_style_map, no_progress_categories=[],
-channel_mode=False, feature=False, index=0)` : rend une carte video (vignette
-pleine hauteur, titre, meta, progression de lecture, notation — sans labels
-techniques ni categories). Utilisee par `videos.html`, `channel_videos.html`,
+Contient uniquement la composition FastAPI, le lifespan (tables de demo,
+reglages par defaut, scheduler) et les middlewares (gzip, verification
+d'origine, chronometrage). Aucune route : une route va dans le module
+`back/api/` de son sujet.
+
+### `back/api/`
+
+L'API JSON sous `/api`, un module par sujet : `channels.py` (chaines,
+recherche YouTube, import CSV des abonnements), `videos.py` (fiches et leurs
+actions), `media.py` (vignettes, sous-titres, flux audio/video avec `Range`,
+avatars et bannieres, tous verifies sous le dossier de la fiche ou des
+chaines), `imports.py` (telechargement manuel, import de fichier, import du
+raccourci iOS), `library.py` (`GET /api/library` et les cartes par
+identifiants), `dashboard.py` (Nouveautes, Historique, temps d'ecran),
+`playlists.py`, `llm.py` (demandes au LLM, leurs jobs, cout reel), `jobs.py`
+(journal des jobs, page des logs, etat d'un job), `scan.py` (scan des chaines
+a la demande, son etat et son flux d'evenements), `stats.py` (`/stats`,
+`/rag`, dernier lot de notes automatiques), `settings.py` (reglages et
+categories), `raton.py` (la replique de Raton). `__init__.py` les assemble en
+un seul routeur, inclus par `back/main.py` ; chaque module a son tag OpenAPI,
+et le schema (`/docs` du back) decrit toute l'API. `cards.py` construit la
+carte d'une fiche commune a toutes les listes, `lookups.py` trouve
+l'enregistrement qu'un chemin designe (fiche, chaine, playlist, element) ou
+repond `404` avec le message du service, `errors.py` le format d'erreur
+commun.
+
+### `back/core/`
+
+Configuration, journal applicatif, et les middlewares HTTP du back :
+`compression.py` (gzip du texte seulement), `same_origin.py` (refus des
+ecritures inter-sites), `request_timing.py` (duree et nombre de requetes SQL
+de chaque requete).
+
+### `back/services/`
+
+Les regles metier, rangees en paquets par domaine (`common`, `youtube`,
+`llm`, `media`, `channels`, `ingest`, `playlists`, `videos`, `raton`, `rag`,
+`library_chat`, `jobs`) : role de chaque paquet et de chaque module,
+dependances autorisees et regles de structure dans
+[10 Services](10-services.md).
+
+## Modules du front
+
+### `front/main.py`
+
+Composition de l'app des pages : middlewares (gzip, verification d'origine
+des formulaires), `/static`, le relais `/api/*` et les routeurs de
+`front/routes/`. Une erreur de l'API sur une page (fiche inconnue...) est
+repondue avec le meme statut et le meme `detail`.
+
+### `front/api.py` et `front/proxy.py`
+
+`api.py` : le client de l'API qu'utilisent les routes des pages ; un refus
+leve `ApiError` avec le message francais du back. `proxy.py` : le relais des
+appels `/api/*` du navigateur vers le back (corps et reponses en flux,
+`Range` compris) ; il transmet les en-tetes `Host`, `Origin` et
+`Sec-Fetch-*` d'origine, si bien que la verification d'origine du back
+s'applique aux ecritures du navigateur. Pages et API partagent donc une seule
+origine : pas de CORS.
+
+### `front/records.py`
+
+Le JSON de l'API en objets pour les templates (`Record`) : les dates-heures
+ISO redeviennent des `datetime`.
+
+### `front/routes/`
+
+Une page par sujet, et les routes de formulaire qui servent de repli sans
+JavaScript (elles appellent l'API puis redirigent) : `dashboard.py`
+(accueil, Nouveautes, Historique), `videos.py` (bibliotheque, page d'une
+chaine, fiche, import, raccourci iOS `/videos/share-import`), `channels.py`,
+`playlists.py`, `stats.py` (`/stats`, `/rag`), `settings.py` (`/settings`,
+`/logs`), `raton.py` (`/raton/variations`).
+
+### Mise en forme
+
+`formatting.py` (dates, durees, tailles, nombres, couleurs des categories),
+`cards.py` (badges, libelles de progression, jours de l'Historique, anneaux
+de temps d'ecran), `library.py` (de l'URL de `/videos` aux parametres de
+`GET /api/library`, pastilles de filtres, liens des vues enregistrees,
+mosaique des shorts, periodicite d'une chaine), `video_detail.py` (libelles
+de la fiche), `library_chat.py` (le widget du chat de l'accueil), `logs.py`
+(badges et jours de `/logs`), `charts.py` (dessin de `/stats`), `pages.py`
+(redirections, chemins de retour internes, liens de pagination), `forms.py`
+(champs des formulaires), `templating.py` (environnement Jinja et ses
+globals).
+
+### `front/templates/_macros.html`
+
+Macro Jinja partagee `video_card(card, next_path, category_style_map,
+channel_mode=False, feature=False, index=0, short_tile=False)` : rend une carte de fiche, a partir d'une carte de l'API (`LibraryVideoRead` : l'etat de grisage, l'etat deduit de la lecture et la categorie « sans barre de progression » sont donnes par l'API) — vignette
+pleine hauteur, titre, meta, progression de lecture, notation, sans labels
+techniques ni categories. Utilisee par `videos.html`, `channel_videos.html`,
 `dashboard.html` (section Nouveautes) et `dashboard_new_videos.html` pour
 garantir un rendu identique. `channel_mode` est reserve a la page d'une chaine
 (`channel_videos.html`) : pastille « Nouveau », progression sur la vignette,
@@ -50,15 +148,13 @@ Macro `numbered_pagination(current_page, total_pages, page_href)` :
 pagination numerotee de la page d'une chaine (la pagination « Precedent /
 Suivant » reste celle des autres pages).
 
-Macro Jinja partagee `video_stack_list(stacks, next_path, category_style_map,
-no_progress_categories=[])` : rend la section Nouveautes — une pile
+Macro Jinja partagee `video_stack_list(stacks, next_path, category_style_map)` : rend la section Nouveautes — une pile
 (`.video-stack`) par chaine, chacune enveloppant ses cartes `video_card`
 dans un carrousel navigable aux fleches (`.video-stack-carousel`). Utilisee
 par `dashboard.html` et `dashboard_new_videos.html`.
 
-Macro Jinja partagee `media_row(job, category_style_map,
-no_progress_categories=[])` : rend une ligne d'activite "Historique"
-(reprise de lecture). Utilisee par `dashboard.html` et `dashboard_history.html`.
+Macro Jinja partagee `media_row(row, category_style_map)` : rend une ligne "Historique"
+(une ligne de `GET /api/historique`). Utilisee par `dashboard.html` et `dashboard_history.html`.
 
 La ligne affiche le titre, les labels techniques et categories, la chaine, la
 progression de lecture, puis une derniere ligne qui porte le poids du fichier
@@ -66,141 +162,11 @@ a gauche et les actions Vu/Ecartee + la notation a droite. Elle ne repete ni la
 date de publication ni la date de lecture : le bloc de journee qui la contient
 donne deja le jour (voir [02 Fonctionnalites](02-fonctionnalites.md)).
 
-### `app/web/shared.py`
-
-Contient les helpers web communs :
-
-- instance Jinja2 partagee ;
-- redirections `303` ;
-- validation des chemins de retour internes ;
-- parsing/serialisation des categories pour formulaires ;
-- pagination (`paginate`, `page_href_builder`) et chemin de la requete
-  courante ;
-- lecture de `metadata.json` (`video_metadata`) et labels techniques d'une
-  video ;
-- globals Jinja partages.
-
-`app/web/shared.py` ne depend d'aucun autre module de `app/web/` : les
-modules ci-dessous l'importent, jamais l'inverse.
-
-### `app/web/formatting.py`
-
-Formatage pour l'affichage : durees longues, tailles de stockage et de fichier,
-nombre de vues, periodicite de publication d'une chaine. Enregistre les
-globals Jinja de formatage. Les durees `m:ss` et leur lecture
-(`format_duration`, `format_compact_duration`, `parse_duration_label`) sont
-dans `app/services/common/durations.py`, car le service de lecture les utilise.
-
-### `app/web/playback.py`
-
-Affichage de l'activite de lecture : couleur et pourcentage des anneaux de
-temps d'ecran (`playback_time_dashboard`), regroupement de l'historique par
-jour (`history_day_groups`). Le calcul est dans `app/services/videos/playback.py`.
-
-### `app/web/video_library.py`
-
-Helpers HTTP de la bibliotheque video : lecture des filtres/tri/recherche
-depuis la requete (`library_filters_from_request`, qui ajoute les defauts de
-la page : types de fichiers preselectionnes, `filter_mode`, mode `and` des
-Notees), liens des vues sauvegardees, pastilles de filtres actifs, mosaique
-des shorts. Les regles de validation des filtres sont dans
-`library_filters` (`app/services/videos/library_view.py`), partagees avec
-`GET /api/library`.
-
-Ce que la page montre pour un jeu de filtres (chaine et section, page de
-fiches, compteurs, cartes, vues enregistrees actives) est calcule sans HTTP
-par `app/services/videos/library_view.py` : la route ne fait que lire la
-requete, appeler ces fonctions et construire les liens. Un autre client
-(`/api`, un autre front) appelle les memes fonctions avec un
-`LibraryFilters`. Les filtres eux-memes (en Python et en SQL) et l'etat de
-liste Vu/Ecartee sont dans `app/services/videos/`.
-
-### `app/web/video_detail.py`
-
-Contexte du template de la page d'une fiche : libelles (durees, nombres de
-vues, categories de segments sponsors), lien et libelle de retour, config du
-widget de discussion. Les donnees elles-memes (documents, sous-titres,
-metadonnees, segments, positions de reprise) viennent brutes de
-`app/services/videos/detail_view.py`, qui sert aussi tout autre client de
-la fiche.
-
-### `app/web/library_chat.py`
-
-Config du widget du chat de la bibliotheque sur l'accueil : messages deja
-echanges, note de couverture de l'index et requetes proposees par le menu.
-
-### `app/web/routes/dashboard.py`
-
-Tableau de bord (`/`), pages `/dashboard/nouveautes` et
-`/dashboard/historique`, et leur contexte (`dashboard_context`, piles
-Nouveautes).
-
-### `app/web/routes/channels.py`
-
-Page `/channels`, ajout, import CSV d'abonnements, notation, categories,
-cloche (`auto-metadata`), import de metadonnees et suppression d'une chaine.
-
-### `app/web/routes/videos.py`
-
-Bibliotheque `/videos`, page detail `/videos/{id}`, page d'import et replis
-sans JavaScript de ses formulaires (categories, commentaire, note, segments
-sponsors, telechargements manuels, import de fichier), plus l'import du
-raccourci iOS (`/videos/share-import`).
-
-### `app/web/routes/transcript.py`
-
-Routes `/videos/{id}/transcript*` : redirection vers l'onglet transcript de
-la fiche et repli sans JavaScript de la generation des notes. La discussion
-et le suivi des jobs LLM n'existent que dans `/api` (`app/api/llm.py`).
-
-### `app/web/routes/media.py`
-
-Contient les routes de fichiers locaux :
-
-- vignettes ;
-- sous-titres ;
-- streaming audio/video avec `Range` ;
-- suppression audio/video.
-
-Les routes media ne doivent servir que des fichiers situes sous
-`video.folder_path`.
-
-### `app/web/routes/settings.py`
-
-Contient :
-
-- page parametres ;
-- formulaire parametres ;
-- page logs.
-
-### `app/api/`
-
-L'API JSON sous `/api`, un module par sujet : `channels.py` (chaines et
-import CSV des abonnements), `videos.py` (fiches et leurs actions),
-`imports.py` (telechargement manuel et import de fichier),
-`library.py` (`GET /api/library`), `playlists.py`, `llm.py` (demandes au LLM
-et leurs jobs), `jobs.py` (journal et etat des jobs de telechargement et
-d'import), `scan.py` (scan des chaines a la demande et son flux d'evenements), `stats.py` (`/stats` et `/rag`), `settings.py`. `__init__.py` les
-assemble en un seul routeur, inclus par `app/main.py` ; chaque module a son
-tag OpenAPI, et le schema (`/docs`) ne decrit que `/api` (les routes HTML en
-sont exclues). `lookups.py` trouve l'enregistrement qu'un chemin designe
-(fiche, chaine, playlist, element) ou repond `404` avec le message du
-service, `errors.py` le format d'erreur commun. Chaque route appelle le meme
-service que son equivalent HTML.
-
 Le JavaScript des pages (`app.js`, `playlist-player.js`) n'appelle que
-`/api` : un formulaire porte son jumeau dans `data-api-action`, et son
-`action` HTML reste le repli sans JavaScript, qui ne fait que rediriger. Les
-routes HTML ne repondent jamais en JSON (seule exception :
-`POST /videos/share-import`, appelee par le raccourci iOS).
-
-### `app/services/`
-
-Les regles metier, rangees en paquets par domaine (`common`, `youtube`,
-`llm`, `media`, `channels`, `ingest`, `playlists`, `videos`, `raton`, `rag`,
-`library_chat`, `jobs`) : role de chaque paquet et de chaque module,
-dependances autorisees et regles de structure dans
-[10 Services](10-services.md).
+`/api` (relaye par le front) : un formulaire porte son jumeau dans
+`data-api-action`, et son `action` HTML reste le repli sans JavaScript, qui
+ne fait que rediriger. Les routes du front ne repondent jamais en JSON (seule
+exception : `POST /videos/share-import`, appelee par le raccourci iOS).
 
 ## Flux de donnees
 
@@ -217,7 +183,7 @@ YouTube subtitles -> .vtt/.srt/.json3 -> transcript.txt -> clean/notes/chat via 
 Pour les players :
 
 ```text
-Browser <video>/<audio> -> /videos/{id}/video|audio -> StreamingResponse Range -> media file
+Browser <video>/<audio> -> /api/videos/{id}/video|audio -> relais du front -> back : StreamingResponse Range -> media file
 ```
 
 ## Contraintes d'architecture
@@ -226,9 +192,9 @@ Browser <video>/<audio> -> /videos/{id}/video|audio -> StreamingResponse Range -
 - Les fichiers ne doivent etre deplaces vers le dossier final qu'apres succes.
 - Ajouter un format a une fiche existante doit merger les fichiers staging dans
   le dossier final sans supprimer l'autre format.
-- Les routes media restent isolees dans `app/web/routes/media.py`.
-- Les templates restent server-rendered, sans framework frontend. Turbo Drive
-  (`app/static/js/vendor/`) accelere la navigation entre pages deja rendues
+- Les routes media restent isolees dans `back/api/media.py`.
+- Le front ne lit les donnees que par l'API ; ses templates restent server-rendered, sans framework frontend. Turbo Drive
+  (`front/static/js/vendor/`) accelere la navigation entre pages deja rendues
   cote serveur (voir [11 Interface HTML](11-interface-html.md)) mais ne
   change pas ce modele : pas de composants, pas d'etat client, pas d'etape de
   build.

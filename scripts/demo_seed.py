@@ -11,10 +11,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.base import *  # noqa: F403  (registers every model on Base.metadata)
-from app.db.session import Base, SessionLocal, engine
-from app.models.channel import Channel
-from app.models.video import Video
+from back.db.base import *  # noqa: F403  (registers every model on Base.metadata)
+from back.db.session import Base, SessionLocal, engine
+from back.models.channel import Channel
+from back.models.video import Video
 
 DEMO_CHANNELS = [
     ("Atelier du code", "UCdemo000000000000000001", True),

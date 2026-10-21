@@ -7,7 +7,7 @@ title: "08 Medias et lecteurs"
 
 ### Thumbnail
 
-`GET /videos/{id}/thumbnail`
+`GET /api/videos/{id}/thumbnail`
 
 - sert `thumbnail_path` ;
 - valide que le fichier existe ;
@@ -26,7 +26,7 @@ copies reduites y sont floues sur telephone).
 
 ### Audio
 
-`GET /videos/{id}/audio`
+`GET /api/videos/{id}/audio`
 
 - sert `audio_path` ;
 - valide que le fichier existe ;
@@ -38,7 +38,7 @@ copies reduites y sont floues sur telephone).
 
 ### Video
 
-`GET /videos/{id}/video`
+`GET /api/videos/{id}/video`
 
 - sert `video_path` ;
 - valide que le fichier existe ;
@@ -53,9 +53,9 @@ copies reduites y sont floues sur telephone).
 Sur `/videos/{id}`, si `video_path` existe :
 
 ```html
-<video controls preload="metadata" poster="/videos/{id}/thumbnail">
-  <source src="/videos/{id}/video">
-  <track kind="subtitles" src="/videos/{id}/subtitles" label="Sous-titres">
+<video controls preload="metadata" poster="/api/videos/{id}/thumbnail">
+  <source src="/api/videos/{id}/video">
+  <track kind="subtitles" src="/api/videos/{id}/subtitles" label="Sous-titres">
 </video>
 ```
 
@@ -84,7 +84,7 @@ Si `audio_path` **et** `video_path` existent tous les deux (cas rare, formats
 combines), le lecteur audio inline reste inchange :
 
 ```html
-<audio controls preload="metadata" src="/videos/{id}/audio"></audio>
+<audio controls preload="metadata" src="/api/videos/{id}/audio"></audio>
 ```
 
 Le lecteur video (toujours natif, `<video controls>`) n'est pas concerne par
@@ -149,7 +149,7 @@ bouton (`format-toggle-loading`, `-active`, `-error`).
 ## Reprise de la position de lecture
 
 Les trois lecteurs (`<video>`, `<audio>` inline, mini-lecteur) reprennent la
-lecture la ou elle s'etait arretee (`app/static/js/app.js`,
+lecture la ou elle s'etait arretee (`front/static/js/app.js`,
 `bindResumableMedia` et `initMiniPlayer`, helpers partages
 `readStoredResume`/`writeStoredResume`/`resolveResumePosition`).
 
@@ -160,7 +160,7 @@ La position est connue a deux endroits :
   cle soeur `...:at` porte l'horodatage (ms) de la derniere ecriture ;
 - **serveur** : le journal d'activite (`POST /api/videos/{id}/activity`, jobs
   `played`) contient deja `position_seconds`. `latest_playback_positions`
-  (`app/services/videos/playback.py`) en extrait la derniere position par type de media, et
+  (`back/services/videos/playback.py`) en extrait la derniere position par type de media, et
   `/videos/{id}` l'expose sur le lecteur via `data-resume-server-position` /
   `data-resume-server-at` (et `data-track-resume-server-*` sur le bouton
   "Ecouter").
@@ -198,7 +198,7 @@ reprend que depuis le `localStorage` de l'appareil.
 
 ## Mini-lecteur persistant (audio seul)
 
-Barre fixe en bas de l'ecran (`#mini-player`, `app/templates/base.html`),
+Barre fixe en bas de l'ecran (`#mini-player`, `front/templates/base.html`),
 presente sur toutes les pages, masquee tant qu'aucune piste
 audio-seule n'a ete lancee. Elle contient un unique element natif `<audio>`
 partage entre toutes les pages : `data-turbo-permanent` (Turbo Drive) fait
@@ -215,7 +215,7 @@ channel, src, thumb, resume-key, activity-url, detail-url) :
 
 - le bouton "Ecouter" sur `/videos/{id}` pour une video audio-seule ;
 - un bouton play en superposition sur la vignette de chaque carte
-  audio-seule dans `video_card` (`app/templates/_macros.html`), utilise a la
+  audio-seule dans `video_card` (`front/templates/_macros.html`), utilise a la
   fois par `/videos`, la section Nouveautes du dashboard, et
   `/dashboard/nouveautes` (`dashboard_new_videos.html`).
 
@@ -244,14 +244,14 @@ Cliquer un point d'entree deja en cours de lecture bascule play/pause au lieu
 de relancer la piste depuis le debut. Reprise de position (voir "Reprise de
 la position de lecture" ci-dessus, cle
 `raton:media-position:{id}:audio`) et log d'activite (`POST /api/videos/{id}/activity`) fonctionnent comme
-pour les lecteurs video/audio classiques (`app/static/js/app.js`,
+pour les lecteurs video/audio classiques (`front/static/js/app.js`,
 `initMiniPlayer`).
 
 ## Video vue et fichiers retires
 
 Le seuil de 90 % de lecture est evalue cote serveur par
 `POST /api/videos/{id}/activity` (`record_playback_activity`, qui appelle
-`mark_watched_if_complete`, `app/services/videos/playback.py`) : la premiere fois que
+`mark_watched_if_complete`, `back/services/videos/playback.py`) : la premiere fois que
 `position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
 seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont
 decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).
@@ -265,7 +265,7 @@ retelecharger.
 ## Segments sponsorisés
 
 Sur `/videos/{id}`, la liste des segments détectés s'affiche dans son propre
-onglet **Segments** (`app/templates/video_detail.html`,
+onglet **Segments** (`front/templates/video_detail.html`,
 `data-tab="segments"`/`data-tab-panel="segments"`, bloc `#segments-sponsors`)
 — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)
 pour la place de cet onglet dans la barre.
@@ -298,7 +298,7 @@ dédiée au saut.
 
 Chaque segment affiché est listé avec sa plage horaire et le libellé de sa
 catégorie. La plage horaire est un bouton cliquable
-(`data-seek-time="{{ segment.start_seconds }}"`, `app/static/js/app.js`) qui
+(`data-seek-time="{{ segment.start_seconds }}"`, `front/static/js/app.js`) qui
 déplace la tête de lecture à cet instant et relance la lecture — un seek
 manuel au clic, indépendant du saut automatique. Deux cas selon le type de
 lecteur présent sur la page :
@@ -313,7 +313,7 @@ lecteur présent sur la page :
   dès l'évènement `loadedmetadata` du mini-lecteur.
 
 Recherche SponsorBlock automatique : un téléchargement manuel réussi
-(`app/services/ingest/manual_download.py:download_manual_media`) déclenche automatiquement
+(`back/services/ingest/manual_download.py:download_manual_media`) déclenche automatiquement
 la même recherche SponsorBlock que le bouton, sur les catégories activées
 dans `/settings` — best-effort, une erreur (réseau, API indisponible) est
 avalée silencieusement sans faire échouer le téléchargement ; le bouton
@@ -329,7 +329,7 @@ automatiquement les segments détectés", **coché par défaut**, voir
 par-dessus les segments détectés. Le saut est armé sur les **trois** lecteurs
 de l'app : le `<video>` et le `<audio>` de `/videos/{id}`, et le mini-lecteur
 persistant. Le moteur est une fonction unique partagée,
-`bindSponsorSkip(media, { visual })` (`app/static/js/app.js`), idempotente :
+`bindSponsorSkip(media, { visual })` (`front/static/js/app.js`), idempotente :
 un lecteur déjà armé n'est jamais réarmé, seule sa liste de segments est
 remplacée.
 
@@ -360,7 +360,7 @@ Séquence d'un saut :
    est **le volume réglé par l'utilisateur**, jamais `1.0` : remonter à `1.0`
    au fondu entrant augmenterait le son à chaque saut. Sur le `<video>`
    uniquement, la classe `sponsor-skip-fading` déclenche en parallèle un fondu
-   d'opacité de même durée (`app/static/css/tailwind.input.css`) ;
+   d'opacité de même durée (`front/static/css/tailwind.input.css`) ;
 3. **revalidation** avant le seek : le fondu a duré au moins 250 ms, pendant
    lesquelles l'utilisateur a pu chercher ailleurs ou changer de piste. Si la
    tête de lecture n'est plus dans ce même segment, le volume est restauré

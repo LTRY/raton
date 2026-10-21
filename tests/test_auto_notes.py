@@ -9,28 +9,29 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.llm_job import LlmJob
-from app.models.video import Video
-from app.services.common.settings import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.llm_job import LlmJob
+from back.models.video import Video
+from back.services.common.settings import (
     AUTO_NOTES_ENABLED_KEY,
     AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY,
     get_setting,
     set_setting,
 )
-from app.services.llm.prompts import Prompt, build_auto_notes_prompt, split_auto_notes_result
-from app.services.llm.provider import AnthropicProvider, BatchEntry
-from app.services.rag import auto_notes
-from app.services.rag import indexing as rag_indexing
-from app.services.rag.auto_notes import (
+from back.services.llm.prompts import Prompt, build_auto_notes_prompt, split_auto_notes_result
+from back.services.llm.provider import AnthropicProvider, BatchEntry
+from back.services.rag import auto_notes
+from back.services.rag import indexing as rag_indexing
+from back.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
     BATCH_SUBMITTED_AT_KEY,
     eligible_videos,
     run_auto_notes_sweep,
 )
+from tests.site import site_client
 
 LONG_TRANSCRIPT = "Une phrase du transcript. " * 40  # > MIN_TRANSCRIPT_CHARS
 ANSWER = """# Résumé
@@ -516,11 +517,10 @@ def test_batch_results_maps_outcomes_and_halves_the_price(monkeypatch):
 
 @pytest.fixture
 def settings_client():
-    from fastapi.testclient import TestClient
     from sqlalchemy.pool import StaticPool
 
-    from app.db.session import get_db
-    from app.main import app
+    from back.db.session import get_db
+    from back.main import app
 
     engine = create_engine(
         "sqlite+pysqlite:///:memory:",
@@ -531,7 +531,7 @@ def settings_client():
     session = sessionmaker(bind=engine, expire_on_commit=False)()
     app.dependency_overrides[get_db] = lambda: session
     try:
-        yield TestClient(app), session
+        yield site_client(), session
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -552,17 +552,16 @@ def test_settings_page_shows_the_card_with_the_defaults(settings_client):
 
 
 def test_settings_form_saves_the_switch_and_the_exclusions(settings_client):
-    from app.web.routes import settings as settings_routes
+    client, db = settings_client
 
-    _, db = settings_client
-
-    settings_routes.settings_form(
-        "/media",
-        1.0,
-        "",
-        db,
-        auto_notes_enabled="",
-        auto_notes_excluded_categories=["Science", "cuisine"],
+    client.post(
+        "/settings",
+        data={
+            "media_root": "/media",
+            "quota_gb": "1.0",
+            "auto_notes_excluded_categories": ["Science", "cuisine"],
+        },
+        follow_redirects=False,
     )
 
     assert get_setting(db, AUTO_NOTES_ENABLED_KEY, "true") == "false"

@@ -1,6 +1,6 @@
-from app.services.rag import retrieval as rag_retrieval
-from app.services.rag.embeddings import EmbeddingError
-from app.services.rag.retrieval import RetrievedChunk
+from back.services.rag import retrieval as rag_retrieval
+from back.services.rag.embeddings import EmbeddingError
+from back.services.rag.retrieval import RetrievedChunk
 
 
 def chunk(video_id, content="- fait"):

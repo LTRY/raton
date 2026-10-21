@@ -3,13 +3,13 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.services.media.media_storage import purge_watched_media
-from app.services.videos.playback import mark_watched_if_complete
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.services.media.media_storage import purge_watched_media
+from back.services.videos.playback import mark_watched_if_complete
 
 
 def make_session():

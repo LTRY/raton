@@ -3,19 +3,19 @@
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.web import job_logs
-from app.web.job_logs import LOG_PAGE_SIZE
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.services.common.job_log import LOG_PAGE_SIZE
+from front import logs as job_logs
+from tests.site import site_client
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def add_channel_video(db, name="Nota Bene", title="Les routes de la soie"):
 
 
 def get_logs(path="/logs"):
-    response = TestClient(app).get(path)
+    response = site_client().get(path)
     assert response.status_code == 200
     return response.text
 

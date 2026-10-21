@@ -3,8 +3,8 @@ title: "10 Services"
 ---
 # 10 Services
 
-Les règles métier de Raton vivent dans `app/services/`, rangées en paquets, un
-par domaine. Les routes HTML (`app/web/`) et `/api` (`app/api/`) les appellent :
+Les règles métier de Raton vivent dans `back/services/`, rangées en paquets, un
+par domaine. Les routes HTML (`front/`) et `/api` (`back/api/`) les appellent :
 elles lisent la requête, traduisent les erreurs en réponse HTTP, lancent les
 tâches de fond et rendent la page, sans écrire elles-mêmes dans la DB.
 
@@ -37,17 +37,17 @@ que des paquets situés plus haut dans ce tableau.
 | Règle | Pourquoi |
 |---|---|
 | Les dépendances entre paquets suivent la colonne « Dépend de » ; aucun paquet n'importe `jobs`. | Pas de cycle : chaque paquet se comprend et se teste avec ceux dont il dépend. |
-| Aucun service n'importe `app/web/`. | Un service sert aussi `/api` et les jobs, qui n'ont pas de requête HTTP. |
-| Rien sous `app/web/` ni `app/api/` n'écrit dans la DB. | Une règle métier ne s'écrit qu'une fois, dans un service. |
+| Aucun service n'importe `front/`. | Un service sert aussi `/api` et les jobs, qui n'ont pas de requête HTTP. |
+| Rien sous `front/` ni `back/api/` n'écrit dans la DB. | Une règle métier ne s'écrit qu'une fois, dans un service. |
 | Seul `jobs/` ouvre une session DB (`SessionLocal`). | Les autres services travaillent dans la session qu'on leur passe : une requête ou un job valide une seule unité de travail. |
-| Aucun modèle (`app/models/`) n'importe un service. | Les services s'appuient sur les modèles ; une constante qui dimensionne une colonne est définie à côté de la colonne. |
-| Chaque module est dans un paquet ; aucun ne reste à la racine de `app/services/`. | Le paquet dit à quel domaine appartient le module. |
+| Aucun modèle (`back/models/`) n'importe un service. | Les services s'appuient sur les modèles ; une constante qui dimensionne une colonne est définie à côté de la colonne. |
+| Chaque module est dans un paquet ; aucun ne reste à la racine de `back/services/`. | Le paquet dit à quel domaine appartient le module. |
 
 `tests/test_code_structure.py` fait respecter ces règles ; la table des
 dépendances y est `SERVICE_PACKAGE_DEPENDENCIES`.
 
-Hors de `app/services/` : le résumé du journal applicatif (`logs_digest`) est
-dans `app/core/`, à côté de `app/core/logging.py` qui écrit ce journal ; les
+Hors de `back/services/` : le résumé du journal applicatif (`logs_digest`) est
+dans `back/core/`, à côté de `back/core/logging.py` qui écrit ce journal ; les
 données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 `scripts/demo_seed.py`.
 
@@ -133,10 +133,10 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés |
+| `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés ; ce que contient une fiche (`video_badges`) |
 | `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
 | `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`, construit et validé par `library_filters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives ; sert `/videos` et `GET /api/library` |
-| `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture |
+| `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture ; catégories sans barre de progression (`card_list_states`) |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
@@ -144,6 +144,8 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
+| `nouveautes` | Les Nouveautés (`GET /api/nouveautes`) : une pile des fiches les plus récentes par chaîne suivie, paginée par chaîne |
+| `history` | L'Historique (`GET /api/historique`) : la dernière lecture de chaque média, jour local par jour local, et le temps de lecture de chaque jour de la page |
 
 ### `raton/`
 

@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block toasts %}
+{% if added_channel %}
+<div class="toast" role="status" data-toast data-toast-param="added_channel_id" data-turbo-temporary>
+  <p class="toast-text">Chaîne <strong>{{ added_channel.name }}</strong> ajoutée.</p>
+  <a class="toast-link" href="/videos?channel_id={{ added_channel.id }}">Voir la chaîne</a>
+  <button class="toast-close" type="button" data-toast-close aria-label="Fermer la notification">×</button>
+</div>
+{% endif %}
+{% endblock %}
+{% block content %}
+<section>
+  <div class="section-heading">
+    <h1>Chaînes</h1>
+    <details class="page-actions-menu">
+      <summary>+ Ajouter</summary>
+      <div class="page-actions-panel">
+        <details class="page-action">
+          <summary>Ajouter une chaîne</summary>
+          <form class="download-form channel-create-form" action="/channels" method="post">
+            <label>
+              Chaîne YouTube
+              <input name="url" type="text" placeholder="Nom ou URL de la chaîne" required>
+            </label>
+            <div class="category-editor video-import-category-editor">
+              <span class="category-editor-title">Catégories</span>
+              <span class="category-filter-options" aria-label="Catégories prédéfinies">
+                {% for category in category_filter_options %}
+                <label class="asset-filter-chip">
+                  <input name="preset_categories" type="checkbox" value="{{ category.label }}">
+                  <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
+                </label>
+                {% endfor %}
+              </span>
+              <label class="custom-category-field">
+                <span>Custom</span>
+                <input name="custom_categories" type="text" placeholder="ex. histoire, interview">
+              </label>
+            </div>
+            <button type="submit">Ajouter</button>
+          </form>
+        </details>
+        <details class="page-action">
+          <summary>Importer des abonnements (CSV)</summary>
+          <p class="csv-import-hint">Exporte tes abonnements YouTube (Google Takeout) et dépose le fichier CSV ici.</p>
+          <form class="csv-dropzone-form" action="/channels/import-csv" method="post" enctype="multipart/form-data" data-csv-dropzone-form data-turbo="false">
+            <label class="csv-dropzone" data-csv-dropzone for="csv-file-input">
+              <input id="csv-file-input" name="csv_file" type="file" accept=".csv,text/csv" data-csv-dropzone-input required>
+              <span class="csv-dropzone-icon" aria-hidden="true">⇪</span>
+              <span class="csv-dropzone-text" data-csv-dropzone-text>Glisse le fichier CSV ici, ou clique pour le choisir</span>
+            </label>
+            <button type="submit">Analyser le fichier</button>
+          </form>
+        </details>
+      </div>
+    </details>
+  </div>
+
+  {% if youtube_search %}
+  <div class="download-form channel-search-panel">
+    <div class="settings-category-header">
+      <h2>Chaînes YouTube pour « {{ youtube_search.query }} »</h2>
+      <a class="channel-search-close" href="{{ current_channels_path }}">Fermer</a>
+    </div>
+    {% if youtube_search.error %}
+    <p class="notice error">{{ youtube_search.error }}</p>
+    {% elif not youtube_search.results %}
+    <p class="empty-state">Aucune chaîne trouvée sur YouTube.</p>
+    {% else %}
+    <ul class="channel-search-list">
+      {% for result in youtube_search.results %}
+      <li class="channel-search-row">
+        {% if result.thumbnail_url %}
+        <img class="channel-search-avatar" src="{{ result.thumbnail_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">
+        {% else %}
+        <span class="channel-search-avatar" aria-hidden="true"></span>
+        {% endif %}
+        <div class="channel-search-text">
+          <span class="channel-search-name">{{ result.name }}</span>
+          <span class="channel-search-meta">
+            {{- [result.handle, format_subscribers(result.subscriber_count)] | select | join(" · ") -}}
+          </span>
+          {% if result.description %}<p class="channel-search-description">{{ result.description }}</p>{% endif %}
+        </div>
+        {% if result.existing %}
+        <a class="csv-import-badge" href="/videos?channel_id={{ result.existing.id }}">Déjà ajoutée</a>
+        {% else %}
+        <form action="/channels" method="post">
+          <input type="hidden" name="url" value="{{ result.url }}">
+          <input type="hidden" name="custom_categories" value="{{ youtube_search.categories }}">
+          <button type="submit">Ajouter</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if csv_preview %}
+  <div class="download-form csv-import-panel">
+    <div class="settings-category-header">
+      <h2>Abonnements trouvés</h2>
+      <output>{{ csv_preview.new_count }} nouvelle{{ 's' if csv_preview.new_count != 1 else '' }} · {{ csv_preview.existing_count }} déjà importée{{ 's' if csv_preview.existing_count != 1 else '' }}</output>
+    </div>
+    <form action="/channels/import-csv/confirm" method="post" data-turbo="false">
+      <div class="csv-import-list">
+        {% for row in csv_preview.rows %}
+        <label class="csv-import-row {{ 'csv-import-row-existing' if row.already_imported else '' }}">
+          {% if row.already_imported %}
+          <input type="checkbox" disabled>
+          {% else %}
+          <input type="checkbox" name="import_rows" value="{{ row.token }}" checked>
+          {% endif %}
+          <span class="csv-import-row-name">{{ row.name }}</span>
+          <span class="csv-import-row-url">{{ row.url }}</span>
+          {% if row.already_imported %}<span class="csv-import-badge">Déjà importée</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      <div class="csv-import-actions">
+        <button class="secondary" type="button" data-csv-select-all>Tout sélectionner</button>
+        <button class="secondary" type="button" data-csv-select-none>Tout désélectionner</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <form class="inline-form asset-filter-form channel-filter-form" action="/channels" method="get" data-auto-submit-filter data-live-search="channel-results">
+    <label class="search-field">
+      <span>Recherche</span>
+      <input name="q" type="search" value="{{ search_query|default('') }}" placeholder="Nom, label, URL, ID" autocomplete="off">
+    </label>
+    <span class="asset-filter-options" aria-label="Filtrer les chaînes">
+      <label class="asset-filter-chip">
+        <input name="rated" value="false" type="hidden">
+        <input name="rated" value="true" type="checkbox" {% if rated_filter|default(true) %}checked{% endif %}>
+        <span class="asset-label asset-label-rating">★ Notées</span>
+      </label>
+    </span>
+    <select name="sort" aria-label="Classer les chaînes">
+      <option value="activity" {% if selected_sort|default('activity') == "activity" %}selected{% endif %}>Dernier média joué</option>
+      <option value="rating" {% if selected_sort|default('activity') == "rating" %}selected{% endif %}>Note</option>
+      <option value="alpha" {% if selected_sort|default('activity') == "alpha" %}selected{% endif %}>A-Z</option>
+      <option value="added" {% if selected_sort|default('activity') == "added" %}selected{% endif %}>Ajoutées récemment</option>
+    </select>
+    <button class="visually-hidden" type="submit">Filtrer</button>
+  </form>
+
+  {# Everything that depends on `q` lives in this frame: live search swaps it
+     alone, so the search field keeps focus while typing. #}
+  <turbo-frame id="channel-results" class="live-results" target="_top">
+  <div class="section-heading">
+    <h2>{{ "Chaînes notées" if rated_filter|default(false) else "Chaînes configurées" }}</h2>
+    {% set visible_channel_count = total_channel_entry_count|default(channel_entries|default(channels|default([]))|length) %}
+    <span class="section-heading-actions">{{ visible_channel_count }} chaîne{{ "s" if visible_channel_count != 1 else "" }}</span>
+  </div>
+
+  <div class="channel-grid">
+    {% for entry in channel_entries|default(channels|default([])) %}
+    {% set channel = entry.channel if entry.channel is defined else entry %}
+    {% set asset_version = channel.metadata_fetched_at.timestamp()|int if channel.metadata_fetched_at else 0 %}
+    <article class="channel-card">
+      {% if channel.banner_url %}
+      <img class="channel-card-banner" src="{{ channel.banner_url }}?v={{ asset_version }}" alt="" loading="lazy">
+      {% else %}
+      <div class="channel-card-banner channel-banner-fallback" aria-hidden="true"></div>
+      {% endif %}
+      <div class="channel-card-body">
+        {% if channel.avatar_url %}
+        <img class="channel-avatar channel-card-avatar" src="{{ channel.avatar_url }}?v={{ asset_version }}" alt="" loading="lazy">
+        {% else %}
+        <span class="channel-avatar channel-card-avatar channel-avatar-initial" aria-hidden="true">{{ channel.name[:1]|upper }}</span>
+        {% endif %}
+        <a class="channel-card-name" href="/videos?channel_id={{ channel.id }}">{{ channel.name }}</a>
+        {% set selected_categories = channel.categories %}
+        {% if selected_categories %}
+        <span class="category-labels" aria-label="Catégories">
+          {% for category in selected_categories %}
+          {% set category_style = (category_style_map|default({})).get(category) %}
+          <span class="category-label" {% if category_style %}style="{{ video_category_css_style(category_style) }}"{% endif %}>{{ category }}</span>
+          {% endfor %}
+        </span>
+        {% endif %}
+        <p class="channel-card-meta">
+          {% if entry.video_count is defined %}<span>{{ entry.video_count }} fiche{{ "s" if entry.video_count != 1 else "" }}</span>{% endif %}
+          {% if entry.last_played_at is defined %}
+          <span>
+            Dernière activité :
+            {% if entry.last_played_at %}{{ format_french_datetime(entry.last_played_at) }}{% else %}aucune lecture{% endif %}
+          </span>
+          {% endif %}
+        </p>
+      </div>
+      <div class="channel-card-actions">
+        <div class="channel-card-bells">
+          {% for bell_section, bell_label, bell_on in [('videos', 'vidéos', channel.auto_metadata_enabled), ('shorts', 'shorts', channel.auto_shorts_enabled)] %}
+          <form class="channel-bell-form" action="/channels/{{ channel.id }}/auto-metadata" method="post" data-bell-form>
+            <input type="hidden" name="next" value="{{ current_channels_path|default('/channels') }}">
+            <input type="hidden" name="section" value="{{ bell_section }}">
+            {# Same bell as the channel page: the corner badge tells videos (play) from shorts (portrait frame). #}
+            <button class="channel-bell-btn{{ ' active' if bell_on else '' }}" type="submit" aria-pressed="{{ 'true' if bell_on else 'false' }}" aria-label="{{ 'Désactiver' if bell_on else 'Activer' }} le suivi quotidien des {{ bell_label }} de {{ channel.name }}" title="{{ 'Suivi quotidien des ' ~ bell_label ~ ' activé' if bell_on else 'Activer le suivi quotidien des ' ~ bell_label }}">
+              <span class="channel-bell-ripple" aria-hidden="true"></span>
+              <svg class="channel-bell-icon" viewBox="0 0 24 24" fill="{{ 'currentColor' if bell_on else 'none' }}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"/><path d="M10 20a2 2 0 0 0 4 0" fill="none"/>{% if not bell_on %}<path class="channel-bell-slash" d="M4 4l16 16" stroke-dasharray="24"/>{% endif %}</svg>
+              <span class="channel-bell-badge" aria-hidden="true">
+                {% if bell_section == 'videos' %}<svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg>{% else %}<svg width="9" height="11" viewBox="0 0 16 24" fill="none" stroke="currentColor" stroke-width="3"><rect x="2" y="1.5" width="12" height="21" rx="3"/></svg>{% endif %}
+              </span>
+            </button>
+          </form>
+          {% endfor %}
+        </div>
+        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" data-rating-url="/api/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
+          <input type="hidden" name="next" value="{{ current_channels_path|default('/channels') }}">
+          {% for value in range(1, 6) %}
+          <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if channel.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
+            <span aria-hidden="true">★</span>
+          </button>
+          {% endfor %}
+          <button class="rating-star rating-star-empty" name="rating" value="0" type="submit" aria-label="Retirer la note" title="0 / 5">
+            <span aria-hidden="true">×</span>
+          </button>
+        </form>
+      </div>
+    </article>
+    {% else %}
+    <p class="empty-state">{% if search_query|default('') %}Aucun résultat pour « {{ search_query }} ».{% else %}Aucune chaîne configurée.{% endif %}</p>
+    {% endfor %}
+  </div>
+  {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
+  </turbo-frame>
+</section>
+{% endblock %}

@@ -3,26 +3,26 @@
 from datetime import UTC, datetime
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.llm_job import LlmJob
-from app.models.video import Video
-from app.services.llm.usage import llm_spend_by_month
-from app.services.videos.charts import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.llm_job import LlmJob
+from back.models.video import Video
+from back.services.llm.usage import llm_spend_by_month
+from back.services.videos.charts import (
     MONTHS_WINDOW,
     TOP_CHANNELS,
     library_chart_data,
-    monthly_view,
     purged_media_by_month,
 )
+from front.charts import monthly_view
+from tests.site import site_client
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -75,7 +75,7 @@ def test_empty_library(db):
     assert data["storage_by_channel"] == []
     assert len(data["monthly"]) == MONTHS_WINDOW
     assert all(month["cards_added"] == 0 for month in data["monthly"])
-    assert TestClient(app).get("/stats").status_code == 200
+    assert site_client().get("/stats").status_code == 200
 
 
 def test_channel_and_format_aggregation(db):
@@ -142,12 +142,12 @@ def test_monthly_window_and_cumulative_bytes(db):
 def test_stats_page_and_api(db):
     add_video(db, add_channel(db, "Nota Bene"), "a", size=2048)
 
-    page = TestClient(app).get("/stats")
+    page = site_client().get("/stats")
     assert page.status_code == 200
     assert "Nota Bene" in page.text
     assert "Stockage par chaîne" in page.text
 
-    payload = TestClient(app).get("/api/stats/charts").json()
+    payload = site_client().get("/api/stats/charts").json()
     assert payload["total_cards"] == 1
     assert payload["total_bytes"] == 2048
     # Everything the page shows around the charts, not only `library_chart_data`.
@@ -219,12 +219,12 @@ def test_llm_spend_by_month_groups_kinds_and_drops_leading_empty_months(db):
     assert october["height"] == 100
     assert spend["total"] == 2.0
     assert spend["current"] == 1.0
-    assert TestClient(app).get("/stats").text.count("Dépenses en modèle") == 1
+    assert site_client().get("/stats").text.count("Dépenses en modèle") == 1
 
 
 def test_llm_spend_absent_without_cost(db):
     assert llm_spend_by_month(db, now=NOW)["months"] == []
-    assert "Dépenses en modèle" not in TestClient(app).get("/stats").text
+    assert "Dépenses en modèle" not in site_client().get("/stats").text
 
 
 def test_purged_media_by_month_counts_purge_jobs_per_month(db):
@@ -248,7 +248,7 @@ def test_purged_media_by_month_counts_purge_jobs_per_month(db):
 
 
 def test_purged_media_card_only_when_something_was_purged(db):
-    client = TestClient(app)
+    client = site_client()
     assert "Médias supprimés automatiquement" not in client.get("/stats").text
     db.add(DownloadJob(status="purged", message="x"))
     db.commit()

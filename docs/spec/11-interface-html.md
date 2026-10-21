@@ -14,16 +14,16 @@ Palette "chaleureuse et personnelle" (terracotta/ambre sur fond creme,
 theme clair uniquement ; seul le mini-lecteur audio est sombre, couleurs en
 dur) et police Plus Jakarta Sans (Google Fonts,
 chargee depuis `<head>`), portees par des tokens CSS dans
-`app/static/css/tailwind.input.css`.
+`front/static/css/tailwind.input.css`.
 
 Icone de l'application : le raton laveur aux lunettes 3D et au pop-corn,
-`app/static/img/apple-touch-icon.png` (180 x 180, fond creme opaque : iOS
+`front/static/img/apple-touch-icon.png` (180 x 180, fond creme opaque : iOS
 n'accepte pas la transparence) declaree par `<link rel="apple-touch-icon">`
 dans `<head>`, et `favicon.png` (64 x 64) par `<link rel="icon">`. Sans
 elle, « Ajouter a l'ecran d'accueil » affiche la simple lettre « P ». Le nom
 sous l'icone vient de `apple-mobile-web-app-title` (« Raton »).
 
-Navigation pilotee par Turbo Drive (`app/static/js/vendor/turbo.min.js`,
+Navigation pilotee par Turbo Drive (`front/static/js/vendor/turbo.min.js`,
 vendored, charge dans `<head>` avec `data-turbo-track="reload"`) : les clics
 sur les liens et la plupart des soumissions de formulaire deviennent des
 visites en arriere-plan (fetch + remplacement du `<body>`) au lieu d'un
@@ -91,11 +91,11 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   (`selectinload`/`joinedload`), jamais une requete par ligne.
 - Une table qui grossit a chaque lecture (`download_jobs` de statut `played`)
   n'est jamais lue en entier pour un calcul qui ne regarde qu'une periode :
-  `recent_played_jobs` (`app/services/videos/playback.py`) borne la lecture aux 30 jours
+  `recent_played_jobs` (`back/services/videos/playback.py`) borne la lecture aux 30 jours
   des temps de lecture (aujourd'hui/7 jours/30 jours) et charge les videos
   d'un coup. `/settings` et `/dashboard/historique` l'utilisent.
 - Un fichier du disque (`metadata.json`, transcript) n'est pas relu pour chaque
-  ligne d'une liste. Une carte (`downloaded_video_card`, `app/services/videos/library_view.py`) ne lit aucun fichier :
+  ligne d'une liste. Une carte (`downloaded_video_card`, `back/services/videos/library_view.py`) ne lit aucun fichier :
   sa duree vient de `videos.duration_seconds`. Le media est parfois monte depuis une VM
   (Docker sur macOS) ou un `metadata.json` de ~140 Ko coute 20 a 100 ms a froid : le relire
   pour 100 cartes rendait `/dashboard/nouveautes` et `/videos` longs de
@@ -103,7 +103,7 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   Les pages `/playlists` et `/playlists/{id}` suivent la meme regle (duree et tri
   par duree depuis la colonne, `items`/`video`/`channel` charges d'avance).
   Les couvertures de `/playlists` sont chargees en une requete et rattachees a
-  leur element (`list_playlists`, `app/services/playlists/listing.py`) : la
+  leur element (`list_playlists`, `back/services/playlists/listing.py`) : la
   carte d'identite de la session ne garde que des references faibles, s'y fier
   coutait une requete par playlist. L'export CSV d'une playlist
   (`playlist_csv_export`) charge aussi ses elements et leurs fiches d'avance
@@ -117,7 +117,7 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
 
 Une page lente peut perdre son temps dans le SQL, le rendu, l'attente d'un
 thread, un CPU ou une VM saturee : le profil d'une seule page ne les distingue
-pas. `RequestTimingMiddleware` (`app/web/request_timing.py`) ecrit donc, pour
+pas. `RequestTimingMiddleware` (`back/core/request_timing.py`) ecrit donc, pour
 chaque requete, une ligne `raton.timing` :
 `GET /dashboard/nouveautes -> 200 312 ms (sql 13 stmts, 41 ms)`.
 
@@ -135,21 +135,21 @@ chaque requete, une ligne `raton.timing` :
 ### Polices et compression
 
 - La police Plus Jakarta Sans est servie par l'application
-  (`app/static/fonts/*.woff2`, police variable 200-800, licence OFL, sous-ensembles
+  (`front/static/fonts/*.woff2`, police variable 200-800, licence OFL, sous-ensembles
   `latin` et `latin-ext`), declaree par `@font-face` dans
-  `app/static/css/tailwind.input.css` avec `font-display: swap`, et prechargee
+  `front/static/css/tailwind.input.css` avec `font-display: swap`, et prechargee
   depuis `<head>`. Aucune requete vers un autre domaine n'est necessaire pour
   afficher une page : l'application fonctionne hors ligne.
 - Les reponses texte (HTML, CSS, JS, JSON, SVG) de plus de 1 Ko sont compressees
   en gzip quand le navigateur l'accepte (`TextGZipMiddleware`,
-  `app/web/compression.py`). Les flux audio/video et les images ne le sont
+  `back/core/compression.py`). Les flux audio/video et les images ne le sont
   jamais : deja compresses, et la compression casserait leurs `Range`.
 
 ### Vignettes des cartes
 
 La vignette d'une carte video (`video_card`, `_macros.html`) est une `<img>`
 `loading="lazy"` `decoding="async"` avec `srcset` sur les copies reduites
-(`/videos/{id}/thumbnail?w=320` et `?w=640`, voir
+(`/api/videos/{id}/thumbnail?w=320` et `?w=640`, voir
 [08 Medias et lecteurs](08-medias-et-lecteurs.md)), jamais un `background-image`
 (qui ne se charge pas a la demande). `sizes` est volontairement un peu sous la
 largeur reelle (100 px sur telephone) : un iPhone 3x prend alors la copie 320
@@ -214,7 +214,7 @@ declarent le meme meta, pour la meme raison : leurs cartes et lignes ont une
 animation d'entree (`pl-card-in`) qui se rejouait entre l'apercu du cache et
 la page fraiche, donnant l'impression que la page se chargeait deux fois.
 
-`app/static/js/app.js` est charge en fin de `<body>` (pas dans `<head>`) :
+`front/static/js/app.js` est charge en fin de `<body>` (pas dans `<head>`) :
 Turbo Drive re-execute les scripts de body a chaque visite, donc tout le
 fichier est enveloppe dans une IIFE (sinon les `const`/`let` de premier
 niveau declenchent une `SyntaxError` des la deuxieme page visitee).
@@ -236,7 +236,7 @@ Navigation principale :
 - Logs `/logs` (sur telephone, sans barre du haut ni onglet : par le lien
   « Voir tous les logs » de `/settings`)
 
-Barre d'onglets mobile (`.mobile-tabbar`, `app/templates/base.html`, visible
+Barre d'onglets mobile (`.mobile-tabbar`, `front/templates/base.html`, visible
 sous 800 px) : cinq onglets avec icone SVG seule (pas de libelle visible ; le nom de la page
 est dans `aria-label`) — Accueil `/`, Chaines `/channels`,
 **Bibliotheque** `/dashboard/nouveautes` (au centre), Playlists `/playlists`,
@@ -280,7 +280,7 @@ sinon.
 ### Verre liquide
 
 Les surfaces de verre partagent des variables posees sur `:root` de
-`app/static/css/tailwind.input.css` : `--glass-fill` (barres et controles),
+`front/static/css/tailwind.input.css` : `--glass-fill` (barres et controles),
 `--glass-fill-strong` (couches qui portent du texte), `--glass-rim`,
 `--glass-highlight`, `--glass-blur`, `--glass-blur-layer`, `--glass-saturate`,
 `--glass-fill-opaque` (feuilles qui doivent cacher ce qui est derriere) et
@@ -356,15 +356,15 @@ Bibliotheque = quatre vues reliees par une barre de sous-navigation commune
 - Toute date affichee dans l'interface utilise le format francais long
   `Lun. 20 juil. 2026` (jour abrege + point, jour, mois abrege + point,
   annee), et `Lun. 20 juil. 2026 14:32` quand une heure est jointe. Fonctions
-  `format_french_date`/`format_french_datetime` (`app/web/shared.py`,
+  `format_french_date`/`format_french_datetime` (`front/pages.py`,
   exposees comme globals Jinja) ; ne pas utiliser `isoformat()`/`strftime()`
   bruts dans les templates. `created_at.isoformat()` reste utilise tel quel
   dans les reponses JSON de `/api` (pas concerne).
 
 ## Statistiques
 
-Template : `stats.html`, route `GET /stats` (`app/web/routes/stats.py`),
-agregations dans `app/services/videos/charts.py`. Page sans JavaScript : les
+Template : `stats.html`, route `GET /stats` (`front/routes/stats.py`),
+agregations dans `back/services/videos/charts.py`. Page sans JavaScript : les
 graphiques sont des barres CSS (largeurs/hauteurs en pourcentage calcule cote
 serveur). Elle montre :
 
@@ -383,12 +383,12 @@ serveur). Elle montre :
   fenetre complete de 12 mois.
 
 - medias supprimes automatiquement par mois (`purged_media_by_month`,
-  `app/services/videos/charts.py`) : barres du nombre de videos dont la purge
+  `back/services/videos/charts.py`) : barres du nombre de videos dont la purge
   (`purge_watched_media`) a supprime les fichiers, comptees depuis les
   lignes `purged` de `download_jobs`, sur 12 mois sans les mois vides en tete ;
   total / mois en cours / moyenne en tete ; la carte est absente tant qu'aucune
   purge n'a eu lieu. Le poids libere n'est pas enregistre, donc pas affiche ;
-- depenses en modele par mois (`llm_spend_by_month`, `app/services/llm/usage.py`) :
+- depenses en modele par mois (`llm_spend_by_month`, `back/services/llm/usage.py`) :
   barres empilees par groupe de jobs (notes et resumes, nettoyage de
   transcript, discussions, autres), cout total au-dessus de chaque barre,
   total / mois en cours / moyenne en tete. Cout reel des `llm_jobs` ayant un
@@ -404,8 +404,8 @@ snapshots.
 
 ## Indexation RAG
 
-Template : `rag_dashboard.html`, route `GET /rag` (`app/web/routes/rag.py`),
-donnees dans `app/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
+Template : `rag_dashboard.html`, route `GET /rag` (`front/routes/stats.py`),
+donnees dans `back/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
 "Indexation RAG" dans une carte de `/settings` (ancre `#rag`). Page de lecture sans JavaScript,
 construite avec les cartes et barres CSS de `/stats` ; elle repond a "ou en
 est l'indexation des notes et que va faire le passage de la nuit ?" et sert
@@ -531,7 +531,7 @@ depend donc pas de la pagination.
 La vue `Historique` ne liste pas les lectures a plat : elle les regroupe
 par jour de lecture (`DownloadJob.created_at`, ramene au fuseau local du
 serveur comme les stats de temps de lecture — voir `history_day_groups` dans
-`app/web/playback.py`). Chaque journee est un bloc repliable a part entiere qui
+`front/cards.py`). Chaque journee est un bloc repliable a part entiere qui
 porte, dans son en-tete, le libelle du jour et le nombre de medias. Le rendu
 est la macro `history_day_list` (`_macros.html`).
 
@@ -563,7 +563,7 @@ progression" (reglable dans `/settings`, cle `no_progress_category_labels`,
 defaut **amv**/**musique** — voir « Parametres » plus bas).
 
 - Lecture terminee (`is_completed`, calcule dans `playback_activity_view`/
-  `app/services/videos/playback.py` a partir de la position et de la duree de lecture) et video
+  `back/services/videos/playback.py` a partir de la position et de la duree de lecture) et video
   hors de ces categories : la barre disparait et la carte est grisee
   (classe `video-row-watched` sur `/videos`/dashboard, `dashboard-media-row-completed`
   pour `Historique`) pour signaler que le media a ete vu en entier.
@@ -582,7 +582,7 @@ Les statistiques de la bibliotheque (fiches, transcripts, chaines, chaines
 actives, videos, shorts, medias, stockage utilise / quota avec jauge) et le
 carrousel "Temps de lecture" sont des cartes de `/settings` (ancres
 `#library-stats` et `#playback-time`), calculees par `library_stats_context`
-(`app/web/library_stats.py`, compteurs dans `app/services/videos/stats.py`). La carte stockage renvoie vers `/stats` (bouton
+(`front/routes/settings.py`, compteurs dans `back/services/videos/stats.py`). La carte stockage renvoie vers `/stats` (bouton
 "Voir les graphiques").
 
 Le carrousel "Temps de lecture" (`.screen-time-carousel`, periodes
@@ -595,14 +595,14 @@ reste le defilement vertical.
 ## Widget de chat (composant partage)
 
 Macro `chat_widget(widget_id, title, config, extra_class="")` dans
-`app/templates/_macros.html`, utilisee a la fois par la barre de la page d'accueil
+`front/templates/_macros.html`, utilisee a la fois par la barre de la page d'accueil
 (portee bibliotheque uniquement) et par la section discussion de
 `/videos/{id}` (portee video uniquement, placeholder "Discuter du
 contenu"). `title` vide (cas des deux pages) ⇒ ni icone, ni titre, ni sous-titre. Le rendu
 HTML est statique (aucun message ni bouton de bascule genere cote serveur
 au-dela du marquage) ; tout le rendu dynamique (messages, citations,
 bascule de portee, soumission/poll) est gere par `initChatWidget`
-(`app/static/js/app.js`), instancie automatiquement sur chaque element
+(`front/static/js/app.js`), instancie automatiquement sur chaque element
 `[data-chat-widget]` au chargement de la page a partir du JSON dans son
 attribut `data-chat-config` :
 
@@ -696,7 +696,7 @@ attribut `data-chat-config` :
   ("Ajoute la chaine de ") et y place le curseur, sans envoyer. Pour
   `library` : trouver une chaine, trouver une video, interroger les notes,
   ajouter une chaine YouTube (`LIBRARY_CHAT_SUGGESTIONS`,
-  `app/web/library_chat.py`).
+  `front/library_chat.py`).
 - A la soumission, la question est affichee immediatement en bulle et
   suivie d'une bulle "en train d'ecrire" ; les deux sont remplacees par la
   liste de messages renvoyee par le serveur (ou retirees par un nouveau rendu
@@ -725,7 +725,7 @@ attribut `data-chat-config` :
   d'abord, en puces pleines (`.chat-channel-chip`), puis les videos.
 - `coverageNote` (scope `library` uniquement) affiche combien de videos sont
   actuellement indexees pour la recherche dans les notes (`"12/773 videos indexees..."`),
-  calcule cote serveur (`library_chat_scope_config`, `app/web/library_chat.py`) a partir
+  calcule cote serveur (`library_chat_scope_config`, `front/library_chat.py`) a partir
   de `indexed_video_count`/`total_video_count` (voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)).
 - Les messages initiaux sont pre-rendus dans la config au chargement de la
@@ -783,7 +783,7 @@ Contenu :
   (`video_count` de chaque entree, `channels_context`). La description, les
   mots-cles et le bouton de rafraichissement du profil sont sur la page de la
   chaine, pas dans la liste. Les images sont servies par
-  `/channels/{id}/avatar` et `/channels/{id}/banner` ; un parametre `v` (date
+  `/api/channels/{id}/avatar` et `/api/channels/{id}/banner` ; un parametre `v` (date
   de recuperation du profil) force le navigateur a les recharger apres un
   rafraichissement ;
 - note sur 5 étoiles par chaine ;
@@ -804,7 +804,7 @@ La barre de recherche suit les regles de la section
 
 Templates : `playlists.html` (index), `playlist_detail.html` (detail). Styles
 `.pl-*` (index) et `.pld-*` (detail) dans `tailwind.input.css`, script du
-detail dans `app/static/js/playlist-player.js`.
+detail dans `front/static/js/playlist-player.js`.
 
 ### Index `/playlists`
 
@@ -850,7 +850,7 @@ Deux colonnes : panneau lecteur a gauche, file de lecture a droite.
   precedent, lecture/pause, suivant, boucle (aleatoire et boucle portent
   `aria-pressed`). En mode Audio la piste est une pochette carree (la vignette
   recadree) ; en mode Video, un `<video>` 16:9. Les deux modes partagent le meme
-  element media (`/videos/{id}/audio` ou `/videos/{id}/video`). La lecture
+  element media (`/api/videos/{id}/audio` ou `/api/videos/{id}/video`). La lecture
   journalise l'activite via `POST /api/videos/{id}/activity` (comme la page d'une
   video), sauf en **ecoute libre**.
 - **Infos et options** sous le lecteur : titre, labels de categories, source,
@@ -913,7 +913,7 @@ Les pages `/videos` et `/channels` ont chacune un champ `q` dans leur
 formulaire de filtres. La recherche s'ajoute aux filtres actifs (chaine,
 types de fichier, categories, "Notees"...) : elle ne les remplace pas.
 
-Correspondance (`search_rank` dans `app/services/common/search.py`) :
+Correspondance (`search_rank` dans `back/services/common/search.py`) :
 
 - la requete est decoupee en mots ; **tous** les mots doivent etre presents,
   dans n'importe quel ordre et dans n'importe quel champ (`python tuto`
@@ -1025,7 +1025,7 @@ qu'il tienne sur une ou deux lignes, et non au bas de la vignette.
 **Chaine sans fiche** : quand la liste est vide et qu'aucune recherche n'est
 active, la zone de resultats affiche un raton laveur
 (`static/img/raccoon-empty.png`, decoratif : `alt=""`) et, dessous, un message
-tire au hasard dans `CHANNEL_EMPTY_MESSAGES` (`app/web/shared.py`) a chaque
+tire au hasard dans `CHANNEL_EMPTY_MESSAGES` (`front/pages.py`) a chaque
 rendu — donc un nouveau message a chaque rafraichissement de la page. Une
 recherche sans resultat garde le texte « Aucun resultat pour « q ». ».
 
@@ -1118,7 +1118,7 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   3 colonnes sur telephone, flux `dense`). Un short nouveau (`is_new`) ou note 5
   (`.video-row-feature`) occupe une grande tuile 2×2 avec son titre en
   surimpression. Les grandes tuiles sont choisies par `shorts_feature_flags`
-  (`app/web/video_library.py`) : d'abord les nouveaux et les notes 5, dans
+  (`front/library.py`) : d'abord les nouveaux et les notes 5, dans
   l'ordre de la page, puis une tuile sur 7 (la premiere, la huitieme…) pour que
   la mosaique ne soit jamais plate. Deux grandes tuiles commencent toujours a
   au moins 6 positions d'ecart : un short prioritaire trop proche d'une grande
@@ -1251,7 +1251,7 @@ memorisee dans les vues enregistrees.
 
 Les cartes video n'exposent aucun bouton Audio/Video : le telechargement et la
 suppression d'un format se font depuis la page detail video
-(`video_detail.html`, macro `format_actions`). Cote client (`app/static/js/app.js`),
+(`video_detail.html`, macro `format_actions`). Cote client (`front/static/js/app.js`),
 une file traite ces telechargements en arriere-plan **sequentiellement** (un
 seul a la fois) ; `POST /api/videos/{id}/media/{type}/download` reutilise la meme
 file de jobs et le meme `GET /api/jobs/{id}` que le formulaire de
@@ -1405,8 +1405,8 @@ fixe (voir [13 Jobs, logs et planification](13-jobs-logs-planification.md)).
 
 ## Logs
 
-Template : `logs.html`. Helpers : `app/web/job_logs.py`. Route : `GET /logs` dans
-`app/web/routes/settings.py`.
+Template : `logs.html`. Helpers : `front/logs.py`. Route : `GET /logs` dans
+`front/routes/settings.py`.
 
 Meme langage visuel que la page d'une chaine (barre d'outils en pilules de 44px,
 cartes arrondies a filets, orange reserve aux etats actifs). Elements, de haut en

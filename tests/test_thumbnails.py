@@ -4,22 +4,22 @@ import shutil
 import subprocess
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.video import Video
-from app.services.media.thumbnails import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.video import Video
+from back.services.media.thumbnails import (
     THUMBNAIL_WIDTHS,
     backfill_video_thumbnails,
     ensure_video_thumbnails,
     thumbnail_variant_path,
 )
+from tests.site import site_client
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 
@@ -121,7 +121,7 @@ def test_a_missing_ffmpeg_or_file_never_raises(db, tmp_path, monkeypatch):
     (tmp_path / "cover.jpg").write_bytes(b"not an image")
     video.thumbnail_path = str(tmp_path / "cover.jpg")
     monkeypatch.setattr(
-        "app.services.media.thumbnails.subprocess.run",
+        "back.services.media.thumbnails.subprocess.run",
         lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("ffmpeg")),
     )
     assert ensure_video_thumbnails(video) is False
@@ -140,18 +140,18 @@ def test_backfill_creates_only_the_missing_copies(db, tmp_path):
 @needs_ffmpeg
 def test_route_serves_the_copy_and_falls_back_to_the_original(db, tmp_path):
     video, folder = make_video(db, tmp_path)
-    client = TestClient(app)
+    client = site_client()
     original = (folder / "cover.jpg").read_bytes()
 
     assert (
-        client.get(f"/videos/{video.id}/thumbnail?w=320").content == original
+        client.get(f"/api/videos/{video.id}/thumbnail?w=320").content == original
     )  # copies not made yet
     ensure_video_thumbnails(video)
-    small = client.get(f"/videos/{video.id}/thumbnail?w=320").content
+    small = client.get(f"/api/videos/{video.id}/thumbnail?w=320").content
     assert small == thumbnail_variant_path(folder, 320).read_bytes() != original
-    assert client.get(f"/videos/{video.id}/thumbnail").content == original
+    assert client.get(f"/api/videos/{video.id}/thumbnail").content == original
     assert (
-        client.get(f"/videos/{video.id}/thumbnail?w=999").content == original
+        client.get(f"/api/videos/{video.id}/thumbnail?w=999").content == original
     )  # unknown width: no new file
 
 
@@ -167,7 +167,7 @@ def test_cards_ask_for_the_small_copies_lazily(db, tmp_path):
     db.add(video)
     db.commit()
 
-    page = TestClient(app).get("/videos").text
+    page = site_client().get("/videos").text
 
     assert f"/videos/{video.id}/thumbnail?w=320 320w" in page
     assert f"/videos/{video.id}/thumbnail?w=640 640w" in page
@@ -191,7 +191,7 @@ def test_short_tiles_use_the_original_thumbnail(db, tmp_path):
     db.add(video)
     db.commit()
 
-    page = TestClient(app).get(f"/videos?channel_id={channel.id}&section=shorts").text
+    page = site_client().get(f"/videos?channel_id={channel.id}&section=shorts").text
 
-    assert f'class="video-row-thumb-img" src="/videos/{video.id}/thumbnail" alt=""' in page
+    assert f'class="video-row-thumb-img" src="/api/videos/{video.id}/thumbnail" alt=""' in page
     assert "srcset=" not in page

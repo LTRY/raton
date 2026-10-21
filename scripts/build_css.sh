@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compiles app/static/css/tailwind.input.css into app/static/css/app.css using
+# Compiles front/static/css/tailwind.input.css into front/static/css/app.css using
 # the Tailwind standalone CLI (no Node/npm required). The binary is cached in
 # .local/bin (gitignored) and downloaded on first use, matching the pattern
 # already used by .local/media and .local/*.db for machine-local state.
@@ -28,4 +28,4 @@ if [ ! -x "$BIN_PATH" ]; then
   chmod +x "$BIN_PATH"
 fi
 
-"$BIN_PATH" -i app/static/css/tailwind.input.css -o app/static/css/app.css --minify "$@"
+"$BIN_PATH" -i front/static/css/tailwind.input.css -o front/static/css/app.css --minify "$@"

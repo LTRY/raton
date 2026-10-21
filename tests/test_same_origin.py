@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.web.same_origin import SameOriginMiddleware
+from back.core.same_origin import SameOriginMiddleware
 
 
 def make_client(trusted=frozenset()):

@@ -1,15 +1,15 @@
 """Turbo cache behavior of the playlist pages (`playlists.html`, `playlist_detail.html`)."""
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.playlist import Playlist
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.playlist import Playlist
+from tests.site import site_client
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def client_and_playlist():
     db.commit()
     app.dependency_overrides[get_db] = lambda: db
     try:
-        yield TestClient(app), playlist
+        yield site_client(), playlist
     finally:
         app.dependency_overrides.clear()
 
@@ -54,8 +54,8 @@ def test_playlist_detail_shows_and_edits_labels(client_and_playlist):
 def test_playlist_rows_have_no_number_and_play_from_the_row(client_and_playlist):
     # The row number was replaced by whole-row playback (spec 11, "Lignes"):
     # no `.pld-num`, and a "⋯" menu for the actions on a phone.
-    from app.models.playlist import PlaylistItem
-    from app.models.video import Video
+    from back.models.playlist import PlaylistItem
+    from back.models.video import Video
 
     client, playlist = client_and_playlist
     db = app.dependency_overrides[get_db]()

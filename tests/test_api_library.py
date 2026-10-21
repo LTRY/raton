@@ -9,15 +9,15 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.setting import AppSetting
-from app.models.video import Video
-from app.services.common.library_views import VIDEO_ASSET_KINDS
-from app.web.video_library import VIDEO_ASSET_FILTER_OPTIONS
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.setting import AppSetting
+from back.models.video import Video
+from back.services.common.library_views import VIDEO_ASSET_KINDS
+from front.library import VIDEO_ASSET_FILTER_OPTIONS
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 

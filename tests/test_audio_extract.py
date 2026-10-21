@@ -7,12 +7,12 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.setting import AppSetting
-from app.models.video import TranscriptStatus, Video
-from app.services.ingest import manual_download, staging
-from app.services.media import audio_extract
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.setting import AppSetting
+from back.models.video import TranscriptStatus, Video
+from back.services.ingest import manual_download, staging
+from back.services.media import audio_extract
 
 MERGED = {
     "requested_formats": [

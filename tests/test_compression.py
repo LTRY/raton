@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, Response
 from fastapi.testclient import TestClient
 
-from app.web.compression import TextGZipMiddleware
+from back.core.compression import TextGZipMiddleware
 
 app = FastAPI()
 app.add_middleware(TextGZipMiddleware, minimum_size=1024)
@@ -61,6 +61,6 @@ def test_small_responses_are_left_as_they_are():
 
 
 def test_the_real_app_installs_the_middleware():
-    from app.main import app as real_app
+    from back.main import app as real_app
 
     assert any(middleware.cls is TextGZipMiddleware for middleware in real_app.user_middleware)

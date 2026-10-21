@@ -1,30 +1,27 @@
-import io
 from datetime import UTC, datetime
 
 import pytest
-from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from starlette.requests import Request
+from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.job import DownloadJob
-from app.models.playlist import Playlist, PlaylistItem
-from app.models.video import Video
-from app.services.common.job_log import log_job
-from app.services.ingest.throttle import RateLimitedError
-from app.services.jobs import downloads as downloads_jobs
-from app.services.jobs import playlists as playlists_jobs
-from app.services.jobs.playlists import run_playlist_csv_import_job
-from app.services.playlists import imports as playlists_service
-from app.services.playlists.editing import playlist_title_from_filename
-from app.services.playlists.imports import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.job import DownloadJob
+from back.models.playlist import Playlist, PlaylistItem
+from back.models.video import Video
+from back.services.common.job_log import log_job
+from back.services.ingest.throttle import RateLimitedError
+from back.services.jobs import downloads as downloads_jobs
+from back.services.jobs import playlists as playlists_jobs
+from back.services.jobs.playlists import run_playlist_csv_import_job
+from back.services.playlists import imports as playlists_service
+from back.services.playlists.editing import playlist_title_from_filename
+from back.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
     parse_playlist_csv,
 )
-from app.web.routes import playlists as playlists_routes
 
 CSV_SAMPLE = (
     "ID vidéo,Code temporel de création de la vidéo de la playlist\n"
@@ -34,23 +31,13 @@ CSV_SAMPLE = (
 
 
 def make_session():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)()
-
-
-def make_request(method="POST", path="/playlists", headers=None):
-    return Request(
-        {
-            "type": "http",
-            "method": method,
-            "path": path,
-            "query_string": b"",
-            "headers": headers or [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
 
 def add_video(db, yt_video_id="v1", title="V1"):
@@ -77,7 +64,7 @@ def fake_import_video_metadata(
     subtitle_source="auto",
     is_new=False,
 ):
-    """Stands in for app.services.ingest.scanner.import_video_metadata in tests:
+    """Stands in for back.services.ingest.scanner.import_video_metadata in tests:
     same get-or-create-by-yt_video_id idempotency, no yt-dlp/network calls.
     """
     yt_video_id = (preview or {}).get("id") or video_url.rsplit("v=", 1)[-1]
@@ -296,10 +283,11 @@ def test_same_video_reachable_via_two_playlists_creates_one_video_row(monkeypatc
 # --- routes: manual create / delete -----------------------------------------
 
 
-def test_create_playlist_manual_creates_row_and_redirects():
+def test_create_playlist_manual_creates_row_and_redirects(front_client):
     db = make_session()
+    client = front_client(db)
 
-    response = playlists_routes.create_playlist_manual(title="  My Playlist  ", db=db)
+    response = client.post("/playlists", data={"title": "  My Playlist  "}, follow_redirects=False)
 
     playlist = db.scalars(select(Playlist)).one()
     assert playlist.title == "My Playlist"
@@ -308,7 +296,7 @@ def test_create_playlist_manual_creates_row_and_redirects():
     assert response.headers["location"] == f"/playlists/{playlist.id}"
 
 
-def test_delete_playlist_leaves_video_intact():
+def test_delete_playlist_leaves_video_intact(front_client):
     db = make_session()
     playlist = Playlist(title="P", source="manual")
     video = add_video(db)
@@ -317,7 +305,9 @@ def test_delete_playlist_leaves_video_intact():
     db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
     db.commit()
 
-    playlists_routes.delete_playlist_route(playlist.id, db=db)
+    response = front_client(db).post(f"/playlists/{playlist.id}/delete", follow_redirects=False)
+
+    assert response.status_code == 303
 
     assert db.get(Playlist, playlist.id) is None
     assert db.get(Video, video.id) is not None
@@ -327,8 +317,9 @@ def test_delete_playlist_leaves_video_intact():
 # --- routes: remove / move items ------------------------------------------
 
 
-def test_move_and_remove_playlist_items_reorder_positions():
+def test_move_and_remove_playlist_items_reorder_positions(front_client):
     db = make_session()
+    client = front_client(db)
     playlist = Playlist(title="P", source="manual")
     v1 = add_video(db, "v1", "V1")
     v2 = add_video(db, "v2", "V2")
@@ -346,7 +337,12 @@ def test_move_and_remove_playlist_items_reorder_positions():
     ).all()
     assert [item.video_id for item in items] == [v1.id, v2.id, v3.id]
 
-    playlists_routes.move_playlist_item(playlist.id, items[2].id, direction="up", db=db)
+    response = client.post(
+        f"/playlists/{playlist.id}/items/{items[2].id}/move",
+        data={"direction": "up"},
+        follow_redirects=False,
+    )
+    assert response.headers["location"] == f"/playlists/{playlist.id}"
     items = db.scalars(
         select(PlaylistItem)
         .where(PlaylistItem.playlist_id == playlist.id)
@@ -354,7 +350,12 @@ def test_move_and_remove_playlist_items_reorder_positions():
     ).all()
     assert [item.video_id for item in items] == [v1.id, v3.id, v2.id]
 
-    playlists_routes.remove_playlist_item(playlist.id, items[1].id, return_to="", db=db)
+    response = client.post(
+        f"/playlists/{playlist.id}/items/{items[1].id}/remove",
+        data={"next": ""},
+        follow_redirects=False,
+    )
+    assert response.headers["location"] == f"/playlists/{playlist.id}"
     items = db.scalars(
         select(PlaylistItem)
         .where(PlaylistItem.playlist_id == playlist.id)
@@ -367,22 +368,28 @@ def test_move_and_remove_playlist_items_reorder_positions():
 # --- routes: video-detail "add to playlist" ---------------------------------
 
 
-def test_add_video_to_playlist_existing_and_new_branches():
+def test_add_video_to_playlist_existing_and_new_branches(front_client):
     db = make_session()
+    client = front_client(db)
     video = add_video(db)
     playlist = Playlist(title="Existing playlist", source="manual")
     db.add(playlist)
     db.commit()
 
-    playlists_routes.add_video_to_playlist_form(
-        video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
+    response = client.post(
+        f"/videos/{video.id}/playlists",
+        data={"playlist_id": str(playlist.id), "new_playlist_title": "", "next": ""},
+        follow_redirects=False,
     )
+    assert response.headers["location"] == f"/videos/{video.id}"
     items = db.scalars(select(PlaylistItem).where(PlaylistItem.video_id == video.id)).all()
     assert len(items) == 1
     assert items[0].playlist_id == playlist.id
 
-    playlists_routes.add_video_to_playlist_form(
-        video.id, playlist_id="", new_playlist_title="Brand New", return_to="", db=db
+    client.post(
+        f"/videos/{video.id}/playlists",
+        data={"playlist_id": "", "new_playlist_title": "Brand New", "next": ""},
+        follow_redirects=False,
     )
     new_playlist = db.scalars(select(Playlist).where(Playlist.title == "Brand New")).one()
     items = db.scalars(select(PlaylistItem).where(PlaylistItem.video_id == video.id)).all()
@@ -393,7 +400,7 @@ def test_add_video_to_playlist_existing_and_new_branches():
 # --- routes: import-url / import-csv (synchronous half only) ---------------
 
 
-def test_import_playlist_url_route_schedules_background_job(monkeypatch):
+def test_import_playlist_url_route_schedules_background_job(monkeypatch, front_client):
     db = make_session()
     monkeypatch.setattr(
         playlists_jobs,
@@ -401,18 +408,14 @@ def test_import_playlist_url_route_schedules_background_job(monkeypatch):
         lambda url: {"url": url, "title": "Remote Title", "yt_playlist_id": "PL123"},
     )
     scheduled = []
-    background_tasks = BackgroundTasks()
     monkeypatch.setattr(
-        background_tasks,
-        "add_task",
-        lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
+        "back.api.playlists.run_playlist_url_import_job", lambda *args: scheduled.append(args)
     )
 
-    response = playlists_routes.import_playlist_url(
-        background_tasks,
-        url="https://www.youtube.com/playlist?list=PL123",
-        title="",
-        db=db,
+    response = front_client(db).post(
+        "/playlists/import-url",
+        data={"url": "https://www.youtube.com/playlist?list=PL123", "title": ""},
+        follow_redirects=False,
     )
 
     playlist = db.scalars(select(Playlist)).one()
@@ -420,12 +423,12 @@ def test_import_playlist_url_route_schedules_background_job(monkeypatch):
     assert playlist.source == "url"
     assert playlist.yt_playlist_id == "PL123"
     assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/playlists/{playlist.id}?")
     assert len(scheduled) == 1
-    assert scheduled[0][0] is playlists_jobs.run_playlist_url_import_job
-    assert scheduled[0][1][1] == playlist.id
+    assert scheduled[0][1] == playlist.id
 
 
-def test_import_playlist_url_route_reports_not_found(monkeypatch):
+def test_import_playlist_url_route_reports_not_found(monkeypatch, front_client):
     db = make_session()
 
     def fail(url):
@@ -433,39 +436,48 @@ def test_import_playlist_url_route_reports_not_found(monkeypatch):
 
     monkeypatch.setattr(playlists_jobs, "extract_playlist_info", fail)
 
-    response = playlists_routes.import_playlist_url(BackgroundTasks(), url="bad", title="", db=db)
+    response = front_client(db).post(
+        "/playlists/import-url", data={"url": "bad", "title": ""}, follow_redirects=False
+    )
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
     assert db.scalars(select(Playlist)).all() == []
 
 
-def test_import_playlist_csv_route_schedules_background_job_and_derives_title():
+def test_import_playlist_csv_route_schedules_background_job_and_derives_title(
+    monkeypatch, front_client
+):
     db = make_session()
     scheduled = []
-    background_tasks = BackgroundTasks()
+    monkeypatch.setattr(
+        "back.api.playlists.run_playlist_csv_import_job", lambda *args: scheduled.append(args)
+    )
 
-    def capture(fn, *args, **kwargs):
-        scheduled.append((fn, args, kwargs))
-
-    background_tasks.add_task = capture
-    upload = UploadFile(file=io.BytesIO(CSV_SAMPLE), filename="Vidéos de Tech.csv")
-
-    response = playlists_routes.import_playlist_csv(background_tasks, file=upload, title="", db=db)
+    response = front_client(db).post(
+        "/playlists/import-csv",
+        files={"file": ("Vidéos de Tech.csv", CSV_SAMPLE)},
+        data={"title": ""},
+        follow_redirects=False,
+    )
 
     playlist = db.scalars(select(Playlist)).one()
     assert playlist.title == "Tech"
     assert playlist.source == "csv"
     assert response.status_code == 303
     assert len(scheduled) == 1
-    assert scheduled[0][0] is playlists_jobs.run_playlist_csv_import_job
+    assert scheduled[0][1] == playlist.id
 
 
-def test_import_playlist_csv_route_rejects_bad_csv():
+def test_import_playlist_csv_route_rejects_bad_csv(front_client):
     db = make_session()
-    upload = UploadFile(file=io.BytesIO(b"nope"), filename="bad.csv")
 
-    response = playlists_routes.import_playlist_csv(BackgroundTasks(), file=upload, title="", db=db)
+    response = front_client(db).post(
+        "/playlists/import-csv",
+        files={"file": ("bad.csv", b"nope")},
+        data={"title": ""},
+        follow_redirects=False,
+    )
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
@@ -502,41 +514,50 @@ def ordered_titles(db, playlist):
     return [item.video.title for item in items]
 
 
-def test_sort_playlist_by_title_and_reverse():
+def test_sort_playlist_by_title_and_reverse(front_client):
     db = make_session()
     playlist, _ = make_playlist_with_videos(db)
+    client = front_client(db)
 
-    playlists_routes.sort_playlist_route(playlist.id, by="title", db=db)
+    def sort(by):
+        return client.post(
+            f"/playlists/{playlist.id}/sort", data={"by": by}, follow_redirects=False
+        )
+
+    sort("title")
     assert ordered_titles(db, playlist) == ["Video A", "Video B", "Video C"]
 
-    playlists_routes.sort_playlist_route(playlist.id, by="reverse", db=db)
+    sort("reverse")
     assert ordered_titles(db, playlist) == ["Video C", "Video B", "Video A"]
 
-    with pytest.raises(HTTPException) as excinfo:
-        playlists_routes.sort_playlist_route(playlist.id, by="nope", db=db)
-    assert excinfo.value.status_code == 400
+    assert sort("nope").status_code == 400
 
 
-def test_rename_and_free_listening_toggle():
+def test_rename_and_free_listening_toggle(front_client):
     db = make_session()
     playlist, _ = make_playlist_with_videos(db, count=1)
+    client = front_client(db)
 
-    playlists_routes.rename_playlist_route(playlist.id, title="  Chill  ", db=db)
+    client.post(
+        f"/playlists/{playlist.id}/rename", data={"title": "  Chill  "}, follow_redirects=False
+    )
     assert db.get(Playlist, playlist.id).title == "Chill"
 
-    response = playlists_routes.set_playlist_free_listening(playlist.id, enabled="1", db=db)
+    response = client.post(
+        f"/playlists/{playlist.id}/free-listening", data={"enabled": "1"}, follow_redirects=False
+    )
     assert response.status_code == 303
     assert db.get(Playlist, playlist.id).free_listening is True
 
 
-def test_duplicate_playlist_copies_items_as_manual_playlist():
+def test_duplicate_playlist_copies_items_as_manual_playlist(front_client):
     db = make_session()
     playlist, _ = make_playlist_with_videos(db)
     playlist.source = "url"
     playlist.free_listening = True
     db.commit()
 
-    playlists_routes.duplicate_playlist_route(playlist.id, db=db)
+    front_client(db).post(f"/playlists/{playlist.id}/duplicate", follow_redirects=False)
 
     copy = db.scalar(select(Playlist).where(Playlist.id != playlist.id))
     assert copy.title == "Mix (copie)"
@@ -545,35 +566,35 @@ def test_duplicate_playlist_copies_items_as_manual_playlist():
     assert ordered_titles(db, copy) == ordered_titles(db, playlist)
 
 
-def test_export_csv_round_trips_through_the_importer():
+def test_export_csv_round_trips_through_the_importer(front_client):
     db = make_session()
     playlist, videos = make_playlist_with_videos(db)
 
-    response = playlists_routes.export_playlist_csv(playlist.id, db=db)
+    response = front_client(db).get(f"/playlists/{playlist.id}/export.csv")
 
-    rows = parse_playlist_csv(response.body)
+    assert response.status_code == 200
+    rows = parse_playlist_csv(response.content)
     assert [row["yt_video_id"] for row in rows] == [video.yt_video_id for video in videos]
 
 
-def test_download_playlist_media_only_queues_missing_files(monkeypatch):
+def test_download_playlist_media_only_queues_missing_files(monkeypatch, front_client):
     db = make_session()
     playlist, videos = make_playlist_with_videos(db)
     videos[0].audio_path = "/media/id0/a.m4a"
     db.commit()
-    background_tasks = BackgroundTasks()
+    queued = []
+    monkeypatch.setattr(
+        "back.api.playlists.run_media_download_job", lambda *args: queued.append(args)
+    )
 
-    response = playlists_routes.download_playlist_media(
-        playlist.id, "audio", background_tasks, db=db
+    response = front_client(db).post(
+        f"/playlists/{playlist.id}/download/audio", follow_redirects=False
     )
 
     assert response.status_code == 303
-    assert len(background_tasks.tasks) == 2
-    queued_urls = {task.args[1] for task in background_tasks.tasks}
-    assert queued_urls == {videos[1].url, videos[2].url}
-    assert all(
-        task.func is downloads_jobs.run_media_download_job for task in background_tasks.tasks
-    )
-    assert all(task.args[2] == "audio" for task in background_tasks.tasks)
+    assert len(queued) == 2
+    assert {args[1] for args in queued} == {videos[1].url, videos[2].url}
+    assert all(args[2] == "audio" for args in queued)
 
 
 def test_run_media_download_job_refreshes_metadata_and_leaves_the_transcript(monkeypatch):
@@ -662,14 +683,16 @@ def test_preview_playlist_rejects_unreadable_url(monkeypatch):
 # --- playlist labels, inherited by the videos like a channel's ------------
 
 
-def test_saving_playlist_labels_labels_only_videos_without_any():
+def test_saving_playlist_labels_labels_only_videos_without_any(front_client):
     db = make_session()
     playlist, videos = make_playlist_with_videos(db, count=3)
     videos[0].category_labels = "histoire"
     db.commit()
 
-    playlists_routes.update_playlist_categories(
-        playlist.id, preset_categories=["musique"], custom_categories="Chill, musique", db=db
+    front_client(db).post(
+        f"/playlists/{playlist.id}/categories",
+        data={"preset_categories": ["musique"], "custom_categories": "Chill, musique"},
+        follow_redirects=False,
     )
 
     assert db.get(Playlist, playlist.id).category_labels == "musique,chill"
@@ -678,15 +701,20 @@ def test_saving_playlist_labels_labels_only_videos_without_any():
     assert labels == {"Video C": "histoire", "Video B": "musique,chill", "Video A": "musique,chill"}
 
 
-def test_clearing_playlist_labels_leaves_the_videos_labels_alone():
+def test_clearing_playlist_labels_leaves_the_videos_labels_alone(front_client):
     db = make_session()
     playlist, videos = make_playlist_with_videos(db, count=1)
-    playlists_routes.update_playlist_categories(
-        playlist.id, preset_categories=["musique"], custom_categories="", db=db
+    client = front_client(db)
+    client.post(
+        f"/playlists/{playlist.id}/categories",
+        data={"preset_categories": ["musique"], "custom_categories": ""},
+        follow_redirects=False,
     )
 
-    playlists_routes.update_playlist_categories(
-        playlist.id, preset_categories=[], custom_categories="", db=db
+    client.post(
+        f"/playlists/{playlist.id}/categories",
+        data={"custom_categories": ""},
+        follow_redirects=False,
     )
 
     assert db.get(Playlist, playlist.id).category_labels is None
@@ -694,7 +722,7 @@ def test_clearing_playlist_labels_leaves_the_videos_labels_alone():
     assert db.get(Video, videos[0].id).category_labels == "musique"
 
 
-def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels():
+def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels(front_client):
     db = make_session()
     plain = add_video(db, "plain", "Plain")
     labelled = add_video(db, "labelled", "Labelled")
@@ -703,9 +731,12 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels():
     db.add(playlist)
     db.commit()
 
+    client = front_client(db)
     for video in (plain, labelled):
-        playlists_routes.add_video_to_playlist_form(
-            video.id, playlist_id=str(playlist.id), new_playlist_title="", return_to="", db=db
+        client.post(
+            f"/videos/{video.id}/playlists",
+            data={"playlist_id": str(playlist.id), "new_playlist_title": "", "next": ""},
+            follow_redirects=False,
         )
 
     assert db.get(Video, plain.id).category_labels == "podcasts"
@@ -740,13 +771,13 @@ def test_url_import_gives_new_videos_the_playlist_labels(monkeypatch):
     assert db.scalar(select(Video).where(Video.yt_video_id == "vid9")).category_labels == "musique"
 
 
-def test_duplicate_playlist_keeps_the_labels():
+def test_duplicate_playlist_keeps_the_labels(front_client):
     db = make_session()
     playlist, _ = make_playlist_with_videos(db, count=1)
     playlist.category_labels = "musique"
     db.commit()
 
-    playlists_routes.duplicate_playlist_route(playlist.id, db=db)
+    front_client(db).post(f"/playlists/{playlist.id}/duplicate", follow_redirects=False)
 
     assert (
         db.scalar(select(Playlist).where(Playlist.id != playlist.id)).category_labels == "musique"

@@ -15,16 +15,17 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
-    container_name: raton
-    image: ${RATON_IMAGE:-raton:local}
-    build: .
+  # The API (`back/`): the only container with the database, the media volume and the secrets.
+  # No published port: the front relays `/api/*` to it on the Compose network.
+  api:
+    container_name: raton-api
+    image: ${RATON_API_IMAGE:-raton-api:local}
+    build:
+      context: .
+      target: back
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      # Loopback only: the app has no authentication. Set APP_BIND=0.0.0.0 to open it to a trusted LAN.
-      - "${APP_BIND:-127.0.0.1}:8000:8000"
     volumes:
       - ${MEDIA_HOST_ROOT:-./.local/media/YouTube}:/media/youtube
       # The journal survives the container recreation of every deploy (spec 13, "Journal applicatif").
@@ -39,6 +40,25 @@ services:
       VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-voyage-3.5}
       RERANK_MODEL: ${RERANK_MODEL:-rerank-2.5}
+      # The browser's writes come through the front with its Host: the same-origin check of the
+      # back compares against it.
+      APP_TRUSTED_ORIGINS: ${APP_TRUSTED_ORIGINS:-}
+
+  # The pages (`front/`): no database, no media, no secret; it calls the API over HTTP.
+  app:
+    container_name: raton
+    image: ${RATON_IMAGE:-raton:local}
+    build:
+      context: .
+      target: front
+    depends_on:
+      - api
+    ports:
+      # Loopback only: the app has no authentication. Set APP_BIND=0.0.0.0 to open it to a trusted LAN.
+      - "${APP_BIND:-127.0.0.1}:8000:8000"
+    environment:
+      RATON_API_URL: http://api:8001
+      APP_TRUSTED_ORIGINS: ${APP_TRUSTED_ORIGINS:-}
 
 volumes:
   postgres_data:

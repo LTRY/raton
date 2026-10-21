@@ -1,10 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.llm_job import LlmJob
-from app.services.llm.usage import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.llm_job import LlmJob
+from back.services.llm.usage import (
     compute_call_cost_usd,
     compute_job_cost_usd,
     llm_usage_summary,

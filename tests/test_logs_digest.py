@@ -3,7 +3,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-from app.core.logs_digest import build_digest, load_events, render_digest
+from back.core.logs_digest import build_digest, load_events, render_digest
 
 NOW = datetime(2026, 10, 17, 12, 0, tzinfo=UTC)
 

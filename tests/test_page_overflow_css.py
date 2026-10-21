@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 CSS = (
-    Path(__file__).resolve().parents[1] / "app" / "static" / "css" / "tailwind.input.css"
+    Path(__file__).resolve().parents[1] / "front" / "static" / "css" / "tailwind.input.css"
 ).read_text()
 
 

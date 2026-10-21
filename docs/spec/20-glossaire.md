@@ -161,10 +161,10 @@ Tout ce qui fait entrer une fiche dans la bibliotheque : le scan, l'import de
 metadonnees, le telechargement manuel, l'import d'un fichier local et le
 rattrapage des transcripts.
 
-- **Code** : paquet `app/services/ingest/`
+- **Code** : paquet `back/services/ingest/`
 - **A ne pas confondre avec** : L'import d'une playlist, qui range des fiches
-  dans une playlist (`app/services/playlists/`) ; l'import du CSV
-  d'abonnements, qui ajoute des chaines (`app/services/channels/`).
+  dans une playlist (`back/services/playlists/`) ; l'import du CSV
+  d'abonnements, qui ajoute des chaines (`back/services/channels/`).
 
 Specs : [02 Fonctionnalites](02-fonctionnalites.md),
 [13 Jobs, logs et planification](13-jobs-logs-planification.md),
@@ -223,7 +223,7 @@ Demande au LLM : creee tout de suite, executee en tache de fond, le client inter
 
 Fichier JSON-lines, un evenement par ligne, ecrit par l'application elle-meme (requetes, jobs, appels externes, erreurs) et conserve 7 jours sur un volume. Sert a relire ce qui s'est passe et a reperer un dysfonctionnement.
 
-- **Code** : `app/core/logging.py`, `LOG_DIR`, `app.jsonl`
+- **Code** : `back/core/logging.py`, `LOG_DIR`, `app.jsonl`
 - **A ne pas confondre avec** : La page Logs (`/logs`), qui affiche les lignes `download_jobs` pour l'utilisateur.
 
 ### Chat
@@ -256,7 +256,7 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 Assistant de la page d'accueil `/` : choisit une replique et un dessin a chaque chargement.
 
-- **Code** : paquet `app/services/raton/` (catalogue `scenarios.py`, tirage `picker.py`, visites `visits.py`)
+- **Code** : paquet `back/services/raton/` (catalogue `scenarios.py`, tirage `picker.py`, visites `visits.py`)
 - **A ne pas confondre avec** : Un composant de chat.
 
 ### Dashboard
@@ -277,15 +277,31 @@ Liste des fiches, avec filtres, tri et recherche.
 
 Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.
 
-- **Code** : reglage `video_library_views` (`app/services/common/library_views.py`)
+- **Code** : reglage `video_library_views` (`back/services/common/library_views.py`)
 - **A ne pas confondre avec** : Une playlist.
 
 ### Carte
 
 Rendu d'une fiche dans une liste.
 
-- **Code** : macro `video_card`
+- **Code** : macro `video_card` (front), donnees `LibraryVideoRead` (`back/api/cards.py`)
 - **A ne pas confondre avec** : La page detail `/videos/{id}`.
 
-Specs : [11 Interface HTML](11-interface-html.md),
+### Back
+
+L'application qui detient les donnees et les regles : l'API `/api`, la DB,
+le dossier media, les jobs et le scheduler.
+
+- **Code** : dossier `back/`, conteneur `api` (port 8001)
+- **A ne pas confondre avec** : Le serveur Postgres (`db`), qui n'est que la DB du back.
+
+### Front
+
+L'application des pages HTML : elle ne lit et n'ecrit que par l'API du back,
+et relaie vers lui les appels `/api/*` du navigateur.
+
+- **Code** : dossier `front/`, conteneur `app` (port 8000), `RATON_API_URL`
+- **A ne pas confondre avec** : Le JavaScript des pages (`front/static/js/`), qui n'en est qu'une partie.
+
+Specs : [03 Architecture](03-architecture.md), [11 Interface HTML](11-interface-html.md),
 [18 Raton : scenarios et repliques](18-raton-scenarios.md).
