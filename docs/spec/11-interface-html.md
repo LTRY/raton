@@ -45,9 +45,16 @@ ouvrent sur la meme ligne de titre `.page-head` (titre `h1` de 24 px a
 gauche, d'au moins 44 px de haut comme le champ de recherche des Playlists,
 recherche ou actions de la page poussees a droite, 24 px avant la suite),
 pour que le titre soit a la meme hauteur d'une page a l'autre, sur ordinateur
-comme sur telephone. Le champ de recherche de Playlists et de Chaines est le
-meme (`.page-search` : pilule de 44 px, loupe, texte « Rechercher une
-playlist » / « Rechercher une chaine »). Sur Chaines, il est suivi, dans la
+comme sur telephone. Le champ de recherche de Playlists, Chaines et
+Bibliotheque (Exploration) est le meme (`.page-search` : pilule de 44 px,
+loupe, texte « Rechercher une playlist » / « une chaine » / « une fiche »),
+a droite du titre, de la meme largeur (240 px) sur les trois pages et sur
+toute la largeur sur telephone. Sur ecran tactile (`pointer: coarse`) son
+texte, comme celui du tri, est en 16 px : en dessous, Safari iOS zoome sur la
+page quand le champ prend le focus. Dans la Bibliotheque, le champ est relie
+au formulaire de filtres par l'attribut `form` (il est hors du formulaire) ;
+`app.js` parcourt `form.elements` pour l'envoi automatique et la recherche
+instantanee. Sur Chaines, il est suivi, dans la
 meme ligne (`.page-tools`), de deux commandes discretes : le filtre « ★ Notees »
 (`.page-toggle`, pilule sans fond, teintee quand il est actif) et le tri
 (`.page-sort` : un `<select>` natif habille en bouton texte, icone de tri et
@@ -811,7 +818,7 @@ Contenu :
 
 - titre « Chaines » suivi du nombre de chaines, puis, sur la meme ligne, la
   recherche, le filtre « Notees » et le tri (voir « En-tete de page » dans
-  « Base ») ;
+  « Base ») ; la grille suit directement, sans sous-titre ni second compteur ;
 - formulaire ajout chaine (avec categories), dans la feuille d'import (voir
   « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
   tout autre texte est un nom a chercher ;
@@ -988,8 +995,9 @@ periodique).
 
 ## Recherche (videos et chaines)
 
-Les pages `/videos` et `/channels` ont chacune un champ `q` dans leur
-formulaire de filtres. La recherche s'ajoute aux filtres actifs (chaine,
+Les pages `/videos` et `/channels` ont chacune un champ `q` relie a leur
+formulaire de filtres, sur la ligne du titre (voir « En-tete de page » dans
+« Base »). La recherche s'ajoute aux filtres actifs (chaine,
 types de fichier, categories, "Notees"...) : elle ne les remplace pas.
 
 Correspondance (`search_rank` dans `back/services/common/search.py`) :

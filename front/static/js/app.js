@@ -244,8 +244,9 @@ document.querySelectorAll("form[data-auto-submit-filter]").forEach((form) => {
       return;
     }
   });
-  form.querySelectorAll("input, select").forEach((control) => {
-    if (control.type === "hidden") return;
+  // `form.elements` also holds the fields tied to the form by a `form=` attribute.
+  Array.from(form.elements).forEach((control) => {
+    if (!["INPUT", "SELECT"].includes(control.tagName) || control.type === "hidden") return;
     // A live search field already refreshed the results while typing; its
     // `change` fires on blur, and a full submit there would race the click
     // that caused the blur (e.g. on a result link).
@@ -260,7 +261,7 @@ document.querySelectorAll("form[data-auto-submit-filter]").forEach((form) => {
 // `data-live-search`, so the field keeps focus and caret. Enter still does a
 // regular full submit.
 document.querySelectorAll("form[data-live-search]").forEach((form) => {
-  const input = form.querySelector('input[type="search"]');
+  const input = Array.from(form.elements).find((control) => control.type === "search");
   const frame = document.getElementById(form.dataset.liveSearch);
   if (!input || !frame) return;
   let timer = null;

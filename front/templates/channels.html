@@ -112,12 +112,6 @@
   {# Everything that depends on `q` lives in this frame: live search swaps it
      alone, so the search field keeps focus while typing. #}
   <turbo-frame id="channel-results" class="live-results" target="_top">
-  <div class="section-heading">
-    <h2>{{ "Chaînes notées" if rated_filter|default(false) else "Chaînes configurées" }}</h2>
-    {% set visible_channel_count = total_channel_entry_count|default(channel_entries|default(channels|default([]))|length) %}
-    <span class="section-heading-actions">{{ visible_channel_count }} chaîne{{ "s" if visible_channel_count != 1 else "" }}</span>
-  </div>
-
   <div class="channel-grid">
     {% for entry in channel_entries|default(channels|default([])) %}
     {% set channel = entry.channel if entry.channel is defined else entry %}

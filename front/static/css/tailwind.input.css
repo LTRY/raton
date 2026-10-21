@@ -321,8 +321,10 @@ h2 {
   display: flex;
   gap: 8px;
   height: 44px;
-  min-width: 220px;
+  /* One width on every page (Chaînes, Playlists, Bibliothèque); full width on a phone. */
+  max-width: 100%;
   padding: 0 16px;
+  width: 240px;
 }
 
 .page-search:focus-within {
@@ -350,10 +352,6 @@ h2 {
   gap: 8px;
   margin: 0;
   min-width: 0;
-}
-
-.page-tools .page-search {
-  flex: 1 1 220px;
 }
 
 /* A filter switched on or off with one tap: a quiet pill, tinted when on. */
@@ -432,6 +430,14 @@ h2 {
   text-overflow: ellipsis;
   /* As wide as the chosen option rather than the longest one, where the browser supports it. */
   field-sizing: content;
+}
+
+/* Below 16px, iOS Safari zooms into the page when the field gets the focus. */
+@media (pointer: coarse) {
+  .page-search input,
+  .page-sort select {
+    font-size: 16px;
+  }
 }
 
 .metrics {
@@ -7982,18 +7988,13 @@ turbo-frame {
     flex-direction: column;
   }
 
-  /* Below 16px iOS zooms into the page when the select opens. */
-  .page-sort select {
-    font-size: 16px;
-  }
-
   /* The search takes the full row, the filters share the next one. */
   .page-tools {
     width: 100%;
   }
 
-  .page-tools .page-search {
-    flex-basis: 100%;
+  .page-search {
+    width: 100%;
   }
 
   .page-toggle span {

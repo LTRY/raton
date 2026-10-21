@@ -1757,6 +1757,9 @@ def test_videos_page_searches_titles_and_channels(monkeypatch):
     assert "Cours architecture locale" in rendered
     assert "Cuisine rapide" not in rendered
     assert 'name="q" type="search" value="architecture"' in rendered
+    # The field sits on the title row, outside the filters form it submits with.
+    assert 'form="library-filters"' in rendered
+    assert 'id="library-filters"' in rendered
 
 
 def test_search_rank_matches_every_word_ignoring_order_case_and_accents():
