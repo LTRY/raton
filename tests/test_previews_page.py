@@ -4,6 +4,7 @@ from scripts.previews import (
     parse_previews,
     preview_status,
     preview_url,
+    prod_status,
     render_page,
     same_origin,
 )
@@ -65,3 +66,27 @@ def test_page_escapes_titles_and_lists_previews_of_closed_prs():
     assert 'action="/prs/5/down"' in page
     assert 'href="http://nas:9005/"' in page
     assert "http-equiv" not in page  # no auto-refresh while nothing is building
+
+
+def test_refresh_and_production_deploy_sit_above_the_prs():
+    page = render_page("nas:8999", [OPEN_PR], {}, {}, None)
+
+    deploy = page.index('action="/prod/deploy"')
+    assert page.index(">Rafraîchir<") < deploy < page.index('action="/prs/31/up"')
+    assert "return confirm(" in page  # a stray tap must not rebuild the real stack
+    assert 'href="/prod/log"' not in page  # no journal before a first deploy
+
+
+def test_a_running_production_deploy_disables_the_button_and_refreshes_the_page():
+    page = render_page("nas:8999", [], {}, {}, None, Job("deploy", 0.0))
+
+    assert "Déploiement en cours…" in page
+    assert '<button class="primary" disabled>Déployer main en production' in page
+    assert 'http-equiv="refresh"' in page
+    assert 'href="/prod/log"' in page
+
+
+def test_prod_status_reports_the_last_deploy():
+    assert prod_status(None)[1] == "none"
+    assert prod_status(Job("deploy", 0.0, returncode=0)) == ("Déployée", "ok")
+    assert prod_status(Job("deploy", 0.0, returncode=2)) == ("Échec du déploiement", "error")

@@ -11,6 +11,14 @@ Les pages principales ne sont pas authentifiees dans cet etat cible actuel.
 Cette absence d'authentification n'est pas un bug tant que l'app n'est pas
 exposee hors LAN.
 
+La page des previews (`make previews`, port `8999`) n'est pas authentifiee non
+plus, alors que son bouton **Deployer main en production** reconstruit la vraie
+instance : sur ce LAN, n'importe qui peut la redeployer. Garde-fous : origine
+verifiee sur chaque formulaire, confirmation, un seul deploiement a la fois, et
+`scripts/deploy.sh` ne deploie que `origin/main` (voir
+[04 Configuration et deploiement](04-configuration-et-deploiement.md),
+« Deploiement de main »).
+
 ## Garde-fous sans authentification
 
 - **Separation front/back** : seul le back (conteneur `api`, sans port

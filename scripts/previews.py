@@ -1,10 +1,13 @@
 """The previews page: lists the open PRs and deploys or removes their preview with one click.
 
+It also deploys main to the real stack (scripts/deploy.sh, button at the top of the page).
+
 Usage: python3 scripts/previews.py [--host 127.0.0.1] [--port 8999]   (or `make previews`)
 
 A small standard-library server, outside Raton (no import of back/ or front/): it reads the
-open PRs with `gh` and runs scripts/preview.sh, which does the work. Each action runs in
-the background; its output goes to .local/previews/logs/pr-<N>.log, shown by the page.
+open PRs with `gh` and runs scripts/preview.sh or scripts/deploy.sh, which do the work. Each
+action runs in the background; its output goes to .local/previews/logs/ (pr-<N>.log, prod.log),
+shown by the page.
 Unauthenticated like Raton itself (trusted LAN), but it only ever builds an open PR of this
 repository (preview.sh refuses forks), and refuses a form posted from another site.
 Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
@@ -25,6 +28,7 @@ from urllib.parse import urlsplit
 
 REPO = Path(__file__).resolve().parent.parent
 PREVIEW_SH = REPO / "scripts" / "preview.sh"
+DEPLOY_SH = REPO / "scripts" / "deploy.sh"
 LOG_DIR = REPO / ".local" / "previews" / "logs"
 
 
@@ -40,13 +44,15 @@ class Preview:
 
 @dataclass
 class Job:
-    action: str  # "up" or "down"
+    action: str  # "up" or "down"; "deploy" for the production
     started: float
     returncode: int | None = None
 
 
-# Running and last finished action of each PR; the page reads it, the action threads write it.
+# Running and last finished action of each PR, and of the production deploy; the page reads
+# them, the action threads write them.
 jobs: dict[int, Job] = {}
+prod_job: Job | None = None
 jobs_lock = threading.Lock()
 
 
@@ -87,6 +93,22 @@ def log_path(pr: int) -> Path:
     return LOG_DIR / f"pr-{pr}.log"
 
 
+PROD_LOG = LOG_DIR / "prod.log"
+
+
+def run_in_background(job: Job, command: list[str], log_file: Path) -> None:
+    def run() -> None:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with log_file.open("w") as log:
+            process = subprocess.run(
+                command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=False
+            )
+        with jobs_lock:
+            job.returncode = process.returncode
+
+    threading.Thread(target=run, daemon=True).start()
+
+
 def start_job(pr: int, action: str) -> bool:
     """Run `preview.sh <action> <pr>` in the background; False when the PR already has one running."""
     with jobs_lock:
@@ -95,21 +117,19 @@ def start_job(pr: int, action: str) -> bool:
             return False
         job = Job(action, time.time())
         jobs[pr] = job
+    run_in_background(job, [str(PREVIEW_SH), action, str(pr)], log_path(pr))
+    return True
 
-    def run() -> None:
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-        with log_path(pr).open("w") as log:
-            process = subprocess.run(
-                [str(PREVIEW_SH), action, str(pr)],
-                cwd=REPO,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                check=False,
-            )
-        with jobs_lock:
-            job.returncode = process.returncode
 
-    threading.Thread(target=run, daemon=True).start()
+def start_prod_deploy() -> bool:
+    """Run `deploy.sh` in the background; False when a deploy is already running."""
+    global prod_job
+    with jobs_lock:
+        if prod_job is not None and prod_job.returncode is None:
+            return False
+        prod_job = Job("deploy", time.time())
+        job = prod_job
+    run_in_background(job, [str(DEPLOY_SH)], PROD_LOG)
     return True
 
 
@@ -135,6 +155,17 @@ def preview_url(host: str | None, port: int) -> str:
     if ":" in hostname:
         hostname = f"[{hostname}]"
     return f"http://{hostname}:{port}/"
+
+
+def prod_status(job: Job | None) -> tuple[str, str]:
+    """(French label, CSS class) of the last production deploy launched from this page."""
+    if job is None:
+        return ("Aucun déploiement lancé depuis cette page", "none")
+    if job.returncode is None:
+        return ("Déploiement en cours…", "busy")
+    if job.returncode != 0:
+        return ("Échec du déploiement", "error")
+    return ("Déployée", "ok")
 
 
 def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[str, str]:
@@ -164,12 +195,17 @@ html, body { overflow-x: clip; }
 body { margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 main { max-width: 820px; margin: 0 auto; padding: 20px 16px 40px; }
+.top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-start;
+  justify-content: space-between; }
+.top > div { min-width: 0; }
 h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 0; }
 .lead { color: var(--muted); margin: 0 0 18px; }
 .banner { border: 1px solid var(--error); color: var(--error); border-radius: 10px; padding: 10px 12px;
   margin-bottom: 14px; overflow-wrap: anywhere; }
 .pr { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
   margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.prod { border-color: var(--accent); margin-bottom: 22px; }
 .info { flex: 1 1 260px; min-width: 0; }
 .title { font-weight: 600; overflow-wrap: anywhere; }
 .title a { color: inherit; text-decoration: none; }
@@ -179,7 +215,7 @@ h1 { font-size: 22px; margin: 0 0 4px; }
 .none { color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 form { margin: 0; }
-button, .open { font: inherit; font-size: 14px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+button, .open, .refresh { font: inherit; font-size: 14px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
   border: 1px solid var(--line); background: var(--card); color: var(--text); text-decoration: none; }
 button.primary, .open { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
@@ -233,12 +269,29 @@ def render_row(
     )
 
 
+def render_prod(job: Job | None) -> str:
+    label, css = prod_status(job)
+    disabled = " disabled" if css == "busy" else ""
+    # The real stack and its data: a stray tap must not rebuild it.
+    confirm = "return confirm('Déployer main sur la vraie instance de Raton ?')"
+    log = '<a class="log" href="/prod/log">Journal</a>' if job is not None else ""
+    return (
+        '<div class="pr prod"><div class="info"><h2>Production</h2>'
+        '<div class="meta">Met le dépôt à jour sur origin/main puis lance make up.</div>'
+        f'<div class="status {css}">{html.escape(label)}</div></div>'
+        f'<div class="actions"><form method="post" action="/prod/deploy" onsubmit="{confirm}">'
+        f'<button class="primary"{disabled}>Déployer main en production</button></form>{log}</div>'
+        "</div>"
+    )
+
+
 def render_page(
     host: str | None,
     prs: list[dict],
     previews: dict[int, Preview],
     job_by_pr: dict[int, Job],
     error: str | None,
+    prod_job: Job | None = None,
 ) -> str:
     rows = [
         render_row(host, pr["number"], pr, previews.get(pr["number"]), job_by_pr.get(pr["number"]))
@@ -251,7 +304,9 @@ def render_page(
         for number, preview in sorted(previews.items(), reverse=True)
         if number not in open_numbers
     ]
-    busy = any(job.returncode is None for job in job_by_pr.values())
+    busy = any(job.returncode is None for job in job_by_pr.values()) or (
+        prod_job is not None and prod_job.returncode is None
+    )
     refresh = '<meta http-equiv="refresh" content="4">' if busy else ""
     banner = f'<div class="banner">{html.escape(error)}</div>' if error else ""
     empty = '<p class="lead">Aucune PR ouverte.</p>' if not rows else ""
@@ -260,11 +315,13 @@ def render_page(
 <meta name="viewport" content="width=device-width, initial-scale=1">{refresh}
 <title>Previews des PR · Raton</title><style>{STYLE}</style></head>
 <body><main>
-<h1>Previews des PR</h1>
+<div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de Raton par PR (données de démo), sur le port 9000 + numéro.</p>
+</div><a href="/" class="refresh">Rafraîchir</a></div>
+{render_prod(prod_job)}
 {banner}{"".join(rows)}{empty}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
-<a href="/" class="log">Rafraîchir</a></footer>
+</footer>
 </main></body></html>"""
 
 
@@ -290,11 +347,17 @@ class Handler(BaseHTTPRequestHandler):
             prs, error = list_open_prs()
             with jobs_lock:
                 job_by_pr = dict(jobs)
-            page = render_page(self.headers.get("Host"), prs, list_previews(), job_by_pr, error)
+                prod = prod_job
+            page = render_page(
+                self.headers.get("Host"), prs, list_previews(), job_by_pr, error, prod
+            )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
             path = log_path(int(parts[1]))
             text = path.read_text(errors="replace") if path.exists() else "Aucun journal."
+            self.send_text(HTTPStatus.OK, text, "text/plain")
+        elif parts == ["prod", "log"]:
+            text = PROD_LOG.read_text(errors="replace") if PROD_LOG.exists() else "Aucun journal."
             self.send_text(HTTPStatus.OK, text, "text/plain")
         else:
             self.send_text(HTTPStatus.NOT_FOUND, "Page introuvable.", "text/plain")
@@ -311,6 +374,9 @@ class Handler(BaseHTTPRequestHandler):
             and parts[2] in ("up", "down")
         ):
             start_job(int(parts[1]), parts[2])
+            self.redirect_home()
+        elif parts == ["prod", "deploy"]:
+            start_prod_deploy()
             self.redirect_home()
         elif parts == ["sweep"]:
             start_sweep()
