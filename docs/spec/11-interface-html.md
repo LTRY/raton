@@ -1062,6 +1062,10 @@ Contenu :
   `cover` si la carte est plus haute ; en conteneur etroit (telephone, moins
   de 460px) la colonne passe a 176px et la vignette occupe toujours toute la
   hauteur de la carte ;
+- toutes les cartes de la liste ont la meme hauteur, celle de la plus haute
+  (titre sur 2 lignes, barre de progression) : la liste porte
+  `grid-auto-rows: 1fr` (hors grille d'une chaine, qui dimensionne ses
+  tuiles elle-meme) ;
 - sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
   `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis

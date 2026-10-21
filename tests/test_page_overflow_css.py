@@ -21,3 +21,11 @@ def test_page_fields_are_16px_on_touch_screens():
     assert match, "no `@media (pointer: coarse)` block in tailwind.input.css"
     rule = re.search(r"\.page-search input,\s*\.page-sort select\s*\{([^}]*)\}", match.group(1))
     assert rule and re.search(r"font-size:\s*16px\s*;", rule.group(1))
+
+
+def test_library_cards_share_one_height():
+    # Exploration: a card with a two-line title or a progress bar must not stand taller than its neighbours.
+    rule = re.search(
+        r"^\.video-row-list:not\(\.channel-video-grid\)\s*\{([^}]*)\}", CSS, re.MULTILINE
+    )
+    assert rule and re.search(r"grid-auto-rows:\s*1fr\s*;", rule.group(1))

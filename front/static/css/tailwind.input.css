@@ -2250,6 +2250,13 @@ button.secondary {
   overflow: hidden;
 }
 
+/* Exploration: every card takes the height of the tallest one (a two-line
+   title, a progress bar), so the list reads as an even column. The channel
+   grid sizes its own tiles. */
+.video-row-list:not(.channel-video-grid) {
+  grid-auto-rows: 1fr;
+}
+
 .video-row-list .empty-state {
   border: 0;
   border-radius: 0;
