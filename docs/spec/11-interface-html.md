@@ -60,9 +60,11 @@ meme ligne (`.page-tools`), de deux commandes discretes : le filtre « ★ Notee
 (`.page-sort` : un `<select>` natif habille en bouton texte, icone de tri et
 chevron, fond et bordure seulement au survol). Sur telephone, la recherche
 prend toute la ligne et les deux commandes partagent la suivante. Un
-compteur en pastille (`.page-count`) suit le titre de Chaines (toutes les
-chaines de la bibliotheque, `channel_count` de `GET /api/channels`) et de
-Playlists (toutes les playlists) ; il ignore la recherche et les filtres.
+compteur en pastille (`.page-count`) suit le titre de Chaines et de
+Playlists. Sur Chaines, il suit le filtre « ★ Notees » (`channel_count` de
+`GET /api/channels`) : les chaines notees quand il est coche (par defaut),
+toutes les chaines de la bibliotheque quand il est decoche ; il ignore la
+recherche. Sur Playlists, il compte toutes les playlists.
 
 Le surlignage d'une etoile de notation au survol (couleur du palier qu'elle
 donnerait, leger decalage vers le haut) n'existe que sous `@media (hover: hover)` :

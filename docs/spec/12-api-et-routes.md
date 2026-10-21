@@ -204,7 +204,7 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   `/channels` (`channel_page`). Contrairement a la page, toutes les chaines
   sont listees sauf `rated=true`. Repond `{items, sort, page, total_pages,
   total, channel_count}` (`total` : chaines filtrees et cherchees ;
-  `channel_count` : toutes les chaines de la bibliotheque) ; chaque chaine `{id, url, name, yt_channel_id, rating,
+  `channel_count` : chaines gardees par le filtre Notees, sans la recherche) ; chaque chaine `{id, url, name, yt_channel_id, rating,
   categories, auto_metadata_enabled, auto_shorts_enabled, created_at,
   avatar_url, banner_url, metadata_fetched_at, video_count, last_played_at}`
   (`last_played_at` : derniere lecture d'une de ses fiches, `null` sinon). Le nombre de requetes ne depend pas du nombre de

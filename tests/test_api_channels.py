@@ -111,9 +111,11 @@ def test_list_sorts_filters_and_searches_like_the_channels_page(client, db):
     assert [item["name"] for item in rated["items"]] == ["Bravo Histoire", "Charlie"]
     assert [item["name"] for item in found["items"]] == ["Bravo Histoire"]
     assert bogus["sort"] == "activity"
-    # `total` follows the filter and search, `channel_count` stays the whole library.
-    assert (rated["total"], rated["channel_count"]) == (2, 3)
+    rated_found = client.get("/api/channels?rated=true&q=histoire").json()
+    # `total` follows the filter and search, `channel_count` the Notées filter only.
+    assert (rated["total"], rated["channel_count"]) == (2, 2)
     assert (found["total"], found["channel_count"]) == (1, 3)
+    assert (rated_found["total"], rated_found["channel_count"]) == (1, 2)
 
 
 def test_list_counts_fiches_for_the_page_only_in_constant_queries(client, db):
