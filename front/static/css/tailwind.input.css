@@ -4570,6 +4570,40 @@ body.hide-thumbnails .pld-thumb img {
   transform: translateY(-4px);
 }
 
+/* Last card of a search: same frame as a channel card, dashed to read as an action. */
+.channel-youtube-card {
+  align-items: center;
+  border-style: dashed;
+  flex-direction: row;
+  gap: 14px;
+  min-height: 120px;
+  padding: 16px;
+}
+
+.channel-youtube-icon {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border-radius: 50%;
+  color: var(--color-primary);
+  display: flex;
+  flex: none;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.channel-youtube-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.channel-youtube-card:hover .channel-card-name {
+  color: var(--color-primary);
+}
+
 .channel-card-banner {
   display: block;
   height: 84px;

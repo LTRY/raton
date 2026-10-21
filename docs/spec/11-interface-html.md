@@ -822,6 +822,12 @@ Contenu :
 - formulaire ajout chaine (avec categories), dans la feuille d'import (voir
   « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
   tout autre texte est un nom a chercher ;
+- pendant une recherche (`q` non vide), la derniere carte de la grille (sur
+  la derniere page ; seule carte quand aucune chaine ne correspond) est
+  "Chercher « q » sur YouTube" : un lien vers la meme liste avec
+  `youtube_q=<q>`, qui ouvre le panneau ci-dessous. Elle suit la recherche
+  en direct comme les autres cartes, et disparait quand le panneau affiche
+  deja ce texte ;
 - panneau "Chaines YouTube pour « nom »" quand `/channels` recoit
   `?youtube_q=<nom>` : une ligne par candidate (avatar, nom, handle, nombre
   d'abonnes, debut de description) avec un bouton "Ajouter" qui poste son URL

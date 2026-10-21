@@ -3772,6 +3772,33 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
     assert 'name="next" value="/channels?sort=alpha"' in rendered
 
 
+def test_channels_search_ends_with_a_youtube_search_card():
+    db = make_session()
+    db.add(Channel(url="https://example.test/leo", name="Leo Duff", rating=1))
+    db.commit()
+
+    rendered = channels_page(db, "q=Leo&sort=alpha")
+    frame = rendered[rendered.index('<turbo-frame id="channel-results"') :]
+
+    card = '<a class="channel-card channel-youtube-card" href="/channels?q=Leo&amp;sort=alpha&amp;youtube_q=Leo">'
+    assert card in frame
+    assert frame.index("Leo Duff") < frame.index(card)
+    assert "Chercher « Leo » sur YouTube" in frame
+
+
+def test_channels_search_without_match_only_offers_youtube(monkeypatch):
+    db = make_session()
+    monkeypatch.setattr(channel_listing, "search_channels", lambda query: [])
+
+    rendered = channels_page(db, "q=introuvable")
+
+    assert "Chercher « introuvable » sur YouTube" in rendered
+    assert "Aucune chaîne configurée." not in rendered
+    assert "channel-youtube-card" not in channels_page(db)
+    # Once the panel shows that search, the card would only repeat it.
+    assert "channel-youtube-card" not in channels_page(db, "q=zz&youtube_q=zz")
+
+
 def test_channels_page_reports_a_failed_youtube_search(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
