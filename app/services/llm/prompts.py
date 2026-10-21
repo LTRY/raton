@@ -72,8 +72,7 @@ _NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 def _notes_rules() -> str:
     """The notes rules without any role or "nothing before the first title" line, so that the
-    combined prompts can nest them under their own level-1 title. `_notes_system` wraps them
-    with a role and that line for the standalone prompt."""
+    combined prompts can nest them under their own level-1 title."""
     section_headers = "\n".join(f"## {name}" for name in NOTES_SECTION_NAMES)
     section_contents = "\n".join(f"- {name} : {text}" for name, text in NOTES_SECTIONS.items())
     return f"""Les notes sont structurées, exhaustives, et suivent exactement ces sections
@@ -100,20 +99,9 @@ Règles :
 {_TRANSCRIPT_USAGE_RULE}"""
 
 
-def _notes_system() -> str:
-    """The system prompt of a notes-only completion."""
-    return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
-Produis des notes à partir de ce transcript, sans rien d'autre avant le premier titre.
-
-{_notes_rules()}"""
-
-
-def build_notes_prompt(transcript: str) -> Prompt:
-    return Prompt(_notes_system(), _transcript_turn(transcript))
-
-
 def split_notes_sections(text: str) -> list[tuple[str, str]]:
-    """Split a build_notes_prompt completion into (section_name, content) chunks.
+    """Split notes (the `# Notes` part of a `build_generation_prompt` completion) into
+    (section_name, content) chunks.
 
     One chunk per Markdown section, used both to render the notes tab and to
     index each section as a separate embedding for cross-video RAG search
@@ -163,23 +151,8 @@ Règle commune : n'invente rien, base-toi uniquement sur le contenu de <{TRANSCR
 {_TRANSCRIPT_USAGE_RULE}"""
 
 
-def _summary_system() -> str:
-    """The system prompt of a résumé-only completion."""
-    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
-
-Produis deux éléments fidèles et autonomes à propos de cette vidéo, dans cet
-ordre exact, avec ces deux titres Markdown exacts et rien d'autre avant le
-premier titre :
-
-{_summary_rules()}"""
-
-
-def build_summary_prompt(transcript: str) -> Prompt:
-    return Prompt(_summary_system(), _transcript_turn(transcript))
-
-
 def split_summary_result(text: str) -> tuple[str, list[str]]:
-    """Split a build_summary_prompt completion into (short, questions).
+    """Split the `# Résumé` part of a `build_generation_prompt` completion into (short, questions).
 
     Falls back to (whole text as the short résumé, []) if the model didn't follow the
     header format — degrades gracefully instead of guessing.

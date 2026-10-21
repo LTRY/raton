@@ -1,13 +1,20 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.actions import JobQueuedRead
+from app.schemas.video import Categories
 
 
 class ChannelCreate(BaseModel):
     url: str
-    rating: int = Field(default=1, ge=0, le=5)
+    # Checked by the service (`check_rating`), whose refusal is the French message.
+    rating: int = 1
+
+
+class RatingUpdate(BaseModel):
+    rating: int
 
 
 class ChannelRead(BaseModel):
@@ -16,9 +23,39 @@ class ChannelRead(BaseModel):
     name: str
     yt_channel_id: str | None
     rating: int
-    category_labels: str | None
+    categories: Categories
+    auto_metadata_enabled: bool
+    auto_shorts_enabled: bool
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChannelListItemRead(ChannelRead):
+    video_count: int
+    # Last playback of one of its fiches; None if none was ever played.
+    last_played_at: datetime | None
+
+
+class ChannelPageRead(BaseModel):
+    """`GET /api/channels`: one page of the channels, in the order and filter asked."""
+
+    items: list[ChannelListItemRead]
+    sort: str
+    page: int
+    total_pages: int
+    total: int
+
+
+class ChannelDetailRead(ChannelRead):
+    description: str | None
+    keywords: list[str]
+    # Routes serving the profile images; None when the channel has none.
+    avatar_url: str | None
+    banner_url: str | None
+    metadata_fetched_at: datetime | None
+    last_scanned_at: datetime | None
+    video_count: int
 
 
 BellSection = Literal["videos", "shorts"]

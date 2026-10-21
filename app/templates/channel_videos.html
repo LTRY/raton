@@ -40,7 +40,7 @@
           </button>
         </form>
         {% endfor %}
-        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
+        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" data-rating-url="/api/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
           <input type="hidden" name="next" value="{{ current_videos_path }}">
           {% for value in range(1, 6) %}
           <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if channel.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
@@ -228,7 +228,7 @@
       </details>
       <button class="visually-hidden" type="submit">Filtrer</button>
     </form>
-    <form class="channel-refresh-form" action="/channels/{{ channel.id }}/import-metadata" method="post" data-async-job data-turbo="false" data-pending-message="Recherche des nouveautés en file d'attente...">
+    <form class="channel-refresh-form" action="/channels/{{ channel.id }}/import-metadata" data-api-action="/api/channels/{{ channel.id }}/import-metadata" data-api-body="channelImport" method="post" data-async-job data-turbo="false" data-pending-message="Recherche des nouveautés en file d'attente...">
       <input type="hidden" name="page" value="1">
       <input type="hidden" name="section" value="{{ selected_channel_section }}">
       <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">
@@ -277,7 +277,7 @@
   </turbo-frame>
 
   {% set channel_is_empty = not video_cards and not search_query %}
-  <form class="channel-explore" action="/channels/{{ channel.id }}/import-metadata" method="post" data-explore data-turbo="false" data-channel-id="{{ channel.id }}" data-channel-name="{{ channel.name }}" data-section="{{ selected_channel_section }}" data-expected="{{ channel_page_size }}">
+  <form class="channel-explore" action="/channels/{{ channel.id }}/import-metadata" data-api-action="/api/channels/{{ channel.id }}/import-metadata" method="post" data-explore data-turbo="false" data-channel-id="{{ channel.id }}" data-channel-name="{{ channel.name }}" data-section="{{ selected_channel_section }}" data-expected="{{ channel_page_size }}">
     <input type="hidden" name="page" value="{{ next_import_page }}">
     <input type="hidden" name="section" value="{{ selected_channel_section }}">
     <input type="hidden" name="next" value="/videos?channel_id={{ channel.id }}&section={{ selected_channel_section }}&page={{ channel_page }}">

@@ -42,6 +42,12 @@ def log_job(
 JOB_DONE_STATUSES = {"downloaded", "metadata", "failed", "cancelled"}
 
 
-def recent_jobs(db: Session, limit: int = 100) -> list[DownloadJob]:
-    """The latest `download_jobs` rows, newest first; bounded because the table only grows."""
-    return list(db.scalars(select(DownloadJob).order_by(desc(DownloadJob.created_at)).limit(limit)))
+def recent_jobs(
+    db: Session, limit: int = 100, statuses: list[str] | None = None
+) -> list[DownloadJob]:
+    """The latest `download_jobs` rows (of these statuses), newest first; bounded because the
+    table only grows."""
+    query = select(DownloadJob)
+    if statuses:
+        query = query.where(DownloadJob.status.in_(statuses))
+    return list(db.scalars(query.order_by(desc(DownloadJob.created_at)).limit(limit)))

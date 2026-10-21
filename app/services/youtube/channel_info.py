@@ -162,44 +162,6 @@ def fetch_channel_profile(channel_url: str) -> dict[str, Any]:
     }
 
 
-def count_channel_entries(channel: Channel) -> int | None:
-    def count_from_info(info: dict[str, Any]) -> int | None:
-        for key in ("playlist_count", "n_entries"):
-            value = info.get(key)
-            if isinstance(value, int) and value >= 0:
-                return value
-        return None
-
-    opts = {
-        "quiet": True,
-        "skip_download": True,
-        "extract_flat": True,
-        "ignoreerrors": True,
-        "playlistend": 1,
-    }
-    with ytdlp_call("count_channel_entries"), YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(channel.url, download=False)
-
-    count = count_from_info(info)
-    if count is not None:
-        return count
-
-    full_opts = {
-        "quiet": True,
-        "skip_download": True,
-        "extract_flat": True,
-        "ignoreerrors": True,
-    }
-    with ytdlp_call("count_channel_entries"), YoutubeDL(full_opts) as ydl:
-        info = ydl.extract_info(channel.url, download=False)
-
-    count = count_from_info(info)
-    if count is not None:
-        return count
-    entries = info.get("entries")
-    return len([entry for entry in entries if entry]) if isinstance(entries, list) else None
-
-
 def normalized_channel_section(section: str = "videos") -> str:
     normalized = CHANNEL_SECTION_ALIASES.get(section)
     if normalized is None:

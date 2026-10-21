@@ -2,8 +2,6 @@ from urllib.parse import urlencode
 
 from fastapi import Request
 
-from app.models.video import Video
-from app.services.videos.documents import read_video_metadata as video_metadata
 from app.services.videos.library_view import LibraryFilters, library_filters
 from app.services.videos.list_state import video_auto_list_state, video_list_state
 from app.web.shared import templates
@@ -150,13 +148,6 @@ def video_active_filter_pills(
             }
         )
     return pills
-
-
-def video_view_count(video: Video) -> int:
-    try:
-        return int(video_metadata(video).get("view_count"))
-    except TypeError, ValueError:
-        return 0
 
 
 def video_library_view_path(view: dict, request: Request) -> str:

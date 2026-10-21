@@ -81,9 +81,7 @@ def video_detail_context(detail: VideoDetail, back_path: str) -> dict:
             "llmProviderLabel": llm_provider_label,
             "scopes": {
                 "video": {
-                    "askUrl": f"/videos/{video.id}/transcript/chat",
-                    "clearUrl": f"/videos/{video.id}/transcript/chat/clear",
-                    "jobUrlTemplate": f"/videos/{video.id}/transcript/jobs/" + "{job_id}",
+                    "chatUrl": f"/api/videos/{video.id}/chat",
                     "placeholder": "Discuter du contenu",
                     "messages": detail.documents["chat_messages"],
                 },

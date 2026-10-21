@@ -15,13 +15,13 @@ Ils servent a afficher :
 
 ## Telechargement manuel
 
-`POST /videos/download` :
+`POST /api/videos/import` (et son repli sans JavaScript `POST /videos/download`) :
 
 1. valide `media_type` ;
 2. cree un job `queued` ;
 3. lance `run_manual_download_job` en background ;
-4. retourne JSON si requete fetch ;
-5. sinon redirige avec message.
+4. repond `202` avec l'adresse du job (`/api`) ou redirige avec message
+   (formulaire sans JavaScript).
 
 `run_manual_download_job` :
 
@@ -50,7 +50,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
 
 ## Import playlist (URL)
 
-`POST /playlists/import-url` :
+`POST /api/playlists/import-url` (repli sans JavaScript `POST /playlists/import-url`) :
 
 1. resout l'URL synchronement via `extract_playlist_info` (sonde `yt-dlp`
    rapide, `extract_flat`) — si echec, message d'erreur immediat, aucun job
@@ -59,7 +59,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
    comme pour l'ajout d'une chaine) ;
 3. cree un job `queued` ;
 4. lance `run_playlist_url_import_job` en arriere-plan ;
-5. retourne JSON si requete fetch, sinon redirige avec message.
+5. repond `202 {playlist, job}`, ou redirige vers la playlist (repli).
 
 `run_playlist_url_import_job` (`app/services/jobs/playlists.py`) :
 
@@ -82,7 +82,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
 
 ## Import playlist (CSV)
 
-`POST /playlists/import-csv` :
+`POST /api/playlists/import-csv` (repli sans JavaScript `POST /playlists/import-csv`) :
 
 1. parse le fichier synchronement via `parse_playlist_csv` (pas de reseau,
    rapide) — si le CSV est illisible ou vide, message d'erreur immediat,
@@ -91,7 +91,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
    fourni par l'utilisateur) tout de suite ;
 3. cree un job `queued` ;
 4. lance `run_playlist_csv_import_job` avec les lignes deja parsees ;
-5. retourne JSON si requete fetch, sinon redirige avec message.
+5. repond `202 {playlist, job}`, ou redirige vers la playlist (repli).
 
 **Pas d'etape de previsualisation/confirmation**, contrairement a l'import CSV
 des abonnements de chaine (`POST /channels/import-csv` puis
@@ -118,7 +118,7 @@ Le scheduler APScheduler (`app/services/jobs/scheduler.py`) demarre reellement a
 lifespan FastAPI (`app/main.py:lifespan`, appel a `start_scheduler()` juste
 apres `ensure_default_settings`, `stop_scheduler()` a l'arret) et enregistre
 un job cron quotidien a `DAILY_SCAN_HOUR` (3h, timezone
-`Europe/Paris`). Un declenchement a la demande (`POST /settings/scan`) et un
+`Europe/Paris`). Un declenchement a la demande (`POST /api/scan`) et un
 rattrapage au demarrage existent en plus du cron (voir ci-dessous).
 
 `scheduled_scan()` :
@@ -151,7 +151,8 @@ rattrapage au demarrage existent en plus du cron (voir ci-dessous).
 ## Scan a la demande et evenements
 
 `/settings` (carte "Suivi automatique") porte un bouton "Lancer le scan
-maintenant" : `POST /settings/scan` lance `scheduled_scan` en tache de fond,
+maintenant" : `POST /api/scan` (`start_manual_scan` puis `run_manual_scan_job`,
+`app/services/jobs/scheduler.py`) lance `scheduled_scan` en tache de fond,
 donc avec le meme verrou, la meme garde de stockage et la meme mise a jour de
 "Dernier scan automatique" que le cron.
 
@@ -160,7 +161,7 @@ Le scan (planifie ou manuel) publie ce qu'il fait dans un flux en memoire,
 nouveautes trouvees et plafond atteint, chaque fiche importee, chaque echec,
 "rien de nouveau", interruption par un 429, garde de stockage, fin avec le
 total et la duree. Le dernier evenement d'un scan porte `final = true`.
-La page parametres lit `GET /settings/scan/events` toutes les 1,5 s et affiche
+La page parametres lit `GET /api/scan/events` toutes les 1,5 s et affiche
 chaque evenement en notification (toast, rouge pour un echec) jusqu'a
 l'evenement final ; elle suit aussi un scan deja en cours a son ouverture. Le
 flux est volatil (500 evenements, perdu au redemarrage) : la trace durable

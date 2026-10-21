@@ -10,7 +10,6 @@ from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
 from app.services.common.settings import (
-    get_llm_provider_display_label,
     get_no_progress_category_labels,
     get_screen_time_limits,
     get_video_category_label_styles,
@@ -24,8 +23,8 @@ from app.services.videos.playback import (
     playback_time_stats,
     recent_played_jobs,
 )
+from app.web.library_chat import library_chat_widget_config
 from app.web.playback import history_day_groups, playback_time_dashboard
-from app.web.routes.library_chat import library_chat_payload, library_chat_scope_config
 from app.web.shared import (
     category_style_map,
     current_request_path,
@@ -98,11 +97,7 @@ def dashboard_context(db: Session) -> dict:
     """Home renders Raton's scenario and the library chat bar, nothing else."""
     return {
         "raton": raton_home_context(db),
-        "chat_widget_config": {
-            "defaultScope": "library",
-            "llmProviderLabel": get_llm_provider_display_label(),
-            "scopes": {"library": library_chat_scope_config(library_chat_payload(db))},
-        },
+        "chat_widget_config": library_chat_widget_config(db),
     }
 
 

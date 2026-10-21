@@ -290,7 +290,7 @@ ou indisponibles au moment du telechargement initial), la fiche video
 (`/videos/{id}`) affiche un bouton "Recuperer la transcription" (visible
 uniquement quand `video.transcript_path` est vide) :
 
-- `POST /videos/{id}/transcript/download` cree un `DownloadJob` et lance
+- `POST /api/videos/{id}/transcript/download` cree un `DownloadJob` et lance
   `retry_transcript_download` (`app/services/ingest/transcript_retry.py`) en tache de fond ;
 - une seule tentative, sur la piste choisie par `choose_subtitle_track`
   (createur fr/en, puis originale fr/en, puis originale dans une autre langue :
@@ -303,7 +303,7 @@ uniquement quand `video.transcript_path` est vide) :
   fichier au nom different (langue differente, titre modifie) ne s'accumule
   a cote du nouveau ;
 - suit le meme pattern de polling que les autres telechargements manuels
-  (`GET /videos/download-jobs/{job_id}`).
+  (`GET /api/jobs/{job_id}`).
 
 ## Jobs
 

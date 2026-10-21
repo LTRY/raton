@@ -154,7 +154,7 @@
           <p class="empty-state">Aucun scan automatique n'a encore tourné.</p>
           {% endif %}
           <p class="settings-hint">Le scan peut être lancé à la main. Sa progression s'affiche en notifications, tant que cette page reste ouverte.</p>
-          <button class="secondary" type="button" data-scan-run data-scan-url="/settings/scan" data-scan-feed-url="/settings/scan/events" data-scan-running="{{ 'true' if scan_running else 'false' }}" data-scan-after="{{ scan_events_last_id }}">Lancer le scan maintenant</button>
+          <button class="secondary" type="button" data-scan-run data-scan-url="/api/scan" data-scan-feed-url="/api/scan/events" data-scan-running="{{ 'true' if scan_running else 'false' }}" data-scan-after="{{ scan_events_last_id }}">Lancer le scan maintenant</button>
         </div>
 
         <div class="settings-card" id="categories">

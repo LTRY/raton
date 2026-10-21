@@ -1,9 +1,25 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict
+from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field
 
 from app.models.video import TranscriptStatus
+from app.services.common.categories import parse_video_category_labels
+
+
+def category_list(value) -> list[str]:
+    # The column stores "label,label"; a list is one already (a model built from another model).
+    if isinstance(value, list):
+        return value
+    return parse_video_category_labels(value)
+
+
+# `categories` read from the `category_labels` column of a channel or a fiche.
+Categories = Annotated[
+    list[str],
+    BeforeValidator(category_list),
+    Field(validation_alias=AliasChoices("categories", "category_labels")),
+]
 
 
 class VideoRead(BaseModel):
@@ -18,7 +34,7 @@ class VideoRead(BaseModel):
     transcript_status: TranscriptStatus
     rating: int
     imported_via_form: bool
-    category_labels: str | None
+    categories: Categories
     file_size_bytes: int
 
     model_config = ConfigDict(from_attributes=True)

@@ -4,7 +4,7 @@
 <section>
   <h1>Bibliothèque</h1>
   {{ macros.library_subnav("import") }}
-  <form class="download-form import-form" action="/videos/download" method="post" data-async-download data-download-format-form data-turbo="false" data-pending-message="Import en file d'attente...">
+  <form class="download-form import-form" action="/videos/download" data-api-action="/api/videos/import" data-api-body="manualDownload" method="post" data-async-download data-download-format-form data-turbo="false" data-pending-message="Import en file d'attente...">
     <label>
       URL YouTube
       <input name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required autofocus>
@@ -61,7 +61,7 @@
     <input type="hidden" name="next" value="/videos/import">
     <button type="submit">Importer</button>
   </form>
-  <form class="import-dropzone-form" action="/videos/upload" method="post" enctype="multipart/form-data" data-local-upload data-turbo="false">
+  <form class="import-dropzone-form" action="/videos/upload" data-api-action="/api/videos/upload" method="post" enctype="multipart/form-data" data-local-upload data-turbo="false">
     <label class="import-dropzone" data-dropzone>
       <input name="file" type="file" accept="video/*,audio/*,.mkv,.flac,.opus" required>
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"></path></svg>

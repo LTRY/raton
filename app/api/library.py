@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.db.session import get_db
 from app.schemas.library import (
     CardPlaybackRead,
@@ -21,7 +22,7 @@ from app.services.videos.library_view import (
     library_saved_views,
 )
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["Bibliothèque"])
 
 
 def filters_read(filters: LibraryFilters) -> LibraryFiltersRead:
@@ -59,7 +60,7 @@ def card_read(card: dict) -> LibraryVideoRead:
     )
 
 
-@router.get("/library", response_model=LibraryPageRead)
+@router.get("/library", response_model=LibraryPageRead, responses=error_responses(404, 422))
 def get_library(
     channel_id: int | None = None,
     section: str | None = None,

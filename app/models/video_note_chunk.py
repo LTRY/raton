@@ -16,7 +16,7 @@ class VideoNoteChunk(Base):
     """One embedded section of a video's structured notes, for cross-video RAG search.
 
     Populated by app/services/rag/indexing.py whenever notes are (re)generated in
-    the Markdown-sectioned format produced by build_notes_prompt; a video only
+    the Markdown-sectioned format of build_generation_prompt's notes; a video only
     becomes searchable from the cross-video chat once it has at least one row
     here. Rows are replaced wholesale on regeneration (see
     docs/spec/09-transcript-et-discussion-llm.md).

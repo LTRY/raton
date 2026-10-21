@@ -375,3 +375,25 @@ def test_export_csv_cost_does_not_grow_with_the_playlist(client, db, path):
         counts.append(len(db.statements))
 
     assert counts[0] == counts[1]
+
+
+def test_preview_summarises_a_playlist_url_in_raw_values(client, db, monkeypatch):
+    summary = {
+        "url": "https://youtube.com/playlist?list=PL1",
+        "title": "Cours",
+        "yt_playlist_id": "PL1",
+        "channel_name": "Chan",
+        "video_count": 2,
+        "unavailable_count": 1,
+        "duration_seconds": 5400.5,
+        "unknown_duration_count": 0,
+        "known_in_library_count": 1,
+        "sample_titles": ["A", "B"],
+        "truncated": False,
+    }
+    monkeypatch.setattr(playlists_api, "preview_playlist", lambda db_, url: summary)
+
+    response = client.post("/api/playlists/preview", json={"url": summary["url"]})
+
+    assert response.status_code == 200
+    assert response.json() == summary

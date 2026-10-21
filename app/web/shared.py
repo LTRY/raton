@@ -46,12 +46,6 @@ def redirect(path: str) -> RedirectResponse:
     return RedirectResponse(path, status_code=303)
 
 
-def wants_json(request: Request | None) -> bool:
-    # Set by the app.js fetch calls that update the page in place: a form
-    # route answers them in JSON and keeps its redirect for plain submissions.
-    return request is not None and request.headers.get("x-requested-with") == "fetch"
-
-
 def internal_return_path(path: str, fallback: str = "/videos") -> str:
     if not path.startswith("/") or path.startswith("//"):
         return fallback

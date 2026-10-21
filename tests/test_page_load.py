@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -111,15 +112,32 @@ def seed_followed_library(db, video_count: int) -> None:
     db.commit()
 
 
+def forbid_metadata_reads(db, monkeypatch, tmp_path) -> None:
+    """Give every fiche a real metadata.json, then fail on any read of one.
+
+    The files must exist: a reader checks `is_file()` first, so a missing file would hide a read.
+    """
+    for video in db.query(Video):
+        path = tmp_path / str(video.id) / "metadata.json"
+        path.parent.mkdir()
+        path.write_text("{}", encoding="utf-8")
+        video.metadata_path = str(path)
+    db.commit()
+    read_text = Path.read_text
+
+    def guarded(self, *args, **kwargs):
+        if self.name == "metadata.json":
+            raise AssertionError(f"{self} read while rendering a list")
+        return read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded)
+
+
 @pytest.mark.parametrize("path", ["/dashboard/nouveautes", "/videos"])
-def test_video_cards_do_not_read_metadata_files(db, monkeypatch, path):
+def test_video_cards_do_not_read_metadata_files(db, monkeypatch, tmp_path, path):
     """A metadata.json is the full yt-dlp dump (~140 KB): reading one per card made the pages take seconds."""
     seed_followed_library(db, 12)
-
-    def forbidden(video):
-        raise AssertionError(f"metadata.json read while rendering {path}")
-
-    monkeypatch.setattr("app.web.video_library.video_metadata", forbidden)
+    forbid_metadata_reads(db, monkeypatch, tmp_path)
 
     response = TestClient(app).get(path)
 
@@ -158,13 +176,9 @@ def seed_playlist(db, video_count: int) -> int:
 
 
 @pytest.mark.parametrize("path", ["/playlists", "/playlists/{id}"])
-def test_playlist_pages_read_no_files_and_cost_constant_statements(db, monkeypatch, path):
+def test_playlist_pages_read_no_files_and_cost_constant_statements(db, monkeypatch, tmp_path, path):
     playlist_id = seed_playlist(db, 40)
-
-    def forbidden(video):
-        raise AssertionError("metadata.json read while rendering a playlist page")
-
-    monkeypatch.setattr("app.web.routes.playlists.video_metadata", forbidden, raising=False)
+    forbid_metadata_reads(db, monkeypatch, tmp_path)
     db.statements.clear()
 
     response = TestClient(app).get(path.format(id=playlist_id))

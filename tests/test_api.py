@@ -99,15 +99,18 @@ def test_api_videos_rejects_page_zero(db):
 @pytest.mark.parametrize(
     ("method", "path", "detail"),
     [
-        ("post", "/api/channels/999/rating?rating=3", "Chaîne introuvable"),
+        ("put", "/api/channels/999/rating", "Chaîne introuvable"),
+        ("get", "/api/channels/999", "Chaîne introuvable"),
         ("delete", "/api/channels/999", "Chaîne introuvable"),
-        ("post", "/api/videos/999/rating?rating=3", "Vidéo introuvable"),
+        ("put", "/api/videos/999/rating", "Vidéo introuvable"),
         ("get", "/api/videos/999/sponsor-segments", "Vidéo introuvable"),
         ("get", "/api/videos/999", "Vidéo introuvable"),
     ],
 )
 def test_api_not_found_details_are_french(db, method, path, detail):
-    response = getattr(TestClient(app), method)(path)
+    kwargs = {"json": {"rating": 3}} if method == "put" else {}
+
+    response = getattr(TestClient(app), method)(path, **kwargs)
 
     assert response.status_code == 404
     assert response.json() == {"detail": detail}
@@ -123,16 +126,27 @@ def test_api_stats_counts_the_library(db):
     assert set(payload) == {"channels", "videos", "used_bytes", "quota_bytes"}
 
 
-def test_api_errors_lists_the_hundred_newest_jobs(db):
+def test_api_jobs_lists_the_hundred_newest_jobs(db):
     for index in range(105):
         db.add(DownloadJob(status="failed", message=f"m{index}", created_at=NOW + timedelta(index)))
     db.commit()
 
-    payload = TestClient(app).get("/api/errors").json()
+    payload = TestClient(app).get("/api/jobs").json()
 
     assert len(payload) == 100
     assert payload[0]["message"] == "m104"
     assert payload[-1]["message"] == "m5"
+    assert payload[0]["done"] is True
+
+
+def test_api_jobs_filters_by_status(db):
+    for status in ("failed", "played", "queued", "failed", "warning"):
+        db.add(DownloadJob(status=status, message=status))
+    db.commit()
+
+    payload = TestClient(app).get("/api/jobs?status=failed&status=warning").json()
+
+    assert sorted(job["status"] for job in payload) == ["failed", "failed", "warning"]
 
 
 def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):

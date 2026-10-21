@@ -40,8 +40,7 @@ une cle qui ne change jamais (l'identifiant YouTube, contrairement au nom) :
 L'extension suit le type de l'image recue (`.jpg`, `.png`, `.webp`, `.gif`) ;
 `channels.avatar_path`/`banner_path` stockent le chemin relatif a
 `MEDIA_ROOT`. Le dossier est supprime avec la chaine (la suppression des
-fichiers video, elle, reste decrite plus bas) et n'entre pas dans le quota, qui additionne `Video.file_size_bytes` (seul le recalcul brut de
-la racine media, `recalculate_media_root_usage`, le compte).
+fichiers video, elle, reste decrite plus bas) et n'entre pas dans le quota, qui additionne `Video.file_size_bytes`.
 
 Si la date de publication est inconnue, le nom doit rester stable et lisible.
 Les noms doivent etre sanifies pour eviter les caracteres invalides.

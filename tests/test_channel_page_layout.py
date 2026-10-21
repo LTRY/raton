@@ -331,7 +331,7 @@ def test_channel_import_job_status_lists_the_videos_imported_so_far():
     db.add(DownloadJob(channel_id=channel.id, video_id=first.id, status="metadata", message="new"))
     db.commit()
 
-    payload = client.get(f"/jobs/{queued_after.id}").json()
+    payload = client.get(f"/api/jobs/{queued_after.id}").json()
 
     assert payload["done"] is False
     assert payload["videos"] == [{"id": first.id, "title": "Titre first"}]
@@ -339,7 +339,7 @@ def test_channel_import_job_status_lists_the_videos_imported_so_far():
     done = DownloadJob(channel_id=channel.id, status="downloaded", message="ok")
     db.add(done)
     db.commit()
-    assert "videos" not in client.get(f"/jobs/{done.id}").json()
+    assert "videos" not in client.get(f"/api/jobs/{done.id}").json()
 
 
 def test_cards_fragment_renders_the_requested_cards_in_order():
@@ -361,17 +361,17 @@ def test_cancel_marks_a_running_channel_import_as_cancelled_and_done():
     db.add(job)
     db.commit()
 
-    payload = client.post(f"/jobs/{job.id}/cancel").json()
+    payload = client.post(f"/api/jobs/{job.id}/cancel").json()
 
     assert payload["status"] == "cancelled"
     assert payload["done"] is True
-    assert client.get(f"/jobs/{job.id}").json()["done"] is True
+    assert client.get(f"/api/jobs/{job.id}").json()["done"] is True
     # A finished job is left as it is.
     finished = DownloadJob(channel_id=channel.id, status="metadata", message="ok")
     db.add(finished)
     db.commit()
-    assert client.post(f"/jobs/{finished.id}/cancel").json()["status"] == "metadata"
-    assert client.post("/jobs/99999/cancel").status_code == 404
+    assert client.post(f"/api/jobs/{finished.id}/cancel").json()["status"] == "metadata"
+    assert client.post("/api/jobs/99999/cancel").status_code == 404
 
 
 def test_cards_carry_their_video_id_for_the_exploration_dedup():

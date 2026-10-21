@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api import video_actions
+from app.api import videos as videos_api
 from app.db.base import *  # noqa: F403
 from app.db.session import Base, get_db
 from app.main import app
@@ -97,7 +97,7 @@ def test_activity_records_playback_and_marks_vu_when_complete(client, db, video)
 
 def test_media_download_queues_a_job_and_runs_it_in_the_background(client, db, video, monkeypatch):
     calls = []
-    monkeypatch.setattr(video_actions, "run_media_download_job", lambda *args: calls.append(args))
+    monkeypatch.setattr(videos_api, "run_media_download_job", lambda *args: calls.append(args))
 
     response = client.post(
         f"/api/videos/{video.id}/media/audio/download", json={"video_quality": "720"}
@@ -122,7 +122,7 @@ def test_media_download_queues_a_job_and_runs_it_in_the_background(client, db, v
 
 
 def test_job_status_is_polled_until_done(client, db, video, monkeypatch):
-    monkeypatch.setattr(video_actions, "run_transcript_retry_job", lambda *args: None)
+    monkeypatch.setattr(videos_api, "run_transcript_retry_job", lambda *args: None)
     queued = client.post(f"/api/videos/{video.id}/transcript/download").json()
 
     status = client.get(queued["status_url"]).json()

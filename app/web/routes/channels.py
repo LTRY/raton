@@ -10,16 +10,14 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.channel import Channel
 from app.services.channels.listing import (
-    CHANNEL_SORTS,
-    channel_entries,
+    channel_page,
     channels_by_yt_id,
-    video_counts_by_channel,
 )
 from app.services.channels.manage import (
     ChannelAlreadyInLibraryError,
@@ -46,11 +44,11 @@ from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
-from app.services.jobs.downloads import (
+from app.services.jobs.download_requests import (
     queue_channel_catalog_sync,
     queue_channel_metadata_import,
-    run_channel_metadata_import_job,
 )
+from app.services.jobs.downloads import run_channel_metadata_import_job
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,
@@ -64,10 +62,8 @@ from app.web.shared import (
     form_text_value,
     internal_return_path,
     page_href_builder,
-    paginate,
     redirect,
     templates,
-    wants_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,9 +104,6 @@ def youtube_channel_search(request: Request, db: Session) -> dict | None:
 
 def channels_context(request: Request, rated: bool | None, page: int, db: Session) -> dict:
     search_query = normalized_search_query(request.query_params.get("q"))
-    selected_sort = request.query_params.get("sort")
-    if selected_sort not in CHANNEL_SORTS:
-        selected_sort = "activity"
     rated_values = request.query_params.getlist("rated") if "query_string" in request.scope else []
     legacy_favorite_values = (
         request.query_params.getlist("favorite") if "query_string" in request.scope else []
@@ -123,12 +116,8 @@ def channels_context(request: Request, rated: bool | None, page: int, db: Sessio
         rated_filter = rated
     else:
         rated_filter = True
-    all_channel_entries = channel_entries(db, selected_sort, rated_filter, search_query)
-    page_entries, page, total_pages = paginate(all_channel_entries, page)
-    # Counted for the visible page only: the card shows how many library entries (fiches) the channel has.
-    video_counts = video_counts_by_channel(db, [entry["channel"].id for entry in page_entries])
-    for entry in page_entries:
-        entry["video_count"] = video_counts.get(entry["channel"].id, 0)
+    listed = channel_page(db, request.query_params.get("sort"), rated_filter, search_query, page)
+    page_entries = listed.entries
     category_label_styles = get_video_category_label_styles(db)
     added_channel_id = request.query_params.get(ADDED_CHANNEL_PARAM, "")
     added_channel = db.get(Channel, int(added_channel_id)) if added_channel_id.isdecimal() else None
@@ -136,16 +125,16 @@ def channels_context(request: Request, rated: bool | None, page: int, db: Sessio
         "added_channel": added_channel,
         "channel_entries": page_entries,
         "channels": [entry["channel"] for entry in page_entries],
-        "total_channel_entry_count": len(all_channel_entries),
+        "total_channel_entry_count": listed.total,
         "rated_filter": rated_filter,
         "search_query": search_query,
-        "selected_sort": selected_sort,
+        "selected_sort": listed.sort,
         "current_channels_path": current_request_path(request, exclude=ONE_SHOT_PARAMS),
         "category_filter_options": category_label_styles,
         "category_option_labels": [style["label"] for style in category_label_styles],
         "category_style_map": category_style_map(category_label_styles),
-        "page": page,
-        "total_pages": total_pages,
+        "page": listed.page,
+        "total_pages": listed.total_pages,
         "page_href": page_href_builder(request, exclude=ONE_SHOT_PARAMS),
         "message": request.query_params.get("message"),
         "message_level": request.query_params.get("level", "success"),
@@ -252,8 +241,8 @@ def rate_channel_form(
     rating: int = Form(...),
     return_to: str = Form("/channels", alias="next"),
     db: Session = Depends(get_db),
-    request: Request = None,
 ):
+    """The no-JS fallback of the stars, which app.js saves with PUT /api/.../rating."""
     channel = db.get(Channel, channel_id)
     try:
         check_rating(rating)
@@ -261,10 +250,6 @@ def rate_channel_form(
             set_rating(db, channel, rating)
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if wants_json(request):
-        if not channel:
-            raise HTTPException(status_code=404, detail="Chaîne introuvable")
-        return JSONResponse({"rating": channel.rating})
     return redirect(internal_return_path(return_to))
 
 
@@ -329,7 +314,6 @@ def toggle_channel_auto_metadata_form(
 
 @router.post("/channels/{channel_id}/import-metadata")
 def import_channel_metadata_form(
-    request: Request,
     background_tasks: BackgroundTasks,
     channel_id: int,
     page: int = Form(1),
@@ -337,29 +321,16 @@ def import_channel_metadata_form(
     return_to: str = Form("/videos", alias="next"),
     db: Session = Depends(get_db),
 ):
+    """The no-JS fallback of a channel's exploration, which app.js sends to /api."""
     target = internal_return_path(return_to)
-    page = max(page, 1)
     channel = db.get(Channel, channel_id)
     if channel is None:
-        message = "Chaîne introuvable."
-        if request.headers.get("x-requested-with") == "fetch":
-            return JSONResponse({"status": "failed", "message": message}, status_code=404)
-        return redirect(append_query(target, {"level": "error", "message": message}))
-
+        return redirect(append_query(target, {"level": "error", "message": "Chaîne introuvable."}))
     section = bell_section(section)
     job = queue_channel_metadata_import(db, channel, section)
-    background_tasks.add_task(run_channel_metadata_import_job, job.id, channel.id, page, section)
-
-    if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse(
-            {
-                "job_id": job.id,
-                "status": job.status,
-                "message": job.message,
-                "status_url": f"/jobs/{job.id}",
-                "return_to": target,
-            }
-        )
+    background_tasks.add_task(
+        run_channel_metadata_import_job, job.id, channel.id, max(page, 1), section
+    )
     return redirect(
         append_query(target, {"message": "Import des métadonnées lancé en arrière-plan."})
     )

@@ -158,7 +158,7 @@ La position est connue a deux endroits :
 - **`localStorage`**, cle `raton:media-position:{id}:{video|audio}`,
   ecrite toutes les 5 s de lecture, a la pause et a la sortie de page. Une
   cle soeur `...:at` porte l'horodatage (ms) de la derniere ecriture ;
-- **serveur** : le journal d'activite (`POST /videos/{id}/activity`, jobs
+- **serveur** : le journal d'activite (`POST /api/videos/{id}/activity`, jobs
   `played`) contient deja `position_seconds`. `latest_playback_positions`
   (`app/services/videos/playback.py`) en extrait la derniere position par type de media, et
   `/videos/{id}` l'expose sur le lecteur via `data-resume-server-position` /
@@ -243,14 +243,14 @@ controles natifs du navigateur.
 Cliquer un point d'entree deja en cours de lecture bascule play/pause au lieu
 de relancer la piste depuis le debut. Reprise de position (voir "Reprise de
 la position de lecture" ci-dessus, cle
-`raton:media-position:{id}:audio`) et log d'activite (`POST /videos/{id}/activity`) fonctionnent comme
+`raton:media-position:{id}:audio`) et log d'activite (`POST /api/videos/{id}/activity`) fonctionnent comme
 pour les lecteurs video/audio classiques (`app/static/js/app.js`,
 `initMiniPlayer`).
 
 ## Video vue et fichiers retires
 
 Le seuil de 90 % de lecture est evalue cote serveur par
-`POST /videos/{id}/activity` (`record_playback_activity`, qui appelle
+`POST /api/videos/{id}/activity` (`record_playback_activity`, qui appelle
 `mark_watched_if_complete`, `app/services/videos/playback.py`) : la premiere fois que
 `position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
 seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont

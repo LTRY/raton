@@ -99,7 +99,8 @@ que les actions formats Audio/Vidéo (`.video-detail-action-bar`), pour rester
 visible sans defiler jusqu'a la section transcript :
 
 - bouton icone `.ai-generate-button` (robot SVG, rond, sans libelle) qui
-  soumet `#generate-form` (`POST /videos/{id}/transcript/generate`) ; il n'est
+  soumet `#generate-form` : le script appelle `POST /api/videos/{id}/notes/generate`
+  (`POST /videos/{id}/transcript/generate` sans JavaScript) ; il n'est
   rendu que si `transcript.txt` existe ;
 - au survol (ou au focus clavier, via `:hover`/`:focus-within` sur
   `.ai-generate`), une infobulle `#ai-generate-tooltip` resume ce que le
@@ -112,7 +113,7 @@ visible sans defiler jusqu'a la section transcript :
 - **la page n'est jamais rechargee** et ne defile pas : des que le job est en
   file, le résumé court s'ecrit **mot par mot** sous le titre
   (`#video-short-summary`) au fil de la reponse du LLM, sans ouvrir d'onglet ;
-  - le client interroge `GET /videos/{id}/transcript/jobs/{job_id}` toutes
+  - le client interroge `GET /api/llm-jobs/{job_id}` toutes
     les 400 ms (2 s pour les autres jobs LLM) et lit `partial_short_summary`
     (voir section Jobs LLM asynchrones) ;
   - `createWordStream` (script de `video_detail.html`) revele le texte recu a
@@ -124,8 +125,8 @@ visible sans defiler jusqu'a la section transcript :
   - le spinner du bouton continue de tourner une fois le résumé court ecrit, tant
     que les notes (generees ensuite) ne sont pas terminees ;
 - a la fin du job, les onglets textuels, le résumé court et les questions
-  suggerees sont mis a jour sur place a partir de la reponse
-  (`documents_payload`), sans changer l'onglet affiche ;
+  suggerees sont mis a jour sur place a partir des `documents` de la
+  reponse, sans changer l'onglet affiche ;
 - une notification `.toast` (`window.showToast`, voir
   `11-interface-html.md`) annonce la fin : succes (`Notes et résumé
   générés par l'IA.`) ou erreur ; en cas d'erreur, le résumé court
@@ -157,27 +158,24 @@ discussion. Un seul bouton (le bouton robot en haut de la page, voir "Bouton rob
 seul appel LLM — il n'y a pas de route ni de bouton pour en régénérer un seul
 en isolation.
 
-`POST /videos/{id}/transcript/generate` :
+`POST /api/videos/{id}/notes/generate` :
 
 - source : `transcript.txt` ;
 - crée systématiquement un job dans la DB (`llm_jobs`, `kind="generate"`) et
-  répond immédiatement `{"status":"queued", "job_id": ..., "estimated_seconds":
-  null, "estimated_cost_usd": null}` (pas d'estimation fiable, la sortie
-  combinée n'est pas corrélée 1:1 à la longueur d'entrée) — planification
-  asynchrone par `BackgroundTasks` ;
+  répond immédiatement `202 {job_id, status, status_url}` (aucune estimation
+  de durée ni de coût : la sortie combinée n'est pas corrélée à la longueur
+  d'entrée) — planification asynchrone par `BackgroundTasks` ;
 - **un seul appel LLM produit les deux documents**, pour n'envoyer le
   transcript qu'une seule fois (`app/services/llm/prompts.py:build_generation_prompt`) :
-  le prompt combine les instructions des deux anciens prompts à usage unique
-  (`build_notes_prompt`/`build_summary_prompt`, conservés et toujours
-  utilisables individuellement) sous deux titres Markdown de **niveau 1**
+  le prompt combine les instructions des notes et du résumé (les anciens
+  prompts séparés, inutilisés, ont été supprimés) sous deux titres Markdown de **niveau 1**
   exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
   réponse arrive) — chacun suivi des mêmes sous-sections de niveau 2 qu'avant :
   - La règle « rien d'autre avant le premier titre » n'est énoncée qu'une fois,
     pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
     n'en portent pas (deux consignes imbriquées faisaient parfois écrire
     `## Notes` au lieu de `# Notes`) ;
-  - chaque builder (`build_notes_prompt`, `build_summary_prompt`,
-    `build_generation_prompt`, `build_auto_notes_prompt`, `build_chat_prompt`,
+  - chaque builder (`build_generation_prompt`, `build_auto_notes_prompt`, `build_chat_prompt`,
     `build_library_chat_prompt`) renvoie un `Prompt(system, messages)` : les
     consignes vont dans le paramètre `system` de l'API, les données (le
     transcript, la question) dans les messages `user`. Le job stocke ce
@@ -210,16 +208,15 @@ en isolation.
   interne via l'indexation RAG ci-dessous, `split_summary_result`) ; un titre de niveau 1 absent (modèle
   n'ayant pas suivi le format) dégrade proprement vers un résultat vide pour
   ce seul document, sans deviner, comme chaque split_* individuel ;
-- le client interroge `GET /videos/{id}/transcript/jobs/{job_id}` jusqu'à
+- le client interroge `GET /api/llm-jobs/{job_id}` jusqu'à
   résolution, qui applique le résultat complet en une fois : écrit
   `transcript.notes.txt`, `transcript.summary_short.txt`,
   `transcript.questions.txt` (une
-  question par ligne) ; répond avec
-  `app/web/routes/transcript.py:documents_payload`
-  (`{"status": "generated", "message": "...", ...}`) ; peut être
+  question par ligne) ; répond avec les `documents` de la fiche ; peut être
   régénéré à volonté, ce qui écrase les quatre fichiers ;
-- redirige vers `/videos/{id}?message=...#transcript` (requêtes non-fetch) ;
-- en cas d'erreur, redirige avec `level=error`.
+- sans JavaScript, `POST /videos/{id}/transcript/generate` met le même job en
+  file et redirige vers `/videos/{id}?message=...#transcript` (`level=error`
+  en cas d'erreur).
 
 **Génération automatique** : le bouton robot n'est plus le seul moyen d'obtenir
 des notes. Un lot nocturne (`auto_notes`, voir
@@ -257,18 +254,16 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
 
 ## Jobs LLM asynchrones
 
-`GET /videos/{id}/transcript/jobs/{job_id}`
+`GET /api/llm-jobs/{job_id}` (voir [12 API et routes](12-api-et-routes.md))
 
 La mise en file (lecture du transcript, prompt, question vide refusee) et
 la resolution d'un job (en attente, echec, ecriture du resultat au premier
-poll) sont dans `app/services/jobs/llm_requests.py`, partagees par les
-routes HTML ci-dessous et par `/api` (`GET /api/llm-jobs/{id}`, voir
-[12 API et routes](12-api-et-routes.md)).
+poll) sont dans `app/services/jobs/llm_requests.py`.
 
 - s'applique a tous les jobs `llm_jobs`, quel que soit le fournisseur
   (traites en tache de fond dans le process web via
   `app/services/jobs/llm_jobs.py:run_llm_job`) ;
-- tant que le job est `queued`/`running`, repond `{"status": "pending"}` ;
+- tant que le job est `queued`/`running`, repond `status: "pending"` ;
   pour un job `generate` dont la reponse a commence a arriver, la reponse
   porte en plus `partial_short_summary` : le résumé court tel qu'ecrit
   jusque-la (`app/services/llm/prompts.py:partial_generation_summary`). Cette valeur ne fait
@@ -277,29 +272,18 @@ routes HTML ci-dessous et par `/api` (`GET /api/llm-jobs/{id}`, voir
   `run_llm_job` enregistre pour cela le texte recu dans `llm_jobs.result`
   toutes les 0,4 s pendant que le job `generate` est `running` — `result`
   n'est la reponse complete qu'une fois le job `done` ;
-- si le job a echoue, repond en 400 avec un message d'erreur explicite
-  (`Génération` ou `Réponse` selon `kind`) ;
+- si le job a echoue, repond `status: "failed"` avec un message d'erreur
+  explicite (`Génération` ou `Réponse` selon `kind`) ;
 - des que le job est termine (`done`), applique le resultat une seule fois
   (ecrit `transcript.notes.txt`/`transcript.summary_short.txt`/
   `transcript.questions.txt` pour
   `generate` ; ajoute question/reponse a `transcript.chat.json` pour `chat` —
   voir sections Génération/Discussion ci-dessus), passe le job a
-  `applied`, puis repond avec `documents_payload`
-  (`generate`), ou `chat_payload` (`chat`). Un nouveau poll sur un
-  job deja `applied` renvoie l'etat courant sans ré-appliquer (idempotent).
-
-`documents_payload(video)` renvoie l'etat complet des 2 onglets textuels de
-`/videos/{id}` a chaque reponse (generate), pour que le client
-resynchronise tous ses onglets (et le resume court sous le titre) en une fois
-quelle que soit l'action déclenchee :
-
-```json
-{
-  "transcript": "...", "transcript_length": 0,
-  "notes_transcript": "...", "notes_length": 0, "has_notes": false,
-  "short_summary": "..."
-}
-```
+  `applied`, puis repond `status: "done"` avec `documents` (`generate` :
+  transcript, notes, résumé court, questions et discussion, pour que la page
+  resynchronise ses onglets et le résumé sous le titre en une fois) ou
+  `chat_messages` (`chat`). Un nouveau poll sur un job deja `applied`
+  renvoie l'etat courant sans ré-appliquer (idempotent).
 
 ## Cout reel des jobs LLM
 
@@ -361,9 +345,10 @@ Elle affiche le widget de chat partage (voir
   sous l'en-tete (la portee `library` garde le sien) ;
 - formulaire textarea `question`.
 
-`POST /videos/{id}/transcript/chat`
+`POST /api/videos/{id}/chat` `{question}` (le widget n'a pas de repli sans
+JavaScript)
 
-- refuse les questions vides par redirection simple ;
+- refuse les questions vides (`400`) ;
 - lit `transcript.txt` ;
 - charge `transcript.chat.json` ;
 - construit le `Prompt` (`prompts.py:build_chat_prompt`) : consignes dans
@@ -373,16 +358,13 @@ Elle affiche le widget de chat partage (voir
   chat bibliotheque) et la question ;
 - cree systematiquement un job dans la DB (`kind="chat"`, la question brute est
   conservee a part pour etre ajoutee a l'historique une fois la reponse
-  obtenue) et repond immediatement `{"status":"queued","job_id":...}`, sans
+  obtenue) et repond immediatement `202 {job_id, status, status_url}`, sans
   jamais bloquer la requete ;
 - planifie `app/services/jobs/llm_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
-  jobs LLM asynchrones ci-dessus pour la resolution ;
-- redirige vers `/videos/{id}#discussion`.
+  jobs LLM asynchrones ci-dessus pour la resolution.
 
-`POST /videos/{id}/transcript/chat/clear`
-
-- supprime `transcript.chat.json` si present ;
-- redirige vers `/videos/{id}#discussion`.
+`DELETE /api/videos/{id}/chat` supprime `transcript.chat.json` si present
+(`204`).
 
 ## Chat cross-video (bibliotheque)
 
@@ -505,14 +487,14 @@ chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
 
 ### Routes
 
-`POST /chat` (`question` en form-data) :
+`POST /api/chat` `{question}` :
 
-- refuse les questions vides (`{"status":"failed",...}`, 400) ;
+- refuse les questions vides (`400`) ;
 - construit le prompt a partir des 10 derniers messages du fil
   (`library_chat_messages`) et de la question — aucune recherche n'est faite
   dans la requete HTTP ;
 - cree un job (`llm_jobs`, `kind="library_chat"`, `video_id=null`) et repond
-  `{"status":"queued","job_id":...}`, meme mecanique asynchrone
+  `202 {job_id, status, status_url}`, meme mecanique asynchrone
   (`BackgroundTasks`) que les autres jobs LLM.
 
 Les messages envoyes au modele sont construits par
@@ -532,13 +514,11 @@ additionnes dans `input_tokens`/`output_tokens`, donc `cost_usd` couvre
 l'echange entier. Le texte, references validees comprises, va dans `llm_jobs.result`, les ids
 cites dans `llm_jobs.sources`.
 
-`GET /chat/jobs/{job_id}` :
+`GET /api/llm-jobs/{job_id}` pour un job `library_chat` :
 
-- meme cycle `pending`/`failed`/`done`→`applied` que
-  `GET /videos/{id}/transcript/jobs/{job_id}`, mais sans `video_id` dans
-  l'URL — verifie `job.kind == "library_chat"` et `job.video_id is None` ;
-- tant que le job est `pending`, la reponse est
-  `{"status":"pending","tool_calls":[{"label","result"}]}` : les appels
+- meme cycle `pending`/`failed`/`done`→`applied` que les autres jobs LLM ;
+- tant que le job est `pending`, la reponse porte
+  `tool_calls: [{label, result}]` : les appels
   d'outils faits jusque-la (`llm_jobs.tool_calls`, ecrit par
   `LibraryChatToolbox` a chaque appel via le callback `on_progress` de
   `run_llm_job`). `label` decrit la recherche en cours (« Recherche de la
@@ -548,16 +528,16 @@ cites dans `llm_jobs.sources`.
 - a l'application (`done`), insere un message `user` et un message
   `assistant` dans `library_chat_messages`, ce dernier avec les videos
   (`sources`) et les chaines (`channel_sources`) lues dans `llm_jobs.sources` ;
-- reponse : `{"status":"ok","message":...,"messages":[{"role","content",
-  "channels":[{"channel_id","name"}],"citations":[{"video_id","title"}]},...],
-  "indexed_video_count":N,"total_video_count":M}`. Les chaines et videos
+- reponse : `library_chat` `{messages: [{role, content, channels:
+  [{channel_id, name}], citations: [{video_id, title}]}, ...],
+  indexed_video_count, total_video_count}`, comme `GET /api/chat`. Les chaines et videos
   supprimees depuis la reponse sont retirees de `channels`/`citations`.
   `indexed_video_count`/`total_video_count` alimentent la note de couverture
   du widget : combien de videos la recherche dans les notes peut voir (une
   video n'est indexee que si ses notes ont ete (re)generees au format a
   sections, voir la section Notes structurees ci-dessus).
 
-`POST /chat/clear` : vide entierement `library_chat_messages` (fil unique,
+`DELETE /api/chat` : vide entierement `library_chat_messages` (fil unique,
 pas de portee par utilisateur).
 
 ## Fournisseur LLM
@@ -568,7 +548,7 @@ Le fournisseur est choisi uniquement par la variable d'environnement
 `app/services/common/settings.py:get_llm_provider_name`. `anthropic` est la seule
 valeur acceptee : `AnthropicProvider` (`app/services/llm/provider.py`) est appele par
 `app/services/jobs/llm_jobs.py:run_llm_job`, en tache de fond dans le process
-web juste apres la reponse `{"status":"queued",...}`, jamais de facon
+web juste apres la reponse `202` de la demande, jamais de facon
 synchrone dans le handler de la requete.
 
 Le client Anthropic est cree avec
@@ -577,7 +557,7 @@ Le client Anthropic est cree avec
   UX a retenter plus longtemps sur des erreurs transitoires (429, 5xx, y
   compris `overloaded_error` — HTTP 529, surcharge temporaire cote Anthropic).
 
-L'UI interroge `GET /videos/{id}/transcript/jobs/{job_id}`
+L'UI interroge `GET /api/llm-jobs/{job_id}`
 jusqu'a resolution (voir plus haut) — la reponse n'est jamais immediate, quel
 que soit le fournisseur.
 

@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api import channel_actions
+from app.api import channels as channels_api
 from app.db.base import *  # noqa: F403
 from app.db.session import Base, get_db
 from app.main import app
@@ -45,7 +45,7 @@ def tasks(monkeypatch):
         "run_channel_profile_backfill_job",
     ):
         monkeypatch.setattr(
-            channel_actions, name, lambda *args, _name=name: calls.append((_name, *args))
+            channels_api, name, lambda *args, _name=name: calls.append((_name, *args))
         )
     return calls
 

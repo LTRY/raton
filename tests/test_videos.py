@@ -13,7 +13,10 @@ from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
 from app import main
-from app.api import routes as api_routes
+from app.api import channels as api_channels
+from app.api import llm as llm_api
+from app.api import settings as api_settings
+from app.api import videos as api_videos
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
@@ -22,14 +25,16 @@ from app.models.llm_job import LlmJob
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
+from app.schemas.llm import QuestionCreate
 from app.schemas.settings import SettingsUpdate
 from app.services.channels import manage as channel_manage
 from app.services.common import search
 from app.services.common.settings import get_sponsor_skip_enabled
 from app.services.ingest.identity import channel_values_from_info
-from app.services.jobs import backfills, downloads, llm_jobs
+from app.services.jobs import backfills, download_requests, downloads, llm_jobs
 from app.services.jobs.scheduler import record_scan_result
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
+from app.services.videos import editing as videos_editing
 from app.services.videos import list_state as videos_list_state
 from app.services.videos import playback as videos_playback
 from app.services.youtube import channel_info, sponsor_segments
@@ -327,7 +332,7 @@ def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_pat
     assert "Bonjour depuis le transcript." in rendered
     assert 'id="discussion"' in rendered
     assert "Pose une question sur le transcript." not in rendered
-    assert f'"askUrl": "/videos/{video.id}/transcript/chat"' in rendered
+    assert f'"chatUrl": "/api/videos/{video.id}/chat"' in rendered
     assert f'action="/videos/{video.id}/transcript/clean"' not in rendered
     assert f'action="/videos/{video.id}/transcript/revert"' not in rendered
     assert 'data-tab="cleaned"' not in rendered
@@ -450,19 +455,6 @@ def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
     )  # prompt over 100K tokens -> long-prompt tier
 
 
-def fetch_request(path: str) -> Request:
-    return Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": path,
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-
 def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
     db = make_session()
     video = add_video(db)
@@ -477,13 +469,12 @@ def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
         ],
     )
 
-    response = videos_routes.fetch_video_sponsorblock_segments(
-        fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
-    )
-    payload = json.loads(response.body)
+    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
 
-    assert response.status_code == 200
-    assert payload["status"] == "ok"
+    assert response.status_code == 303
+    assert response.headers["location"] == (
+        f"/videos/{video.id}?message=1+segment+trouv%C3%A9.#segments-sponsors"
+    )
     rows = list(
         db.scalars(select(VideoSponsorSegment).where(VideoSponsorSegment.video_id == video.id))
     )
@@ -501,13 +492,11 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
 
     monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
-    response = videos_routes.fetch_video_sponsorblock_segments(
-        fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
-    )
-    payload = json.loads(response.body)
+    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
 
-    assert response.status_code == 400
-    assert "impossible" in payload["message"].lower()
+    assert response.status_code == 303
+    assert "level=error" in response.headers["location"]
+    assert response.headers["location"].endswith("#segments-sponsors")
     assert (
         db.scalar(select(VideoSponsorSegment).where(VideoSponsorSegment.video_id == video.id))
         is None
@@ -547,7 +536,7 @@ def test_api_sponsor_segments_returns_normalized_payload():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     assert payload["skip_enabled"] is True
     assert payload["segments"] == [{"start": 0.0, "end": 8.0}, {"start": 30.0, "end": 60.0}]
@@ -578,7 +567,7 @@ def test_api_sponsor_segments_filters_out_unchecked_categories():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     assert payload["segments"] == [{"start": 30.0, "end": 60.0}]
 
@@ -599,7 +588,7 @@ def test_api_sponsor_segments_reports_skip_disabled():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     # La route renvoie toujours les segments : c'est le client qui décide de les
     # armer ou non à partir de `skip_enabled` (app/static/js/app.js).
@@ -611,7 +600,7 @@ def test_api_sponsor_segments_raises_404_for_unknown_video():
     db = make_session()
 
     with pytest.raises(HTTPException) as excinfo:
-        api_routes.get_video_sponsor_segments(999, db)
+        api_videos.get_video_sponsor_segments(999, db)
 
     assert excinfo.value.status_code == 404
 
@@ -644,9 +633,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     db.commit()
     job_id = job.id
 
-    assert json.loads(
-        transcript_routes.transcript_job_status(video_id, job_id, BackgroundTasks(), db).body
-    ) == {"status": "pending"}
+    assert llm_api.get_llm_job(job_id, BackgroundTasks(), db).partial_short_summary is None
 
     streamed = "# Résumé\n## Résumé court\nLigne 1."
     polled = []
@@ -654,13 +641,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     class FakeProvider:
         def complete(self, messages, on_text=None, system=None):
             on_text(streamed)
-            polled.append(
-                json.loads(
-                    transcript_routes.transcript_job_status(
-                        video_id, job_id, BackgroundTasks(), db
-                    ).body
-                )
-            )
+            polled.append(llm_api.get_llm_job(job_id, BackgroundTasks(), db))
             return CompletionResult(
                 text=GENERATION_RESULT_TEXT,
                 model="claude-haiku-4-5",
@@ -675,7 +656,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
 
     llm_jobs.run_llm_job(job_id)
 
-    assert polled == [{"status": "pending", "partial_short_summary": "Ligne 1."}]
+    assert [(job.status, job.partial_short_summary) for job in polled] == [("pending", "Ligne 1.")]
     assert db.get(LlmJob, job_id).result == GENERATION_RESULT_TEXT
 
 
@@ -710,18 +691,19 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, background_tasks, db)
-    assert json.loads(response.body)["status"] == "generated"
+    status = llm_api.get_llm_job(job.id, background_tasks, db)
+    assert status.status == "done"
+    assert "- Fait 1\n- Fait 2" in status.documents.notes
     assert len(scheduled) == 1
     fn, args, kwargs = scheduled[0]
-    assert fn is transcript_routes.run_notes_indexing_job
+    assert fn is llm_api.run_notes_indexing_job
     assert args[0] == video.id
     assert "- Fait 1\n- Fait 2" in args[1]
     assert kwargs == {}
 
     # Idempotent replay ("applied") must not reschedule indexing a second time.
     scheduled.clear()
-    transcript_routes.transcript_job_status(video.id, job.id, background_tasks, db)
+    llm_api.get_llm_job(job.id, background_tasks, db)
     assert scheduled == []
 
 
@@ -1053,9 +1035,10 @@ def test_transcript_job_status_pending_while_queued(tmp_path):
     db.add(job)
     db.commit()
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert json.loads(response.body) == {"status": "pending"}
+    assert status.status == "pending"
+    assert status.documents is None
 
 
 def test_transcript_job_status_reports_failure(tmp_path):
@@ -1080,10 +1063,10 @@ def test_transcript_job_status_reports_failure(tmp_path):
     db.add(job)
     db.commit()
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert response.status_code == 400
-    assert "API indisponible." in json.loads(response.body)["message"]
+    assert status.status == "failed"
+    assert "API indisponible." in status.message
 
 
 def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
@@ -1098,17 +1081,11 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
 
-    response = transcript_routes.chat_about_video_transcript(
-        fetch_request(f"/videos/{video.id}/transcript/chat"),
-        video.id,
-        BackgroundTasks(),
-        "Question ?",
-        db,
+    queued = llm_api.ask_about_video(
+        video.id, QuestionCreate(question="Question ?"), BackgroundTasks(), db
     )
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
 
-    job = db.get(LlmJob, payload["job_id"])
+    job = db.get(LlmJob, queued.job_id)
     assert job.kind == "chat"
     assert job.provider == "anthropic"
     assert job.question == "Question ?"
@@ -1118,26 +1095,21 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     job.result = "Réponse du LLM."
     db.commit()
 
-    resolved_response = transcript_routes.transcript_job_status(
-        video.id, job.id, BackgroundTasks(), db
-    )
-    resolved_payload = json.loads(resolved_response.body)
+    resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert resolved_payload["status"] == "ok"
-    assert resolved_payload["messages"] == [
+    assert resolved.status == "done"
+    assert [message.model_dump() for message in resolved.chat_messages] == [
         {"role": "user", "content": "Question ?"},
         {"role": "assistant", "content": "Réponse du LLM."},
     ]
     assert (folder / "transcript.chat.json").exists()
 
     # Re-polling must not duplicate the appended messages.
-    second_resolved = transcript_routes.transcript_job_status(
-        video.id, job.id, BackgroundTasks(), db
-    )
-    assert len(json.loads(second_resolved.body)["messages"]) == 2
+    second_resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    assert len(second_resolved.chat_messages) == 2
 
 
-def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(monkeypatch, tmp_path):
+def test_video_chat_queues_job_and_resolves_after_background_task(monkeypatch, tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
@@ -1171,35 +1143,18 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/chat",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-    response = transcript_routes.chat_about_video_transcript(
-        request, video.id, background_tasks, "Question ?", db
-    )
-    payload = json.loads(response.body)
-
-    assert response.status_code == 200
-    assert payload["status"] == "queued"
-    job_id = payload["job_id"]
+    job_id = llm_api.ask_about_video(
+        video.id, QuestionCreate(question="Question ?"), background_tasks, db
+    ).job_id
     assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     # Simulate the background task the request scheduled.
     llm_jobs.run_llm_job(job_id)
 
-    resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
-    resolved_payload = json.loads(resolved.body)
+    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
 
-    assert resolved_payload["status"] == "ok"
-    assert resolved_payload["messages"] == [
+    assert resolved.status == "done"
+    assert [message.model_dump() for message in resolved.chat_messages] == [
         {"role": "user", "content": "Question ?"},
         {"role": "assistant", "content": "Réponse à Question ?"},
     ]
@@ -1211,7 +1166,7 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
     assert "Prompt envoyé sur Une vidéo à lire localement: Question ?" in job.message
 
 
-def test_transcript_chat_clear_fetch_returns_empty_messages(tmp_path):
+def test_clearing_the_video_chat_deletes_its_file(tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
@@ -1226,23 +1181,8 @@ def test_transcript_chat_clear_fetch_returns_empty_messages(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/chat/clear",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
+    llm_api.clear_video_chat(video.id, db)
 
-    response = transcript_routes.clear_video_transcript_chat(request, video.id, db)
-    payload = json.loads(response.body)
-
-    assert response.status_code == 200
-    assert payload["status"] == "ok"
-    assert payload["messages"] == []
     assert not (folder / "transcript.chat.json").exists()
 
 
@@ -1309,7 +1249,7 @@ def test_audio_only_video_detail_renders_mini_player_trigger(monkeypatch, tmp_pa
     assert f'data-track-src="/videos/{video.id}/audio"' in rendered
     assert f'data-track-thumb="/videos/{video.id}/thumbnail"' in rendered
     assert f'data-track-resume-key="raton:media-position:{video.id}:audio"' in rendered
-    assert f'data-track-activity-url="/videos/{video.id}/activity"' in rendered
+    assert f'data-track-activity-url="/api/videos/{video.id}/activity"' in rendered
     assert f'data-track-detail-url="/videos/{video.id}"' in rendered
     assert '<audio controls preload="metadata" src="/videos/' not in rendered
     assert "Supprimer l’audio ?" in rendered
@@ -1377,19 +1317,9 @@ def test_delete_video_media_removes_file_and_keeps_audio(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
+        video.id, "video", return_to=f"/videos/{video.id}", db=db
     )
 
     assert response.status_code == 303
@@ -1402,7 +1332,7 @@ def test_delete_video_media_removes_file_and_keeps_audio(tmp_path):
     assert video.file_size_bytes == len(b"audio bytes")
 
 
-def test_delete_video_media_fetch_returns_json(tmp_path):
+def test_api_delete_media_removes_the_file(tmp_path):
     db = make_session()
     folder = tmp_path / "media"
     folder.mkdir()
@@ -1419,29 +1349,14 @@ def test_delete_video_media_fetch_returns_json(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
-    )
+    api_videos.delete_media(video.id, "video", db)
 
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "deleted"
     assert not video_file.exists()
     assert video.video_path is None
 
 
-def test_delete_video_media_fetch_returns_json_error_when_already_missing(tmp_path):
+def test_api_delete_media_refuses_a_missing_file(tmp_path):
     db = make_session()
     folder = tmp_path / "media"
     folder.mkdir()
@@ -1455,24 +1370,11 @@ def test_delete_video_media_fetch_returns_json_error_when_already_missing(tmp_pa
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/delete",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    response = media_routes.delete_video_media_form(
-        request, video.id, "video", return_to=f"/videos/{video.id}", db=db
-    )
+    with pytest.raises(HTTPException) as refused:
+        api_videos.delete_media(video.id, "video", db)
 
-    assert response.status_code == 400
-    payload = json.loads(response.body)
-    assert payload["status"] == "failed"
+    assert refused.value.status_code == 400
 
 
 def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
@@ -1495,19 +1397,9 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/audio/delete",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = media_routes.delete_video_media_form(
-        request, video.id, "audio", return_to=f"/videos/{video.id}", db=db
+        video.id, "audio", return_to=f"/videos/{video.id}", db=db
     )
 
     assert response.status_code == 303
@@ -1520,128 +1412,41 @@ def test_delete_audio_media_removes_file_and_keeps_video(tmp_path):
     assert video.file_size_bytes == len(b"video bytes")
 
 
-def test_download_video_media_queues_job_and_returns_json(monkeypatch):
+def test_download_video_media_form_queues_job_and_redirects(monkeypatch):
     db = make_session()
     video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", lambda *args, **kwargs: None)
+    background_tasks = BackgroundTasks()
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/audio/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = videos_routes.download_video_media_form(
-        request, BackgroundTasks(), video.id, "audio", db=db
-    )
+    response = videos_routes.download_video_media_form(background_tasks, video.id, "audio", db=db)
 
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
-    assert payload["status_url"] == f"/videos/download-jobs/{payload['job_id']}"
-    job = db.get(DownloadJob, payload["job_id"])
-    assert job is not None
-    assert job.video_id == video.id
+    job = db.scalar(select(DownloadJob))
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/videos/{video.id}?message=")
+    assert (job.status, job.video_id) == ("queued", video.id)
+    assert background_tasks.tasks[0].args == (job.id, video.url, "audio", "1080")
 
 
-def test_download_video_media_returns_internal_next_as_return_to(monkeypatch):
+def test_download_video_media_form_returns_to_an_internal_next_only():
     db = make_session()
     video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", lambda *args, **kwargs: None)
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/video/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
+    inside = videos_routes.download_video_media_form(
+        BackgroundTasks(), video.id, "video", "1080", "/videos?channel_id=1&section=shorts", db=db
     )
-    response = videos_routes.download_video_media_form(
-        request,
-        BackgroundTasks(),
-        video.id,
-        "video",
-        "1080",
-        "/videos?channel_id=1&section=shorts",
-        db=db,
+    outside = videos_routes.download_video_media_form(
+        BackgroundTasks(), video.id, "video", "1080", "https://evil.example/", db=db
     )
-    assert json.loads(response.body)["return_to"] == "/videos?channel_id=1&section=shorts"
 
-    response = videos_routes.download_video_media_form(
-        request, BackgroundTasks(), video.id, "video", "1080", "https://evil.example/", db=db
-    )
-    assert "return_to" not in json.loads(response.body)
+    assert inside.headers["location"].startswith("/videos?channel_id=1&section=shorts&message=")
+    assert outside.headers["location"].startswith(f"/videos/{video.id}?message=")
 
 
 def test_download_video_media_rejects_invalid_format():
     db = make_session()
     video = add_video(db)
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/media/subtitles/download",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     with pytest.raises(HTTPException):
-        videos_routes.download_video_media_form(
-            request, BackgroundTasks(), video.id, "subtitles", db=db
-        )
-
-
-def test_retry_video_transcript_queues_job_and_returns_json(monkeypatch):
-    db = make_session()
-    video = add_video(db)
-    monkeypatch.setattr(videos_routes, "run_transcript_retry_job", lambda *args, **kwargs: None)
-
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    response = videos_routes.retry_video_transcript_form(
-        request, BackgroundTasks(), video.id, db=db
-    )
-
-    assert response.status_code == 200
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
-    assert payload["status_url"] == f"/videos/download-jobs/{payload['job_id']}"
-    job = db.get(DownloadJob, payload["job_id"])
-    assert job is not None
-    assert job.video_id == video.id
-
-
-def test_retry_video_transcript_rejects_missing_video():
-    db = make_session()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/999/transcript/download",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-    with pytest.raises(HTTPException):
-        videos_routes.retry_video_transcript_form(request, BackgroundTasks(), 999, db=db)
+        videos_routes.download_video_media_form(BackgroundTasks(), video.id, "subtitles", db=db)
 
 
 def test_run_transcript_retry_job_marks_job_downloaded_on_success(monkeypatch):
@@ -1935,16 +1740,6 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     # A forced language asks YouTube for an auto-translation (HTTP 429): the form leaves the track choice to the server.
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -1953,7 +1748,6 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=en123",
         media_type=["metadata"],
@@ -1962,7 +1756,7 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
         db=db,
     )
 
-    assert '"return_to":"/videos/import"' in response.body.decode()
+    assert response.headers["location"].startswith("/videos/import?message=")
     assert scheduled[0][1][5] is None
 
 
@@ -2025,19 +1819,9 @@ def test_import_page_route_is_not_shadowed_by_video_detail():
     assert 'action="/videos/download"' in response.text
 
 
-def test_download_form_queues_ajax_job(monkeypatch):
+def test_download_form_queues_job(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2046,7 +1830,6 @@ def test_download_form_queues_ajax_job(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=abc123",
         media_type=["audio"],
@@ -2055,12 +1838,9 @@ def test_download_form_queues_ajax_job(monkeypatch):
         db=db,
     )
 
-    payload = response.body.decode()
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert job.status == "queued"
-    assert f'"job_id":{job.id}' in payload
-    assert f"/videos/download-jobs/{job.id}" in payload
     assert scheduled == [
         (
             downloads.run_manual_download_job,
@@ -2072,29 +1852,20 @@ def test_download_form_queues_ajax_job(monkeypatch):
                 None,
                 None,
                 "both",
+                "1080",
             ),
             {},
         )
     ]
 
-    status = videos_routes.download_job_status(job.id, db)
+    status = download_requests.job_status(db, job.id)
     assert status["status"] == "queued"
     assert status["done"] is False
 
 
-def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
+def test_download_form_accepts_metadata_only_job(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2103,7 +1874,6 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=meta123",
         media_type=["metadata"],
@@ -2113,12 +1883,21 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
     )
 
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert job.status == "queued"
     assert scheduled == [
         (
             downloads.run_manual_download_job,
-            (job.id, "https://youtube.com/watch?v=meta123", ["metadata"], True, None, None, "both"),
+            (
+                job.id,
+                "https://youtube.com/watch?v=meta123",
+                ["metadata"],
+                True,
+                None,
+                None,
+                "both",
+                "1080",
+            ),
             {},
         )
     ]
@@ -2127,16 +1906,6 @@ def test_download_form_accepts_metadata_only_ajax_job(monkeypatch):
 def test_download_form_queues_category_labels(monkeypatch):
     db = make_session()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": "/videos/download",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -2145,7 +1914,6 @@ def test_download_form_queues_category_labels(monkeypatch):
     )
 
     response = videos_routes.download_video_form(
-        request,
         background_tasks,
         url="https://youtube.com/watch?v=cat123",
         media_type=["metadata"],
@@ -2157,7 +1925,7 @@ def test_download_form_queues_category_labels(monkeypatch):
     )
 
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
     assert scheduled == [
         (
             downloads.run_manual_download_job,
@@ -2169,6 +1937,7 @@ def test_download_form_queues_category_labels(monkeypatch):
                 "maker,science,interview",
                 None,
                 "both",
+                "1080",
             ),
             {},
         )
@@ -2937,19 +2706,8 @@ def test_videos_page_uses_separate_asset_and_category_filter_modes(monkeypatch):
 def test_video_categories_form_saves_presets_and_custom_labels():
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/categories",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = videos_routes.update_video_categories_form(
-        request,
         video.id,
         preset_categories=["maker", "science"],
         custom_categories="Interview, maker",
@@ -2987,22 +2745,12 @@ def test_videos_page_accepts_empty_channel_filter(monkeypatch):
     assert video.title in rendered
 
 
-def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
+def test_channel_metadata_import_form_queues_the_job_and_redirects(monkeypatch):
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne test")
     db.add(channel)
     db.commit()
     scheduled = []
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/channels/{channel.id}/import-metadata",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
     background_tasks = BackgroundTasks()
     monkeypatch.setattr(
         background_tasks,
@@ -3011,7 +2759,6 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
     )
 
     response = channels_routes.import_channel_metadata_form(
-        request,
         background_tasks,
         channel.id,
         page=2,
@@ -3019,18 +2766,16 @@ def test_channel_metadata_import_form_queues_ajax_job(monkeypatch):
         db=db,
     )
 
-    payload = response.body.decode()
     job = db.scalar(select(DownloadJob))
-    assert response.status_code == 200
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/videos?channel_id={channel.id}&message=")
     assert job.status == "queued"
     assert job.channel_id == channel.id
-    assert f'"job_id":{job.id}' in payload
-    assert f"/jobs/{job.id}" in payload
     assert scheduled == [
         (downloads.run_channel_metadata_import_job, (job.id, channel.id, 2, "videos"), {})
     ]
 
-    status = videos_routes.job_status(job.id, db)
+    status = download_requests.job_status(db, job.id)
     assert status["status"] == "queued"
     assert status["done"] is False
 
@@ -3296,14 +3041,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
     video = add_video(db)
     base = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
     for offset, media_type, position in ((0, "video", 120), (1, "audio", 45), (2, "video", 252.5)):
-        videos_routes.log_video_activity(
-            video.id,
-            media_type=media_type,
-            position_seconds=position,
-            duration_seconds=600,
-            watched_seconds=10,
-            db=db,
-        )
+        videos_playback.record_playback_activity(db, video, media_type, position, 600, 10)
         job = db.scalars(
             select(DownloadJob)
             .where(DownloadJob.status == "played")
@@ -3363,17 +3101,9 @@ def test_video_activity_logs_media_playback():
     db = make_session()
     video = add_video(db)
 
-    response = videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=252,
-        duration_seconds=600,
-        watched_seconds=83,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 252, 600, 83)
     job = db.scalar(select(DownloadJob).where(DownloadJob.status == "played"))
 
-    assert response == {"status": "logged"}
     assert job is not None
     assert job.video_id == video.id
     assert job.channel_id == video.channel_id
@@ -3390,24 +3120,10 @@ def test_video_activity_sets_watched_at_at_ninety_percent():
     db = make_session()
     video = add_video(db)
 
-    videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=300,
-        duration_seconds=600,
-        watched_seconds=10,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 300, 600, 10)
     assert db.get(Video, video.id).watched_at is None
 
-    videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=540,
-        duration_seconds=600,
-        watched_seconds=10,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 540, 600, 10)
     assert db.get(Video, video.id).watched_at is not None
 
 
@@ -4809,21 +4525,13 @@ def test_channel_rating_updates_channel_and_returns_to_filter():
     assert response.headers["location"] == "/channels?rated=true"
 
 
-def test_rating_answers_json_to_fetch_instead_of_redirecting():
-    db = make_session()
-    video = add_video(db)
-    request = SimpleNamespace(headers={"x-requested-with": "fetch"})
-
-    video_response = videos_routes.rate_video_form(video.id, 4, "/videos", db, request)
-    channel_response = channels_routes.rate_channel_form(
-        video.channel.id, 3, "/channels", db, request
-    )
-
-    assert video.rating == 4
-    assert video_response.status_code == 200
-    assert json.loads(video_response.body) == {"rating": 4}
-    assert video.channel.rating == 3
-    assert json.loads(channel_response.body) == {"rating": 3}
+def test_rating_forms_hand_the_stars_to_the_api():
+    # app.js saves a note with PUT {rating} on data-rating-url; `action` stays the no-JS fallback.
+    for template in ("_macros.html", "channels.html", "channel_videos.html", "video_detail.html"):
+        source = (pathlib.Path("app/templates") / template).read_text(encoding="utf-8")
+        for form in re.findall(r'<form class="rating-control[^>]*>', source):
+            action = re.search(r'action="([^"]+)"', form).group(1)
+            assert f'data-rating-url="/api{action}"' in form, form
 
 
 def test_base_layout_keeps_scroll_position_on_page_refresh():
@@ -5165,7 +4873,9 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
         },
     )
 
-    channel = api_routes.create_channel(api_routes.ChannelCreate(url="Chaîne API"), db)
+    channel = api_channels.create_channel(
+        api_channels.ChannelCreate(url="Chaîne API"), BackgroundTasks(), db
+    )
 
     assert channel.name == "Chaîne API"
     assert channel.url == "https://www.youtube.com/@api-channel"
@@ -5191,7 +4901,9 @@ def test_api_create_channel_refuses_a_channel_added_under_another_url(monkeypatc
     )
 
     with pytest.raises(HTTPException) as exc:
-        api_routes.create_channel(api_routes.ChannelCreate(url="@api-channel"), db)
+        api_channels.create_channel(
+            api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db
+        )
 
     assert exc.value.status_code == 409
     assert db.scalar(select(func.count(Channel.id))) == 1
@@ -5210,7 +4922,7 @@ def test_api_and_form_delete_a_channel_with_its_profile_files(monkeypatch):
     db.add_all([first, second])
     db.commit()
 
-    api_routes.delete_channel(first.id, db)
+    api_channels.delete_channel(first.id, db)
     channels_routes.delete_channel_form(second.id, "/channels", db)
 
     assert removed == ["UCA", "UCB"]
@@ -5228,7 +4940,9 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     )
 
     with pytest.raises(HTTPException) as exc:
-        api_routes.create_channel(api_routes.ChannelCreate(url="@missing-handle"), db)
+        api_channels.create_channel(
+            api_channels.ChannelCreate(url="@missing-handle"), BackgroundTasks(), db
+        )
 
     assert exc.value.status_code == 404
     # The service's French message reaches the client, as on the HTML form.
@@ -5658,7 +5372,7 @@ def test_videos_page_uses_custom_category_options_from_settings(monkeypatch):
 def test_settings_api_updates_media_root_and_quota(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             media_root=str(tmp_path),
             global_quota_bytes=100,
@@ -5682,7 +5396,7 @@ def test_settings_api_updates_media_root_and_quota(tmp_path):
 def test_settings_api_updates_category_label_colors(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             media_root=str(tmp_path),
             global_quota_bytes=100,
@@ -5708,7 +5422,7 @@ def test_settings_api_updates_category_label_colors(tmp_path):
 def test_settings_api_updates_video_library_views(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             video_library_views=[
                 {
@@ -5806,38 +5520,26 @@ def test_set_video_list_state_persists_each_value():
     video = add_video(db)
 
     for state in ("watched", "unwatched", "hidden"):
-        videos_routes.set_video_list_state_form(video.id, state, db)
+        videos_editing.set_video_list_state(db, video, state)
         assert db.get(Video, video.id).list_state == state
 
 
 def test_set_video_list_state_clear_resets_to_null():
     db = make_session()
     video = add_video(db)
-    videos_routes.set_video_list_state_form(video.id, "hidden", db)
+    videos_editing.set_video_list_state(db, video, "hidden")
 
-    response = videos_routes.set_video_list_state_form(video.id, "clear", db)
+    videos_editing.set_video_list_state(db, video, "clear")
 
     assert db.get(Video, video.id).list_state is None
-    assert json.loads(response.body.decode()) == {"state": None}
 
 
 def test_set_video_list_state_rejects_unknown_value():
     db = make_session()
     video = add_video(db)
 
-    with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state_form(video.id, "bogus", db)
-
-    assert excinfo.value.status_code == 400
-
-
-def test_set_video_list_state_rejects_unknown_video():
-    db = make_session()
-
-    with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state_form(9999, "hidden", db)
-
-    assert excinfo.value.status_code == 404
+    with pytest.raises(ValueError, match="État de liste inconnu."):
+        videos_editing.set_video_list_state(db, video, "bogus")
 
 
 def test_videos_page_hide_hidden_excludes_only_hidden_videos():
@@ -6367,7 +6069,7 @@ def test_share_import_waits_for_the_import_and_returns_the_video_url(monkeypatch
         job.status, job.video_id = "downloaded", video.id
         db.commit()
 
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", fake_run)
+    monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
     request = Request(
         {
             "type": "http",
@@ -6396,7 +6098,7 @@ def test_share_import_reports_a_failed_import_and_rejects_other_hosts(monkeypatc
         job.status, job.message = "failed", "Vidéo indisponible"
         db.commit()
 
-    monkeypatch.setattr(videos_routes, "run_manual_download_job", fake_run)
+    monkeypatch.setattr(downloads, "run_manual_download_job", fake_run)
     request = Request(
         {
             "type": "http",

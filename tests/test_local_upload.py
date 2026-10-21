@@ -1,10 +1,11 @@
 import io
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from starlette.requests import Request
 
+from app.api import imports as imports_api
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
@@ -77,16 +78,30 @@ def test_path_in_filename_cannot_escape_the_media_root(tmp_path):
     assert (tmp_path / "Local") in __import__("pathlib").Path(video.folder_path).parents
 
 
-def test_upload_route_answers_json_for_fetch(tmp_path):
+def test_api_upload_creates_the_fiche_once_and_refuses_other_files(tmp_path):
     db = make_session(tmp_path)
-    request = Request({"type": "http", "headers": [(b"x-requested-with", b"fetch")]})
+
+    def upload(name, content=b"data"):
+        return type("Upload", (), {"filename": name, "file": io.BytesIO(content)})()
+
+    created = imports_api.upload(upload("clip.mp4"), db)
+    again = imports_api.upload(upload("copie.mp4"), db)
+    with pytest.raises(HTTPException) as refused:
+        imports_api.upload(upload("clip.pdf"), db)
+
+    assert created.created is True
+    assert (again.video_id, again.created) == (created.video_id, False)
+    assert refused.value.status_code == 400
+
+
+def test_upload_form_without_js_redirects_to_the_fiche(tmp_path):
+    db = make_session(tmp_path)
     upload = type("Upload", (), {"filename": "clip.mp4", "file": io.BytesIO(b"data")})()
-
-    response = videos_routes.upload_local_media(request, upload, db)
-
-    assert response.status_code == 200
-    assert b'"video_id"' in response.body
-
     bad = type("Upload", (), {"filename": "clip.pdf", "file": io.BytesIO(b"data")})()
-    refused = videos_routes.upload_local_media(request, bad, db)
-    assert refused.status_code == 400
+
+    response = videos_routes.upload_local_media(upload, db)
+    refused = videos_routes.upload_local_media(bad, db)
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/videos/")
+    assert refused.headers["location"].startswith("/videos/import?level=error")

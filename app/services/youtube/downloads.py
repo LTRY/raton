@@ -182,15 +182,6 @@ def download_thumbnail(video_url: str, folder: Path, info: dict[str, Any] | None
         _extract_and_write(ydl, video_url, info)
 
 
-def download_video(video_url: str, folder: Path) -> dict[str, Any]:
-    info = download_media(video_url, folder, media_type="video")
-    try:
-        download_subtitles(video_url, folder)
-    except Exception:
-        pass
-    return info
-
-
 def discover_downloaded_files(folder: Path) -> dict[str, Path | None]:
     result: dict[str, Path | None] = {
         "video_path": None,

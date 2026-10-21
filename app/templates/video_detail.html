@@ -93,7 +93,7 @@
             <button type="button" class="category-label category-label-add" id="playlist-widget-toggle" aria-expanded="false" aria-controls="playlist-widget-form">+ Playlists</button>
           </span>
         </span>
-        <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
+        <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" data-rating-url="/api/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
           <input type="hidden" name="next" value="/videos/{{ video.id }}">
           {% for value in range(1, 6) %}
           <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if video.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
@@ -211,7 +211,7 @@
           </div>
           {% if video.video_path %}
           <section class="video-player-panel" aria-label="Lecteur vidéo">
-            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.thumbnail_path %}poster="/videos/{{ video.id }}/thumbnail"{% endif %}>
+            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.thumbnail_path %}poster="/videos/{{ video.id }}/thumbnail"{% endif %}>
               <source src="/videos/{{ video.id }}/video">
               {% if video.subtitle_path %}
               {# Pas d'attribut `default` : il réactiverait la piste à chaque chargement,
@@ -258,7 +258,7 @@
               data-track-resume-key="raton:media-position:{{ video.id }}:audio"
               {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
               data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
-              data-track-activity-url="/videos/{{ video.id }}/activity"
+              data-track-activity-url="/api/videos/{{ video.id }}/activity"
               data-track-detail-url="/videos/{{ video.id }}">
               <span data-play-track-icon aria-hidden="true">▶</span>
               <span data-play-track-label>Écouter</span>
@@ -266,7 +266,7 @@
           </section>
           {% elif video.audio_path %}
           <section class="audio-player-panel" aria-label="Lecteur audio">
-            <audio controls preload="metadata" src="/videos/{{ video.id }}/audio" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
+            <audio controls preload="metadata" src="/videos/{{ video.id }}/audio" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
           </section>
           {% endif %}
 
@@ -279,7 +279,7 @@
             data-track-resume-key="raton:media-position:{{ video.id }}:audio"
             {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
             data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
-            data-track-activity-url="/videos/{{ video.id }}/activity"
+            data-track-activity-url="/api/videos/{{ video.id }}/activity"
             data-track-detail-url="/videos/{{ video.id }}">
             <div class="media-panel-top">
               <p class="media-panel-label"><span class="mp-when-idle">Télécharger l'audio</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
@@ -515,12 +515,9 @@
     async function saveCategories() {
       setStatus("Enregistrement...", "loading");
       try {
-        const response = await fetch(form.action, {
-          method: "POST",
-          body: new FormData(form),
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+        await window.ratonApi("PUT", `/api/videos/{{ video.id }}/categories`, {
+          categories: new FormData(form).getAll("preset_categories"),
         });
-        if (!response.ok) throw new Error("Enregistrement impossible.");
         setStatus("Enregistré", "success");
       } catch (error) {
         setStatus(error.message, "error");
@@ -721,47 +718,29 @@
     renderActiveTab();
   }
 
-  function updateDocuments(payload) {
-    documents.raw = { label: "Transcript", content: payload.transcript, length: payload.transcript_length, available: true };
-    documents.notes = {
-      label: "Notes structurées",
-      content: payload.notes_transcript,
-      length: payload.notes_length,
-      available: payload.has_notes,
-    };
-    if (typeof payload.short_summary === "string") {
-      shortSummary.textContent = payload.short_summary;
-      shortSummary.hidden = !payload.short_summary;
-    }
-    if (Array.isArray(payload.suggested_questions)) {
-      documents.questions = { items: payload.suggested_questions, available: payload.has_questions };
-    }
-  }
-
-  function applyDocumentsPayload(payload, targetTab) {
-    updateDocuments(payload);
-    activeTab = documents[targetTab] && documents[targetTab].available ? targetTab : "raw";
-    renderActiveTab();
+  // `updated` is the fiche's documents as /api returns them (VideoDocumentsRead). Lengths count
+  // code points, like the server-rendered ones.
+  function updateDocuments(updated) {
+    const transcript = updated.transcript || "";
+    const notes = updated.notes || "";
+    documents.raw = { label: "Transcript", content: transcript, length: [...transcript].length, available: true };
+    documents.notes = { label: "Notes structurées", content: notes, length: [...notes].length, available: Boolean(notes) };
+    shortSummary.textContent = updated.short_summary || "";
+    shortSummary.hidden = !updated.short_summary;
+    documents.questions = { items: updated.suggested_questions, available: updated.suggested_questions.length > 0 };
   }
 
   tabButtons.forEach((button) => {
     button.addEventListener("click", () => setActiveTab(button.dataset.tab));
   });
 
-  async function pollLlmJob(jobId, { interval = 2000, onPending } = {}) {
-    while (true) {
-      const response = await fetch(`/videos/${videoId}/transcript/jobs/${jobId}`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || "Action impossible.");
-      }
-      if (payload.status !== "pending") {
-        return payload;
-      }
-      if (onPending) onPending(payload);
+  // Polls /api/llm-jobs/{id} until the job is no longer pending; a failed job throws its message.
+  async function pollLlmJob(statusUrl, { interval = 2000, onPending } = {}) {
+    for (;;) {
+      const job = await window.ratonApi("GET", statusUrl);
+      if (job.status === "failed") throw new Error(job.message || "Génération impossible.");
+      if (job.status !== "pending") return job;
+      if (onPending) onPending(job);
       await new Promise((resolve) => window.setTimeout(resolve, interval));
     }
   }
@@ -904,37 +883,27 @@
       };
       let shortStream = null;
       try {
-        const response = await fetch(generateForm.action, {
-          method: "POST",
-          body: new FormData(generateForm),
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        let payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.message || "Génération impossible.");
-        }
-        if (payload.status === "queued") {
-          // The résumé court is written under the video title as it arrives.
-          payload = await pollLlmJob(payload.job_id, {
-            interval: 400,
-            onPending(pending) {
-              if (pending.partial_short_summary) {
-                if (!shortStream) {
-                  shortSummary.textContent = "";
-                  shortSummary.hidden = false;
-                  shortStream = createWordStream(shortSummary);
-                }
-                shortStream.push(pending.partial_short_summary);
+        const queued = await window.ratonApi("POST", `/api/videos/${videoId}/notes/generate`);
+        // The résumé court is written under the video title as it arrives.
+        const job = await pollLlmJob(queued.status_url, {
+          interval: 400,
+          onPending(pending) {
+            if (pending.partial_short_summary) {
+              if (!shortStream) {
+                shortSummary.textContent = "";
+                shortSummary.hidden = false;
+                shortStream = createWordStream(shortSummary);
               }
-            },
-          });
-          if (shortStream) await shortStream.finish(payload.short_summary || "");
-        }
+              shortStream.push(pending.partial_short_summary);
+            }
+          },
+        });
+        if (shortStream) await shortStream.finish(job.documents.short_summary || "");
         if (shortStream) shortStream.stop();
         shortStream = null;
-        updateDocuments(payload);
+        updateDocuments(job.documents);
         renderActiveTab();
-        window.showToast(payload.message || "Notes et résumé générés par l'IA.");
+        window.showToast("Notes et résumé générés par l'IA.");
       } catch (error) {
         if (shortStream) {
           shortStream.stop();
@@ -973,31 +942,14 @@
     });
   }
 
-  async function pollTranscriptRetryJob(statusUrl) {
-    for (;;) {
-      const response = await fetch(statusUrl, { headers: { Accept: "application/json" }, cache: "no-store" });
-      if (!response.ok) throw new Error("Suivi de la récupération impossible.");
-      const job = await response.json();
-      if (job.done) {
-        if (job.status !== "downloaded") throw new Error(job.message || "Aucun transcript n'a pu être récupéré.");
-        return;
-      }
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-    }
-  }
-
   if (transcriptRetryButton) {
     transcriptRetryButton.addEventListener("click", async () => {
       setTranscriptRetryBusy(true);
       setTranscriptRetryStatus("Récupération du transcript en cours...", "loading");
       try {
-        const response = await fetch(`/videos/${videoId}/transcript/download`, {
-          method: "POST",
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Récupération impossible.");
-        await pollTranscriptRetryJob(payload.status_url);
+        // The helpers live in app.js.
+        const job = await window.ratonApi("POST", `/api/videos/${videoId}/transcript/download`);
+        await window.ratonWaitForJob(job.status_url, { failure: "Aucun transcript n'a pu être récupéré." });
         window.location.reload();
       } catch (error) {
         setTranscriptRetryStatus(error.message, "error");

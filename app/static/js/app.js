@@ -3,6 +3,86 @@
 // the second visit to any page throws "Identifier has already been declared".
 (function () {
 
+// Calls to the JSON API (/api): the body goes as JSON, and an error answer's `detail` (a French
+// message, see docs/spec/12-api-et-routes.md) becomes the thrown Error's message, its HTTP code
+// the Error's `status`.
+async function apiRequest(method, url, body, { keepalive = false } = {}) {
+  const options = { method, headers: { Accept: "application/json" }, keepalive };
+  if (body instanceof FormData) {
+    options.body = body; // A form with a file goes as multipart.
+  } else if (body !== undefined) {
+    options.headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
+  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(payload?.detail || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+window.ratonApi = apiRequest;
+
+// Polls a job's `status_url` (/api/jobs/{id}) until it is done; a failed job throws its message.
+async function waitForJob(statusUrl, { interval = 2000, onProgress, failure = "Le traitement a échoué." } = {}) {
+  for (;;) {
+    const job = await apiRequest("GET", statusUrl);
+    onProgress?.(job);
+    if (job.status === "failed") throw new Error(job.message || failure);
+    if (job.done) return job;
+    await new Promise((resolve) => window.setTimeout(resolve, interval));
+  }
+}
+window.ratonWaitForJob = waitForJob;
+
+// The JSON body of a form's /api twin, named by its `data-api-body`; without one the form goes
+// as multipart (it carries a file). The form's own field names serve its no-JS fallback.
+function splitLabels(text) {
+  return (text || "")
+    .split(/[,\n]/)
+    .map((label) => label.trim())
+    .filter(Boolean);
+}
+const API_BODIES = {
+  manualDownload: (data) => ({
+    url: data.get("url"),
+    media_types: data.getAll("media_type"),
+    download_transcript: data.get("download_transcript") === "true",
+    video_quality: data.get("video_quality") || "1080",
+    categories: [...data.getAll("preset_categories"), ...splitLabels(data.get("custom_categories"))],
+  }),
+  mediaDownload: (data) => ({ video_quality: data.get("video_quality") || "1080" }),
+  channelImport: (data) => ({
+    page: Number.parseInt(data.get("page"), 10) || 1,
+    section: data.get("section") || "videos",
+  }),
+  playlistUrl: (data) => ({ url: data.get("url"), title: data.get("title") || "" }),
+};
+function apiFormBody(form) {
+  const data = new FormData(form);
+  const build = API_BODIES[form.dataset.apiBody];
+  return build ? build(data) : data;
+}
+
+// A player's report to POST /api/videos/{id}/activity; it must never interrupt playback.
+function reportPlayback(url, mediaType, media, watchedSeconds) {
+  const seconds = (value) => (Number.isFinite(value) ? value : 0);
+  apiRequest(
+    "POST",
+    url,
+    {
+      media_type: mediaType,
+      position_seconds: seconds(media.currentTime),
+      duration_seconds: seconds(media.duration),
+      watched_seconds: Math.round(watchedSeconds),
+    },
+    { keepalive: true },
+  ).catch(() => {});
+}
+window.ratonReportPlayback = reportPlayback;
+
 function setAsyncFormState(form, message, level) {
   let status = form.querySelector(".async-form-status");
   if (!status) {
@@ -55,53 +135,28 @@ function restoreFilterScrollPosition() {
 }
 
 async function pollAsyncJob(form, statusUrl, returnTo) {
-  const response = await fetch(statusUrl, {
-    headers: { Accept: "application/json" },
+  const job = await waitForJob(statusUrl, {
+    onProgress: (current) => setAsyncFormState(form, current.message || "Traitement en cours...", "loading"),
   });
-  if (!response.ok) {
-    throw new Error("Impossible de lire l'état du téléchargement.");
-  }
-  const job = await response.json();
-  setAsyncFormState(form, job.message || "Traitement en cours...", job.status === "failed" ? "error" : "loading");
-  if (job.done && job.status !== "failed") {
-    redirectWithMessage(returnTo, "success", job.message || "Traitement terminé.");
-    return;
-  }
-  if (job.status === "failed") {
-    setAsyncFormDisabled(form, false);
-    setAsyncFormState(form, job.message || "Le traitement a échoué.", "error");
-    return;
-  }
-  window.setTimeout(() => {
-    pollAsyncJob(form, statusUrl, returnTo).catch((error) => {
-      setAsyncFormDisabled(form, false);
-      setAsyncFormState(form, error.message, "error");
-    });
-  }, 2000);
+  redirectWithMessage(returnTo, "success", job.message || "Traitement terminé.");
 }
 
 function bindAsyncJobForm(form) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const formData = new FormData(form);
+    // Read before disabling: a disabled field is left out of FormData.
+    const next = new FormData(form).get("next");
+    const body = apiFormBody(form);
     setAsyncFormDisabled(form, true);
     setAsyncFormState(form, form.dataset.pendingMessage || "Traitement en file d'attente...", "loading");
 
     try {
-      const response = await fetch(form.action, {
-        method: "POST",
-        body: formData,
-        headers: {
-          Accept: "application/json",
-          "X-Requested-With": "fetch",
-        },
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || "Le traitement n'a pas pu démarrer.");
-      }
-      setAsyncFormState(form, payload.message || "Traitement lancé.", "loading");
-      await pollAsyncJob(form, payload.status_url, payload.return_to || window.location.pathname);
+      const payload = await apiRequest("POST", form.dataset.apiAction, body);
+      // A playlist import answers {playlist, job}; the other imports answer the job itself.
+      const job = payload.job || payload;
+      const returnTo = payload.playlist ? `/playlists/${payload.playlist.id}` : next || window.location.pathname;
+      setAsyncFormState(form, job.message || "Traitement lancé.", "loading");
+      await pollAsyncJob(form, job.status_url, returnTo);
     } catch (error) {
       setAsyncFormDisabled(form, false);
       setAsyncFormState(form, error.message, "error");
@@ -133,10 +188,10 @@ document.querySelectorAll("form[data-local-upload]").forEach((form) => {
     progress.hidden = false;
     progress.value = 0;
     hint.textContent = `Envoi de ${file.name}...`;
+    // XMLHttpRequest rather than apiRequest: it reports the upload's progress.
     const request = new XMLHttpRequest();
-    request.open("POST", form.action);
+    request.open("POST", form.dataset.apiAction);
     request.setRequestHeader("Accept", "application/json");
-    request.setRequestHeader("X-Requested-With", "fetch");
     request.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) progress.value = (event.loaded / event.total) * 100;
     });
@@ -148,10 +203,11 @@ document.querySelectorAll("form[data-local-upload]").forEach((form) => {
       } catch {
         // Falls through to the generic error below.
       }
-      if (request.status >= 200 && request.status < 300 && payload.return_to) {
-        redirectWithMessage(payload.return_to, "success", payload.message || "Fichier importé.");
+      if (request.status >= 200 && request.status < 300 && payload.video_id) {
+        const message = payload.created ? "Fichier importé." : "Ce fichier est déjà dans la bibliothèque.";
+        redirectWithMessage(`/videos/${payload.video_id}`, "success", message);
       } else {
-        fail(payload.message || "L'envoi a échoué.");
+        fail(payload.detail || "L'envoi a échoué.");
       }
     });
     request.send(data);
@@ -401,20 +457,8 @@ function bindResumableMedia(media) {
   function logActivity() {
     trackWatchedTime(true);
     if (!media.dataset.activityUrl || watchedSeconds < 1) return;
-    const formData = new FormData();
-    formData.set("media_type", media.dataset.mediaKind || "video");
-    formData.set("position_seconds", Number.isFinite(media.currentTime) ? media.currentTime.toString() : "0");
-    formData.set("duration_seconds", Number.isFinite(media.duration) ? media.duration.toString() : "0");
-    formData.set("watched_seconds", Math.round(watchedSeconds).toString());
+    reportPlayback(media.dataset.activityUrl, media.dataset.mediaKind || "video", media, watchedSeconds);
     watchedSeconds = 0;
-    fetch(media.dataset.activityUrl, {
-      method: "POST",
-      body: formData,
-      headers: { Accept: "application/json" },
-      keepalive: true,
-    }).catch(() => {
-      // Activity logging must never interrupt playback.
-    });
   }
 
   media.addEventListener("play", () => {
@@ -1258,39 +1302,14 @@ function enqueueFormatDownload(task) {
   pumpFormatDownloadQueue();
 }
 
-async function pollFormatDownloadJob(statusUrl) {
-  for (;;) {
-    const response = await fetch(statusUrl, { headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Suivi du téléchargement impossible.");
-    const job = await response.json();
-    if (job.done) {
-      if (job.status !== "downloaded") throw new Error(job.message || "Le téléchargement a échoué.");
-      return;
-    }
-    await new Promise((resolve) => window.setTimeout(resolve, 2000));
-  }
-}
-
 async function requestFormatDownload(task) {
-  const body = new URLSearchParams();
-  if (task.quality) body.set("video_quality", task.quality);
-  const response = await fetch(`/videos/${task.videoId}/media/${task.format}/download`, {
-    method: "POST",
-    headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-    body,
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.message || "Téléchargement impossible.");
-  await pollFormatDownloadJob(payload.status_url);
+  const body = task.quality ? { video_quality: task.quality } : undefined;
+  const job = await apiRequest("POST", `/api/videos/${task.videoId}/media/${task.format}/download`, body);
+  await waitForJob(job.status_url, { failure: "Le téléchargement a échoué." });
 }
 
 async function requestFormatDelete(task) {
-  const response = await fetch(`/videos/${task.videoId}/media/${task.format}/delete`, {
-    method: "POST",
-    headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-  });
-  const payload = await response.json();
-  if (!response.ok) throw new Error(payload.message || "Suppression impossible.");
+  await apiRequest("DELETE", `/api/videos/${task.videoId}/media/${task.format}`);
 }
 
 async function runFormatQueueTask(task) {
@@ -1983,14 +2002,13 @@ function initChatWidget(root) {
     button.addEventListener("click", () => setScope(button.dataset.chatScope));
   });
 
-  async function pollJob(jobId, onProgress) {
-    const url = scopeConfig().jobUrlTemplate.replace("{job_id}", jobId);
-    while (true) {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Action impossible.");
-      if (payload.status !== "pending") return payload;
-      if (onProgress) onProgress(payload.tool_calls || []);
+  // Polls /api/llm-jobs/{id} until the answer is written; returns the conversation with it.
+  async function waitForAnswer(statusUrl, onProgress) {
+    for (;;) {
+      const job = await apiRequest("GET", statusUrl);
+      if (job.status === "failed") throw new Error(job.message || "Réponse impossible.");
+      if (job.status === "done") return job.chat_messages || job.library_chat.messages;
+      onProgress(job.tool_calls);
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
     }
   }
@@ -2022,7 +2040,6 @@ function initChatWidget(root) {
       const button = form.querySelector("button");
       const submittedScope = currentScope;
       syncField();
-      const formData = new FormData(form);
       const question = readInput().trim();
       button.disabled = true;
       if (input) input.contentEditable = "false";
@@ -2037,25 +2054,16 @@ function initChatWidget(root) {
       setStatus("Préparation de la réponse...", "loading");
 
       try {
-        const response = await fetch(scopeConfig().askUrl, {
-          method: "POST",
-          body: formData,
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        let payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Discussion impossible.");
+        const job = await apiRequest("POST", scopeConfig().chatUrl, { question });
         form.reset();
         writeInput("");
-        if (payload.status === "queued") {
-          setStatus("Préparation de la réponse, cela peut prendre un moment...", "loading");
-          payload = await pollJob(payload.job_id, renderToolSteps);
-        }
-        config.scopes[submittedScope].messages = payload.messages || [];
+        setStatus("Préparation de la réponse, cela peut prendre un moment...", "loading");
+        config.scopes[submittedScope].messages = await waitForAnswer(job.status_url, renderToolSteps);
         if (submittedScope === currentScope) {
           renderMessages();
           revealLatest();
         }
-        setStatus(payload.message || "Réponse ajoutée.", "success");
+        setStatus("Réponse ajoutée.", "success");
       } catch (error) {
         setStatus(error.message, "error");
         renderMessages();
@@ -2080,15 +2088,10 @@ function initChatWidget(root) {
       button.disabled = true;
       setStatus("Effacement en cours...", "loading");
       try {
-        const response = await fetch(scopeConfig().clearUrl, {
-          method: "POST",
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Effacement impossible.");
-        config.scopes[clearedScope].messages = payload.messages || [];
+        await apiRequest("DELETE", scopeConfig().chatUrl);
+        config.scopes[clearedScope].messages = [];
         if (clearedScope === currentScope) renderMessages();
-        setStatus(payload.message || "Discussion effacée.", "success");
+        setStatus("Discussion effacée.", "success");
       } catch (error) {
         setStatus(error.message, "error");
       } finally {
@@ -2186,9 +2189,9 @@ if (!window.__sameFormRedirectBound) {
   });
 }
 
-// Rating stars. The forms carry data-turbo="false": the note is saved by
-// fetch and the stars repainted in place, so the page neither reloads nor
-// scrolls back to the top. Delegated to the document because Turbo replaces
+// Rating stars. The forms carry data-turbo="false": the note is saved with
+// PUT on `data-rating-url` (/api) and the stars repainted in place, so the page
+// neither reloads nor scrolls back to the top; `action` is the no-JS fallback. Delegated to the document because Turbo replaces
 // the lists; bound once because this file runs again on every visit.
 function ratingFormValue(form) {
   const tier = [...form.classList].find((name) => name.startsWith("rating-tier-"));
@@ -2234,15 +2237,7 @@ async function submitRating(form, requested) {
   const previous = ratingFormValue(form);
   paintRating(action, requested);
   try {
-    const body = new FormData();
-    body.append("rating", String(requested));
-    const response = await fetch(action, {
-      method: "POST",
-      body,
-      headers: { "X-Requested-With": "fetch" },
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await apiRequest("PUT", form.dataset.ratingUrl, { rating: requested });
     paintRating(action, payload.rating);
   } catch (error) {
     paintRating(action, previous, false);
@@ -2287,18 +2282,12 @@ async function submitListState(container, requested) {
     button.disabled = true;
   });
   try {
-    const body = new FormData();
-    body.append("state", requested);
-    const response = await fetch(`/videos/${container.dataset.videoId}/list-state`, {
-      method: "POST",
-      body,
+    const payload = await apiRequest("PUT", `/api/videos/${container.dataset.videoId}/list-state`, {
+      state: requested,
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    // `unwatched` est un forçage, pas un état visuel : il rend la ligne normale.
-    // `null` rend la main à la détection automatique, que seul le serveur connaît
-    // au rendu — on la relit depuis l'attribut posé par la macro.
-    let painted = payload.state;
+    // `unwatched` forces the normal look; `null` hands back to the automatic state, which only
+    // the server knows when rendering: it is read back from the attribute the macro sets.
+    let painted = payload.list_state;
     if (painted === "unwatched") painted = "normal";
     if (!painted) painted = container.dataset.listStateAuto || "normal";
     paintListState(container, painted);
@@ -2570,20 +2559,8 @@ function initMiniPlayer() {
     trackWatchedTime(true);
     const activityUrl = audio.dataset.activityUrl;
     if (!activityUrl || watchedSeconds < 1) return;
-    const formData = new FormData();
-    formData.set("media_type", "audio");
-    formData.set("position_seconds", Number.isFinite(audio.currentTime) ? audio.currentTime.toString() : "0");
-    formData.set("duration_seconds", Number.isFinite(audio.duration) ? audio.duration.toString() : "0");
-    formData.set("watched_seconds", Math.round(watchedSeconds).toString());
+    reportPlayback(activityUrl, "audio", audio, watchedSeconds);
     watchedSeconds = 0;
-    fetch(activityUrl, {
-      method: "POST",
-      body: formData,
-      headers: { Accept: "application/json" },
-      keepalive: true,
-    }).catch(() => {
-      // Activity logging must never interrupt playback.
-    });
   }
 
   function updatePlayPauseUI() {
@@ -3246,11 +3223,9 @@ function initScanRunner() {
     let quiet = 0;
     try {
       while (true) {
-        const response = await fetch(`${button.dataset.scanFeedUrl}?after=${after}`, {
-          headers: { Accept: "application/json" },
+        const feed = await apiRequest("GET", `${button.dataset.scanFeedUrl}?after=${after}`).catch(() => {
+          throw new Error("Impossible de lire la progression du scan.");
         });
-        if (!response.ok) throw new Error("Impossible de lire la progression du scan.");
-        const feed = await response.json();
         after = feed.last_id;
         let finished = false;
         feed.events.forEach((event) => {
@@ -3273,22 +3248,13 @@ function initScanRunner() {
   button.addEventListener("click", async () => {
     setBusy(true);
     try {
-      const response = await fetch(button.dataset.scanUrl, {
-        method: "POST",
-        headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        window.showToast(payload.message || "Le scan n'a pas pu démarrer.", "error");
-        if (payload.status === "already_running") poll();
-        else setBusy(false);
-        return;
-      }
-      after = payload.after;
+      ({ after } = await apiRequest("POST", button.dataset.scanUrl));
       poll();
     } catch (error) {
-      window.showToast(error.message, "error");
-      setBusy(false);
+      window.showToast(error.message || "Le scan n'a pas pu démarrer.", "error");
+      // 409: a scan already runs, follow it instead.
+      if (error.status === 409) poll();
+      else setBusy(false);
     }
   });
 
@@ -3464,9 +3430,7 @@ function initExplorer() {
     const state = window.__ptExplorer;
     if (!state || !state.running) return;
     try {
-      const response = await fetch(state.statusUrl, { headers: { Accept: "application/json" } });
-      if (!response.ok) throw new Error("Impossible de lire l'état de l'exploration.");
-      const job = await response.json();
+      const job = await apiRequest("GET", state.statusUrl);
       const fresh = (job.videos || []).filter((video) => !state.seen.has(video.id));
       if (fresh.length) {
         fresh.forEach((video) => state.seen.add(video.id));
@@ -3504,17 +3468,15 @@ function initExplorer() {
       setRunning(true);
       say("Je m'en occupe !");
       try {
-        const response = await fetch(form.action, {
-          method: "POST",
-          body: new FormData(form),
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
+        const data = new FormData(form);
+        const payload = await apiRequest("POST", form.dataset.apiAction, {
+          page: Number.parseInt(data.get("page"), 10) || 1,
+          section: data.get("section") || "videos",
         });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "L'exploration n'a pas pu démarrer.");
         window.__ptExplorer = {
           running: true,
           statusUrl: payload.status_url,
-          returnTo: payload.return_to || `${window.location.pathname}${window.location.search}`,
+          returnTo: data.get("next") || `${window.location.pathname}${window.location.search}`,
           channelId: form.dataset.channelId,
           channelName: form.dataset.channelName || "",
           section: form.dataset.section,
@@ -3545,10 +3507,7 @@ function initExplorer() {
       stopButton.disabled = true;
       say("J'arrête là…");
       try {
-        await fetch(`${state.statusUrl}/cancel`, {
-          method: "POST",
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
+        await apiRequest("POST", `${state.statusUrl}/cancel`);
       } catch {
         // The polling reports the real state; the button comes back below.
       }

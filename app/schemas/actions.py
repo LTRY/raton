@@ -70,7 +70,42 @@ class JobStatusRead(BaseModel):
     videos: list[dict] | None = None
 
 
-class SponsorSegmentsFetchRead(BaseModel):
-    count: int
+class RecentJobRead(BaseModel):
+    """A row of the jobs journal (`download_jobs`), as `/logs` lists them."""
+
+    id: int
+    status: str
+    message: str
+    channel_id: int | None
+    video_id: int | None
+    created_at: datetime
+    done: bool
+
+
+class SkipSegmentsRead(BaseModel):
+    """The segments the players skip: sorted, merged, filtered by the enabled categories."""
+
     skip_enabled: bool
     segments: list[SkipSegmentRead]
+
+
+class SponsorSegmentsFetchRead(SkipSegmentsRead):
+    # Segments SponsorBlock returned for the enabled categories, before merging.
+    count: int
+
+
+class ManualDownloadCreate(BaseModel):
+    """`POST /api/videos/import`: the import page's download, by YouTube URL."""
+
+    url: str
+    # Run in this order; "metadata" alone imports the fiche without a media file.
+    media_types: list[str] = ["metadata"]
+    download_transcript: bool = True
+    video_quality: str = "1080"
+    categories: list[str] = []
+
+
+class UploadRead(BaseModel):
+    video_id: int
+    # False when the same file (same content) was already in the library.
+    created: bool

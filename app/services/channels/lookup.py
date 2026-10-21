@@ -4,6 +4,18 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 
 
+class ChannelNotInLibraryError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Chaîne introuvable")
+
+
+def find_library_channel(db: Session, channel_id: int) -> Channel:
+    channel = db.get(Channel, channel_id)
+    if channel is None:
+        raise ChannelNotInLibraryError()
+    return channel
+
+
 def find_channel(db: Session, url: str | None, yt_channel_id: str | None) -> Channel | None:
     """The library channel already holding this YouTube channel, if any.
 

@@ -212,7 +212,7 @@
           </form>
           {% endfor %}
         </div>
-        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
+        <form class="rating-control rating-control-minimal channel-rating-control rating-tier-{{ channel.rating }}" action="/channels/{{ channel.id }}/rating" data-rating-url="/api/channels/{{ channel.id }}/rating" method="post" data-turbo="false" aria-label="Noter {{ channel.name }}">
           <input type="hidden" name="next" value="{{ current_channels_path|default('/channels') }}">
           {% for value in range(1, 6) %}
           <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if channel.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">

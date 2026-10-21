@@ -7,16 +7,15 @@ from app.db.session import Base
 
 
 class LlmJob(Base):
-    """A queued LLM completion (transcript clean/chat), run out of the request path.
+    """A queued LLM completion (notes generation, chat), run out of the request path.
 
     Jobs are run in a FastAPI background task in the web process itself (see
     app/services/jobs/llm_jobs.py:run_llm_job). The caller gets an immediate `queued` response
-    and polls `GET /videos/{id}/transcript/jobs/{job_id}` for the result (see
+    and polls `GET /api/llm-jobs/{job_id}` for the result (see
     docs/spec/09-transcript-et-discussion-llm.md).
 
-    `video_id` is null for `kind="library_chat"` — the cross-video chat has no
-    single video to scope the job to; it's polled via `GET /chat/jobs/{job_id}`
-    instead.
+    `video_id` is null for `kind="library_chat"`: the cross-video chat has no
+    single video to scope the job to.
 
     While a `generate` job is `running`, `result` holds the text streamed so
     far (the status route shows the résumé from it as it is written); it is
