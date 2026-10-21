@@ -176,6 +176,14 @@ en isolation.
     pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
     n'en portent pas (deux consignes imbriquées faisaient parfois écrire
     `## Notes` au lieu de `# Notes`) ;
+  - chaque builder (`build_notes_prompt`, `build_summary_prompt`,
+    `build_generation_prompt`, `build_auto_notes_prompt`, `build_chat_prompt`,
+    `build_library_chat_prompt`) renvoie un `Prompt(system, messages)` : les
+    consignes vont dans le paramètre `system` de l'API, les données (le
+    transcript, la question) dans les messages `user`. Le job stocke ce
+    `Prompt` en JSON (`llm_jobs.prompt`), le runner l'exécute tel quel :
+    `complete(messages, system=...)`, `complete_with_tools(...)`, ou
+    `submit_batch` pour le lot nocturne ;
   - le transcript est toujours placé entre `<transcript>` et `</transcript>`
     (`prompts.py:_transcript_block`), dans les prompts de notes, de résumé, de
     génération, de notes automatiques et de chat par vidéo ; les consignes
@@ -352,6 +360,11 @@ Elle affiche le widget de chat partage (voir
 - refuse les questions vides par redirection simple ;
 - lit `transcript.txt` ;
 - charge `transcript.chat.json` ;
+- construit le `Prompt` (`prompts.py:build_chat_prompt`) : consignes dans
+  `VIDEO_CHAT_SYSTEM`, puis le transcript balisé en tête du premier message
+  `user`, les 10 derniers messages de la discussion en vrais tours
+  `user`/`assistant` (l'alternance exigée par l'API est imposée, comme pour le
+  chat bibliotheque) et la question ;
 - cree systematiquement un job dans la DB (`kind="chat"`, la question brute est
   conservee a part pour etre ajoutee a l'historique une fois la reponse
   obtenue) et repond immediatement `{"status":"queued","job_id":...}`, sans
@@ -497,15 +510,15 @@ chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
   (`BackgroundTasks`) que les autres jobs LLM.
 
 Les messages envoyes au modele sont construits par
-`prompts.py:build_library_chat_messages` : les 10 derniers messages de la
+`prompts.py:build_library_chat_prompt` : les 10 derniers messages de la
 discussion en vrais tours `user`/`assistant`, puis la question. L'API exige des
 tours qui alternent et commencent par `user` : un message qui rompt
 l'alternance (question restee sans reponse) est ignore. `llm_jobs.prompt`
-contient ces messages en JSON (le `system` est une constante, pas stocke).
+contient le `Prompt` en JSON (voir [05](05-modele-de-donnees.md)).
 
 Execution (`app/services/jobs/llm_jobs.py:run_llm_job`) : pour
 `kind="library_chat"`, le job passe par
-`AnthropicProvider.complete_with_tools(messages, ..., system=LIBRARY_CHAT_SYSTEM)`, qui boucle tant que le modele
+`AnthropicProvider.complete_with_tools(messages, ..., system=...)`, qui boucle tant que le modele
 demande un outil. Au-dela de `MAX_TOOL_TURNS` (4) tours d'outils, l'appel
 suivant interdit les outils (`tool_choice: none`) pour forcer une reponse.
 Chaque tour est un appel API complet : les tokens de tous les appels sont

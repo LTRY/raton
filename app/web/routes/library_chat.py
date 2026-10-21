@@ -14,7 +14,7 @@ from app.services.library_chat.history import (
     clear_chat,
     total_video_count,
 )
-from app.services.llm.prompts import build_library_chat_messages
+from app.services.llm.prompts import build_library_chat_prompt
 from app.services.rag.retrieval import count_indexed_videos
 
 router = APIRouter()
@@ -73,13 +73,13 @@ def chat_about_library(
     provider = get_llm_provider_name()
     try:
         history = chat_history(db)
-        messages = build_library_chat_messages(history, question)
+        prompt = build_library_chat_prompt(history, question)
         job = enqueue_llm_job(
             db,
             kind="library_chat",
             provider=provider,
             video_id=None,
-            prompt=json.dumps(messages, ensure_ascii=False),
+            prompt=prompt.to_json(),
             question=question,
         )
         background_tasks.add_task(run_llm_job, job.id)

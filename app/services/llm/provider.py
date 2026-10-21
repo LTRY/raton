@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.core.config import get_settings
+from app.services.llm.prompts import Prompt
 from app.services.llm.usage import BATCH_DISCOUNT, compute_call_cost_usd, max_output_tokens
 
 LLM_TIMEOUT_SECONDS = 900
@@ -26,12 +27,12 @@ def _log_excerpt(text: str) -> str:
     return f"{text[:LOG_EXCERPT_CHARS]}… [{len(text) - LOG_EXCERPT_CHARS} caractères de plus]"
 
 
-def _log_single_call(model: str, prompt: str, response) -> None:
+def _log_single_call(model: str, prompt_chars: int, response) -> None:
     # Unlike the tool loop, these prompts carry whole transcripts: sizes only.
     logger.info(
         "appel unique modèle=%s prompt=%d caractères → stop_reason=%s tokens entrée=%d sortie=%d",
         model,
-        len(prompt),
+        prompt_chars,
         response.stop_reason,
         response.usage.input_tokens,
         response.usage.output_tokens,
@@ -128,7 +129,10 @@ class BatchEntry:
 
 class LLMProvider(Protocol):
     def complete(
-        self, prompt: str, on_text: Callable[[str], None] | None = None
+        self,
+        messages: str | list[dict],
+        on_text: Callable[[str], None] | None = None,
+        system: str | None = None,
     ) -> CompletionResult: ...
 
     def complete_with_tools(
@@ -168,9 +172,16 @@ class AnthropicProvider:
         self.model = model
 
     def complete(
-        self, prompt: str, on_text: Callable[[str], None] | None = None
+        self,
+        messages: str | list[dict],
+        on_text: Callable[[str], None] | None = None,
+        system: str | None = None,
     ) -> CompletionResult:
+        """One completion of `messages` (a bare string is a single user message) under `system`."""
         import anthropic
+
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
 
         client = anthropic.Anthropic(
             api_key=self.api_key, timeout=LLM_TIMEOUT_SECONDS, max_retries=LLM_MAX_RETRIES
@@ -180,11 +191,13 @@ class AnthropicProvider:
         with client.messages.stream(
             model=self.model,
             max_tokens=max_output_tokens(self.model),
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
+            **({"system": system} if system else {}),
         ) as stream:
             _forward_text(stream, on_text)
             response = stream.get_final_message()
-        _log_single_call(self.model, prompt, response)
+        prompt_chars = len(system or "") + sum(len(message["content"]) for message in messages)
+        _log_single_call(self.model, prompt_chars, response)
         tally = UsageTally(self.model)
         tally.add(response.usage)
         return tally.result(_response_text(response, tally))
@@ -277,8 +290,8 @@ class AnthropicProvider:
         )
         return tally.result(_response_text(response, tally))
 
-    def submit_batch(self, prompts: dict[str, str], effort: str = "low") -> str:
-        """Send `{custom_id: prompt}` as one Message Batch (half price, asynchronous) and return its id.
+    def submit_batch(self, prompts: dict[str, Prompt], effort: str = "low") -> str:
+        """Send `{custom_id: Prompt}` as one Message Batch (half price, asynchronous) and return its id.
 
         Plain text completions with the effort lowered: extraction needs little reasoning, and the
         thinking tokens are billed as output.
@@ -296,7 +309,8 @@ class AnthropicProvider:
                         "model": self.model,
                         "max_tokens": BATCH_MAX_OUTPUT_TOKENS,
                         "output_config": {"effort": effort},
-                        "messages": [{"role": "user", "content": prompt}],
+                        "system": prompt.system,
+                        "messages": prompt.messages,
                     },
                 }
                 for custom_id, prompt in prompts.items()

@@ -85,7 +85,7 @@ def generate_video_transcript_documents(
             transcript_path.read_text(encoding="utf-8", errors="replace")
         )
         job = enqueue_llm_job(
-            db, kind="generate", provider=provider, video_id=video.id, prompt=prompt
+            db, kind="generate", provider=provider, video_id=video.id, prompt=prompt.to_json()
         )
         background_tasks.add_task(run_llm_job, job.id)
         if request.headers.get("x-requested-with") == "fetch":
@@ -135,7 +135,12 @@ def chat_about_video_transcript(
             transcript_path.read_text(encoding="utf-8", errors="replace"), messages, question
         )
         job = enqueue_llm_job(
-            db, kind="chat", provider=provider, video_id=video.id, prompt=prompt, question=question
+            db,
+            kind="chat",
+            provider=provider,
+            video_id=video.id,
+            prompt=prompt.to_json(),
+            question=question,
         )
         background_tasks.add_task(run_llm_job, job.id)
         if request.headers.get("x-requested-with") == "fetch":

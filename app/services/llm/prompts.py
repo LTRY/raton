@@ -1,4 +1,6 @@
+import json
 import re
+from typing import NamedTuple
 
 TRANSCRIPT_TAG = "transcript"
 _TRANSCRIPT_USAGE_RULE = (
@@ -14,6 +16,37 @@ def _transcript_block(transcript: str) -> str:
     """
     safe = transcript.replace(f"</{TRANSCRIPT_TAG}>", f"</ {TRANSCRIPT_TAG}>")
     return f"<{TRANSCRIPT_TAG}>\n{safe}\n</{TRANSCRIPT_TAG}>"
+
+
+class Prompt(NamedTuple):
+    """What one LLM call is sent: the instructions (`system`) and the conversation (`messages`).
+
+    The instructions are kept apart from the data (the transcript, the question) so that the
+    model never reads a transcript line as an instruction. A job stores the whole Prompt as JSON
+    (`to_json`), so it runs exactly what its route built.
+    """
+
+    system: str
+    messages: list[dict[str, str]]
+
+    def to_json(self) -> str:
+        return json.dumps(self._asdict(), ensure_ascii=False)
+
+    @classmethod
+    def from_json(cls, text: str) -> Prompt:
+        """A stored Prompt; a job queued before prompts were split holds a bare string, which
+        becomes a single user message with no instructions."""
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict) and isinstance(data.get("messages"), list):
+            return cls(data.get("system") or "", data["messages"])
+        return cls("", [{"role": "user", "content": text}])
+
+
+def _transcript_turn(transcript: str) -> list[dict[str, str]]:
+    return [{"role": "user", "content": _transcript_block(transcript)}]
 
 
 # Section name -> what belongs in it. The definitions keep the sections apart so one item lands in
@@ -73,11 +106,8 @@ Produis des notes à partir de ce transcript, sans rien d'autre avant le premier
 {_notes_body()}"""
 
 
-def build_notes_prompt(transcript: str) -> str:
-    return f"""{_notes_instructions()}
-
-{_transcript_block(transcript)}
-"""
+def build_notes_prompt(transcript: str) -> Prompt:
+    return Prompt(_notes_instructions(), _transcript_turn(transcript))
 
 
 def split_notes_sections(text: str) -> list[tuple[str, str]]:
@@ -141,11 +171,8 @@ premier titre :
 {_summary_body()}"""
 
 
-def build_summary_prompt(transcript: str) -> str:
-    return f"""{_summary_instructions()}
-
-{_transcript_block(transcript)}
-"""
+def build_summary_prompt(transcript: str) -> Prompt:
+    return Prompt(_summary_instructions(), _transcript_turn(transcript))
 
 
 def split_summary_result(text: str) -> tuple[str, list[str]]:
@@ -177,14 +204,14 @@ GENERATION_SUMMARY_HEADER = "# Résumé"
 _GENERATION_SECTION_HEADER_RE = re.compile(r"^#\s+(Notes|Résumé)\s*$", re.MULTILINE)
 
 
-def _combined_prompt(summary_body: str, transcript: str) -> str:
+def _combined_prompt(summary_body: str, transcript: str) -> Prompt:
     """Résumé + notes under the two level-1 titles that split_generation_result and
     split_auto_notes_result slice on, with the transcript sent once.
 
     The bodies carry no "nothing before the first title" line of their own: that rule is stated
     once here, for the level-1 titles, so the model is never told two different things.
     """
-    return f"""Tu es un rédacteur rigoureux et un expert en prise de notes efficace. Tu
+    system = f"""Tu es un rédacteur rigoureux et un expert en prise de notes efficace. Tu
 produis deux analyses d'une même vidéo à partir de son transcript, en un seul
 appel. Produis exactement ces deux sections, dans cet ordre, chacune introduite
 par son titre Markdown de niveau 1 exact, et rien d'autre avant le premier titre :
@@ -193,13 +220,11 @@ par son titre Markdown de niveau 1 exact, et rien d'autre avant le premier titre
 {summary_body}
 
 {GENERATION_NOTES_HEADER}
-{_notes_body()}
-
-{_transcript_block(transcript)}
-"""
+{_notes_body()}"""
+    return Prompt(system, _transcript_turn(transcript))
 
 
-def build_generation_prompt(transcript: str) -> str:
+def build_generation_prompt(transcript: str) -> Prompt:
     """Notes + résumé in a single completion, transcript sent once.
 
     Wraps the two single-purpose instruction blocks under distinct level-1
@@ -245,7 +270,7 @@ N'invente rien : base-toi uniquement sur le contenu de <{TRANSCRIPT_TAG}>.
 {_TRANSCRIPT_USAGE_RULE}"""
 
 
-def build_auto_notes_prompt(transcript: str) -> str:
+def build_auto_notes_prompt(transcript: str) -> Prompt:
     """Notes + résumé court in one completion: what the nightly batch asks for each video.
 
     The same `# Résumé` / `# Notes` level-1 headers as build_generation_prompt, so the answer is
@@ -313,24 +338,40 @@ def partial_generation_summary(text: str) -> str:
     return short.strip()
 
 
-def build_chat_prompt(transcript: str, messages: list[dict[str, str]], question: str) -> str:
-    history = "\n\n".join(
-        f"{'UTILISATEUR' if message['role'] == 'user' else 'ASSISTANT'}: {message['content']}"
-        for message in messages[-10:]
-    )
-    return f"""Réponds à la question en utilisant uniquement le transcript fourni entre
-<{TRANSCRIPT_TAG}> et </{TRANSCRIPT_TAG}>. {_TRANSCRIPT_USAGE_RULE}
+VIDEO_CHAT_SYSTEM = f"""Tu réponds aux questions de l'utilisateur sur une vidéo, en utilisant uniquement
+son transcript, fourni dans le premier message entre <{TRANSCRIPT_TAG}> et
+</{TRANSCRIPT_TAG}>. {_TRANSCRIPT_USAGE_RULE}
 Si l'information n'est pas dans le transcript, dis-le clairement.
-Réponds en français, de façon précise. Tu peux citer de courts passages utiles.
+Réponds en français, de façon précise. Tu peux citer de courts passages utiles."""
 
-{_transcript_block(transcript)}
+_CHAT_HISTORY_LIMIT = 10
 
-HISTORIQUE:
-{history or "(aucun échange précédent)"}
 
-QUESTION:
-{question}
-"""
+def _recent_turns(history: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The last exchanges as API turns: alternating, starting with the user, ending with the assistant.
+
+    The API refuses anything else, and the next message is a user turn: a message that breaks
+    the alternation (a question left without answer) is skipped.
+    """
+    turns: list[dict[str, str]] = []
+    for message in history[-_CHAT_HISTORY_LIMIT:]:
+        expected = "user" if len(turns) % 2 == 0 else "assistant"
+        if message["role"] == expected:
+            turns.append({"role": message["role"], "content": message["content"]})
+    if turns and turns[-1]["role"] == "user":
+        turns.pop()
+    return turns
+
+
+def build_chat_prompt(transcript: str, history: list[dict[str, str]], question: str) -> Prompt:
+    """A question about one video: the transcript opens the conversation, then the last exchanges
+    as real turns, then the question."""
+    turns = [*_recent_turns(history), {"role": "user", "content": question}]
+    turns[0] = {
+        "role": "user",
+        "content": f"{_transcript_block(transcript)}\n\n{turns[0]['content']}",
+    }
+    return Prompt(VIDEO_CHAT_SYSTEM, turns)
 
 
 LIBRARY_CHAT_SYSTEM = """Tu es l'assistant de recherche de la bibliothèque vidéo personnelle de
@@ -380,26 +421,14 @@ Réponds en français, de façon précise et concise, en vouvoyant l'utilisateur
 donc pas de Markdown (ni astérisques, ni titres, ni liens). Pour une liste, un
 élément par ligne commençant par un tiret."""
 
-_LIBRARY_CHAT_HISTORY_LIMIT = 10
 
+def build_library_chat_prompt(history: list[dict[str, str]], question: str) -> Prompt:
+    """A turn of the cross-video ("whole library") chat: the last exchanges as real turns, then
+    the question.
 
-def build_library_chat_messages(
-    history: list[dict[str, str]], question: str
-) -> list[dict[str, str]]:
-    """The messages of a cross-video ("whole library") chat turn, ready for the API.
-
-    The instructions live in LIBRARY_CHAT_SYSTEM and carry no library content: the model fetches
-    what it needs through the tools of app/services/library_chat/tools.py, whose reference format
-    the instructions tell it to cite. The last exchanges are sent as real turns, then the question.
-
-    The API wants turns that alternate and start with the user, and the question is a user turn:
-    a message that breaks the alternation (a question left without answer) is skipped.
+    The instructions carry no library content: the model fetches what it needs through the tools
+    of app/services/library_chat/tools.py, whose reference format they tell it to cite.
     """
-    turns: list[dict[str, str]] = []
-    for message in history[-_LIBRARY_CHAT_HISTORY_LIMIT:]:
-        expected = "user" if len(turns) % 2 == 0 else "assistant"
-        if message["role"] == expected:
-            turns.append({"role": message["role"], "content": message["content"]})
-    if turns and turns[-1]["role"] == "user":
-        turns.pop()
-    return [*turns, {"role": "user", "content": question}]
+    return Prompt(
+        LIBRARY_CHAT_SYSTEM, [*_recent_turns(history), {"role": "user", "content": question}]
+    )

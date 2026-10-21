@@ -430,7 +430,7 @@ def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
     job = llm_jobs.enqueue_llm_job(db, kind="chat", provider="anthropic", video_id=None, prompt="p")
 
     class FakeProvider:
-        def complete(self, prompt, on_text=None):
+        def complete(self, messages, on_text=None, system=None):
             tally = UsageTally("claude-haiku-5-5")
             tally.add(SimpleNamespace(input_tokens=1_000_000, output_tokens=1_000_000))
             raise CompletionFailed("La réponse a été tronquée", tally)
@@ -652,7 +652,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     polled = []
 
     class FakeProvider:
-        def complete(self, prompt, on_text=None):
+        def complete(self, messages, on_text=None, system=None):
             on_text(streamed)
             polled.append(
                 json.loads(
@@ -1112,7 +1112,7 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     assert job.kind == "chat"
     assert job.provider == "anthropic"
     assert job.question == "Question ?"
-    assert "Question ?" in job.prompt
+    assert "Question ?" in json.loads(job.prompt)["messages"][-1]["content"]
 
     job.status = "done"
     job.result = "Réponse du LLM."
@@ -1150,8 +1150,8 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
     db.commit()
 
     class FakeProvider:
-        def complete(self, prompt, on_text=None):
-            assert "Question ?" in prompt
+        def complete(self, messages, on_text=None, system=None):
+            assert "Question ?" in messages[-1]["content"]
             return CompletionResult(
                 text="Réponse à Question ?",
                 model="claude-haiku-4-5",

@@ -133,7 +133,9 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     job = db.get(LlmJob, job_id)
     assert job.kind == "library_chat"
     assert job.video_id is None
-    assert json.loads(job.prompt) == [{"role": "user", "content": "Qu'est-ce que le stoïcisme ?"}]
+    stored = json.loads(job.prompt)
+    assert stored["messages"] == [{"role": "user", "content": "Qu'est-ce que le stoïcisme ?"}]
+    assert "bibliothèque" in stored["system"]
     assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     llm_jobs.run_llm_job(job_id)

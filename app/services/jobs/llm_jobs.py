@@ -16,7 +16,7 @@ from app.services.jobs.backfills import run_channel_profile_backfill_job
 from app.services.library_chat.history import add_chat_exchange
 from app.services.library_chat.schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from app.services.library_chat.tools import LibraryChatToolbox
-from app.services.llm.prompts import LIBRARY_CHAT_SYSTEM, split_generation_result
+from app.services.llm.prompts import Prompt, split_generation_result
 from app.services.llm.provider import CompletionFailed, get_llm_provider
 from app.services.llm.usage import compute_job_cost_usd
 from app.services.rag.indexing import index_video_notes
@@ -43,6 +43,7 @@ def run_llm_job(job_id: int) -> None:
         db.commit()
         try:
             provider_instance = get_llm_provider()
+            prompt = Prompt.from_json(job.prompt)
             chunks: list[str] = []
             last_saved = time.monotonic()
 
@@ -64,18 +65,20 @@ def run_llm_job(job_id: int) -> None:
                 toolbox = LibraryChatToolbox(db, on_progress=save_tool_calls)
                 added_channel_ids = toolbox.added_channel_ids
                 completion = provider_instance.complete_with_tools(
-                    json.loads(job.prompt),
+                    prompt.messages,
                     LIBRARY_CHAT_TOOLS,
                     toolbox.run,
                     MAX_TOOL_TURNS,
-                    system=LIBRARY_CHAT_SYSTEM,
+                    system=prompt.system,
                 )
                 completion.text, sources = toolbox.extract_sources(completion.text)
                 job.sources = json.dumps(sources)
             elif job.kind == "generate":
-                completion = provider_instance.complete(job.prompt, on_text=save_partial_result)
+                completion = provider_instance.complete(
+                    prompt.messages, on_text=save_partial_result, system=prompt.system
+                )
             else:
-                completion = provider_instance.complete(job.prompt)
+                completion = provider_instance.complete(prompt.messages, system=prompt.system)
             job.result = completion.text
             job.model = completion.model
             job.input_tokens = completion.input_tokens
