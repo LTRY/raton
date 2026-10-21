@@ -237,6 +237,42 @@ puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make
 (Node >= 22.22 requis), `make docs-build` construit l'image comme le fait la CI
 (job `docs` de `ci.yml`).
 
+## Previews des PR
+
+Une preview est une instance jetable de Raton (back et front) construite a
+partir d'une PR ouverte, pour l'essayer avant le merge sans toucher a la pile
+reelle. Elle se deploie a la main, depuis une page web ou en ligne de commande ;
+le merge ne deploie rien.
+
+- **Page des previews** : `make previews` (`scripts/previews.py`, bibliotheque
+  standard Python seulement) sert une page sur le port `8999` (`PREVIEWS_PORT`),
+  sur l'interface d'`APP_BIND` du `.env` (`PREVIEWS_BIND` la remplace). Elle
+  liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
+  leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
+  en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
+  et les boutons **Deployer**/**Redeployer**, **Ouvrir** et **Retirer**. Les
+  previews dont la PR est fermee restent listees pour etre retirees, et
+  **Retirer les previews des PR fermees** les supprime toutes. La sortie de
+  chaque action est dans `.local/previews/logs/pr-<N>.log` (lien **Journal**).
+  La page n'a pas d'authentification (comme Raton, reseau local de confiance)
+  et refuse un formulaire poste depuis une autre origine.
+- **Script** : `scripts/preview.sh up <N>` recupere la tete de la PR
+  (`refs/pull/<N>/head`) dans un worktree git `.local/previews/pr-<N>`, puis
+  construit et lance le projet compose `raton-pr-<N>`
+  (`docker-compose.preview.yml`) ; `down <N>` supprime conteneurs, images et
+  worktree ; `list` liste les previews ; `sweep` retire celles des PR fermees.
+- **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
+- **Isolement** : DB SQLite dans le conteneur `api`, remplie par les donnees de
+  demo (`scripts/demo_seed.py`, `APP_AUTO_CREATE_TABLES=true`), recreee a chaque
+  deploiement ; pas de dossier media, pas de secret (`ANTHROPIC_API_KEY`,
+  `VOYAGE_API_KEY`), scheduler coupe (`APP_SCHEDULER_ENABLED=false`). Les
+  migrations Alembic ne tournent pas : le schema vient des modeles de la PR.
+- **PR de fork refusees** : la machine construit et execute le code de la PR,
+  donc seules les PR du depot lui-meme ont une preview.
+
+`make compose-config` valide aussi `docker-compose.preview.yml`. Les fonctions
+de la page sont testees dans `tests/test_previews_page.py`.
+
 ## Conventions de nommage des PR
 
 Le titre d'une PR commence par une ou plusieurs etiquettes de perimetre entre

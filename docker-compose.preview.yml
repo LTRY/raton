@@ -1,0 +1,40 @@
+# One PR preview, driven by scripts/preview.sh (compose project raton-pr-<PR>): the PR's back and
+# front, built from its git worktree (PREVIEW_SRC), on port PREVIEW_PORT. Throwaway on purpose:
+# a sqlite DB inside the `api` container filled with the demo data, no media, no secret, no
+# scheduler — a preview never touches the real stack, its DB or its media.
+# See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+services:
+  api:
+    build:
+      context: ${PREVIEW_SRC:?set by scripts/preview.sh}
+      target: back
+    image: raton-preview-api:pr-${PREVIEW_PR:?set by scripts/preview.sh}
+    volumes:
+      # The demo seed is not in the back image (scripts/ is not copied): read it from the PR's worktree.
+      - ${PREVIEW_SRC}/scripts:/app/scripts:ro
+    environment:
+      DATABASE_URL: sqlite+pysqlite:////tmp/raton.db
+      MEDIA_ROOT: /tmp/media
+      APP_AUTO_CREATE_TABLES: "true"
+      APP_SCHEDULER_ENABLED: "false"
+    command:
+      - sh
+      - -c
+      - mkdir -p /tmp/media && python -m scripts.demo_seed && uvicorn back.main:app --host 0.0.0.0 --port 8001
+
+  app:
+    build:
+      context: ${PREVIEW_SRC}
+      target: front
+    image: raton-preview:pr-${PREVIEW_PR}
+    depends_on:
+      - api
+    # scripts/preview.sh finds the previews, and the commit each one runs, through these labels.
+    labels:
+      raton.preview.pr: "${PREVIEW_PR}"
+      raton.preview.sha: "${PREVIEW_SHA:-}"
+    ports:
+      # Same interface as the real stack (APP_BIND in .env): loopback unless opened to the LAN.
+      - "${APP_BIND:-127.0.0.1}:${PREVIEW_PORT:?set by scripts/preview.sh}:8000"
+    environment:
+      RATON_API_URL: http://api:8001

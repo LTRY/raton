@@ -317,3 +317,16 @@ et relaie vers lui les appels `/api/*` du navigateur.
 
 Specs : [03 Architecture](03-architecture.md), [11 Interface HTML](11-interface-html.md),
 [18 Raton : scenarios et repliques](18-raton-scenarios.md).
+
+## Developpement
+
+### Preview
+
+Instance jetable de Raton construite a partir d'une PR ouverte, avec les
+donnees de demo, sur le port `9000 + N`. Se deploie depuis la page des
+previews (`make previews`).
+
+- **Code** : `scripts/preview.sh`, `scripts/previews.py`, `docker-compose.preview.yml`, projet compose `raton-pr-<N>`
+- **A ne pas confondre avec** : `make demo` (le code local, pas celui d'une PR) ; l'apercu d'une playlist avant import.
+
+Specs : [04 Configuration et deploiement](04-configuration-et-deploiement.md).
