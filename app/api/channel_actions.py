@@ -62,12 +62,6 @@ def channel_state(channel: Channel) -> ChannelStateRead:
     )
 
 
-def job_queued(job) -> JobQueuedRead:
-    return JobQueuedRead(
-        job_id=job.id, status=job.status, message=job.message, status_url=f"/api/jobs/{job.id}"
-    )
-
-
 @router.put("/channels/{channel_id}/categories", response_model=ChannelStateRead)
 def update_categories(
     channel_id: int, payload: ChannelCategoriesUpdate, db: Session = Depends(get_db)
@@ -94,7 +88,9 @@ def update_bell(
         background_tasks.add_task(
             run_channel_metadata_import_job, job.id, channel.id, 1, section, False
         )
-    return ChannelBellRead(channel=channel_state(channel), job=job_queued(job) if job else None)
+    return ChannelBellRead(
+        channel=channel_state(channel), job=JobQueuedRead.from_job(job) if job else None
+    )
 
 
 @router.post(
@@ -113,7 +109,7 @@ def import_metadata(
     background_tasks.add_task(
         run_channel_metadata_import_job, job.id, channel.id, payload.page, payload.section
     )
-    return job_queued(job)
+    return JobQueuedRead.from_job(job)
 
 
 @router.post(

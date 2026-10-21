@@ -11,6 +11,41 @@ from app.models.video import Video
 from app.services.common.categories import serialized_category_labels
 from app.services.common.settings import add_video_category_labels
 
+PLAYLIST_TITLE_MAX_LENGTH = 500
+
+
+class PlaylistNotInLibraryError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Playlist introuvable")
+
+
+class PlaylistItemNotFoundError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Élément introuvable")
+
+
+def find_playlist(db: Session, playlist_id: int) -> Playlist:
+    playlist = db.get(Playlist, playlist_id)
+    if playlist is None:
+        raise PlaylistNotInLibraryError()
+    return playlist
+
+
+def find_playlist_item(db: Session, playlist_id: int, item_id: int) -> PlaylistItem:
+    """An item, only if it belongs to that playlist."""
+    item = db.get(PlaylistItem, item_id)
+    if item is None or item.playlist_id != playlist_id:
+        raise PlaylistItemNotFoundError()
+    return item
+
+
+def playlist_title(title: str) -> str:
+    """A title typed by a person: trimmed, required, cut to the column's length."""
+    title = title.strip()
+    if not title:
+        raise ValueError("Le titre est obligatoire.")
+    return title[:PLAYLIST_TITLE_MAX_LENGTH]
+
 
 def next_item_position(db: Session, playlist_id: int) -> int:
     current_max = db.scalar(
@@ -48,27 +83,28 @@ def add_video_to_playlist(
     playlist_id: int,
     video_id: int,
     added_at: datetime | None = None,
-) -> None:
+) -> PlaylistItem:
+    """Append the video to the playlist, once: an existing item is returned as it is."""
     existing = db.scalar(
         select(PlaylistItem).where(
             PlaylistItem.playlist_id == playlist_id, PlaylistItem.video_id == video_id
         )
     )
     if existing:
-        return
-    db.add(
-        PlaylistItem(
-            playlist_id=playlist_id,
-            video_id=video_id,
-            position=next_item_position(db, playlist_id),
-            added_at=added_at,
-        )
+        return existing
+    item = PlaylistItem(
+        playlist_id=playlist_id,
+        video_id=video_id,
+        position=next_item_position(db, playlist_id),
+        added_at=added_at,
     )
+    db.add(item)
     playlist = db.get(Playlist, playlist_id)
     video = db.get(Video, video_id)
     if playlist is not None and video is not None:
         inherit_playlist_labels(playlist, video)
     db.commit()
+    return item
 
 
 def apply_item_order(db: Session, playlist: Playlist, ordered_item_ids: list[int]) -> bool:
@@ -133,16 +169,17 @@ def create_playlist(db: Session, title: str, source: str = "manual", **fields) -
     return playlist
 
 
+def create_manual_playlist(db: Session, title: str) -> Playlist:
+    return create_playlist(db, playlist_title(title))
+
+
 def delete_playlist(db: Session, playlist: Playlist) -> None:
     db.delete(playlist)
     db.commit()
 
 
 def rename_playlist(db: Session, playlist: Playlist, title: str) -> None:
-    title = title.strip()
-    if not title:
-        raise ValueError("Le titre est obligatoire.")
-    playlist.title = title[:500]
+    playlist.title = playlist_title(title)
     db.commit()
 
 

@@ -126,7 +126,8 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | Module | Responsabilité |
 |---|---|
 | `imports` | Aperçu d'une playlist YouTube, lecture du CSV Google Takeout, ajout d'une entrée à la playlist, export CSV |
-| `editing` | Édition d'une playlist et de ses éléments |
+| `editing` | Édition d'une playlist et de ses éléments ; recherche d'une playlist ou d'un élément (`find_playlist`, `find_playlist_item`), titre obligatoire (`playlist_title`) |
+| `listing` | Données des pages `/playlists` et `/playlists/{id}` et de leurs jumelles `/api`, en valeurs brutes : liste avec couvertures, détail chargé d'avance, lignes et compteurs |
 
 ### `videos/`
 
@@ -181,8 +182,8 @@ web ; chacune ouvre sa propre session DB.
 
 | Module | Responsabilité |
 |---|---|
-| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) ou une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
-| `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout |
+| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) ou une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`), formats manquants d'une playlist (`queue_playlist_downloads`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
+| `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
 | `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques |

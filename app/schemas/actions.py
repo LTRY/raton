@@ -50,6 +50,15 @@ class JobQueuedRead(BaseModel):
     message: str
     status_url: str
 
+    @classmethod
+    def from_job(cls, job) -> JobQueuedRead:
+        return cls(
+            job_id=job.id,
+            status=job.status,
+            message=job.message,
+            status_url=f"/api/jobs/{job.id}",
+        )
+
 
 class JobStatusRead(BaseModel):
     id: int

@@ -21,6 +21,7 @@ from app.services.ingest.manual_download import download_manual_media
 from app.services.ingest.metadata_import import import_video_metadata
 from app.services.ingest.scanner import scan_channel_section
 from app.services.ingest.transcript_retry import retry_transcript_download
+from app.services.playlists.editing import videos_missing_media
 from app.services.videos.download_options import normalize_video_quality
 
 logger = logging.getLogger(__name__)
@@ -61,6 +62,18 @@ def run_media_download_job(
     run_manual_download_job(
         job_id, video_url, [media_type, "metadata"], False, video_quality=video_quality
     )
+
+
+def queue_playlist_downloads(
+    db: Session, playlist, media_type: str
+) -> list[tuple[Video, DownloadJob]]:
+    """One `queue_media_download` per video of the playlist without that format yet."""
+    if media_type not in FICHE_MEDIA_TYPES:
+        raise InvalidMediaFormatError("Le format doit être vidéo ou audio.")
+    return [
+        (video, queue_media_download(db, video, media_type))
+        for video in videos_missing_media(playlist, media_type)
+    ]
 
 
 def queue_transcript_retry(db: Session, video: Video) -> DownloadJob:

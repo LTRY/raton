@@ -307,6 +307,55 @@ la suppression sont plus haut.
   chaines des `token` de l'apercu qui ne sont pas deja dans la bibliotheque,
   `{added}` ; lance le rattrapage des profils si au moins une est ajoutee.
 
+### Playlists
+
+Corps en JSON, memes services que les pages `/playlists` ; `404 Playlist
+introuvable` si la playlist n'existe pas. Une playlist se lit `{id, title,
+source, source_url, yt_playlist_id, categories, free_listening,
+created_at}`. L'export CSV reste `GET /playlists/{id}/export.csv`.
+
+- `GET /api/playlists` : toutes les playlists, la plus recente d'abord, plus
+  `item_count` et `cover_video_id` (premiere fiche, `null` si vide). Nombre de
+  requetes constant.
+- `POST /api/playlists` `{title}` : creation manuelle, `201` ; `400 Le titre
+  est obligatoire.` pour un titre vide.
+- `GET /api/playlists/{id}` : la playlist plus `stats` `{count,
+  total_duration_seconds, seen_count, missing_audio, missing_video}` et
+  `items` dans l'ordre (`{item_id, position, added_at, video_id, title,
+  channel_name, duration_seconds, has_audio, has_video, seen}`).
+- `DELETE /api/playlists/{id}` : `204`, ne supprime jamais les fiches.
+- `PUT /api/playlists/{id}/title` `{title}`, `PUT .../free-listening`
+  `{enabled}` : repondent la playlist.
+- `PUT /api/playlists/{id}/categories` `{categories}` : remplace les labels
+  et les copie sur ses fiches qui n'en ont aucun ; repond `{playlist,
+  labelled_count}`.
+- `PUT /api/playlists/{id}/order` `{item_ids}` : tous les elements, dans le
+  nouvel ordre ; `409` si la playlist a change entre-temps. `POST
+  .../sort` `{by}` (`added`, `duration`, `title`, `reverse` ; `400` sinon),
+  `POST .../items/{item_id}/move` `{direction: up|down}` : repondent le
+  detail.
+- `POST /api/playlists/{id}/items` `{video_id}` : ajoute la fiche a la fin,
+  une seule fois (`201`, detail) ; `404 Vidéo introuvable`. `DELETE
+  .../items/{item_id}` : retire l'element (jamais la fiche) et renumerote,
+  `204` ; `404 Élément introuvable` si l'element n'est pas dans cette
+  playlist.
+- `POST /api/playlists/{id}/duplicate` : copie manuelle, `201`.
+- `POST /api/playlists/preview` `{url}` : apercu d'une URL de playlist, rien
+  n'est ecrit (memes champs que `POST /playlists/preview`, sans
+  `duration_label`) ; `404` si introuvable.
+- `POST /api/playlists/import-url` `{url, title}` et `POST
+  /api/playlists/import-csv` (multipart : `file`, `title` facultatif) : creent
+  la playlist tout de suite et importent ses videos (metadonnees seules) en
+  arriere-plan ; `202 {playlist, job}`. Sans titre : celui de YouTube, ou le
+  nom du fichier (`Vidéos de X.csv` donne `X`). `404` pour une URL
+  introuvable, `400` pour un CSV refuse.
+- `POST /api/playlists/{id}/refresh` : relance l'import par URL (nouvelles
+  videos ajoutees a la fin), `202` + job ; `400` si la playlist ne vient pas
+  d'une URL.
+- `POST /api/playlists/{id}/download/{audio|video}` : un telechargement par
+  fiche qui n'a pas encore ce format, `202 {jobs: [...]}` (vide si rien ne
+  manque) ; `400` pour un autre format.
+
 ### Actions sur une fiche
 
 Corps en JSON. Chaque route appelle le meme service que son formulaire HTML
