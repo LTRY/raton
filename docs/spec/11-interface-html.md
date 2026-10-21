@@ -872,6 +872,11 @@ formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
   qu'au survol ou au focus sur les pointeurs qui survolent, et reste visible
   sur ecran tactile. Un champ de recherche filtre les cartes par titre cote
   client.
+- Sans aucune playlist : le meme etat vide qu'une chaine sans fiche (Raton,
+  `raccoon-empty.png`) avec « Aucune playlist pour le moment. » et un bouton
+  **Ajouter une playlist** (meme style que « Commencer l'exploration ») qui
+  ouvre la feuille d'import (`data-import-open`, lien
+  `/playlists?import=playlist` sans JavaScript).
 - Animations : entree des cartes en 260 ms, echelonnee sur les 7 premieres ;
   au survol la carte monte de 4 px et les deux couches s'ecartent ; les trois
   formulaires du panneau arrivent l'un apres l'autre. Tout est coupe avec

@@ -8928,6 +8928,11 @@ body.has-mini-player .explorer-raton {
   padding: 0 26px;
 }
 
+/* Also a link: the "Ajouter une playlist" of the empty Playlists page. */
+a.channel-explore-btn {
+  text-decoration: none;
+}
+
 .channel-explore-btn:hover {
   background: var(--color-primary);
   border-color: var(--color-primary);

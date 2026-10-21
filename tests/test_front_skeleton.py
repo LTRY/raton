@@ -111,6 +111,12 @@ def test_import_sheet_carries_only_the_import_of_its_page(front_client):
             assert (f'action="{action}"' in html) == (action in actions), (path, action)
 
 
+def test_empty_playlists_page_offers_to_add_one(front_client):
+    html = front_client(make_session()).get("/playlists").text
+    assert "raccoon-empty.png" in html
+    assert 'href="/playlists?import=playlist" data-import-open>Ajouter une playlist' in html
+
+
 def test_import_query_opens_the_sheet_of_its_page(front_client):
     client = front_client(make_session())
     assert "data-import-fab open" in client.get("/videos?import=video").text

@@ -3707,6 +3707,15 @@ if (!window.__importFabBound) {
   window.__importFabBound = true;
   const closeAll = () => document.querySelectorAll("[data-import-fab][open]").forEach(closeImportFab);
   document.addEventListener("click", (event) => {
+    // A link elsewhere on the page that opens the sheet (empty Playlists page); its href is the no-JS fallback.
+    const opener = event.target.closest("[data-import-open]");
+    const importFab = opener && document.querySelector("[data-import-fab]");
+    if (importFab) {
+      event.preventDefault();
+      importFab.classList.remove("is-closing");
+      importFab.open = true;
+      return;
+    }
     const button = event.target.closest(".import-fab-button");
     const fab = button && button.closest("[data-import-fab]");
     if (fab && fab.open) {
