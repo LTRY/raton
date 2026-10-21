@@ -3340,6 +3340,8 @@ def test_channels_page_shows_rated_channels_by_default():
     assert "Rated" in rendered
     assert "Unrated" not in rendered
     assert 'name="rated" value="true" type="checkbox" checked' in rendered
+    # The count next to the title is every channel, not only the rated ones listed.
+    assert '<h1>Chaînes <span class="page-count">2</span></h1>' in rendered
 
 
 def test_channels_page_shows_last_played_activity_without_video_title():

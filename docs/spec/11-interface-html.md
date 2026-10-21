@@ -40,6 +40,16 @@ notation (`form.rating-control`). Les formulaires simples (commentaire,
 categories de chaine, parametres) ne sont pas exclus et beneficient de Turbo
 sans changement de comportement.
 
+En-tete de page : Chaines, Playlists et les trois vues de la Bibliotheque
+ouvrent sur la meme ligne de titre `.page-head` (titre `h1` de 24 px a
+gauche, d'au moins 44 px de haut comme le champ de recherche des Playlists,
+recherche ou actions de la page poussees a droite, 24 px avant la suite),
+pour que le titre soit a la meme hauteur d'une page a l'autre, sur ordinateur
+comme sur telephone. Un
+compteur en pastille (`.page-count`) suit le titre de Chaines (toutes les
+chaines de la bibliotheque, `channel_count` de `GET /api/channels`) et de
+Playlists (toutes les playlists) ; il ignore la recherche et les filtres.
+
 Le surlignage d'une etoile de notation au survol (couleur du palier qu'elle
 donnerait, leger decalage vers le haut) n'existe que sous `@media (hover: hover)` :
 sur ecran tactile, un doigt qui effleure une etoile sans appuyer ne la
@@ -792,6 +802,8 @@ Template : `channels.html`
 
 Contenu :
 
+- titre « Chaines » suivi du nombre de chaines (voir « En-tete de page » dans
+  « Base ») ;
 - formulaire ajout chaine (avec categories), dans la feuille d'import (voir
   « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
   tout autre texte est un nom a chercher ;
@@ -859,7 +871,8 @@ detail dans `front/static/js/playlist-player.js`.
 
 ### Index `/playlists`
 
-La page ne porte que la grille des playlists et sa recherche : les trois
+La page ne porte que le titre « Playlists » suivi du nombre de playlists (voir
+« En-tete de page » dans « Base »), la grille des playlists et sa recherche : les trois
 formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
 **Une playlist** de la feuille d'import.
 

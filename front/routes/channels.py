@@ -75,6 +75,7 @@ def channels_context(request: Request, page: int, api: Api) -> dict:
         "added_channel": added_channel,
         "channel_entries": [{"channel": item, **vars(item)} for item in listed.items],
         "total_channel_entry_count": listed.total,
+        "channel_count": listed.channel_count,
         "rated_filter": rated,
         "search_query": " ".join((request.query_params.get("q") or "").split()),
         "selected_sort": listed.sort,
