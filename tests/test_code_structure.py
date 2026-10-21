@@ -4,7 +4,9 @@ import ast
 import re
 from pathlib import Path
 
-APP = Path(__file__).resolve().parents[1] / "app"
+ROOT = Path(__file__).resolve().parents[1]
+APP = ROOT / "back"
+FRONT = ROOT / "front"
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "api_route"}
 
 
@@ -20,7 +22,7 @@ def imported_modules(path: Path) -> set[str]:
 
 
 def test_main_declares_no_route():
-    # Routes live in app/web/routes/ and are plugged in with include_router (see the docstring of app/main.py).
+    # Routes live in back/api/ and are plugged in with include_router (see back/api/__init__.py).
     tree = ast.parse((APP / "main.py").read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
@@ -28,21 +30,35 @@ def test_main_declares_no_route():
                 target = decorator.func if isinstance(decorator, ast.Call) else decorator
                 if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
                     assert not (target.value.id == "app" and target.attr in ROUTE_METHODS), (
-                        f"app/main.py declares a route on `{node.name}`: move it to app/web/routes/"
+                        f"back/main.py declares a route on `{node.name}`: move it to back/api/"
                     )
 
 
-def test_web_shared_imports_no_other_web_module():
-    # Every web module imports shared.py, so it must not import one back (circular import).
-    offenders = sorted(
-        module
-        for module in imported_modules(APP / "web" / "shared.py")
-        if module.startswith("app.web.") and module != "app.web.shared"
+def imports_of(root: Path, prefix: str) -> list[str]:
+    return sorted(
+        f"{path.relative_to(ROOT)}: {module}"
+        for path in root.rglob("*.py")
+        for module in imported_modules(path)
+        if module == prefix or module.startswith(prefix + ".")
     )
-    assert not offenders, f"app/web/shared.py imports {offenders}"
 
 
-# Package -> packages it may import, inside app/services/. Every service module lives in one of these
+def test_front_never_imports_the_back():
+    # The front reads and writes only through the back's /api (docs/spec/03-architecture.md), so
+    # another front, or an MCP server, can be built the same way.
+    assert not imports_of(FRONT, "back"), imports_of(FRONT, "back")
+
+
+def test_back_never_imports_the_front():
+    assert not imports_of(APP, "front"), imports_of(APP, "front")
+
+
+def test_front_speaks_http_only_through_its_api_client_and_relay():
+    talkers = {path.split(":")[0] for path in imports_of(FRONT, "httpx")}
+    assert talkers <= {"front/api.py", "front/proxy.py"}, talkers
+
+
+# Package -> packages it may import, inside back/services/. Every service module lives in one of these
 # packages; `jobs` is the orchestration on top of all of them, so no other package imports it.
 SERVICE_PACKAGE_DEPENDENCIES = {
     "common": set(),
@@ -73,20 +89,9 @@ SERVICE_PACKAGE_DEPENDENCIES = {
 
 def service_package(module: str) -> str | None:
     parts = module.split(".")
-    if parts[:2] != ["app", "services"] or len(parts) < 3:
+    if parts[:2] != ["back", "services"] or len(parts) < 3:
         return None
     return parts[2]
-
-
-def test_services_import_no_web_module():
-    # The web layer calls the services, never the reverse: a service is also called by /api and jobs.
-    offenders = sorted(
-        f"{path.relative_to(APP)}: {module}"
-        for path in (APP / "services").rglob("*.py")
-        for module in imported_modules(path)
-        if module == "app.web" or module.startswith("app.web.")
-    )
-    assert not offenders, f"services import the web layer: {offenders}"
 
 
 def test_models_import_no_service():
@@ -96,7 +101,7 @@ def test_models_import_no_service():
         f"{path.relative_to(APP)}: {module}"
         for path in (APP / "models").rglob("*.py")
         for module in imported_modules(path)
-        if module == "app.services" or module.startswith("app.services.")
+        if module == "back.services" or module.startswith("back.services.")
     )
     assert not offenders, f"models import services: {offenders}"
 
@@ -108,9 +113,9 @@ def test_only_jobs_open_a_db_session():
         str(path.relative_to(APP / "services"))
         for path in (APP / "services").rglob("*.py")
         if path.relative_to(APP / "services").parts[0] != "jobs"
-        and "app.db.session.SessionLocal" in imported_modules(path)
+        and "back.db.session.SessionLocal" in imported_modules(path)
     )
-    assert not offenders, f"open the session in app/services/jobs/ instead: {offenders}"
+    assert not offenders, f"open the session in back/services/jobs/ instead: {offenders}"
 
 
 def test_every_service_module_belongs_to_a_known_package():
@@ -133,23 +138,23 @@ def test_service_packages_form_a_dag():
         allowed = SERVICE_PACKAGE_DEPENDENCIES.get(owner, set())
         for module in imported_modules(path):
             target = service_package(module)
-            # `from app.services import x` names a package too.
-            if target is None and module.startswith("app.services."):
+            # `from back.services import x` names a package too.
+            if target is None and module.startswith("back.services."):
                 target = module.split(".")[2]
             if target and target != owner and target not in allowed:
                 offenders.append(f"{relative}: {module}")
     assert not offenders, "forbidden service imports: " + ", ".join(sorted(set(offenders)))
 
 
-# The web layer writes nothing to the DB itself: a route reads the request, calls a service and
-# renders; the service owns the business rule and its commit (docs/spec/10-services.md).
+# The API writes nothing to the DB itself: a route reads the request, calls a service and answers;
+# the service owns the business rule and its commit (docs/spec/10-services.md).
 DB_WRITE = re.compile(r"\bdb\.(add|add_all|commit|delete|flush|merge)\(|\.delete\(\)")
 
 
-def test_web_layer_leaves_db_writes_to_services():
+def test_api_leaves_db_writes_to_services():
     offenders = sorted(
         str(path.relative_to(APP))
-        for path in [*(APP / "web").rglob("*.py"), *(APP / "api").rglob("*.py")]
+        for path in (APP / "api").rglob("*.py")
         if DB_WRITE.search(path.read_text(encoding="utf-8"))
     )
     assert not offenders, (
@@ -157,7 +162,7 @@ def test_web_layer_leaves_db_writes_to_services():
     )
 
 
-SERVICES_SPEC = APP.parent / "docs" / "spec" / "10-services.md"
+SERVICES_SPEC = ROOT / "docs" / "spec" / "10-services.md"
 
 
 def spec_table_rows(section: str) -> list[list[str]]:

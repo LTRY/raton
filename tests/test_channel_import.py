@@ -1,21 +1,17 @@
-import io
-
 import pytest
-from fastapi import UploadFile
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from starlette.requests import Request
+from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.services.channels.subscriptions import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.services.channels.subscriptions import (
     SubscriptionsCsvError,
     decode_import_token,
     encode_import_token,
     parse_subscriptions_csv,
 )
-from app.web.routes import channels as channels_routes
 
 CSV_SAMPLE = (
     "ID des chaînes,URL des chaînes,Titres des chaînes\n"
@@ -26,23 +22,20 @@ CSV_SAMPLE = (
 
 
 def make_session():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    # One connection shared across threads: the back serves the front's calls from another one.
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)()
 
 
-def make_request(method="POST", path="/channels/import-csv", query_string=b""):
-    return Request(
-        {
-            "type": "http",
-            "method": method,
-            "path": path,
-            "query_string": query_string,
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
+@pytest.fixture(autouse=True)
+def no_profile_backfill(monkeypatch):
+    # Adding channels starts the profile backfill, which would reach YouTube.
+    monkeypatch.setattr("back.api.channels.run_channel_profile_backfill_job", lambda: None)
 
 
 def test_parse_subscriptions_csv_normalizes_url_and_dedupes():
@@ -88,7 +81,7 @@ def test_decode_import_token_rejects_garbage():
     assert decode_import_token("not-a-valid-token") is None
 
 
-def test_import_channels_csv_preview_flags_already_imported():
+def test_import_channels_csv_preview_flags_already_imported(front_client):
     db = make_session()
     db.add(
         Channel(
@@ -99,9 +92,10 @@ def test_import_channels_csv_preview_flags_already_imported():
     )
     db.commit()
 
-    upload = UploadFile(file=io.BytesIO(CSV_SAMPLE), filename="abonnements.csv")
-    response = channels_routes.import_channels_csv_preview(make_request(), csv_file=upload, db=db)
-    rendered = response.body.decode()
+    response = front_client(db).post(
+        "/channels/import-csv", files={"csv_file": ("abonnements.csv", CSV_SAMPLE)}
+    )
+    rendered = response.text
 
     assert "Chaine Deux" in rendered
     assert "Déjà importée" in rendered
@@ -109,17 +103,18 @@ def test_import_channels_csv_preview_flags_already_imported():
     assert rendered.count('name="import_rows"') == 1
 
 
-def test_import_channels_csv_preview_rejects_bad_csv():
-    db = make_session()
-    upload = UploadFile(file=io.BytesIO(b"nope"), filename="abonnements.csv")
-
-    response = channels_routes.import_channels_csv_preview(make_request(), csv_file=upload, db=db)
+def test_import_channels_csv_preview_rejects_bad_csv(front_client):
+    response = front_client(make_session()).post(
+        "/channels/import-csv",
+        files={"csv_file": ("abonnements.csv", b"nope")},
+        follow_redirects=False,
+    )
 
     assert response.status_code == 303
     assert "level=error" in response.headers["location"]
 
 
-def test_import_channels_csv_confirm_adds_only_selected_new_channels():
+def test_import_channels_csv_confirm_adds_only_selected_new_channels(front_client):
     db = make_session()
     db.add(
         Channel(
@@ -141,9 +136,12 @@ def test_import_channels_csv_confirm_adds_only_selected_new_channels():
         "name": "Chaine Un",
     }
 
-    response = channels_routes.import_channels_csv_confirm(
-        import_rows=[encode_import_token(new_row), encode_import_token(already_imported_row)],
-        db=db,
+    response = front_client(db).post(
+        "/channels/import-csv/confirm",
+        data={
+            "import_rows": [encode_import_token(new_row), encode_import_token(already_imported_row)]
+        },
+        follow_redirects=False,
     )
 
     channels = db.scalars(select(Channel)).all()
@@ -154,9 +152,9 @@ def test_import_channels_csv_confirm_adds_only_selected_new_channels():
     )
 
 
-def test_import_channels_csv_confirm_with_no_rows_reports_error():
-    db = make_session()
-
-    response = channels_routes.import_channels_csv_confirm(import_rows=[], db=db)
+def test_import_channels_csv_confirm_with_no_rows_reports_error(front_client):
+    response = front_client(make_session()).post(
+        "/channels/import-csv/confirm", data={}, follow_redirects=False
+    )
 
     assert "level=error" in response.headers["location"]

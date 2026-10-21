@@ -1,20 +1,33 @@
-from fastapi import BackgroundTasks
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from starlette.requests import Request
+from sqlalchemy.pool import StaticPool
 
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.video import TranscriptStatus, Video
-from app.services.ingest import scanner
-from app.web.routes import channels as channels_routes
-from app.web.routes import videos as videos_routes
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.video import TranscriptStatus, Video
+from back.services.ingest import scanner
 
 
 def make_session():
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, expire_on_commit=False)()
+
+
+@pytest.fixture
+def imports(monkeypatch):
+    """The catalogue imports a cloche turned on queues, recorded instead of run."""
+    started = []
+    monkeypatch.setattr(
+        "back.api.channels.run_channel_metadata_import_job", lambda *args: started.append(args)
+    )
+    return started
 
 
 def test_daily_scan_only_processes_channels_with_the_bell_enabled(monkeypatch):
@@ -76,48 +89,52 @@ def test_daily_scan_scans_only_the_sections_whose_bell_is_on(monkeypatch):
     ]
 
 
-def test_enabling_the_bell_starts_a_new_metadata_import():
+def test_enabling_the_bell_starts_a_new_metadata_import(front_client, imports):
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne suivie")
     db.add(channel)
     db.commit()
-    tasks = BackgroundTasks()
 
-    response = channels_routes.toggle_channel_auto_metadata_form(
-        tasks, channel.id, "/channels", db, "videos"
+    response = front_client(db).post(
+        f"/channels/{channel.id}/auto-metadata",
+        data={"next": "/channels", "section": "videos"},
+        follow_redirects=False,
     )
 
     assert channel.auto_metadata_enabled is True
     assert channel.auto_shorts_enabled is False
     assert response.status_code == 303
-    assert len(tasks.tasks) == 1
-    assert tasks.tasks[0].args[-2:] == ("videos", False)
+    assert len(imports) == 1
+    assert imports[0][-2:] == ("videos", False)
 
 
-def test_the_shorts_bell_toggles_independently_and_imports_the_shorts_section():
+def test_the_shorts_bell_toggles_independently_and_imports_the_shorts_section(
+    front_client, imports
+):
     db = make_session()
     channel = Channel(
         url="https://example.test/channel", name="Chaîne suivie", auto_metadata_enabled=True
     )
     db.add(channel)
     db.commit()
-    tasks = BackgroundTasks()
+    client = front_client(db)
+    toggle = {"next": "/channels", "section": "shorts"}
 
-    channels_routes.toggle_channel_auto_metadata_form(tasks, channel.id, "/channels", db, "shorts")
+    client.post(f"/channels/{channel.id}/auto-metadata", data=toggle, follow_redirects=False)
 
     assert channel.auto_shorts_enabled is True
     assert channel.auto_metadata_enabled is True
-    assert len(tasks.tasks) == 1
-    assert tasks.tasks[0].args[-2:] == ("shorts", False)
+    assert len(imports) == 1
+    assert imports[0][-2:] == ("shorts", False)
 
-    channels_routes.toggle_channel_auto_metadata_form(tasks, channel.id, "/channels", db, "shorts")
+    client.post(f"/channels/{channel.id}/auto-metadata", data=toggle, follow_redirects=False)
 
     assert channel.auto_shorts_enabled is False
     assert channel.auto_metadata_enabled is True
-    assert len(tasks.tasks) == 1
+    assert len(imports) == 1
 
 
-def test_visiting_a_new_video_clears_its_new_label():
+def test_visiting_a_new_video_clears_its_new_label(front_client):
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")
     video = Video(
@@ -131,17 +148,7 @@ def test_visiting_a_new_video_clears_its_new_label():
     )
     db.add(video)
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "GET",
-            "path": "/videos/1",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
-    videos_routes.video_detail_page(request, video.id, db)
+    front_client(db).get(f"/videos/{video.id}")
 
     assert video.is_new is False

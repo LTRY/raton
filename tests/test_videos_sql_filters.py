@@ -7,19 +7,19 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.video import Video
-from app.services.videos.filters import video_filters_condition, video_matches_filters
-from app.services.youtube.view_counts import backfill_view_counts
-from app.web.shared import LIBRARY_PAGE_SIZE
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.video import Video
+from back.services.videos.filters import video_filters_condition, video_matches_filters
+from back.services.videos.library_view import LIBRARY_PAGE_SIZE
+from back.services.youtube.view_counts import backfill_view_counts
+from tests.site import site_client
 
 
 @pytest.fixture
@@ -145,7 +145,7 @@ def test_videos_page_paginates_in_sql_and_sorts_by_stored_view_count(db):
     db.commit()
     db.statements.clear()
 
-    page = TestClient(app).get("/videos?sort=views&page=2")
+    page = site_client().get("/videos?sort=views&page=2")
 
     assert page.status_code == 200
     # Page 2 holds the 5 least viewed videos, most viewed first.
@@ -156,7 +156,7 @@ def test_videos_page_paginates_in_sql_and_sorts_by_stored_view_count(db):
 
 def test_backfill_reads_view_counts_from_metadata_files(db, tmp_path, monkeypatch):
     monkeypatch.setattr(
-        "app.services.youtube.view_counts.local_media_path", lambda path: Path(path)
+        "back.services.youtube.view_counts.local_media_path", lambda path: Path(path)
     )
     counted = tmp_path / "counted.json"
     counted.write_text(json.dumps({"view_count": 1234, "duration": 754.0}))
@@ -199,7 +199,7 @@ def test_uncategorized_filter_lists_videos_without_own_or_channel_labels(db):
     add_video(db, "orphan")
     db.commit()
 
-    page = TestClient(app).get("/videos?asset_filters=1&uncategorized=1")
+    page = site_client().get("/videos?asset_filters=1&uncategorized=1")
 
     assert page.status_code == 200
     titles = set(re.findall(r"Video (?:own|inherited|empty|orphan)", page.text))

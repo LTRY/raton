@@ -13,13 +13,21 @@ exposee hors LAN.
 
 ## Garde-fous sans authentification
 
-- **CSRF** : `app/web/same_origin.py` refuse (403) toute requete d'ecriture
+- **Separation front/back** : seul le back (conteneur `api`, sans port
+  publie) lit la DB, le dossier media et les secrets ; le front n'a rien de
+  tout cela et ne fait qu'appeler l'API. Le seul point d'entree publie est le
+  front, dont le relais `/api/*` transmet les requetes du navigateur au back.
+- **CSRF** : `back/core/same_origin.py` (pour `/api`) et sa copie
+  `front/same_origin.py` (pour les formulaires du front) refusent (403) toute requete d'ecriture
   (hors `GET`/`HEAD`/`OPTIONS`) venue d'un autre site : `Sec-Fetch-Site` autre
   que `same-origin`/`none`, ou hote d'`Origin` (a defaut `Referer`) different du
-  `Host`. Sans ces en-tetes (curl, scripts) la requete passe. Derriere un
+  `Host`. Le relais du front transmet au back le `Host`, l'`Origin` et les
+  `Sec-Fetch-*` du navigateur : la meme verification s'y applique. Les appels
+  du front lui-meme (replis sans JavaScript, rendu des pages) n'ont pas ces
+  en-tetes et passent. Sans ces en-tetes (curl, scripts) la requete passe. Derriere un
   reverse proxy qui change le `Host`, lister l'hote public dans
   `APP_TRUSTED_ORIGINS` (separes par des virgules).
-- **SSRF** : `app/services/youtube/url_guard.py` refuse les URL non http(s) ou visant une
+- **SSRF** : `back/services/youtube/url_guard.py` refuse les URL non http(s) ou visant une
   adresse locale/privee (loopback, 10/8, 172.16/12, 192.168/16, 169.254/16, IPv6
   locale), pour les URL de chaine, de video, de playlist et d'image de profil
   (redirections comprises). Un nom qui ne se resout pas est laisse a l'outil
@@ -35,7 +43,8 @@ Si exposition Internet :
 
 ## Routes media
 
-Les routes `/videos/{id}/thumbnail`, `/audio`, `/video` doivent :
+Les routes `/api/videos/{id}/thumbnail`, `/audio`, `/video`, `/subtitles` et
+`/api/channels/{id}/avatar`, `/banner` (`back/api/media.py`) doivent :
 
 - charger l'objet `Video` ;
 - refuser si chemin absent ;
@@ -50,7 +59,7 @@ Objectif : empecher de servir un fichier arbitraire via chemin modifie en DB.
 ## Redirections
 
 Les formulaires avec `next` ou `return_to` doivent limiter les retours aux
-chemins internes : `internal_return_path` (`app/web/shared.py`) n'accepte qu'un
+chemins internes : `internal_return_path` (`front/pages.py`) n'accepte qu'un
 chemin qui commence par `/` et pas par `//` (qui designerait un autre hote),
 sinon il renvoie la page de repli de la route. Toute redirection construite
 a partir d'un parametre de formulaire passe par cette fonction.
@@ -63,12 +72,12 @@ segments sponsorises envoie l'identifiant YouTube de la video (`videoID`,
 aucune autre metadonnee) a `sponsor.ajay.app`, a la fois automatiquement a
 la fin de chaque telechargement reussi et via le bouton manuel
 "Rechercher les segments sponsors" de l'onglet Segments de `/videos/{id}`
-(`app/services/youtube/sponsorblock.py`). C'est la seule source de segments.
+(`back/services/youtube/sponsorblock.py`). C'est la seule source de segments.
 
 Cet appel peut etre evite entierement en decochant toutes les categories
 dans `/settings` (`sponsor_segment_categories`) : `fetch_sponsorblock_segments`
 retourne `[]` sans requete reseau des que la liste de categories est vide
-(`app/services/youtube/sponsorblock.py`).
+(`back/services/youtube/sponsorblock.py`).
 
 SponsorBlock propose une variante de requete par prefixe de hash, plus
 respectueuse de la vie privee (l'API ne voit alors qu'un prefixe partage par

@@ -61,7 +61,7 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
 4. lance `run_playlist_url_import_job` en arriere-plan ;
 5. repond `202 {playlist, job}`, ou redirige vers la playlist (repli).
 
-`run_playlist_url_import_job` (`app/services/jobs/playlists.py`) :
+`run_playlist_url_import_job` (`back/services/jobs/playlists.py`) :
 
 1. passe le job `running` ;
 2. parcourt toutes les pages de `list_playlist_entries` jusqu'a une page
@@ -99,7 +99,7 @@ des abonnements de chaine (`POST /channels/import-csv` puis
 CSV playlist est une inclusion inconditionnelle, il n'y a pas de choix
 utilisateur ligne par ligne a faire avant de lancer l'import.
 
-`run_playlist_csv_import_job` (`app/services/jobs/playlists.py`) :
+`run_playlist_csv_import_job` (`back/services/jobs/playlists.py`) :
 
 1. passe le job `running` ;
 2. pour chaque ligne, appelle `import_video_metadata(..., is_new=False)` puis
@@ -114,8 +114,8 @@ utilisateur ligne par ligne a faire avant de lancer l'import.
 
 ## Scan automatique
 
-Le scheduler APScheduler (`app/services/jobs/scheduler.py`) demarre reellement au
-lifespan FastAPI (`app/main.py:lifespan`, appel a `start_scheduler()` juste
+Le scheduler APScheduler (`back/services/jobs/scheduler.py`) demarre reellement au
+lifespan FastAPI (`back/main.py:lifespan`, appel a `start_scheduler()` juste
 apres `ensure_default_settings`, `stop_scheduler()` a l'arret) et enregistre
 un job cron quotidien a `DAILY_SCAN_HOUR` (3h, timezone
 `Europe/Paris`). Un declenchement a la demande (`POST /api/scan`) et un
@@ -152,12 +152,12 @@ rattrapage au demarrage existent en plus du cron (voir ci-dessous).
 
 `/settings` (carte "Suivi automatique") porte un bouton "Lancer le scan
 maintenant" : `POST /api/scan` (`start_manual_scan` puis `run_manual_scan_job`,
-`app/services/jobs/scheduler.py`) lance `scheduled_scan` en tache de fond,
+`back/services/jobs/scheduler.py`) lance `scheduled_scan` en tache de fond,
 donc avec le meme verrou, la meme garde de stockage et la meme mise a jour de
 "Dernier scan automatique" que le cron.
 
 Le scan (planifie ou manuel) publie ce qu'il fait dans un flux en memoire,
-`app/services/ingest/scan_events.py` : debut (nombre de chaines), chaine en cours,
+`back/services/ingest/scan_events.py` : debut (nombre de chaines), chaine en cours,
 nouveautes trouvees et plafond atteint, chaque fiche importee, chaque echec,
 "rien de nouveau", interruption par un 429, garde de stockage, fin avec le
 total et la duree. Le dernier evenement d'un scan porte `final = true`.
@@ -183,7 +183,7 @@ FastAPI) est ajoute en plus du cron quotidien normal.
 
 `docker compose logs` ne suffit pas : le conteneur est recree a chaque
 deploiement et l'historique disparait. L'application ecrit donc aussi un
-**journal applicatif** (`app/core/logging.py`, `configure_app_logging`, appele au
+**journal applicatif** (`back/core/logging.py`, `configure_app_logging`, appele au
 lifespan) dans `LOG_DIR/app.jsonl`, sur le volume
 `${LOG_HOST_DIR:-./.local/logs}` (voir
 [04 Configuration et deploiement](04-configuration-et-deploiement.md)).
@@ -223,9 +223,9 @@ Garde-fous :
 
 ### Revue des 24 dernieres heures
 
-Le journal des dernieres heures se resume avec `app/core/logs_digest.py` : il conclut « nominal » ou liste les problemes par gravite, avec leur cause probable, en lecture seule.
+Le journal des dernieres heures se resume avec `back/core/logs_digest.py` : il conclut « nominal » ou liste les problemes par gravite, avec leur cause probable, en lecture seule.
 
-Elle s'appuie sur `app/core/logs_digest.py` (bibliotheque standard seule),
+Elle s'appuie sur `back/core/logs_digest.py` (bibliotheque standard seule),
 lance par `python -m app.core.logs_digest --dir <LOG_DIR> --hours 24`. Le
 digest lit `app.jsonl` et les fichiers tournes, garde la fenetre demandee et
 sort un resume Markdown : lignes par niveau, redemarrages (`app.started`),
@@ -242,7 +242,7 @@ Verification : `tests/test_app_logging.py`, `tests/test_logs_digest.py`.
 
 ## Nombre de vues des videos
 
-`run_view_count_backfill_job` (`app/services/jobs/backfills.py`) copie le
+`run_view_count_backfill_job` (`back/services/jobs/backfills.py`) copie le
 `view_count` et la `duration` de `metadata.json` dans `videos.view_count` et
 `videos.duration_seconds` pour les videos qui ont un fichier de metadonnees et
 n'ont pas encore l'une des deux valeurs. Il est lance une fois
@@ -251,7 +251,7 @@ trigger) ; sans video en attente, il ne fait rien.
 
 ## Miniatures des videos
 
-`run_thumbnail_backfill_job` (`app/services/jobs/backfills.py`) cree les
+`run_thumbnail_backfill_job` (`back/services/jobs/backfills.py`) cree les
 copies reduites de vignette (`thumbs/320.jpg`, `thumbs/640.jpg`) des videos
 qui n'en ont pas encore. Il est lance une fois au demarrage par
 `start_scheduler()` (job `backfill_thumbnails`, sans trigger), en arriere-plan
@@ -260,7 +260,7 @@ ffmpeg est journalise et la page sert la vignette d'origine.
 
 ## Profil des chaines
 
-`run_channel_profile_backfill_job` (`app/services/jobs/backfills.py`) recupere
+`run_channel_profile_backfill_job` (`back/services/jobs/backfills.py`) recupere
 le profil de chaque chaine dont `metadata_fetched_at` est `NULL` (et qui a un
 `yt_channel_id`), une a la fois, avec 2 s de pause entre deux chaines pour ne
 pas marteler YouTube. C'est le point d'entree unique : il est lance en
@@ -303,7 +303,7 @@ n'existe pas), un job unique (`purge_media_catchup`) est ajoute.
 Une troisieme tache quotidienne (`auto_notes_sweep`, `scheduled_auto_notes`)
 tourne a 5h `Europe/Paris`, apres le scan de 3h (qui importe les videos
 de la nuit) et la purge de 4h. Elle appelle `run_auto_notes_sweep`
-(`app/services/rag/auto_notes.py`), qui fait deux choses, dans cet ordre :
+(`back/services/rag/auto_notes.py`), qui fait deux choses, dans cet ordre :
 
 1. **collecter** le lot soumis par le passage precedent, s'il y en a un : les
    resultats sont appliques un par un (`transcript.notes.txt`,

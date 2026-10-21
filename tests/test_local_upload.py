@@ -4,20 +4,24 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
-from app.api import imports as imports_api
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.setting import AppSetting
-from app.models.video import Video
-from app.services.ingest import local_upload
-from app.services.ingest.local_upload import LocalUploadError, import_local_media
-from app.web.routes import videos as videos_routes
+from back.api import imports as imports_api
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.setting import AppSetting
+from back.models.video import Video
+from back.services.ingest import local_upload
+from back.services.ingest.local_upload import LocalUploadError, import_local_media
 
 
 def make_session(media_root):
-    engine = create_engine("sqlite+pysqlite:///:memory:")
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine, expire_on_commit=False)()
     db.add(AppSetting(key="media_root", value=str(media_root)))
@@ -94,13 +98,15 @@ def test_api_upload_creates_the_fiche_once_and_refuses_other_files(tmp_path):
     assert refused.value.status_code == 400
 
 
-def test_upload_form_without_js_redirects_to_the_fiche(tmp_path):
-    db = make_session(tmp_path)
-    upload = type("Upload", (), {"filename": "clip.mp4", "file": io.BytesIO(b"data")})()
-    bad = type("Upload", (), {"filename": "clip.pdf", "file": io.BytesIO(b"data")})()
+def test_upload_form_without_js_redirects_to_the_fiche(tmp_path, front_client):
+    client = front_client(make_session(tmp_path))
 
-    response = videos_routes.upload_local_media(upload, db)
-    refused = videos_routes.upload_local_media(bad, db)
+    response = client.post(
+        "/videos/upload", files={"file": ("clip.mp4", b"data")}, follow_redirects=False
+    )
+    refused = client.post(
+        "/videos/upload", files={"file": ("clip.pdf", b"data")}, follow_redirects=False
+    )
 
     assert response.status_code == 303
     assert response.headers["location"].startswith("/videos/")

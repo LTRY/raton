@@ -6,14 +6,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api import videos as videos_api
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.services.youtube import sponsor_segments
+from back.api import videos as videos_api
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.models.video_sponsor_segment import VideoSponsorSegment
+from back.services.youtube import sponsor_segments
 
 
 @pytest.fixture

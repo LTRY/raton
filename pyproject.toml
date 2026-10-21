@@ -56,7 +56,7 @@ extend-immutable-calls = [
 
 [tool.setuptools.packages.find]
 # Flat layout: without this, setuptools refuses to pick between app/, alembic/, docs-site/...
-include = ["app*"]
+include = ["back*", "front*"]
 
 [build-system]
 requires = ["setuptools>=69"]

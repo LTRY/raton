@@ -7,12 +7,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.playlist import Playlist
-from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
-from app.services.videos.detail_view import VideoNotFoundError, open_video_detail
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.playlist import Playlist
+from back.models.video import Video
+from back.models.video_sponsor_segment import VideoSponsorSegment
+from back.services.videos.detail_view import VideoNotFoundError, open_video_detail
 
 
 @pytest.fixture

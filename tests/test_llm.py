@@ -1,8 +1,8 @@
 import anthropic
 import pytest
 
-from app.services.llm import provider as llm
-from app.services.llm.prompts import (
+from back.services.llm import provider as llm
+from back.services.llm.prompts import (
     LIBRARY_CHAT_SYSTEM,
     NOTES_SECTION_NAMES,
     NOTES_SECTIONS,
@@ -17,8 +17,8 @@ from app.services.llm.prompts import (
     split_notes_sections,
     split_summary_result,
 )
-from app.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
-from app.services.videos.documents import load_chat, save_chat
+from back.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
+from back.services.videos.documents import load_chat, save_chat
 
 
 def test_save_and_load_chat_roundtrip(tmp_path):

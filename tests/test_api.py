@@ -9,14 +9,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.playlist import Playlist, PlaylistItem
-from app.models.video import Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.playlist import Playlist, PlaylistItem
+from back.models.video import Video
+from back.models.video_sponsor_segment import VideoSponsorSegment
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -123,7 +123,18 @@ def test_api_stats_counts_the_library(db):
 
     assert payload["channels"] == 1
     assert payload["videos"] == 2
-    assert set(payload) == {"channels", "videos", "used_bytes", "quota_bytes"}
+    assert set(payload) == {
+        "channels",
+        "rated_channels",
+        "videos",
+        "regular_videos",
+        "shorts",
+        "downloaded_media",
+        "transcripts",
+        "used_bytes",
+        "quota_bytes",
+        "storage_percent",
+    }
 
 
 def test_api_jobs_lists_the_hundred_newest_jobs(db):
@@ -207,7 +218,7 @@ def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
     assert payload["is_new"] is True
     assert payload["media_urls"] == {
         "video": None,
-        "audio": f"/videos/{video.id}/audio",
+        "audio": f"/api/videos/{video.id}/audio",
         "thumbnail": None,
         "subtitles": None,
     }

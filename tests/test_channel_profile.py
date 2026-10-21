@@ -2,21 +2,21 @@ import json
 from datetime import UTC, datetime
 
 from fastapi import BackgroundTasks
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.setting import AppSetting
-from app.services.channels import manage as channel_manage
-from app.services.channels import profile as channel_profile
-from app.services.jobs import backfills
-from app.services.jobs import scheduler as scheduler_module
-from app.services.youtube import channel_info
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.setting import AppSetting
+from back.services.channels import manage as channel_manage
+from back.services.channels import profile as channel_profile
+from back.services.jobs import backfills
+from back.services.jobs import scheduler as scheduler_module
+from back.services.youtube import channel_info
+from tests.site import site_client
 
 
 def make_session():
@@ -400,7 +400,7 @@ def test_start_scheduler_queues_a_profile_backfill_at_startup(monkeypatch, tmp_p
 
 
 def test_toolbox_remembers_channels_it_added():
-    from app.services.library_chat.tools import LibraryChatToolbox
+    from back.services.library_chat.tools import LibraryChatToolbox
 
     db = make_session()
     toolbox = LibraryChatToolbox(db)
@@ -431,7 +431,7 @@ def make_client(tmp_path):
     db.add(channel)
     db.commit()
     app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app), db, channel
+    return site_client(), db, channel
 
 
 def test_avatar_and_banner_routes_serve_the_stored_files(tmp_path):
@@ -444,8 +444,8 @@ def test_avatar_and_banner_routes_serve_the_stored_files(tmp_path):
     channel.banner_path = "_channels/UC1/banner.png"
     db.commit()
     try:
-        avatar = client.get(f"/channels/{channel.id}/avatar")
-        banner = client.get(f"/channels/{channel.id}/banner")
+        avatar = client.get(f"/api/channels/{channel.id}/avatar")
+        banner = client.get(f"/api/channels/{channel.id}/banner")
     finally:
         app.dependency_overrides.clear()
 
@@ -458,7 +458,7 @@ def test_images_are_written_and_served_through_the_dev_pc_prefix_translation(mon
     from pathlib import Path
     from types import SimpleNamespace
 
-    from app.core import config
+    from back.core import config
 
     local = tmp_path / "local-mount"
     local.mkdir()
@@ -481,7 +481,7 @@ def test_images_are_written_and_served_through_the_dev_pc_prefix_translation(mon
     )
     try:
         channel_profile.refresh_channel_profile(db, channel)
-        response = client.get(f"/channels/{channel.id}/avatar")
+        response = client.get(f"/api/channels/{channel.id}/avatar")
     finally:
         app.dependency_overrides.clear()
 
@@ -496,13 +496,13 @@ def test_image_routes_404_when_missing_or_outside_the_channels_folder(tmp_path):
     client, db, channel = make_client(tmp_path)
     (tmp_path / "secret.txt").write_text("secret")
     try:
-        assert client.get(f"/channels/{channel.id}/avatar").status_code == 404
+        assert client.get(f"/api/channels/{channel.id}/avatar").status_code == 404
         channel.avatar_path = "../secret.txt"
         channel.banner_path = "secret.txt"
         db.commit()
-        assert client.get(f"/channels/{channel.id}/avatar").status_code == 404
-        assert client.get(f"/channels/{channel.id}/banner").status_code == 404
-        assert client.get("/channels/999/avatar").status_code == 404
+        assert client.get(f"/api/channels/{channel.id}/avatar").status_code == 404
+        assert client.get(f"/api/channels/{channel.id}/banner").status_code == 404
+        assert client.get("/api/channels/999/avatar").status_code == 404
     finally:
         app.dependency_overrides.clear()
 
@@ -546,20 +546,20 @@ def test_deleting_a_channel_removes_its_profile_folder(tmp_path):
 
 
 def test_adding_a_channel_queues_the_profile_backfill(tmp_path, monkeypatch):
-    from app.web.routes import channels as channels_routes
-
     client, db, channel = make_client(tmp_path)
-    app.dependency_overrides.clear()
     monkeypatch.setattr(
         channel_manage,
         "extract_channel_info",
         lambda url: {"url": "https://example.test/new", "name": "Nouvelle", "yt_channel_id": "UC2"},
     )
-    tasks = BackgroundTasks()
+    started = []
+    monkeypatch.setattr(
+        "back.api.channels.run_channel_profile_backfill_job", lambda: started.append(True)
+    )
 
-    channels_routes.add_channel("@nouvelle", db, background_tasks=tasks)
+    client.post("/channels", data={"url": "@nouvelle"}, follow_redirects=False)
 
-    assert [task.func.__name__ for task in tasks.tasks] == ["run_channel_profile_backfill_job"]
+    assert started == [True]
 
 
 def give_profile(db, channel, description="High-intensity <b>tutorials</b>"):
@@ -579,8 +579,8 @@ def test_channels_list_shows_the_banner_and_avatar_but_not_the_profile_text(tmp_
     finally:
         app.dependency_overrides.clear()
 
-    assert f'src="/channels/{channel.id}/avatar?v=' in html
-    assert f'src="/channels/{channel.id}/banner?v=' in html
+    assert f'src="/api/channels/{channel.id}/avatar?v=' in html
+    assert f'src="/api/channels/{channel.id}/banner?v=' in html
     assert "High-intensity" not in html
     assert ">angular<" not in html
     assert "refresh-profile" not in html
@@ -594,8 +594,8 @@ def test_channel_page_shows_banner_avatar_description_keywords_and_refresh(tmp_p
     finally:
         app.dependency_overrides.clear()
 
-    assert f'src="/channels/{channel.id}/avatar?v=' in html
-    assert f'src="/channels/{channel.id}/banner?v=' in html
+    assert f'src="/api/channels/{channel.id}/avatar?v=' in html
+    assert f'src="/api/channels/{channel.id}/banner?v=' in html
     assert "High-intensity &lt;b&gt;tutorials&lt;/b&gt;" in html
     assert ">angular<" in html and ">firebase<" in html
     assert f'action="/channels/{channel.id}/refresh-profile"' in html

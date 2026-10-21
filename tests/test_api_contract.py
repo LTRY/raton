@@ -11,15 +11,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import api
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.video import Video
+from back import api
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.video import Video
+from tests.site import site_client
 
 ROUTES = [route for module in api.MODULES for route in module.router.routes]
-# Helpers of app/api/lookups.py: each answers 404 when the record is missing.
+# Helpers of back/api/lookups.py: each answers 404 when the record is missing.
 LOOKUPS_404 = {"fiche", "library_channel", "library_playlist", "playlist_item"}
+# Helpers of back/api/media.py that raise for the route calling them.
+HELPER_CODES = {
+    "channel_image_response": {404},
+    "media_stream_response": {404, 416},
+    "media_head_response": {404, 416},
+}
 
 
 def raised_codes(endpoint) -> set[int]:
@@ -38,6 +45,8 @@ def raised_codes(endpoint) -> set[int]:
             }
         elif name in LOOKUPS_404:
             codes.add(404)
+        elif name in HELPER_CODES:
+            codes |= HELPER_CODES[name]
     return codes
 
 
@@ -74,7 +83,8 @@ def test_every_route_is_typed_and_every_error_uses_the_api_format():
             success = [code for code in operation["responses"] if code.startswith("2")]
             assert success, f"{method} {path}"
             content = operation["responses"][success[0]].get("content", {})
-            if success[0] != "204" and "text/csv" not in str(content):
+            # A file (CSV export, image, stream) has no JSON schema.
+            if success[0] != "204" and "application/json" in content:
                 schema = content["application/json"]["schema"]
                 assert "$ref" in str(schema) or "items" in schema, f"{method} {path}: untyped"
             for code, response in operation["responses"].items():
@@ -96,22 +106,23 @@ def test_a_validation_error_answers_a_french_detail_and_its_fields(client):
 
 
 def test_html_routes_keep_fastapi_validation_answer(client):
-    response = client.post("/videos/1/rating", data={})
+    # `client` set the back's `get_db`: the front serves the form route.
+    response = site_client().post("/videos/1/rating", data={})
 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)
 
 
 def test_html_routes_redirect_and_leave_json_to_the_api():
-    """The page scripts call `/api`; a form route only serves the no-JS fallback. The iOS
-    share shortcut is the one HTML route answering JSON, it cannot follow a redirect."""
-    routes_dir = Path(__file__).resolve().parents[1] / "app" / "web" / "routes"
+    """The page scripts call `/api`; a form route of the front only serves the no-JS fallback.
+    The iOS share shortcut is the one HTML route answering JSON, it cannot follow a redirect."""
+    routes_dir = Path(__file__).resolve().parents[1] / "front" / "routes"
     answering_json = {
         path.name
         for path in routes_dir.glob("*.py")
         if "JSONResponse(" in path.read_text(encoding="utf-8")
     }
-    scripts = Path(__file__).resolve().parents[1] / "app"
+    scripts = Path(__file__).resolve().parents[1] / "front"
     fetch_header = [
         str(path.relative_to(scripts))
         for path in [*scripts.glob("static/js/*.js"), *scripts.glob("templates/**/*.html")]

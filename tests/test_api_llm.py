@@ -12,12 +12,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api import llm as llm_api
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.llm_job import LlmJob
-from app.models.video import Video
+from back.api import llm as llm_api
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.llm_job import LlmJob
+from back.models.video import Video
 
 # Same shape as tests/test_videos.py: the two level-1 headers `split_generation_result` cuts on.
 GENERATION_RESULT_TEXT = (

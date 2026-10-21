@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.core.logging import (
+from back.core.logging import (
     LOG_FILE_NAME,
     configure_app_logging,
     log_event,
@@ -16,7 +16,7 @@ from app.core.logging import (
     redact,
     shutdown_app_logging,
 )
-from app.web.request_timing import RequestTimingMiddleware
+from back.core.request_timing import RequestTimingMiddleware
 
 
 @pytest.fixture
@@ -34,14 +34,14 @@ def read_lines(log_dir):
 
 
 def test_module_loggers_reach_the_json_file(log_dir):
-    # Most modules use getLogger(__name__), i.e. the "app." tree, not "raton".
-    logging.getLogger("app.services.ingest.scanner").info("scan started")
+    # Most modules use getLogger(__name__), i.e. the "back." tree, not "raton".
+    logging.getLogger("back.services.ingest.scanner").info("scan started")
     log_event(logging.getLogger("raton.llm"), "llm.call", model="m", tokens=12)
 
     first, second = read_lines(log_dir)
     assert first["msg"] == "scan started"
     assert first["level"] == "INFO"
-    assert first["logger"] == "app.services.ingest.scanner"
+    assert first["logger"] == "back.services.ingest.scanner"
     assert first["ts"][:4].isdigit()
     assert second["event"] == "llm.call"
     assert second["tokens"] == 12
@@ -51,7 +51,7 @@ def test_exception_is_logged_with_its_traceback(log_dir):
     try:
         raise ValueError("boom")
     except ValueError:
-        logging.getLogger("app.x").exception("failed")
+        logging.getLogger("back.x").exception("failed")
 
     (line,) = read_lines(log_dir)
     assert line["level"] == "ERROR"
@@ -59,7 +59,7 @@ def test_exception_is_logged_with_its_traceback(log_dir):
 
 
 def test_secrets_are_masked_in_message_fields_and_traceback(log_dir):
-    logger = logging.getLogger("app.x")
+    logger = logging.getLogger("back.x")
     logger.info("calling with key sk-ant-api03-SECRET123")
     log_event(logger, "ext.call", header="Authorization: Bearer abc.def-ghi")
     try:
@@ -82,7 +82,7 @@ def test_unwritable_log_dir_does_not_stop_the_app(tmp_path):
     blocker.write_text("x")
     try:
         configure_app_logging(blocker / "logs")  # a path under a regular file cannot be created
-        logging.getLogger("app.x").info("still works")
+        logging.getLogger("back.x").info("still works")
     finally:
         shutdown_app_logging()
 
@@ -122,7 +122,7 @@ def test_logged_job_records_a_crash_and_reraises(log_dir):
 
 
 def test_log_external_records_success_and_failure(log_dir):
-    logger = logging.getLogger("app.services.youtube.yt")
+    logger = logging.getLogger("back.services.youtube.yt")
     with log_external(logger, "yt-dlp", "extract", url="u"):
         pass
     with pytest.raises(OSError), log_external(logger, "yt-dlp", "extract", url="u"):
@@ -140,7 +140,7 @@ def build_app() -> FastAPI:
 
     @app.get("/ok")
     def ok():
-        logging.getLogger("app.x").info("inside handler")
+        logging.getLogger("back.x").info("inside handler")
         return {"ok": True}
 
     @app.get("/crash")

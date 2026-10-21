@@ -1,11 +1,11 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.video import TranscriptStatus, Video
-from app.models.video_sponsor_segment import VideoSponsorSegment
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.video import TranscriptStatus, Video
+from back.models.video_sponsor_segment import VideoSponsorSegment
 
 
 def make_session():

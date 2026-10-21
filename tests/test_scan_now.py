@@ -3,9 +3,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from app.services.ingest import scan_events, scanner
-from app.services.jobs import scheduler
+from back.main import app
+from back.services.ingest import scan_events, scanner
+from back.services.jobs import scheduler
 
 
 @pytest.fixture
@@ -15,7 +15,7 @@ def client():
 
 def test_scan_now_starts_the_scan_in_the_background(client, monkeypatch):
     started = []
-    monkeypatch.setattr("app.api.scan.run_manual_scan_job", lambda: started.append(True))
+    monkeypatch.setattr("back.api.scan.run_manual_scan_job", lambda: started.append(True))
 
     response = client.post("/api/scan")
 

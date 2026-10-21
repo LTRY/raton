@@ -65,6 +65,11 @@
 Python 3.14, FastAPI, Jinja2, PostgreSQL 16 + pgvector,
 `yt-dlp` + `ffmpeg`, APScheduler, API Anthropic et Voyage, Docker Compose
 
+Deux applications : `back/` (l'API JSON `/api`, la DB, les médias, les jobs)
+et `front/` (les pages HTML), qui n'appelle que l'API du back. Un autre front
+(application mobile, serveur MCP...) peut donc se brancher sur la même API ;
+son schéma est servi par le back (`/docs`, port 8001 avec `make demo`).
+
 
 ## [04 Configuration et déploiement](docs/spec/04-configuration-et-deploiement.md)
 

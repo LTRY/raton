@@ -4,11 +4,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import Settings
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.services.jobs import scheduler as scheduler_module
-from app.services.jobs.scheduler import (
+from back.core.config import Settings
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.services.jobs import scheduler as scheduler_module
+from back.services.jobs.scheduler import (
     get_last_auto_scan_info,
     get_last_media_purge_at,
     record_media_purge,

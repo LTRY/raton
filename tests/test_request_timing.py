@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
-from app.web import request_timing
-from app.web.request_timing import RequestTimingMiddleware, install_sql_timing
+from back.core import request_timing
+from back.core.request_timing import RequestTimingMiddleware, install_sql_timing
 
 engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
 install_sql_timing(engine)

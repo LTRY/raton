@@ -1,13 +1,13 @@
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.video import Video
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.video import Video
+from tests.site import site_client
 
 
 def make_client():
@@ -34,7 +34,7 @@ def make_client():
     )
     db.commit()
     app.dependency_overrides[get_db] = lambda: db
-    return TestClient(app), db, channel
+    return site_client(), db, channel
 
 
 def test_channel_page_shows_both_bells_and_a_delete_warning():

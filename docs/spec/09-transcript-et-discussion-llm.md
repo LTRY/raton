@@ -166,7 +166,7 @@ en isolation.
   de durée ni de coût : la sortie combinée n'est pas corrélée à la longueur
   d'entrée) — planification asynchrone par `BackgroundTasks` ;
 - **un seul appel LLM produit les deux documents**, pour n'envoyer le
-  transcript qu'une seule fois (`app/services/llm/prompts.py:build_generation_prompt`) :
+  transcript qu'une seule fois (`back/services/llm/prompts.py:build_generation_prompt`) :
   le prompt combine les instructions des notes et du résumé (les anciens
   prompts séparés, inutilisés, ont été supprimés) sous deux titres Markdown de **niveau 1**
   exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
@@ -202,7 +202,7 @@ en isolation.
   - Résumé : `## Résumé court` (exactement 3 lignes, sujet + conclusion
     principale), `## Questions suggérées` (3 à 5 questions concrètes en
     puces, pas génériques) ;
-- `app/services/llm/prompts.py:split_generation_result(text)` découpe
+- `back/services/llm/prompts.py:split_generation_result(text)` découpe
   d'abord la réponse sur les deux titres de niveau 1, puis délègue chaque
   bloc au split_* à usage unique correspondant (`split_notes_sections` en
   interne via l'indexation RAG ci-dessous, `split_summary_result`) ; un titre de niveau 1 absent (modèle
@@ -222,7 +222,7 @@ en isolation.
 des notes. Un lot nocturne (`auto_notes`, voir
 [13 Jobs, logs et planification](13-jobs-logs-planification.md)) produit, pour
 les vidéos qui n'en ont pas, **les notes structurées et le résumé court
-seulement** (`app/services/llm/prompts.py:build_auto_notes_prompt`, mêmes instructions
+seulement** (`back/services/llm/prompts.py:build_auto_notes_prompt`, mêmes instructions
 de notes et de résumé court que ci-dessus, sans questions) et écrit `transcript.notes.txt` et `transcript.summary_short.txt`
 (jamais écrasé s'il existe déjà : un résumé généré à la main prévaut). Le
 résultat est appliqué par le service lui-même, pas par le polling de cette
@@ -232,12 +232,12 @@ tout, y compris ces deux fichiers.
 
 **Indexation RAG cross-video** : dès que le job `generate` est appliqué, une
 tâche `BackgroundTasks` découpe le seul bloc `# Notes` (pas le texte combiné
-entier) en chunks par section (`app/services/llm/prompts.py:split_notes_sections`,
+entier) en chunks par section (`back/services/llm/prompts.py:split_notes_sections`,
 sections vides/placeholder ignorées), les embed via l'API Voyage
-(`app/services/rag/embeddings.py`, `EMBEDDING_MODEL`, 1024 dimensions,
+(`back/services/rag/embeddings.py`, `EMBEDDING_MODEL`, 1024 dimensions,
 `VOYAGE_API_KEY`), chaque section précédée du titre de la vidéo et de sa
 chaîne, et remplace les lignes existantes de `video_note_chunks`
-pour cette vidéo (`app/services/rag/indexing.py:index_video_notes`) ; le **résumé court**
+pour cette vidéo (`back/services/rag/indexing.py:index_video_notes`) ; le **résumé court**
 (`transcript.summary_short.txt`) y ajoute un chunk de section « Résumé », qui
 donne le fil de la vidéo là où les notes donnent des faits isolés.
 `backfill_summary_chunks` ajoute ce chunk aux vidéos indexées avant qu'il
@@ -258,15 +258,15 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
 
 La mise en file (lecture du transcript, prompt, question vide refusee) et
 la resolution d'un job (en attente, echec, ecriture du resultat au premier
-poll) sont dans `app/services/jobs/llm_requests.py`.
+poll) sont dans `back/services/jobs/llm_requests.py`.
 
 - s'applique a tous les jobs `llm_jobs`, quel que soit le fournisseur
   (traites en tache de fond dans le process web via
-  `app/services/jobs/llm_jobs.py:run_llm_job`) ;
+  `back/services/jobs/llm_jobs.py:run_llm_job`) ;
 - tant que le job est `queued`/`running`, repond `status: "pending"` ;
   pour un job `generate` dont la reponse a commence a arriver, la reponse
   porte en plus `partial_short_summary` : le résumé court tel qu'ecrit
-  jusque-la (`app/services/llm/prompts.py:partial_generation_summary`). Cette valeur ne fait
+  jusque-la (`back/services/llm/prompts.py:partial_generation_summary`). Cette valeur ne fait
   que s'allonger d'un poll au suivant (un titre Markdown en cours d'ecriture
   n'y apparait jamais), ce qui permet au client de n'ajouter que la suite ;
   `run_llm_job` enregistre pour cela le texte recu dans `llm_jobs.result`
@@ -287,18 +287,18 @@ poll) sont dans `app/services/jobs/llm_requests.py`.
 
 ## Cout reel des jobs LLM
 
-`app/services/jobs/llm_jobs.py:run_llm_job` enregistre le cout **reel** sur chaque `LlmJob` des
+`back/services/jobs/llm_jobs.py:run_llm_job` enregistre le cout **reel** sur chaque `LlmJob` des
 que la completion reussit, a partir de l'usage exact renvoye par le
 fournisseur lui-meme (`response.usage` du SDK Anthropic,
-`app/services/llm/provider.py:CompletionResult`) :
+`back/services/llm/provider.py:CompletionResult`) :
 
 - `model`, `input_tokens`, `output_tokens` : tels que rapportes par l'API,
   peu importe le nombre reel de caracteres du prompt/de la reponse ;
   `input_tokens` = tout ce qui est envoye (tokens non caches + lectures et
   ecritures de cache), `output_tokens` inclut les tokens de reflexion
   (adaptive thinking), factures comme de la sortie ;
-- `cost_usd` : somme **appel par appel** (`app/services/llm/provider.py:UsageTally`,
-  `app/services/llm/usage.py:compute_call_cost_usd`) contre le tarif du modele
+- `cost_usd` : somme **appel par appel** (`back/services/llm/provider.py:UsageTally`,
+  `back/services/llm/usage.py:compute_call_cost_usd`) contre le tarif du modele
   **effectivement utilise** pour ce job (pas le reglage courant — evite que
   changer de modele ne fausse retroactivement le cout des anciens jobs).
   Appel par appel parce que le tarif de Haiku 5.5 depend de la taille du
@@ -309,18 +309,18 @@ fournisseur lui-meme (`response.usage` du SDK Anthropic,
   modele absent de la table de tarifs (`ANTHROPIC_MODEL_PRICING`) ;
 - un job `queued`/`running` n'a jamais ces champs remplis. Un job `failed` ne
   les a que si l'API a repondu mais que la reponse est inutilisable (tronquee
-  par `max_tokens`, ou vide : `app/services/llm/provider.py:CompletionFailed`) — ces
+  par `max_tokens`, ou vide : `back/services/llm/provider.py:CompletionFailed`) — ces
   tokens sont factures meme si le job echoue, donc comptes. Un echec reseau
   ou API en cours de route n'est pas reconstitue.
 
 Le plafond de tokens de sortie (`max_tokens`) depend du modele
-(`app/services/llm/usage.py:max_output_tokens` : 64 000 pour Haiku 4.5 qui
+(`back/services/llm/usage.py:max_output_tokens` : 64 000 pour Haiku 4.5 qui
 refuse davantage, 128 000 pour les autres modeles connus, 64 000 pour un
 modele inconnu). Avec Haiku 5.5, la reflexion adaptative (effort `medium` par
 defaut) consomme une partie de ce plafond et du cout de sortie.
 
 `/settings` (section "Couts LLM") affiche le cumul par type de job puis par
-modele (`app/services/llm/usage.py:llm_usage_summary`) : nombre de jobs,
+modele (`back/services/llm/usage.py:llm_usage_summary`) : nombre de jobs,
 tokens entree/sortie, cout, plus un total general et un compte des jobs "non
 mesures" (en attente, echoues avant toute reponse, ou sans tarif connu). Ce total ne couvre que
 l'activite depuis l'ajout de ce suivi (une ancienne migration,
@@ -360,7 +360,7 @@ JavaScript)
   conservee a part pour etre ajoutee a l'historique une fois la reponse
   obtenue) et repond immediatement `202 {job_id, status, status_url}`, sans
   jamais bloquer la requete ;
-- planifie `app/services/jobs/llm_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
+- planifie `back/services/jobs/llm_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
   jobs LLM asynchrones ci-dessus pour la resolution.
 
 `DELETE /api/videos/{id}/chat` supprime `transcript.chat.json` si present
@@ -379,13 +379,13 @@ une chaine YouTube a la bibliotheque).
 
 ### Outils
 
-Definis dans `app/services/library_chat/schema.py` (`LIBRARY_CHAT_TOOLS`),
-executes par `LibraryChatToolbox` (`app/services/library_chat/tools.py`) :
+Definis dans `back/services/library_chat/schema.py` (`LIBRARY_CHAT_TOOLS`),
+executes par `LibraryChatToolbox` (`back/services/library_chat/tools.py`) :
 
 - `chercher_chaines(requete)` : recherche textuelle par mots, insensible a la
   casse et aux accents, sur le nom, les labels, l'URL et l'identifiant YouTube
   des chaines — la meme que le champ de recherche de `/channels`
-  (`app/services/common/search.py:channel_search_rank`). Sans requete, liste toutes
+  (`back/services/common/search.py:channel_search_rank`). Sans requete, liste toutes
   les chaines (60 au plus), ce qui permet au modele de retenir lui-meme celles
   qui correspondent a un theme. Chaque chaine est renvoyee avec ses labels, sa
   note, son nombre de videos et l'etat de sa cloche ;
@@ -396,7 +396,7 @@ executes par `LibraryChatToolbox` (`app/services/library_chat/tools.py`) :
   `chaine_id` seul, renvoie les videos les plus recentes de la chaine. 20
   resultats au plus ;
 - `chercher_dans_les_notes(requete)` : recherche semantique (RAG).
-  `app/services/rag/retrieval.py:retrieve_relevant_chunks` embed la requete
+  `back/services/rag/retrieval.py:retrieve_relevant_chunks` embed la requete
   (API Voyage, `input_type="query"` face aux vecteurs `document` de
   l'indexation ; sans cle ou en cas de panne, l'outil renvoie l'erreur au
   modele, qui l'explique, sans faire echouer le job), prend les 50
@@ -414,7 +414,7 @@ executes par `LibraryChatToolbox` (`app/services/library_chat/tools.py`) :
 - `consulter_historique(jours, requete)` : historique de lecture (les
   `download_jobs` `played`, voir [11 Interface HTML](11-interface-html.md)),
   du plus recent au plus ancien, **une ligne par video** comme la page
-  d'historique (`app/services/videos/playback.py:dashboard_media_activity_logs`). `jours`
+  d'historique (`back/services/videos/playback.py:dashboard_media_activity_logs`). `jours`
   (30 par defaut) borne la fenetre, `requete` filtre sur le titre ou la
   chaine. Chaque ligne donne la reference de la video et de sa chaine, la date
   et l'heure de lecture, la position (ou « terminee »), la duree et le temps
@@ -422,7 +422,7 @@ executes par `LibraryChatToolbox` (`app/services/library_chat/tools.py`) :
   enregistre, sans reference. 30 resultats au plus ; 500 lectures lues au
   plus avant regroupement ;
 - `chercher_sur_youtube(requete)` : cherche sur YouTube des chaines par nom
-  (`app/services/youtube/channel_info.py:search_channels`, voir
+  (`back/services/youtube/channel_info.py:search_channels`, voir
   [07 YouTube et telechargements](07-youtube-et-telechargements.md)). Chaque
   candidate est renvoyee avec un identifiant `[youtube:ID]`, son handle, son
   nombre d'abonnes et le debut de sa description ; celles deja dans la
@@ -454,7 +454,7 @@ ou essayer autrement.
 
 Chaque chaine ou video renvoyee par un outil porte une reference
 `[chaine:ID]` ou `[video:ID]`. Les consignes
-(`app/services/llm/prompts.py:LIBRARY_CHAT_SYSTEM`, envoyées en `system`) demandent au modele d'ecrire,
+(`back/services/llm/prompts.py:LIBRARY_CHAT_SYSTEM`, envoyées en `system`) demandent au modele d'ecrire,
 a l'endroit ou il en parle, le nom de chaque chaine ou video qu'il retient
 sous la forme `[[chaine:ID|Nom]]` / `[[video:ID|Titre]]` : le texte affiche
 est le nom, la syntaxe disparait a l'affichage (voir
@@ -504,7 +504,7 @@ tours qui alternent et commencent par `user` : un message qui rompt
 l'alternance (question restee sans reponse) est ignore. `llm_jobs.prompt`
 contient le `Prompt` en JSON (voir [05](05-modele-de-donnees.md)).
 
-Execution (`app/services/jobs/llm_jobs.py:run_llm_job`) : pour
+Execution (`back/services/jobs/llm_jobs.py:run_llm_job`) : pour
 `kind="library_chat"`, le job passe par
 `AnthropicProvider.complete_with_tools(messages, ..., system=...)`, qui boucle tant que le modele
 demande un outil. Au-dela de `MAX_TOOL_TURNS` (4) tours d'outils, l'appel
@@ -544,15 +544,15 @@ pas de portee par utilisateur).
 
 Le fournisseur est choisi uniquement par la variable d'environnement
 `LLM_PROVIDER` (voir [04](04-configuration-et-deploiement.md)), lue par
-`app/services/llm/provider.py:get_llm_provider` et
-`app/services/common/settings.py:get_llm_provider_name`. `anthropic` est la seule
-valeur acceptee : `AnthropicProvider` (`app/services/llm/provider.py`) est appele par
-`app/services/jobs/llm_jobs.py:run_llm_job`, en tache de fond dans le process
+`back/services/llm/provider.py:get_llm_provider` et
+`back/services/common/settings.py:get_llm_provider_name`. `anthropic` est la seule
+valeur acceptee : `AnthropicProvider` (`back/services/llm/provider.py`) est appele par
+`back/services/jobs/llm_jobs.py:run_llm_job`, en tache de fond dans le process
 web juste apres la reponse `202` de la demande, jamais de facon
 synchrone dans le handler de la requete.
 
 Le client Anthropic est cree avec
-  `max_retries=6` (`app/services/llm/provider.py:LLM_MAX_RETRIES`, contre 2 par defaut
+  `max_retries=6` (`back/services/llm/provider.py:LLM_MAX_RETRIES`, contre 2 par defaut
   dans le SDK) : ces jobs tournent toujours en tache de fond, donc pas de cout
   UX a retenter plus longtemps sur des erreurs transitoires (429, 5xx, y
   compris `overloaded_error` — HTTP 529, surcharge temporaire cote Anthropic).
@@ -562,7 +562,7 @@ jusqu'a resolution (voir plus haut) — la reponse n'est jamais immediate, quel
 que soit le fournisseur.
 
 Pendant l'attente, le message de statut affiche quel assistant traite la
-demande (`app/services/common/settings.py:get_llm_provider_display_label`, passe au
+demande (`back/services/common/settings.py:get_llm_provider_display_label`, passe au
 template via `llm_provider_label`) : `Claude API (claude-haiku-4-5)`
 selon le modele configure (`ANTHROPIC_MODEL`).
 
@@ -571,9 +571,9 @@ le depot.
 
 ### Trace des appels dans les logs du conteneur
 
-`app/services/llm/provider.py` ecrit chaque appel a l'API sur le logger
+`back/services/llm/provider.py` ecrit chaque appel a l'API sur le logger
 `raton.llm`, envoye sur stderr par
-`app/core/logging.py:configure_app_logging` (appele au demarrage) — donc
+`back/core/logging.py:configure_app_logging` (appele au demarrage) — donc
 visible avec `make logs`. Ces lignes ne vont pas dans la page `/logs`, qui
 n'affiche que `download_jobs`.
 

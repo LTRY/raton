@@ -9,13 +9,13 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.services.channels.listing import CHANNEL_PAGE_SIZE
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.services.channels.listing import CHANNEL_PAGE_SIZE
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 RATING_REFUSED = {"detail": "La note doit être comprise entre 0 et 5."}
@@ -149,7 +149,7 @@ def test_detail_gives_the_profile_and_its_image_routes(client, db):
     assert payload["description"] == "Une chaîne."
     assert payload["keywords"] == ["histoire", "cartes"]
     assert payload["categories"] == ["histoire"]
-    assert payload["avatar_url"] == f"/channels/{channel.id}/avatar"
+    assert payload["avatar_url"] == f"/api/channels/{channel.id}/avatar"
     assert payload["banner_url"] is None
     assert payload["video_count"] == 1
 

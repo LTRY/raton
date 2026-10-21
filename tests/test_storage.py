@@ -6,13 +6,13 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.setting import AppSetting
-from app.models.video import TranscriptStatus, Video
-from app.services.ingest import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.setting import AppSetting
+from back.models.video import TranscriptStatus, Video
+from back.services.ingest import (
     manual_download,
     metadata_import,
     scan_events,
@@ -20,12 +20,12 @@ from app.services.ingest import (
     throttle,
     transcript_retry,
 )
-from app.services.ingest.identity import video_already_downloaded
-from app.services.ingest.scanner import run_scan, scan_channel
-from app.services.youtube import downloads as youtube_downloads
-from app.services.youtube import sponsor_segments
-from app.services.youtube.downloads import build_video_folder
-from app.services.youtube.yt import parse_yt_date
+from back.services.ingest.identity import video_already_downloaded
+from back.services.ingest.scanner import run_scan, scan_channel
+from back.services.youtube import downloads as youtube_downloads
+from back.services.youtube import sponsor_segments
+from back.services.youtube.downloads import build_video_folder
+from back.services.youtube.yt import parse_yt_date
 
 
 def make_session():
@@ -117,7 +117,7 @@ def test_manual_download_stages_files_before_final_folder(monkeypatch, tmp_path)
 
 
 def test_manual_download_fetches_sponsorblock_segments_automatically(monkeypatch, tmp_path):
-    from app.models.video_sponsor_segment import VideoSponsorSegment
+    from back.models.video_sponsor_segment import VideoSponsorSegment
 
     db = make_session()
     db.add(AppSetting(key="media_root", value=str(tmp_path)))
@@ -201,7 +201,7 @@ def test_manual_download_ignores_sponsorblock_failures(monkeypatch, tmp_path):
 def test_manual_download_rolls_back_session_when_replace_sponsor_segments_fails(
     monkeypatch, tmp_path
 ):
-    from app.models.video_sponsor_segment import VideoSponsorSegment
+    from back.models.video_sponsor_segment import VideoSponsorSegment
 
     db = make_session()
     db.add(AppSetting(key="media_root", value=str(tmp_path)))
@@ -942,7 +942,7 @@ def test_retry_transcript_download_replaces_differently_named_stale_subtitle(mon
 
 
 def test_manual_redownload_resets_watched_at_so_purge_keeps_new_file(monkeypatch, tmp_path):
-    from app.services.media.media_storage import purge_watched_media
+    from back.services.media.media_storage import purge_watched_media
 
     db = make_session()
     folder = tmp_path / "Manual channel" / "2026-06-01 - Manual video"
@@ -1383,7 +1383,7 @@ def _missing_video_with_metadata(db, channel, tmp_path, yt_video_id, metadata):
 def test_backfill_original_transcripts_only_retries_videos_that_have_an_original_track(
     monkeypatch, tmp_path
 ):
-    from app.services.ingest import transcript_backfill
+    from back.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")
@@ -1416,7 +1416,7 @@ def test_backfill_original_transcripts_only_retries_videos_that_have_an_original
 def test_backfill_original_transcripts_stops_after_repeated_failures_and_resumes_later(
     monkeypatch, tmp_path
 ):
-    from app.services.ingest import transcript_backfill
+    from back.services.ingest import transcript_backfill
 
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Chaîne")

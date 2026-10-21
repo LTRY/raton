@@ -3,21 +3,21 @@
 import json
 import random
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
-from app.services.common.settings import get_setting, set_setting
-from app.services.raton.picker import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from back.services.common.settings import get_setting, set_setting
+from back.services.raton.picker import (
     active_scenarios,
     all_variations,
     art_files,
@@ -29,8 +29,7 @@ from app.services.raton.picker import (
     pick_next,
     stage_lines,
 )
-from app.services.raton.scenarios import (
-    ART_DIR,
+from back.services.raton.scenarios import (
     CATALOGUE,
     CONDITIONS,
     DEFAULT_SCENARIO,
@@ -40,7 +39,13 @@ from app.services.raton.scenarios import (
     STAGE_GREETING,
     RatonContext,
 )
-from app.services.raton.visits import RATON_SHOWN_KEY, home_context, record_visit, screen_time_today
+from back.services.raton.visits import (
+    RATON_SHOWN_KEY,
+    home_context,
+    record_visit,
+    screen_time_today,
+)
+from tests.site import site_client
 
 NOON = datetime(2026, 10, 10, 15, 0).astimezone()
 
@@ -110,6 +115,9 @@ def test_every_active_scenario_has_a_stage_and_parked_ones_do_not_need_one():
 def test_every_scenario_has_at_least_one_line():
     for scenario in [*CATALOGUE, DEFAULT_SCENARIO]:
         assert scenario.lines, scenario.id
+
+
+ART_DIR = Path(__file__).resolve().parents[1] / "front" / "static" / "img" / "raton"
 
 
 def test_declared_art_files_exist():
@@ -291,7 +299,7 @@ def test_home_page_is_only_raton_and_the_chat(db):
         )
     )
     db.commit()
-    response = TestClient(app).get("/")
+    response = site_client().get("/")
     assert response.status_code == 200
     assert 'id="dashboard-chat"' in response.text
     assert "Une vidéo suivie" not in response.text
@@ -370,7 +378,7 @@ def test_new_count_ignores_channels_without_a_bell(db):
             )
         )
     db.commit()
-    from app.services.raton.visits import build_context
+    from back.services.raton.visits import build_context
 
     assert build_context(db, NOON).new_count == 1
 
@@ -391,7 +399,7 @@ def test_variations_lists_every_active_line():
 
 
 def test_variations_page_shows_everything_without_touching_the_visit(db):
-    client = TestClient(app)
+    client = site_client()
     page = client.get("/raton/variations")
     assert page.status_code == 200
     assert "Je ferme boutique." in page.text

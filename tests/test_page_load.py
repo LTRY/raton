@@ -5,17 +5,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.job import DownloadJob
-from app.models.video import Video
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.job import DownloadJob
+from back.models.video import Video
+from tests.site import site_client
 
 # Generous: the point is a constant, not the exact figure (a page with one statement per video blows past it).
 MAX_STATEMENTS = 60
@@ -81,7 +81,7 @@ def test_playback_time_stats_cost_does_not_grow_with_played_videos(db, path):
     seed_playbacks(db, 150)
     db.statements.clear()
 
-    assert TestClient(app).get(path).status_code == 200
+    assert site_client().get(path).status_code == 200
 
     assert len(db.statements) < MAX_STATEMENTS
 
@@ -139,14 +139,14 @@ def test_video_cards_do_not_read_metadata_files(db, monkeypatch, tmp_path, path)
     seed_followed_library(db, 12)
     forbid_metadata_reads(db, monkeypatch, tmp_path)
 
-    response = TestClient(app).get(path)
+    response = site_client().get(path)
 
     assert response.status_code == 200
     assert "12:34" in response.text  # duration_seconds=754, from the column
 
 
 def seed_playlist(db, video_count: int) -> int:
-    from app.models.playlist import Playlist, PlaylistItem
+    from back.models.playlist import Playlist, PlaylistItem
 
     playlist = Playlist(title="Ma playlist", source="manual")
     db.add(playlist)
@@ -181,7 +181,7 @@ def test_playlist_pages_read_no_files_and_cost_constant_statements(db, monkeypat
     forbid_metadata_reads(db, monkeypatch, tmp_path)
     db.statements.clear()
 
-    response = TestClient(app).get(path.format(id=playlist_id))
+    response = site_client().get(path.format(id=playlist_id))
 
     assert response.status_code == 200
     assert len(db.statements) < 15
@@ -191,7 +191,7 @@ def test_playlist_pages_read_no_files_and_cost_constant_statements(db, monkeypat
 
 def test_playlists_page_cost_does_not_grow_with_the_playlists(db):
     # Each playlist's cover must come from the one batched query, not from a load per playlist.
-    from app.models.playlist import Playlist, PlaylistItem
+    from back.models.playlist import Playlist, PlaylistItem
 
     def add_playlist(index: int) -> None:
         video = Video(
@@ -210,14 +210,14 @@ def test_playlists_page_cost_does_not_grow_with_the_playlists(db):
     add_playlist(0)
     db.expunge_all()
     db.statements.clear()
-    TestClient(app).get("/playlists")
+    site_client().get("/playlists")
     one = len(db.statements)
     for index in range(1, 8):
         add_playlist(index)
     db.expunge_all()
     db.statements.clear()
 
-    response = TestClient(app).get("/playlists")
+    response = site_client().get("/playlists")
 
     assert response.status_code == 200
     assert response.text.count("/thumbnail?w=320") == 8

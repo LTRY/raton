@@ -3,27 +3,27 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.db.base import *  # noqa: F403
-from app.db.session import Base, get_db
-from app.main import app
-from app.models.channel import Channel
-from app.models.llm_job import LlmJob
-from app.models.video import Video
-from app.models.video_note_chunk import VideoNoteChunk
-from app.services.common.settings import AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY, set_setting
-from app.services.rag.auto_notes import (
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
+from back.main import app
+from back.models.channel import Channel
+from back.models.llm_job import LlmJob
+from back.models.video import Video
+from back.models.video_note_chunk import VideoNoteChunk
+from back.services.common.settings import AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY, set_setting
+from back.services.rag.auto_notes import (
     AUTO_NOTES_KIND,
     BATCH_ID_KEY,
     BATCH_SIZE,
     BATCH_SUBMITTED_AT_KEY,
     MAX_FAILURES_PER_VIDEO,
 )
-from app.services.rag.dashboard import next_sweep_at, rag_dashboard_data
+from back.services.rag.dashboard import next_sweep_at, rag_dashboard_data
+from tests.site import site_client
 
 NOW = datetime(2026, 10, 13, 12, 0, tzinfo=UTC)
 MAX_STATEMENTS = 40
@@ -214,7 +214,7 @@ def test_next_sweep_is_5am_in_paris():
 
 
 def test_page_renders_on_an_empty_library(db):
-    response = TestClient(app).get("/rag")
+    response = site_client().get("/rag")
 
     assert response.status_code == 200
     assert "Indexation RAG" in response.text
@@ -232,7 +232,7 @@ def test_page_statement_count_does_not_grow_with_the_library(db):
     db.commit()
     db.statements.clear()
 
-    response = TestClient(app).get("/rag")
+    response = site_client().get("/rag")
 
     assert response.status_code == 200
     assert len(db.statements) <= MAX_STATEMENTS
@@ -245,7 +245,7 @@ def test_api_serves_the_page_data_as_json(db):
     add_video(db, "waiting", channel)
     db.commit()
 
-    payload = TestClient(app).get("/api/rag").json()
+    payload = site_client().get("/api/rag").json()
 
     expected = rag_dashboard_data(db)
     assert payload["total_videos"] == expected["total_videos"] == 2
@@ -257,4 +257,4 @@ def test_api_serves_the_page_data_as_json(db):
     assert payload["pipeline"]["next_sweep_at"].startswith(
         expected["pipeline"]["next_sweep_at"].date().isoformat()
     )
-    assert payload["pipeline"]["next_sweep_in"].startswith("P")
+    assert isinstance(payload["pipeline"]["next_sweep_in_seconds"], int)

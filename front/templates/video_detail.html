@@ -1,0 +1,991 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+<section class="video-detail">
+  <div class="video-topbar">
+    <p class="back-link"><a href="{{ back_path }}">← {{ back_label }}</a></p>
+    {# Phone only (hidden by CSS above 800px, where the tabs and the action bar
+       carry the same things). The description, the sponsor segments and the
+       transcript retry live here instead of in the transcript tabs. The retry
+       button proxies a click to the real one (`#transcript-retry-button`), so
+       its handler and ids stay single. #}
+    <details class="video-more" data-pop>
+      <summary class="video-more-toggle lg" aria-label="Plus d'options">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
+      </summary>
+      <div class="video-more-panel lg">
+        <section class="video-more-block">
+          <h2>Description</h2>
+          {% if extended_metadata is defined and extended_metadata.description %}
+          <p class="video-metadata-description">{{ extended_metadata.description }}</p>
+          {% else %}
+          <p class="empty-state">Aucune description disponible.</p>
+          {% endif %}
+          {% if extended_metadata is defined and extended_metadata.tags %}
+          <div class="video-metadata-tags" aria-label="Tags">
+            {% for tag in extended_metadata.tags %}
+            <span class="asset-label">{{ tag }}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </section>
+        <section class="video-more-block">
+          <h2>Segments</h2>
+          {% if sponsor_segments %}
+          <ol class="video-sponsor-segments">
+            {% for segment in sponsor_segments %}
+            <li>
+              <button type="button" class="video-sponsor-segment-time" data-seek-time="{{ segment.start_seconds }}">
+                {{ segment.start_label }} - {{ segment.end_label }}
+              </button>
+              <span class="category-label">{{ segment.category_label }}</span>
+            </li>
+            {% endfor %}
+          </ol>
+          {% else %}
+          <p class="empty-state">Aucun segment détecté pour l'instant.</p>
+          {% endif %}
+          <form action="/videos/{{ video.id }}/sponsors/fetch" method="post">
+            <button class="secondary" type="submit">Rechercher les segments sponsors</button>
+          </form>
+        </section>
+        {% if not video.has_transcript %}
+        <section class="video-more-block">
+          <h2>Transcription</h2>
+          <p class="empty-state">Aucune transcription disponible pour cette vidéo.</p>
+          <button type="button" class="secondary" data-click-proxy="#transcript-retry-button">Récupérer la transcription</button>
+          <p class="async-form-status" data-retry-status-mirror aria-live="polite" hidden></p>
+        </section>
+        {% endif %}
+      </div>
+    </details>
+  </div>
+  <article class="video-detail-card">
+    <div class="video-detail-heading">
+      <div class="video-detail-heading-main">
+        <h1>{{ video.title }}</h1>
+        <p id="video-short-summary" class="video-short-summary" {% if not short_summary %}hidden{% endif %}>{{ short_summary or "" }}</p>
+        {% if video.channel %}
+        <p class="video-detail-channel"><a href="/videos?channel_id={{ video.channel.id }}">{{ video.channel.name }}</a></p>
+        {% endif %}
+      </div>
+      <div class="video-detail-heading-side">
+        {% set selected_categories = video.categories %}
+        <span class="video-label-groups video-detail-label-groups">
+          <span class="asset-labels" aria-label="Fichiers disponibles">
+            {% for label in badge_labels(video.badges) %}
+            <span class="asset-label asset-label-{{ label.kind }}">{{ label.text }}</span>
+            {% endfor %}
+          </span>
+          <span class="category-labels" aria-label="Catégories">
+            {% for category in selected_categories %}
+            {% set category_style = category_style_map.get(category) %}
+            <span class="category-label" {% if category_style %}style="{{ video_category_css_style(category_style) }}"{% endif %}>{{ category }}</span>
+            {% endfor %}
+            <button type="button" class="category-label category-label-add" id="category-editor-toggle" aria-expanded="false" aria-controls="category-editor-form">+ Catégories</button>
+          </span>
+        </span>
+        <span class="video-label-groups video-detail-label-groups">
+          <span class="category-labels" aria-label="Playlists">
+            {% for link in video_playlist_links %}
+            <span class="category-label">{{ link.title }}</span>
+            {% endfor %}
+            <button type="button" class="category-label category-label-add" id="playlist-widget-toggle" aria-expanded="false" aria-controls="playlist-widget-form">+ Playlists</button>
+          </span>
+        </span>
+        <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" data-rating-url="/api/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
+          <input type="hidden" name="next" value="/videos/{{ video.id }}">
+          {% for value in range(1, 6) %}
+          <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if video.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
+            <span aria-hidden="true">★</span>
+          </button>
+          {% endfor %}
+        </form>
+      </div>
+    </div>
+
+    <form class="category-editor" id="category-editor-form" action="/videos/{{ video.id }}/categories" method="post" data-inline-save hidden>
+      <input type="hidden" name="next" value="/videos/{{ video.id }}">
+      <span class="category-editor-title">Catégories</span>
+      <span class="category-filter-options" id="category-filter-options" aria-label="Catégories">
+        {% for category in category_options %}
+        <label class="asset-filter-chip">
+          <input name="preset_categories" type="checkbox" value="{{ category.label }}" {% if category.label in selected_categories %}checked{% endif %}>
+          <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
+        </label>
+        {% endfor %}
+        {% for extra_label in selected_categories | reject('in', category_option_labels) %}
+        <label class="asset-filter-chip">
+          <input name="preset_categories" type="checkbox" value="{{ extra_label }}" checked>
+          <span class="category-label">{{ extra_label }}</span>
+        </label>
+        {% endfor %}
+        <span class="custom-category-adder" id="custom-category-adder">
+          <button type="button" class="category-label category-label-add" id="custom-category-toggle">+ Custom</button>
+          <input type="text" class="category-label-input" id="custom-category-input" placeholder="Nom du label" hidden>
+        </span>
+      </span>
+      <span id="category-save-status" class="async-form-status" aria-live="polite" hidden></span>
+    </form>
+
+    <div class="category-editor" id="playlist-widget-form" hidden>
+      <span class="category-editor-title">Playlists</span>
+      {% if video_playlist_links %}
+      <ul class="playlist-widget-current">
+        {% for link in video_playlist_links %}
+        <li>
+          <span>{{ link.title }}</span>
+          <form action="/playlists/{{ link.playlist_id }}/items/{{ link.item_id }}/remove" method="post">
+            <input type="hidden" name="next" value="/videos/{{ video.id }}">
+            <button class="danger" type="submit">Retirer</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <form action="/videos/{{ video.id }}/playlists" method="post">
+        <input type="hidden" name="next" value="/videos/{{ video.id }}">
+        <label>
+          Playlist existante
+          <select name="playlist_id">
+            <option value="">— Choisir —</option>
+            {% for playlist in all_playlists %}
+            <option value="{{ playlist.id }}">{{ playlist.title }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Ou nouvelle playlist
+          <input type="text" name="new_playlist_title" placeholder="Titre de la nouvelle playlist">
+        </label>
+        <button type="submit">Ajouter</button>
+      </form>
+    </div>
+
+    <div class="video-detail-action-bar">
+      {{ macros.format_actions(video, allow_delete=true) }}
+      {% if not video.has_transcript %}
+      <div class="transcript-retry">
+        <button type="button" class="secondary" id="transcript-retry-button" data-video-id="{{ video.id }}">Récupérer la transcription</button>
+        <p id="transcript-retry-status" class="async-form-status" aria-live="polite" hidden></p>
+      </div>
+      {% endif %}
+      {% if transcript %}
+      <div class="ai-generate">
+        <form action="/videos/{{ video.id }}/transcript/generate" method="post" data-turbo="false" id="generate-form">
+          <button type="submit" class="ai-generate-button" aria-describedby="ai-generate-tooltip" aria-label="Générer notes, résumé">
+            <span class="ai-generate-spinner" aria-hidden="true"></span>
+            <svg class="ai-generate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="2.8" r="1.2"/>
+              <path d="M12 4v2.5"/>
+              <rect x="4" y="6.5" width="16" height="12" rx="3.5"/>
+              <path d="M2.2 11v3.5M21.8 11v3.5M9.5 15.6h5"/>
+              <circle cx="9" cy="11.8" r="1.3" fill="currentColor" stroke="none"/>
+              <circle cx="15" cy="11.8" r="1.3" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
+          <div class="ai-generate-tooltip" id="ai-generate-tooltip" role="tooltip">
+            <p class="ai-generate-tooltip-title">Générer avec l'IA</p>
+            <ul class="ai-generate-tooltip-list">
+              <li>Notes structurées</li>
+              <li>Résumé (+ résumé court et questions suggérées)</li>
+            </ul>
+          </div>
+        </form>
+        <p id="generate-status" class="ai-generate-status async-form-status" aria-live="polite" hidden></p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% set resume_positions = resume_positions or {} %}
+    {# Video / audio players. On wide screens the two historical sections stay
+       stacked as before; under 800px the pager becomes a two-slide swipeable
+       carousel (video, audio) with one download button per slide (see
+       docs/spec/11-interface-html.md). #}
+    <div class="media-pager" data-media-pager data-video-id="{{ video.id }}" data-initial="{{ 'audio' if (video.media_urls.audio and not video.media_urls.video) else 'video' }}">
+      <div class="media-pager-track" data-media-pager-track>
+        <div class="media-slide media-slide-video" data-media-slide="video" data-state="{{ 'ready' if video.media_urls.video else 'idle' }}">
+          <div class="media-slide-head">
+            <span class="media-slide-badge">Vidéo</span>
+            <button type="button" class="media-slide-delete mp-when-ready" data-media-delete>Supprimer</button>
+          </div>
+          {% if video.media_urls.video %}
+          <section class="video-player-panel" aria-label="Lecteur vidéo">
+            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.media_urls.thumbnail %}poster="{{ video.media_urls.thumbnail }}"{% endif %}>
+              <source src="{{ video.media_urls.video }}">
+              {% if video.media_urls.subtitles %}
+              {# Pas d'attribut `default` : il réactiverait la piste à chaque chargement,
+                 y compris quand l'utilisateur a désactivé les sous-titres dans le
+                 lecteur natif (iPhone). #}
+              <track kind="subtitles" src="{{ video.media_urls.subtitles }}" label="Sous-titres">
+              {% endif %}
+            </video>
+          </section>
+          {% endif %}
+
+          {% if not video.media_urls.video and video.media_urls.thumbnail %}
+          <section class="video-player-panel media-thumbnail-panel" aria-label="Vignette">
+            <img class="audio-player-thumbnail" src="{{ video.media_urls.thumbnail }}" alt="">
+          </section>
+          {% endif %}
+
+          <div class="media-panel media-panel-video">
+            <p class="media-panel-label"><span class="mp-when-idle">Télécharger la vidéo</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Vidéo téléchargée</span></p>
+            <div class="media-panel-actions">
+              <button type="button" class="media-disc media-disc-download mp-when-idle" data-media-download aria-label="Télécharger la vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg></button>
+              <span class="media-disc media-disc-busy mp-when-busy" role="status" aria-label="Téléchargement en cours"><svg class="media-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M12 3a9 9 0 0 1 9 9"/></svg></span>
+              <span class="media-disc media-disc-ok mp-when-ok" role="status" aria-label="Vidéo téléchargée"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>
+            </div>
+            <div class="media-quality" data-media-quality hidden aria-label="Qualité vidéo à télécharger">{% for quality, quality_label in [("360", "360p"), ("480", "480p"), ("720", "720p"), ("1080", "1080p"), ("1440", "1440p"), ("2160", "2160p (4K)"), ("best", "Meilleure disponible")] %}<button type="button" class="media-quality-option" data-media-quality-option data-quality="{{ quality }}">{{ quality_label }}</button>{% endfor %}</div>
+          </div>
+        </div>
+        <div class="media-slide media-slide-audio" data-media-slide="audio" data-state="{{ 'ready' if video.media_urls.audio else 'idle' }}">
+          <div class="media-slide-head">
+            <span class="media-slide-badge">Audio</span>
+            <button type="button" class="media-slide-delete mp-when-ready" data-media-delete>Supprimer</button>
+          </div>
+          <div class="media-audio-art" aria-hidden="true">
+            {% if video.media_urls.thumbnail %}<img src="{{ video.media_urls.thumbnail }}" alt="">{% endif %}
+          </div>
+          {% if video.media_urls.audio and not video.media_urls.video %}
+          <section class="audio-player-panel audio-player-panel-trigger" aria-label="Lecteur audio">
+            <button type="button" class="audio-play-trigger" data-play-track
+              data-track-id="{{ video.id }}"
+              data-track-title="{{ video.title }}"
+              data-track-channel="{{ video.channel.name if video.channel else '' }}"
+              data-track-src="{{ video.media_urls.audio }}"
+              data-track-thumb="{{ video.media_urls.thumbnail or '' }}"
+              data-track-resume-key="raton:media-position:{{ video.id }}:audio"
+              {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
+              data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
+              data-track-activity-url="/api/videos/{{ video.id }}/activity"
+              data-track-detail-url="/videos/{{ video.id }}">
+              <span data-play-track-icon aria-hidden="true">▶</span>
+              <span data-play-track-label>Écouter</span>
+            </button>
+          </section>
+          {% elif video.media_urls.audio %}
+          <section class="audio-player-panel" aria-label="Lecteur audio">
+            <audio controls preload="metadata" src="{{ video.media_urls.audio }}" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
+          </section>
+          {% endif %}
+
+          <div class="media-panel media-panel-audio" data-media-panel="audio"
+            data-track-id="{{ video.id }}"
+            data-track-title="{{ video.title }}"
+            data-track-channel="{{ video.channel.name if video.channel else '' }}"
+            data-track-src="/api/videos/{{ video.id }}/audio"
+            data-track-thumb="{{ video.media_urls.thumbnail or '' }}"
+            data-track-resume-key="raton:media-position:{{ video.id }}:audio"
+            {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
+            data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
+            data-track-activity-url="/api/videos/{{ video.id }}/activity"
+            data-track-detail-url="/videos/{{ video.id }}">
+            <div class="media-panel-top">
+              <p class="media-panel-label"><span class="mp-when-idle">Télécharger l'audio</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
+              <div class="media-wave-block mp-when-ready">
+                <div class="media-seek" data-media-seek role="slider" tabindex="0" aria-label="Position de lecture" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00">
+                  <span class="media-seek-track"><span class="media-seek-buffer"></span><span class="media-seek-fill"></span></span>
+                  <span class="media-seek-thumb"></span>
+                  <span class="media-seek-bubble" data-media-seek-bubble hidden>0:00</span>
+                </div>
+                <div class="media-wave-times"><span data-media-time-current>0:00</span><span data-media-time-duration>--:--</span></div>
+              </div>
+            </div>
+            <div class="media-panel-actions">
+              <button type="button" class="media-skip media-skip-back mp-when-ready" data-audio-skip="-15" aria-label="Reculer de 15 secondes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
+              <button type="button" class="media-disc media-disc-download mp-when-idle" data-media-download aria-label="Télécharger l'audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg></button>
+              <span class="media-disc media-disc-busy mp-when-busy" role="status" aria-label="Téléchargement en cours"><svg class="media-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M12 3a9 9 0 0 1 9 9"/></svg></span>
+              <span class="media-disc media-disc-ok mp-when-ok" role="status" aria-label="Audio téléchargé"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7"/></svg></span>
+              <button type="button" class="media-disc media-disc-play mp-when-ready" data-audio-play aria-label="Lecture"><svg class="media-icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg><svg class="media-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4.5" height="14" rx="1"/><rect x="13.5" y="5" width="4.5" height="14" rx="1"/></svg></button>
+              <button type="button" class="media-skip media-skip-forward mp-when-ready" data-audio-skip="15" aria-label="Avancer de 15 secondes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="media-pager-dots" role="group" aria-label="Choisir vidéo ou audio">
+        <button type="button" class="media-pager-dot media-pager-dot-active" data-media-dot="video" aria-label="Version vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2.5"/><path d="M17 10.5l4-2.5v8l-4-2.5"/></svg></button>
+        <button type="button" class="media-pager-dot" data-media-dot="audio" aria-label="Version audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-4M7 17V7M11 20V4M15 16V8M19 13v-2"/></svg></button>
+      </div>
+    </div>
+
+    {# Low-rated videos whose media the retention purge removed after watching (see the media storage purge service). #}
+    {% if video.watched_at and not video.media_urls.video and not video.media_urls.audio and video.rating < 4 %}
+    <p class="empty-state">Fichiers retirés automatiquement du serveur après visionnage. Vous pouvez les retélécharger.</p>
+    {% endif %}
+
+    <script type="application/json" data-sponsor-skip>{{ (sponsor_skip_payload or {"enabled": false, "segments": []}) | tojson }}</script>
+
+    {# Aucun onglet ouvert a l'arrivee sur la page : le panneau actif est choisi
+       cote client, soit par l'ancre de l'URL, soit par un clic. #}
+    {% set default_tab = '' %}
+    {% set text_default_tab = 'raw' if transcript else '' %}
+    <section id="transcript" class="transcript-section">
+      <div class="transcript-tabs" role="tablist">
+        <button type="button" class="transcript-tab" data-tab="info" role="tab" aria-selected="false">Plus d'informations</button>
+        <button type="button" class="transcript-tab" data-tab="segments" role="tab" aria-selected="false">Segments{% if sponsor_segments %} ({{ sponsor_segments | length }}){% endif %}</button>
+        <button type="button" class="transcript-tab" data-tab="raw" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Transcript</button>
+        <button type="button" class="transcript-tab" data-tab="notes" role="tab" aria-selected="false" {% if not notes_transcript %}hidden{% endif %}>Notes structurées</button>
+        <button type="button" class="transcript-tab" data-tab="vtt" role="tab" aria-selected="false" {% if not vtt_content %}hidden{% endif %}>.vtt</button>
+        <button type="button" class="transcript-tab" data-tab="personal-notes" role="tab" aria-selected="false">Commentaire</button>
+      </div>
+
+      <p id="transcript-action-status" class="async-form-status" aria-live="polite" hidden></p>
+      <progress id="transcript-progress" class="transcript-progress" max="100" hidden></progress>
+
+      {% if transcript %}
+      <div data-tab-panel="text" hidden>
+        <div class="transcript-toolbar">
+          <span id="transcript-version">
+            {{ display_transcript | length }} caractères
+            · Transcript
+          </span>
+        </div>
+        <div class="transcript-content-wrapper">
+          <button type="button" id="copy-transcript" class="transcript-copy-button"
+                  aria-label="Copier le transcript" title="Copier le transcript">
+            <svg class="transcript-copy-icon" viewBox="0 0 16 16" aria-hidden="true">
+              <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+              <path d="M3.5 10.5V3a1.5 1.5 0 0 1 1.5-1.5h7.5"/>
+            </svg>
+            <svg class="transcript-copy-icon transcript-copy-icon--check" viewBox="0 0 16 16" aria-hidden="true" hidden>
+              <path d="M3 8.5l3.2 3.2L13 4.5"/>
+            </svg>
+          </button>
+          <pre id="transcript-content" class="transcript-content">{{ display_transcript }}</pre>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="transcript-panel vtt-panel" data-tab-panel="vtt" {% if default_tab != 'vtt' %}hidden{% endif %}>
+        {% if vtt_content %}
+        <pre class="transcript-content">{{ vtt_content }}</pre>
+        {% else %}
+        <p class="notice error">Aucun fichier .vtt disponible pour cette vidéo.</p>
+        {% endif %}
+      </div>
+
+      <div class="transcript-panel personal-notes-panel" id="personal-notes" data-tab-panel="personal-notes" {% if default_tab != 'personal-notes' %}hidden{% endif %}>
+        <div class="personal-notes-header">
+          <h2>Commentaire</h2>
+          {% if video.comment %}
+          <span>{{ video.comment | length }} caractères</span>
+          {% endif %}
+        </div>
+        <form class="personal-notes-form" action="/videos/{{ video.id }}/comment" method="post">
+          <input type="hidden" name="next" value="/videos/{{ video.id }}#personal-notes">
+          <textarea name="comment" rows="5" placeholder="Ajouter un commentaire, un résumé, une idée à retenir...">{{ video.comment or "" }}</textarea>
+          <button class="secondary" type="submit">Enregistrer le commentaire</button>
+        </form>
+      </div>
+
+      <div class="transcript-panel info-panel" data-tab-panel="info" {% if default_tab != 'info' %}hidden{% endif %}>
+        <div class="video-metadata-details-body">
+        {% if extended_metadata is defined and (extended_metadata.duration or extended_metadata.view_count or extended_metadata.like_count or extended_metadata.comment_count) %}
+        <dl class="video-metadata-stats">
+          {% if extended_metadata.duration %}
+          <div><dt>Durée</dt><dd>{{ extended_metadata.duration }}</dd></div>
+          {% endif %}
+          {% if extended_metadata.view_count %}
+          <div><dt>Vues</dt><dd>{{ extended_metadata.view_count }}</dd></div>
+          {% endif %}
+          {% if extended_metadata.like_count %}
+          <div><dt>Likes</dt><dd>{{ extended_metadata.like_count }}</dd></div>
+          {% endif %}
+          {% if extended_metadata.comment_count %}
+          <div><dt>Commentaires</dt><dd>{{ extended_metadata.comment_count }}</dd></div>
+          {% endif %}
+        </dl>
+        {% endif %}
+        {% if extended_metadata is defined and extended_metadata.chapters %}
+        <ol class="video-metadata-chapters">
+          {% for chapter in extended_metadata.chapters %}
+          <li><span class="video-metadata-chapter-time">{{ chapter.start_label }}</span> {{ chapter.title }}</li>
+          {% endfor %}
+        </ol>
+        {% endif %}
+        {% if extended_metadata is defined and extended_metadata.tags %}
+        <div class="video-metadata-tags" aria-label="Tags">
+          {% for tag in extended_metadata.tags %}
+          <span class="asset-label">{{ tag }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if extended_metadata is defined and extended_metadata.description %}
+        <p class="video-metadata-description">{{ extended_metadata.description }}</p>
+        {% endif %}
+        <dl class="video-metadata-stats">
+          <div>
+            <dt>Publication</dt>
+            <dd>{{ format_french_date(video.published_at) if video.published_at else "Date inconnue" }}</dd>
+          </div>
+          <div>
+            <dt>Téléchargement</dt>
+            <dd>{{ format_french_datetime(video.downloaded_at) if video.downloaded_at else "Date inconnue" }}</dd>
+          </div>
+          <div>
+            <dt>Taille</dt>
+            <dd>{{ format_video_file_size(video.file_size_bytes) }}</dd>
+          </div>
+          <div>
+            <dt>Transcript</dt>
+            <dd>{{ "Disponible" if video.has_transcript else video.transcript_status }}</dd>
+          </div>
+        </dl>
+        </div>
+      </div>
+
+      <div class="transcript-panel segments-panel" data-tab-panel="segments" hidden>
+        <div class="video-sponsor-segments-block" id="segments-sponsors">
+          <div class="video-sponsor-segments-header">
+            <h3>Segments détectés</h3>
+            <div class="video-sponsor-segments-actions">
+              <form action="/videos/{{ video.id }}/sponsors/fetch" method="post">
+                <button class="secondary" type="submit">Rechercher les segments sponsors</button>
+              </form>
+            </div>
+          </div>
+          {% if sponsor_segments %}
+          <ol class="video-sponsor-segments">
+            {% for segment in sponsor_segments %}
+            <li>
+              <button type="button" class="video-sponsor-segment-time" data-seek-time="{{ segment.start_seconds }}">
+                {{ segment.start_label }} - {{ segment.end_label }}
+              </button>
+              <span class="category-label">{{ segment.category_label }}</span>
+            </li>
+            {% endfor %}
+          </ol>
+          {% else %}
+          <p class="empty-state">Aucun segment détecté pour l'instant.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if transcript %}
+      <section id="discussion">
+        {{ macros.chat_widget("video-chat", "", chat_widget_config, "chat-bar") }}
+      </section>
+      {% endif %}
+    </section>
+  </article>
+</section>
+
+<script>
+  (function () {
+    const form = document.getElementById("category-editor-form");
+    const status = document.getElementById("category-save-status");
+    const optionsContainer = document.getElementById("category-filter-options");
+    const adder = document.getElementById("custom-category-adder");
+    const toggleButton = document.getElementById("custom-category-toggle");
+    const input = document.getElementById("custom-category-input");
+    const editorToggle = document.getElementById("category-editor-toggle");
+    let statusTimer;
+
+    editorToggle.addEventListener("click", () => {
+      const isOpen = !form.hidden;
+      form.hidden = isOpen;
+      editorToggle.setAttribute("aria-expanded", String(!isOpen));
+      editorToggle.textContent = isOpen ? "+ Catégories" : "− Catégories";
+    });
+
+    const playlistWidgetToggle = document.getElementById("playlist-widget-toggle");
+    const playlistWidgetForm = document.getElementById("playlist-widget-form");
+    if (playlistWidgetToggle && playlistWidgetForm) {
+      playlistWidgetToggle.addEventListener("click", () => {
+        const isOpen = !playlistWidgetForm.hidden;
+        playlistWidgetForm.hidden = isOpen;
+        playlistWidgetToggle.setAttribute("aria-expanded", String(!isOpen));
+        playlistWidgetToggle.textContent = isOpen ? "+ Playlists" : "− Playlists";
+      });
+    }
+
+    function setStatus(message, level) {
+      window.clearTimeout(statusTimer);
+      status.hidden = false;
+      status.textContent = message;
+      status.dataset.level = level;
+      if (level === "success") {
+        statusTimer = window.setTimeout(() => {
+          status.hidden = true;
+        }, 1600);
+      }
+    }
+
+    async function saveCategories() {
+      setStatus("Enregistrement...", "loading");
+      try {
+        await window.ratonApi("PUT", `/api/videos/{{ video.id }}/categories`, {
+          categories: new FormData(form).getAll("preset_categories"),
+        });
+        setStatus("Enregistré", "success");
+      } catch (error) {
+        setStatus(error.message, "error");
+      }
+    }
+
+    optionsContainer.addEventListener("change", (event) => {
+      if (event.target.matches('input[name="preset_categories"]')) {
+        saveCategories();
+      }
+    });
+
+    function showInput() {
+      toggleButton.hidden = true;
+      input.hidden = false;
+      input.value = "";
+      input.focus();
+    }
+
+    function cancelInput() {
+      input.hidden = true;
+      input.value = "";
+      toggleButton.hidden = false;
+    }
+
+    function commitInput() {
+      const name = input.value.trim();
+      if (!name) {
+        cancelInput();
+        return;
+      }
+      const existing = Array.from(optionsContainer.querySelectorAll('input[name="preset_categories"]'));
+      const match = existing.find((checkbox) => checkbox.value.toLowerCase() === name.toLowerCase());
+      if (match) {
+        match.checked = true;
+      } else {
+        const label = document.createElement("label");
+        label.className = "asset-filter-chip";
+        label.innerHTML = '<input name="preset_categories" type="checkbox" checked><span class="category-label"></span>';
+        label.querySelector("input").value = name;
+        label.querySelector(".category-label").textContent = name;
+        optionsContainer.insertBefore(label, adder);
+      }
+      cancelInput();
+      saveCategories();
+    }
+
+    toggleButton.addEventListener("click", showInput);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        commitInput();
+      } else if (event.key === "Escape") {
+        cancelInput();
+      }
+    });
+    input.addEventListener("blur", cancelInput);
+  })();
+</script>
+
+<script>
+(function () {
+  const videoId = {{ video.id }};
+  const llmProviderLabel = {{ (llm_provider_label or "") | tojson }};
+  const copyButton = document.getElementById("copy-transcript");
+  const transcriptContent = document.getElementById("transcript-content");
+  const transcriptVersion = document.getElementById("transcript-version");
+  const transcriptStatus = document.getElementById("transcript-action-status");
+  const transcriptProgress = document.getElementById("transcript-progress");
+  const shortSummary = document.getElementById("video-short-summary");
+  const tabButtons = document.querySelectorAll(".transcript-tab");
+  const textPanel = document.querySelector('[data-tab-panel="text"]');
+  const otherPanels = document.querySelectorAll(".transcript-panel[data-tab-panel]");
+  const TEXT_TABS = new Set(["raw", "notes"]);
+  let transcriptStatusTimer;
+
+  function setTranscriptStatus(message, level) {
+    window.clearTimeout(transcriptStatusTimer);
+    transcriptStatus.hidden = false;
+    transcriptStatus.textContent = message;
+    transcriptStatus.dataset.level = level;
+    if (level === "success") {
+      transcriptStatusTimer = window.setTimeout(() => {
+        transcriptStatus.hidden = true;
+      }, 2200);
+    }
+  }
+
+  function formatEstimatedDuration(seconds) {
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 1) return "moins d'une minute";
+    if (minutes === 1) return "environ 1 minute";
+    return `environ ${minutes} minutes`;
+  }
+
+  function formatQueuedHint(payload) {
+    const parts = [];
+    parts.push(payload.estimated_seconds ? formatEstimatedDuration(payload.estimated_seconds) : "cela peut prendre un moment");
+    if (payload.estimated_cost_usd) {
+      parts.push(`~$${payload.estimated_cost_usd.toFixed(2)}, estimation`);
+    }
+    return ` (${parts.join(" · ")})`;
+  }
+
+  let progressTimer = null;
+
+  function startProgress(estimatedSeconds) {
+    stopProgress();
+    transcriptProgress.hidden = false;
+    if (estimatedSeconds) {
+      const start = Date.now();
+      transcriptProgress.value = 0;
+      progressTimer = window.setInterval(() => {
+        const elapsed = (Date.now() - start) / 1000;
+        transcriptProgress.value = Math.min(95, (elapsed / estimatedSeconds) * 100);
+      }, 500);
+    } else {
+      transcriptProgress.removeAttribute("value"); // native indeterminate animation
+    }
+  }
+
+  function stopProgress() {
+    if (progressTimer) {
+      window.clearInterval(progressTimer);
+      progressTimer = null;
+    }
+    transcriptProgress.hidden = true;
+    transcriptProgress.removeAttribute("value");
+  }
+
+  const documents = {
+    raw: {
+      label: "Transcript",
+      content: {{ (transcript or "") | tojson }},
+      length: {{ (transcript or "") | length }},
+      available: {{ "true" if transcript else "false" }},
+    },
+    notes: {
+      label: "Notes structurées",
+      content: {{ (notes_transcript or "") | tojson }},
+      length: {{ (notes_transcript or "") | length }},
+      available: {{ "true" if notes_transcript else "false" }},
+    },
+    questions: {
+      items: {{ (suggested_questions or []) | tojson }},
+      available: {{ "true" if suggested_questions else "false" }},
+    },
+  };
+  // Aucun onglet ouvert par defaut : seule une ancre d'URL (redirection apres
+  // une action) ou un clic ouvre un panneau.
+  const textDefaultTab = documents.raw.available ? "raw" : "";
+  const HASH_TABS = {
+    "#transcript": textDefaultTab,
+    "#personal-notes": "personal-notes",
+    "#segments-sponsors": "segments",
+  };
+  let activeTab = "";
+  let hashTab = HASH_TABS[window.location.hash];
+  // Under 800px the "info" and "segments" tabs are hidden: their content is in
+  // the "⋮" popover, so an anchor to them opens it instead of a tab-less panel.
+  if ((hashTab === "info" || hashTab === "segments") && window.matchMedia("(max-width: 800px)").matches) {
+    document.querySelector("details.video-more")?.setAttribute("open", "");
+    hashTab = "";
+  }
+  if (hashTab) {
+    activeTab = hashTab;
+    renderActiveTab();
+  }
+
+  function renderActiveTab() {
+    if (TEXT_TABS.has(activeTab)) {
+      const doc = documents[activeTab];
+      transcriptContent.textContent = doc.content;
+      transcriptVersion.textContent = `${doc.length} caractères · ${doc.label}`;
+      if (textPanel) textPanel.hidden = false;
+      otherPanels.forEach((panel) => {
+        panel.hidden = true;
+      });
+    } else {
+      if (textPanel) textPanel.hidden = true;
+      otherPanels.forEach((panel) => {
+        panel.hidden = panel.dataset.tabPanel !== activeTab;
+      });
+    }
+    tabButtons.forEach((button) => {
+      const tab = button.dataset.tab;
+      if (TEXT_TABS.has(tab)) {
+        button.hidden = !documents[tab].available;
+      }
+      button.classList.toggle("active", tab === activeTab);
+      button.setAttribute("aria-selected", tab === activeTab ? "true" : "false");
+    });
+  }
+
+  function setActiveTab(tab) {
+    if (TEXT_TABS.has(tab) && !documents[tab].available) return;
+    activeTab = tab;
+    renderActiveTab();
+  }
+
+  // `updated` is the fiche's documents as /api returns them (VideoDocumentsRead). Lengths count
+  // code points, like the server-rendered ones.
+  function updateDocuments(updated) {
+    const transcript = updated.transcript || "";
+    const notes = updated.notes || "";
+    documents.raw = { label: "Transcript", content: transcript, length: [...transcript].length, available: true };
+    documents.notes = { label: "Notes structurées", content: notes, length: [...notes].length, available: Boolean(notes) };
+    shortSummary.textContent = updated.short_summary || "";
+    shortSummary.hidden = !updated.short_summary;
+    documents.questions = { items: updated.suggested_questions, available: updated.suggested_questions.length > 0 };
+  }
+
+  tabButtons.forEach((button) => {
+    button.addEventListener("click", () => setActiveTab(button.dataset.tab));
+  });
+
+  // Polls /api/llm-jobs/{id} until the job is no longer pending; a failed job throws its message.
+  async function pollLlmJob(statusUrl, { interval = 2000, onPending } = {}) {
+    for (;;) {
+      const job = await window.ratonApi("GET", statusUrl);
+      if (job.status === "failed") throw new Error(job.message || "Génération impossible.");
+      if (job.status !== "pending") return job;
+      if (onPending) onPending(job);
+      await new Promise((resolve) => window.setTimeout(resolve, interval));
+    }
+  }
+
+  // Reveals a text word by word at a steady pace, whatever the rhythm it
+  // arrives at: the text comes in bursts (one per poll), and showing each
+  // burst at once would read as jumps rather than as writing.
+  function createWordStream(element) {
+    let target = ""; // the text known so far
+    let shown = 0; // how many characters of it are in the DOM
+    let complete = false; // no more text will come
+    let frame = null;
+    let lastTime = 0;
+    let budget = 0; // words allowed out, fractional between frames
+    let resolveDrained;
+    const drained = new Promise((resolve) => {
+      resolveDrained = resolve;
+    });
+    const isWord = (token) => /\S/.test(token);
+    element.classList.add("word-stream", "is-streaming");
+
+    function pendingTokens() {
+      const tokens = target.slice(shown).match(/\s+|\S+/g) || [];
+      // The last word may still be growing.
+      if (!complete && tokens.length && isWord(tokens[tokens.length - 1])) tokens.pop();
+      return tokens;
+    }
+
+    function append(token) {
+      if (isWord(token)) {
+        const word = document.createElement("span");
+        word.className = "stream-word";
+        word.textContent = token;
+        element.append(word);
+      } else {
+        element.append(token);
+      }
+      shown += token.length;
+    }
+
+    function settle() {
+      if (!complete || shown < target.length) return;
+      element.classList.remove("is-streaming");
+      resolveDrained();
+    }
+
+    function step(now) {
+      frame = null;
+      const tokens = pendingTokens();
+      const words = tokens.filter(isWord).length;
+      if (!words) {
+        tokens.forEach(append);
+        budget = 0;
+        settle();
+        return;
+      }
+      // Slow enough to read along, faster as the backlog grows so the display
+      // never trails the model by more than a second or two.
+      const rate = Math.min(120, Math.max(14, words / 1.5));
+      budget += (Math.min(now - lastTime, 100) / 1000) * rate;
+      lastTime = now;
+      const scroller = element.closest(".transcript-content");
+      const pinned = scroller && scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 40;
+      while (tokens.length && (!isWord(tokens[0]) || budget >= 1)) {
+        if (isWord(tokens[0])) budget -= 1;
+        append(tokens.shift());
+      }
+      if (pinned) scroller.scrollTop = scroller.scrollHeight;
+      schedule();
+    }
+
+    function schedule() {
+      if (frame === null) {
+        frame = window.requestAnimationFrame(step);
+      }
+    }
+
+    function push(text) {
+      if (!text.startsWith(target.slice(0, shown))) {
+        element.replaceChildren();
+        shown = 0;
+      }
+      target = text;
+      if (frame === null) lastTime = performance.now();
+      schedule();
+    }
+
+    return {
+      element,
+      push,
+      // Resolves once `text`, the final version, is entirely on screen.
+      finish(text) {
+        complete = true;
+        push(text);
+        // A background tab gets no animation frames: nothing to animate for,
+        // and waiting for one would hold up the end of the generation.
+        if (document.hidden) {
+          window.cancelAnimationFrame(frame);
+          frame = null;
+          pendingTokens().forEach(append);
+          settle();
+        }
+        return drained;
+      },
+      stop() {
+        window.cancelAnimationFrame(frame);
+        element.classList.remove("word-stream", "is-streaming");
+      },
+    };
+  }
+
+  const generateForm = document.getElementById("generate-form");
+  const generateStatus = document.getElementById("generate-status");
+
+  // Le bouton robot vit en haut de la page, loin de #transcript-action-status :
+  // le statut de la generation est double juste sous le bouton pour rester
+  // visible sans avoir a defiler jusqu'a la section transcript.
+  function setGenerateStatus(message, level) {
+    setTranscriptStatus(message, level);
+    if (!generateStatus) return;
+    generateStatus.hidden = false;
+    generateStatus.textContent = message;
+    generateStatus.dataset.level = level;
+  }
+
+  if (generateForm) {
+    generateForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      // Icon button: its text cannot be swapped like the other LLM actions
+      // (that would wipe the SVG), so the loading state is a class that trades
+      // the icon for a spinner. It keeps spinning after the résumé court is written,
+      // while the notes are still being generated.
+      const button = generateForm.querySelector("button");
+      button.disabled = true;
+      button.classList.add("ai-generate-loading");
+      if (generateStatus) generateStatus.hidden = true;
+      const previous = {
+        shortText: shortSummary.textContent,
+        shortHidden: shortSummary.hidden,
+      };
+      let shortStream = null;
+      try {
+        const queued = await window.ratonApi("POST", `/api/videos/${videoId}/notes/generate`);
+        // The résumé court is written under the video title as it arrives.
+        const job = await pollLlmJob(queued.status_url, {
+          interval: 400,
+          onPending(pending) {
+            if (pending.partial_short_summary) {
+              if (!shortStream) {
+                shortSummary.textContent = "";
+                shortSummary.hidden = false;
+                shortStream = createWordStream(shortSummary);
+              }
+              shortStream.push(pending.partial_short_summary);
+            }
+          },
+        });
+        if (shortStream) await shortStream.finish(job.documents.short_summary || "");
+        if (shortStream) shortStream.stop();
+        shortStream = null;
+        updateDocuments(job.documents);
+        renderActiveTab();
+        window.showToast("Notes et résumé générés par l'IA.");
+      } catch (error) {
+        if (shortStream) {
+          shortStream.stop();
+          shortSummary.textContent = previous.shortText;
+          shortSummary.hidden = previous.shortHidden;
+        }
+        setGenerateStatus(error.message, "error");
+        window.showToast(error.message, "error");
+      } finally {
+        button.disabled = false;
+        button.classList.remove("ai-generate-loading");
+      }
+    });
+  }
+
+  const transcriptRetryButton = document.getElementById("transcript-retry-button");
+  const transcriptRetryStatus = document.getElementById("transcript-retry-status");
+
+  // Status lives next to the button only: also writing it to
+  // #transcript-action-status showed the same message twice on the page.
+  // The phone "⋮" popover holds a proxy button and a mirror of the status,
+  // because the action bar's own copy is hidden there.
+  function setTranscriptRetryStatus(message, level) {
+    if (!transcriptRetryStatus) return;
+    [transcriptRetryStatus, ...document.querySelectorAll("[data-retry-status-mirror]")].forEach((element) => {
+      element.hidden = false;
+      element.textContent = message;
+      element.dataset.level = level;
+    });
+  }
+
+  function setTranscriptRetryBusy(busy) {
+    transcriptRetryButton.disabled = busy;
+    document.querySelectorAll('[data-click-proxy="#transcript-retry-button"]').forEach((proxy) => {
+      proxy.disabled = busy;
+    });
+  }
+
+  if (transcriptRetryButton) {
+    transcriptRetryButton.addEventListener("click", async () => {
+      setTranscriptRetryBusy(true);
+      setTranscriptRetryStatus("Récupération du transcript en cours...", "loading");
+      try {
+        // The helpers live in app.js.
+        const job = await window.ratonApi("POST", `/api/videos/${videoId}/transcript/download`);
+        await window.ratonWaitForJob(job.status_url, { failure: "Aucun transcript n'a pu être récupéré." });
+        window.location.reload();
+      } catch (error) {
+        setTranscriptRetryStatus(error.message, "error");
+        setTranscriptRetryBusy(false);
+      }
+    });
+  }
+
+  if (copyButton) {
+    const copyIcon = copyButton.querySelector(".transcript-copy-icon:not(.transcript-copy-icon--check)");
+    const checkIcon = copyButton.querySelector(".transcript-copy-icon--check");
+    copyButton.addEventListener("click", async () => {
+      const text = transcriptContent.textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(transcriptContent);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        document.execCommand("copy");
+        selection.removeAllRanges();
+      }
+      copyButton.classList.add("is-copied");
+      // .hidden (propriété IDL) n'est pas reflétée sur l'attribut par les
+      // éléments SVG : on passe par setAttribute/removeAttribute.
+      copyIcon.setAttribute("hidden", "");
+      checkIcon.removeAttribute("hidden");
+      window.setTimeout(() => {
+        copyButton.classList.remove("is-copied");
+        copyIcon.removeAttribute("hidden");
+        checkIcon.setAttribute("hidden", "");
+      }, 1500);
+    });
+  }
+})();
+</script>
+{% endblock %}

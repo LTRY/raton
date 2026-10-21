@@ -2,9 +2,9 @@ import re
 from pathlib import Path
 
 CSS = (
-    Path(__file__).resolve().parents[1] / "app" / "static" / "css" / "tailwind.input.css"
+    Path(__file__).resolve().parents[1] / "front" / "static" / "css" / "tailwind.input.css"
 ).read_text()
-JS = (Path(__file__).resolve().parents[1] / "app" / "static" / "js" / "app.js").read_text()
+JS = (Path(__file__).resolve().parents[1] / "front" / "static" / "js" / "app.js").read_text()
 
 
 def test_glass_tokens_are_defined_once_on_root():
@@ -47,7 +47,7 @@ def test_ambient_ground_is_flat_cream_on_phones():
 
 
 def test_theme_color_matches_the_page_background():
-    base = (Path(__file__).resolve().parents[1] / "app" / "templates" / "base.html").read_text()
+    base = (Path(__file__).resolve().parents[1] / "front" / "templates" / "base.html").read_text()
     bg = re.search(r"--color-bg:\s*(#[0-9a-fA-F]{6})", CSS).group(1)
     meta = re.search(
         r'<meta name="theme-color" content="(#[0-9a-fA-F]{6})" media="\(max-width: 800px\)">', base
@@ -70,7 +70,7 @@ def test_glass_light_hook_is_wired():
 
 
 def test_topbar_and_everyday_controls_use_the_glass_class():
-    root = Path(__file__).resolve().parents[1] / "app" / "templates"
+    root = Path(__file__).resolve().parents[1] / "front" / "templates"
     assert '<header class="topbar lg">' in (root / "base.html").read_text()
     macros = (root / "_macros.html").read_text()
     start = macros.index("{% macro library_subnav")
@@ -95,7 +95,7 @@ def test_cards_get_glass_look_without_blur():
 
 
 def test_settings_save_bar_uses_the_glass_class():
-    root = Path(__file__).resolve().parents[1] / "app" / "templates"
+    root = Path(__file__).resolve().parents[1] / "front" / "templates"
     assert 'class="settings-actions lg"' in (root / "settings.html").read_text()
 
 
