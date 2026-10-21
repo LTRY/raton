@@ -834,7 +834,8 @@ Contenu :
   et les categories choisies dans le formulaire (`youtube_categories`), ou un
   badge "Deja ajoutee" (lien vers la chaine) si elle est dans la
   bibliotheque. Pas de lien vers YouTube. Lien "Fermer" pour replier le
-  panneau ; erreur de recherche et absence de resultat sont affichees dans le
+  panneau ; il fait partie des resultats de la recherche en direct : retaper
+  dans la recherche le remplace par la liste habituelle ; erreur de recherche et absence de resultat sont affichees dans le
   panneau. Comme `added_channel_id`, ces parametres ne sont pas repris dans
   les `next`/liens de pagination, pour ne pas relancer la recherche au retour
   d'une autre action ;

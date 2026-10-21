@@ -3812,6 +3812,18 @@ def test_channels_page_reports_a_failed_youtube_search(monkeypatch):
     assert "Recherche YouTube impossible : réseau" in rendered
 
 
+def test_channels_youtube_panel_lives_in_the_live_search_frame(monkeypatch):
+    db = make_session()
+    monkeypatch.setattr(channel_listing, "search_channels", lambda query: [])
+
+    rendered = channels_page(db, "q=leo&youtube_q=leo")
+
+    # Live search only swaps this frame and drops `youtube_q`: typing again
+    # must replace the panel with the plain results.
+    frame = rendered[rendered.index('<turbo-frame id="channel-results"') :]
+    assert "Chaînes YouTube pour « leo »" in frame
+
+
 def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch, no_profile_backfill):
     db = make_session()
     db.add(

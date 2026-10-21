@@ -37,6 +37,40 @@
     </form>
   </div>
 
+  {% if csv_preview %}
+  <div class="download-form csv-import-panel">
+    <div class="settings-category-header">
+      <h2>Abonnements trouvés</h2>
+      <output>{{ csv_preview.new_count }} nouvelle{{ 's' if csv_preview.new_count != 1 else '' }} · {{ csv_preview.existing_count }} déjà importée{{ 's' if csv_preview.existing_count != 1 else '' }}</output>
+    </div>
+    <form action="/channels/import-csv/confirm" method="post" data-turbo="false">
+      <div class="csv-import-list">
+        {% for row in csv_preview.rows %}
+        <label class="csv-import-row {{ 'csv-import-row-existing' if row.already_imported else '' }}">
+          {% if row.already_imported %}
+          <input type="checkbox" disabled>
+          {% else %}
+          <input type="checkbox" name="import_rows" value="{{ row.token }}" checked>
+          {% endif %}
+          <span class="csv-import-row-name">{{ row.name }}</span>
+          <span class="csv-import-row-url">{{ row.url }}</span>
+          {% if row.already_imported %}<span class="csv-import-badge">Déjà importée</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+      <div class="csv-import-actions">
+        <button class="secondary" type="button" data-csv-select-all>Tout sélectionner</button>
+        <button class="secondary" type="button" data-csv-select-none>Tout désélectionner</button>
+        <button type="submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  {# Everything that depends on `q` lives in this frame: live search swaps it
+     alone, so the search field keeps focus while typing. The YouTube panel is
+     in it too, so typing again drops it (the live request has no `youtube_q`). #}
+  <turbo-frame id="channel-results" class="live-results" target="_top">
   {% if youtube_search %}
   <div class="download-form channel-search-panel">
     <div class="settings-category-header">
@@ -79,39 +113,6 @@
   </div>
   {% endif %}
 
-  {% if csv_preview %}
-  <div class="download-form csv-import-panel">
-    <div class="settings-category-header">
-      <h2>Abonnements trouvés</h2>
-      <output>{{ csv_preview.new_count }} nouvelle{{ 's' if csv_preview.new_count != 1 else '' }} · {{ csv_preview.existing_count }} déjà importée{{ 's' if csv_preview.existing_count != 1 else '' }}</output>
-    </div>
-    <form action="/channels/import-csv/confirm" method="post" data-turbo="false">
-      <div class="csv-import-list">
-        {% for row in csv_preview.rows %}
-        <label class="csv-import-row {{ 'csv-import-row-existing' if row.already_imported else '' }}">
-          {% if row.already_imported %}
-          <input type="checkbox" disabled>
-          {% else %}
-          <input type="checkbox" name="import_rows" value="{{ row.token }}" checked>
-          {% endif %}
-          <span class="csv-import-row-name">{{ row.name }}</span>
-          <span class="csv-import-row-url">{{ row.url }}</span>
-          {% if row.already_imported %}<span class="csv-import-badge">Déjà importée</span>{% endif %}
-        </label>
-        {% endfor %}
-      </div>
-      <div class="csv-import-actions">
-        <button class="secondary" type="button" data-csv-select-all>Tout sélectionner</button>
-        <button class="secondary" type="button" data-csv-select-none>Tout désélectionner</button>
-        <button type="submit">Enregistrer</button>
-      </div>
-    </form>
-  </div>
-  {% endif %}
-
-  {# Everything that depends on `q` lives in this frame: live search swaps it
-     alone, so the search field keeps focus while typing. #}
-  <turbo-frame id="channel-results" class="live-results" target="_top">
   <div class="channel-grid">
     {% for entry in channel_entries|default(channels|default([])) %}
     {% set channel = entry.channel if entry.channel is defined else entry %}
