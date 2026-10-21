@@ -3,7 +3,6 @@
 `queue_*` build the prompt and create the `LlmJob` a route answers with; the route then hands
 `run_llm_job` to its background tasks. A client polls the job; `resolve_llm_job` says where it
 stands and, on the first poll after it finished, writes its result (see `llm_jobs`).
-Shared by the HTML routes (`transcript.py`, `library_chat.py`) and `/api`.
 """
 
 import json
@@ -34,11 +33,6 @@ class LlmRequestError(ValueError):
     """The request could not be queued; the message is the one shown to the person."""
 
 
-class EmptyQuestionError(LlmRequestError):
-    def __init__(self) -> None:
-        super().__init__("La question est vide.")
-
-
 class LlmJobNotFoundError(ValueError):
     def __init__(self) -> None:
         super().__init__("Tâche introuvable")
@@ -64,7 +58,7 @@ class LlmJobOutcome:
 def _question(question: str) -> str:
     question = question.strip()
     if not question:
-        raise EmptyQuestionError()
+        raise LlmRequestError("La question est vide.")
     return question
 
 
@@ -128,21 +122,6 @@ def queue_library_question(db: Session, question: str) -> LlmJob:
 def find_llm_job(db: Session, job_id: int) -> LlmJob:
     job = db.get(LlmJob, job_id)
     if job is None:
-        raise LlmJobNotFoundError()
-    return job
-
-
-def find_video_llm_job(db: Session, video_id: int, job_id: int) -> LlmJob:
-    """A job of that fiche only."""
-    job = find_llm_job(db, job_id)
-    if job.video_id != video_id:
-        raise LlmJobNotFoundError()
-    return job
-
-
-def find_library_chat_job(db: Session, job_id: int) -> LlmJob:
-    job = find_llm_job(db, job_id)
-    if job.kind != "library_chat" or job.video_id is not None:
         raise LlmJobNotFoundError()
     return job
 

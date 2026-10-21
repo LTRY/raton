@@ -1,8 +1,7 @@
-import logging
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy import desc, func, or_, select
 from sqlalchemy.orm import Session, contains_eager
 
@@ -38,15 +37,13 @@ from app.services.common.settings import (
 )
 from app.services.ingest import scan_events
 from app.services.ingest.scanner import scan_lock
-from app.services.jobs.scheduler import get_last_auto_scan_info, scheduled_scan
+from app.services.jobs.scheduler import get_last_auto_scan_info
 from app.services.llm.usage import llm_usage_summary
 from app.services.rag.auto_notes import LAST_RUN_AT_KEY as AUTO_NOTES_LAST_RUN_AT_KEY
 from app.services.rag.auto_notes import LAST_RUN_SUMMARY_KEY as AUTO_NOTES_LAST_RUN_SUMMARY_KEY
 from app.web.job_logs import LOG_FILTERS, LOG_PAGE_SIZE, log_days, normalize_log_filter
 from app.web.library_stats import library_stats_context
 from app.web.shared import form_list_values, form_text_value, page_href_builder, redirect, templates
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -158,34 +155,6 @@ def settings_form(
         },
     )
     return redirect("/settings")
-
-
-def run_scan_now_job() -> None:
-    """Background task of the "Lancer le scan" button: the same run as the 3am cron."""
-    try:
-        scheduled_scan()
-    except Exception as exc:
-        logger.exception("manual scan failed")
-        scan_events.emit(f"Scan en échec : {exc}", "error", final=True)
-
-
-@router.post("/settings/scan")
-def run_scan_now(background_tasks: BackgroundTasks):
-    # Always answers JSON: the button is driven by app.js, which then polls the event feed.
-    if scan_lock.locked():
-        return JSONResponse(
-            {"status": "already_running", "message": "Un scan est déjà en cours."}, status_code=409
-        )
-    _, after = scan_events.events_after(0)
-    scan_events.emit("Scan lancé à la demande.")
-    background_tasks.add_task(run_scan_now_job)
-    return JSONResponse({"status": "started", "message": "Scan lancé.", "after": after})
-
-
-@router.get("/settings/scan/events")
-def scan_events_feed(after: int = 0):
-    events, last_id = scan_events.events_after(after)
-    return JSONResponse({"events": events, "last_id": last_id, "running": scan_lock.locked()})
 
 
 def _like_pattern(query: str) -> str:

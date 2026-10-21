@@ -1,11 +1,12 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-from fastapi import BackgroundTasks
+import pytest
+from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from starlette.requests import Request
 
+from app.api import llm as llm_api
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
@@ -13,13 +14,14 @@ from app.models.job import DownloadJob
 from app.models.library_chat_message import LibraryChatMessage
 from app.models.llm_job import LlmJob
 from app.models.video import TranscriptStatus, Video
+from app.schemas.llm import QuestionCreate
 from app.services.jobs import backfills, llm_jobs
+from app.services.library_chat.history import chat_messages
 from app.services.library_chat.tools import LibraryChatToolbox
 from app.services.llm.provider import CompletionResult
 from app.services.rag import retrieval as rag_retrieval
 from app.services.rag.retrieval import RetrievedChunk
 from app.services.youtube import channel_info
-from app.web.routes import library_chat as library_chat_routes
 
 
 def make_session():
@@ -66,25 +68,9 @@ def ask(db, monkeypatch, provider, question="Une question ?"):
     monkeypatch.setattr(backfills, "run_channel_profile_backfill_job", lambda: None)
     monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: provider)
     monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    response = library_chat_routes.chat_about_library(
-        fetch_request("/chat"), BackgroundTasks(), question, db
-    )
-    job_id = json.loads(response.body)["job_id"]
+    job_id = llm_api.ask_library(QuestionCreate(question=question), BackgroundTasks(), db).job_id
     llm_jobs.run_llm_job(job_id)
-    return json.loads(library_chat_routes.library_chat_job_status(job_id, db).body)
-
-
-def fetch_request(path: str) -> Request:
-    return Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": path,
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
+    return llm_api.get_llm_job(job_id, BackgroundTasks(), db).library_chat.model_dump()
 
 
 def test_chat_about_library_queues_job_and_resolves_after_background_task(monkeypatch):
@@ -122,14 +108,12 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    response = library_chat_routes.chat_about_library(
-        fetch_request("/chat"), background_tasks, "Qu'est-ce que le stoïcisme ?", db
+    queued = llm_api.ask_library(
+        QuestionCreate(question="Qu'est-ce que le stoïcisme ?"), background_tasks, db
     )
-    payload = json.loads(response.body)
 
-    assert response.status_code == 200
-    assert payload["status"] == "queued"
-    job_id = payload["job_id"]
+    assert queued.status_url == f"/api/llm-jobs/{queued.job_id}"
+    job_id = queued.job_id
     job = db.get(LlmJob, job_id)
     assert job.kind == "library_chat"
     assert job.video_id is None
@@ -142,10 +126,10 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
 
     assert "dichotomie du contrôle" in provider.tool_outputs[0]
 
-    resolved = library_chat_routes.library_chat_job_status(job_id, db)
-    resolved_payload = json.loads(resolved.body)
+    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
+    resolved_payload = resolved.library_chat.model_dump()
 
-    assert resolved_payload["status"] == "ok"
+    assert resolved.status == "done"
     assert resolved_payload["messages"] == [
         {
             "role": "user",
@@ -166,8 +150,8 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     assert resolved_payload["total_video_count"] == 1
 
     # Idempotent replay ("applied") must not duplicate messages.
-    second = library_chat_routes.library_chat_job_status(job_id, db)
-    assert json.loads(second.body)["messages"] == resolved_payload["messages"]
+    second = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
+    assert second.library_chat.model_dump()["messages"] == resolved_payload["messages"]
 
 
 def test_chat_about_library_lists_channels_found_by_the_channel_tool(monkeypatch):
@@ -327,13 +311,10 @@ def test_tool_failure_is_reported_to_the_model_instead_of_failing_the_job(monkey
 
 def test_chat_about_library_rejects_empty_question(monkeypatch):
     db = make_session()
-    response = library_chat_routes.chat_about_library(
-        fetch_request("/chat"), BackgroundTasks(), "   ", db
-    )
-    payload = json.loads(response.body)
+    with pytest.raises(HTTPException) as refused:
+        llm_api.ask_library(QuestionCreate(question="   "), BackgroundTasks(), db)
 
-    assert response.status_code == 400
-    assert payload["status"] == "failed"
+    assert refused.value.status_code == 400
 
 
 def test_library_chat_payload_drops_chips_for_deleted_videos_and_channels(monkeypatch):
@@ -350,7 +331,7 @@ def test_library_chat_payload_drops_chips_for_deleted_videos_and_channels(monkey
     db.delete(channel)  # cascades to its videos
     db.commit()
 
-    message = library_chat_routes.library_chat_payload(db)["messages"][1]
+    message = chat_messages(db)[1]
     assert message["channels"] == []
     assert message["citations"] == []
 
@@ -358,11 +339,10 @@ def test_library_chat_payload_drops_chips_for_deleted_videos_and_channels(monkey
 def test_clear_library_chat_deletes_all_messages(monkeypatch):
     db = make_session()
     ask(db, monkeypatch, fake_provider("Réponse."))
-    assert len(library_chat_routes.library_chat_payload(db)["messages"]) == 2
+    assert len(chat_messages(db)) == 2
 
-    cleared = library_chat_routes.clear_library_chat(db)
-    assert json.loads(cleared.body)["messages"] == []
-    assert library_chat_routes.library_chat_payload(db)["messages"] == []
+    llm_api.clear_library_chat(db)
+    assert chat_messages(db) == []
 
 
 def test_notes_search_keeps_at_most_two_chunks_per_video():
@@ -604,12 +584,10 @@ def test_pending_job_status_exposes_the_tool_calls_made_so_far():
     db.add(job)
     db.commit()
 
-    payload = json.loads(library_chat_routes.library_chat_job_status(job.id, db).body)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert payload == {
-        "status": "pending",
-        "tool_calls": [{"label": "Recherche dans les notes générées…", "result": None}],
-    }
+    assert status.status == "pending"
+    assert status.tool_calls == [{"label": "Recherche dans les notes générées…", "result": None}]
 
 
 def test_run_llm_job_stores_the_tool_calls_of_a_library_chat(monkeypatch):

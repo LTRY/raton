@@ -31,7 +31,6 @@ from app.web.compression import TextGZipMiddleware
 from app.web.request_timing import RequestTimingMiddleware, event_loop_lag_probe, install_sql_timing
 from app.web.routes.channels import router as channels_router
 from app.web.routes.dashboard import router as dashboard_router
-from app.web.routes.library_chat import router as library_chat_router
 from app.web.routes.media import router as media_router
 from app.web.routes.playlists import router as playlists_router
 from app.web.routes.rag import router as rag_router
@@ -107,4 +106,3 @@ app.include_router(raton_router, include_in_schema=False)
 app.include_router(channels_router, include_in_schema=False)
 app.include_router(videos_router, include_in_schema=False)
 app.include_router(transcript_router, include_in_schema=False)
-app.include_router(library_chat_router, include_in_schema=False)

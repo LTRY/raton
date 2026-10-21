@@ -1,7 +1,7 @@
 """`/api` LLM requests: notes of a fiche, its discussion, the library chat, and their jobs.
 
-Each route calls the service its HTML twin calls (`app/web/routes/transcript.py`,
-`library_chat.py`). The discussion and the documents of a fiche are also in
+The page widgets call these routes; only the notes generation keeps a no-JS form fallback
+(`app/web/routes/transcript.py`). The discussion and the documents of a fiche are also in
 `GET /api/videos/{id}`.
 """
 
@@ -122,7 +122,7 @@ def get_llm_job(
     job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> LlmJobStatusRead:
     """Where an LLM job stands. The first poll after it finished writes its result (notes,
-    answer), like the page's polling; a failed job answers 200 with `status: failed`."""
+    answer); a failed job answers 200 with `status: failed`."""
     try:
         job = find_llm_job(db, job_id)
     except LlmJobNotFoundError as exc:

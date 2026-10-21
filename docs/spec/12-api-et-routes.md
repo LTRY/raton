@@ -113,7 +113,9 @@ Videos :
   (defaut sur une chaine), `views` ou `rated` (note decroissante). Avec
   `channel_id` d'une chaine existante, rend `channel_videos.html` (page
   d'une chaine) au lieu de `videos.html`.
-- `POST /videos/{id}/categories` : modifier les categories de la video.
+- `POST /videos/{id}/categories` : modifier les categories de la video, puis
+  rediriger vers `next`. L'editeur de la page detail enregistre a chaque
+  coche par `PUT /api/videos/{id}/categories`.
 - `POST /videos/{id}/comment` : commentaire libre (texte, champ `comment`).
 - `POST /videos/{id}/rating` : note de 0 à 5, redirige (303) vers `next`.
   Repli sans JavaScript : les étoiles appellent `PUT /api/videos/{id}/rating`.
@@ -142,14 +144,14 @@ Videos :
 - `GET /raton/variations` : toutes les repliques de Raton, sans condition
   (voir [18 Raton](18-raton-scenarios.md)).
 - `GET /videos/{id}/transcript` : redirection vers detail ancre transcript.
-- `POST /videos/{id}/transcript/generate` : generer les notes structurees, le resume (+ resume court + questions suggerees) en un seul appel LLM, a partir de `transcript.txt` — voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
-- `POST /videos/{id}/transcript/chat` : poser question.
-- `POST /videos/{id}/transcript/chat/clear` : effacer chat.
-- `GET /videos/{id}/transcript/jobs/{job_id}` : statut/resolution d'un job LLM asynchrone, tous fournisseurs confondus (traite en tache de fond dans le process web) ; pour un job `generate` en cours, renvoie aussi le résumé court deja ecrit (`partial_short_summary`).
-- `POST /videos/{id}/sponsors/fetch` : rechercher les segments sponsorises via l'API publique SponsorBlock — **seule source** — pour les categories activees (`/settings`) ; remplace uniquement les lignes `source="sponsorblock"` de la video. Repond en JSON (`{status, message}`) si l'appel porte l'en-tete `X-Requested-With: fetch`, sinon redirige vers `/videos/{id}?message=...#segments-sponsors` (l'ancre ouvre l'onglet Segments ; `level=error` en cas d'echec) — voir [08 Medias et lecteurs](08-medias-et-lecteurs.md). Il n'existe plus de route de detection par IA : `POST /videos/{id}/sponsors/detect` a ete supprimee.
-- `POST /chat` : chat cross-video (le modele cherche chaines, videos et notes via des outils), voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
-- `POST /chat/clear` : effacer le fil du chat cross-video (`library_chat_messages`, fil unique).
-- `GET /chat/jobs/{job_id}` : statut/resolution d'un job `kind="library_chat"` (equivalent cross-video de `GET /videos/{id}/transcript/jobs/{job_id}`) ; `pending` porte aussi `tool_calls` (appels d'outils deja faits).
+- `POST /videos/{id}/transcript/generate` : repli sans JavaScript de
+  `POST /api/videos/{id}/notes/generate` (notes structurees, resume court et
+  questions suggerees en un seul appel LLM, a partir de `transcript.txt` —
+  voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
+  redirige vers l'onglet transcript de la fiche. La discussion d'une fiche et
+  le chat de la bibliotheque n'ont pas de route HTML : leurs widgets appellent
+  `/api/videos/{id}/chat`, `/api/chat` et `/api/llm-jobs/{id}`.
+- `POST /videos/{id}/sponsors/fetch` : rechercher les segments sponsorises via l'API publique SponsorBlock — **seule source** — pour les categories activees (`/settings`) ; remplace uniquement les lignes `source="sponsorblock"` de la video. Redirige vers `/videos/{id}?message=...#segments-sponsors` (l'ancre ouvre l'onglet Segments ; `level=error` en cas d'echec) — voir [08 Medias et lecteurs](08-medias-et-lecteurs.md). Meme recherche : `POST /api/videos/{id}/sponsor-segments/fetch`.
 - `GET /videos/import` : page du formulaire de telechargement manuel (entree Import du menu Bibliotheque).
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
 - `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`app/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Redirige vers la fiche ; repli sans JavaScript de `POST /api/videos/upload`, qu'appelle la page d'import. Pas de transcript ni de metadonnees YouTube.
@@ -169,19 +171,10 @@ Parametres et divers :
 
 - `GET /settings` : page parametres.
 - `POST /settings` : mise a jour parametres.
-- `POST /settings/scan` : lance le scan des chaines suivies a la demande (meme
-  traitement que le cron de 3h, via `scheduled_scan`) en tache de fond. Repond
-  toujours en JSON : `{status: "started", message, after}` (`after` = dernier
-  identifiant d'evenement deja emis), ou `409 {status: "already_running"}` si un
-  scan tourne.
-- `GET /settings/scan/events?after=N` : evenements du scan emis apres `N`,
-  `{events: [{id, level, message, final}], last_id, running}`. Flux en memoire du
-  processus (`app/services/ingest/scan_events.py`), pas une table.
 - `GET /logs` : logs jobs, filtres `status` (`all`, `errors`, `warnings`, `running`), `q` (recherche) et `page` (voir [11 Interface HTML](11-interface-html.md), section Logs).
 
-Le scan des chaines n'a pas de route dans `/api` : il est declenche par le
-scheduler ou par `POST /settings/scan` (voir
-[13 Jobs, logs et planification](13-jobs-logs-planification.md)).
+Le bouton "Lancer le scan maintenant" de `/settings` appelle `POST /api/scan`
+et suit `GET /api/scan/events` (voir Scan plus bas).
 
 ## API interne `/api`
 
@@ -454,6 +447,16 @@ watched_at}`.
   de la bulle de Raton). `POST /api/jobs/{id}/cancel` passe un job d'import de
   chaine en `cancelled` (bouton × de la bulle) : l'import s'arrete avant la
   fiche suivante ; repond l'etat du job.
+
+### Scan
+
+- `POST /api/scan` : lance le scan des chaines suivies (meme traitement que le
+  cron de 3h, via `scheduled_scan`) en tache de fond ; `202 {after}` (`after` :
+  dernier identifiant d'evenement emis avant ce scan), `409 Un scan est déjà
+  en cours.` si un scan tourne.
+- `GET /api/scan/events?after=N` : evenements du scan emis apres `N`,
+  `{events: [{id, level, message, final}], last_id, running}`. Flux en memoire
+  du processus (`app/services/ingest/scan_events.py`), pas une table.
 
 ### Import de fiches
 

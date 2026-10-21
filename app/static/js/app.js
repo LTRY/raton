@@ -2002,14 +2002,13 @@ function initChatWidget(root) {
     button.addEventListener("click", () => setScope(button.dataset.chatScope));
   });
 
-  async function pollJob(jobId, onProgress) {
-    const url = scopeConfig().jobUrlTemplate.replace("{job_id}", jobId);
-    while (true) {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message || "Action impossible.");
-      if (payload.status !== "pending") return payload;
-      if (onProgress) onProgress(payload.tool_calls || []);
+  // Polls /api/llm-jobs/{id} until the answer is written; returns the conversation with it.
+  async function waitForAnswer(statusUrl, onProgress) {
+    for (;;) {
+      const job = await apiRequest("GET", statusUrl);
+      if (job.status === "failed") throw new Error(job.message || "Réponse impossible.");
+      if (job.status === "done") return job.chat_messages || job.library_chat.messages;
+      onProgress(job.tool_calls);
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
     }
   }
@@ -2041,7 +2040,6 @@ function initChatWidget(root) {
       const button = form.querySelector("button");
       const submittedScope = currentScope;
       syncField();
-      const formData = new FormData(form);
       const question = readInput().trim();
       button.disabled = true;
       if (input) input.contentEditable = "false";
@@ -2056,25 +2054,16 @@ function initChatWidget(root) {
       setStatus("Préparation de la réponse...", "loading");
 
       try {
-        const response = await fetch(scopeConfig().askUrl, {
-          method: "POST",
-          body: formData,
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        let payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Discussion impossible.");
+        const job = await apiRequest("POST", scopeConfig().chatUrl, { question });
         form.reset();
         writeInput("");
-        if (payload.status === "queued") {
-          setStatus("Préparation de la réponse, cela peut prendre un moment...", "loading");
-          payload = await pollJob(payload.job_id, renderToolSteps);
-        }
-        config.scopes[submittedScope].messages = payload.messages || [];
+        setStatus("Préparation de la réponse, cela peut prendre un moment...", "loading");
+        config.scopes[submittedScope].messages = await waitForAnswer(job.status_url, renderToolSteps);
         if (submittedScope === currentScope) {
           renderMessages();
           revealLatest();
         }
-        setStatus(payload.message || "Réponse ajoutée.", "success");
+        setStatus("Réponse ajoutée.", "success");
       } catch (error) {
         setStatus(error.message, "error");
         renderMessages();
@@ -2099,15 +2088,10 @@ function initChatWidget(root) {
       button.disabled = true;
       setStatus("Effacement en cours...", "loading");
       try {
-        const response = await fetch(scopeConfig().clearUrl, {
-          method: "POST",
-          headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.message || "Effacement impossible.");
-        config.scopes[clearedScope].messages = payload.messages || [];
+        await apiRequest("DELETE", scopeConfig().chatUrl);
+        config.scopes[clearedScope].messages = [];
         if (clearedScope === currentScope) renderMessages();
-        setStatus(payload.message || "Discussion effacée.", "success");
+        setStatus("Discussion effacée.", "success");
       } catch (error) {
         setStatus(error.message, "error");
       } finally {
@@ -3239,11 +3223,9 @@ function initScanRunner() {
     let quiet = 0;
     try {
       while (true) {
-        const response = await fetch(`${button.dataset.scanFeedUrl}?after=${after}`, {
-          headers: { Accept: "application/json" },
+        const feed = await apiRequest("GET", `${button.dataset.scanFeedUrl}?after=${after}`).catch(() => {
+          throw new Error("Impossible de lire la progression du scan.");
         });
-        if (!response.ok) throw new Error("Impossible de lire la progression du scan.");
-        const feed = await response.json();
         after = feed.last_id;
         let finished = false;
         feed.events.forEach((event) => {
@@ -3266,22 +3248,13 @@ function initScanRunner() {
   button.addEventListener("click", async () => {
     setBusy(true);
     try {
-      const response = await fetch(button.dataset.scanUrl, {
-        method: "POST",
-        headers: { Accept: "application/json", "X-Requested-With": "fetch" },
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        window.showToast(payload.message || "Le scan n'a pas pu démarrer.", "error");
-        if (payload.status === "already_running") poll();
-        else setBusy(false);
-        return;
-      }
-      after = payload.after;
+      ({ after } = await apiRequest("POST", button.dataset.scanUrl));
       poll();
     } catch (error) {
-      window.showToast(error.message, "error");
-      setBusy(false);
+      window.showToast(error.message || "Le scan n'a pas pu démarrer.", "error");
+      // 409: a scan already runs, follow it instead.
+      if (error.status === 409) poll();
+      else setBusy(false);
     }
   });
 

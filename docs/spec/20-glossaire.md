@@ -214,7 +214,7 @@ Texte des sous-titres de la fiche. Etats : `missing`, `downloaded`, `failed`.
 
 ### Job LLM
 
-Demande au LLM : creee tout de suite, executee en tache de fond, le client interroge `.../transcript/jobs/{job_id}` jusqu'a la fin.
+Demande au LLM : creee tout de suite, executee en tache de fond, le client interroge `GET /api/llm-jobs/{job_id}` jusqu'a la fin.
 
 - **Code** : `LlmJob`, `run_llm_job`
 - **A ne pas confondre avec** : Un `download_jobs` (journal des telechargements et scans).
@@ -228,9 +228,9 @@ Fichier JSON-lines, un evenement par ligne, ecrit par l'application elle-meme (r
 
 ### Chat
 
-Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page detail) et le chat de **toute la bibliotheque** (`/chat`, avec des outils de recherche). Un seul mot, la portee se dit en complement.
+Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page detail) et le chat de **toute la bibliotheque** (barre de l'accueil, avec des outils de recherche). Un seul mot, la portee se dit en complement.
 
-- **Code** : `/videos/{id}/transcript/chat`, `/chat`
+- **Code** : `/api/videos/{id}/chat`, `/api/chat`
 - **A ne pas confondre avec** : Un job LLM, qui est la tache de fond derriere chaque reponse.
 
 ### Chunk

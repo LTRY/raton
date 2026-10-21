@@ -14,6 +14,7 @@ from starlette.requests import Request
 
 from app import main
 from app.api import channels as api_channels
+from app.api import llm as llm_api
 from app.api import settings as api_settings
 from app.api import videos as api_videos
 from app.db.base import *  # noqa: F403
@@ -24,6 +25,7 @@ from app.models.llm_job import LlmJob
 from app.models.setting import AppSetting
 from app.models.video import TranscriptStatus, Video
 from app.models.video_sponsor_segment import VideoSponsorSegment
+from app.schemas.llm import QuestionCreate
 from app.schemas.settings import SettingsUpdate
 from app.services.channels import manage as channel_manage
 from app.services.common import search
@@ -330,7 +332,7 @@ def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_pat
     assert "Bonjour depuis le transcript." in rendered
     assert 'id="discussion"' in rendered
     assert "Pose une question sur le transcript." not in rendered
-    assert f'"askUrl": "/videos/{video.id}/transcript/chat"' in rendered
+    assert f'"chatUrl": "/api/videos/{video.id}/chat"' in rendered
     assert f'action="/videos/{video.id}/transcript/clean"' not in rendered
     assert f'action="/videos/{video.id}/transcript/revert"' not in rendered
     assert 'data-tab="cleaned"' not in rendered
@@ -453,19 +455,6 @@ def test_failed_llm_job_keeps_the_cost_of_a_truncated_response(monkeypatch):
     )  # prompt over 100K tokens -> long-prompt tier
 
 
-def fetch_request(path: str) -> Request:
-    return Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": path,
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-
 def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
     db = make_session()
     video = add_video(db)
@@ -480,13 +469,12 @@ def test_fetch_video_sponsorblock_segments_inserts_rows(monkeypatch, tmp_path):
         ],
     )
 
-    response = videos_routes.fetch_video_sponsorblock_segments(
-        fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
-    )
-    payload = json.loads(response.body)
+    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
 
-    assert response.status_code == 200
-    assert payload["status"] == "ok"
+    assert response.status_code == 303
+    assert response.headers["location"] == (
+        f"/videos/{video.id}?message=1+segment+trouv%C3%A9.#segments-sponsors"
+    )
     rows = list(
         db.scalars(select(VideoSponsorSegment).where(VideoSponsorSegment.video_id == video.id))
     )
@@ -504,13 +492,11 @@ def test_fetch_video_sponsorblock_segments_reports_error_without_writing(monkeyp
 
     monkeypatch.setattr(sponsor_segments, "fetch_sponsorblock_segments", fail)
 
-    response = videos_routes.fetch_video_sponsorblock_segments(
-        fetch_request(f"/videos/{video.id}/sponsors/fetch"), video.id, db
-    )
-    payload = json.loads(response.body)
+    response = videos_routes.fetch_video_sponsorblock_segments(video.id, db)
 
-    assert response.status_code == 400
-    assert "impossible" in payload["message"].lower()
+    assert response.status_code == 303
+    assert "level=error" in response.headers["location"]
+    assert response.headers["location"].endswith("#segments-sponsors")
     assert (
         db.scalar(select(VideoSponsorSegment).where(VideoSponsorSegment.video_id == video.id))
         is None
@@ -647,9 +633,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     db.commit()
     job_id = job.id
 
-    assert json.loads(
-        transcript_routes.transcript_job_status(video_id, job_id, BackgroundTasks(), db).body
-    ) == {"status": "pending"}
+    assert llm_api.get_llm_job(job_id, BackgroundTasks(), db).partial_short_summary is None
 
     streamed = "# Résumé\n## Résumé court\nLigne 1."
     polled = []
@@ -657,13 +641,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     class FakeProvider:
         def complete(self, messages, on_text=None, system=None):
             on_text(streamed)
-            polled.append(
-                json.loads(
-                    transcript_routes.transcript_job_status(
-                        video_id, job_id, BackgroundTasks(), db
-                    ).body
-                )
-            )
+            polled.append(llm_api.get_llm_job(job_id, BackgroundTasks(), db))
             return CompletionResult(
                 text=GENERATION_RESULT_TEXT,
                 model="claude-haiku-4-5",
@@ -678,7 +656,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
 
     llm_jobs.run_llm_job(job_id)
 
-    assert polled == [{"status": "pending", "partial_short_summary": "Ligne 1."}]
+    assert [(job.status, job.partial_short_summary) for job in polled] == [("pending", "Ligne 1.")]
     assert db.get(LlmJob, job_id).result == GENERATION_RESULT_TEXT
 
 
@@ -713,18 +691,19 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, background_tasks, db)
-    assert json.loads(response.body)["status"] == "generated"
+    status = llm_api.get_llm_job(job.id, background_tasks, db)
+    assert status.status == "done"
+    assert "- Fait 1\n- Fait 2" in status.documents.notes
     assert len(scheduled) == 1
     fn, args, kwargs = scheduled[0]
-    assert fn is transcript_routes.run_notes_indexing_job
+    assert fn is llm_api.run_notes_indexing_job
     assert args[0] == video.id
     assert "- Fait 1\n- Fait 2" in args[1]
     assert kwargs == {}
 
     # Idempotent replay ("applied") must not reschedule indexing a second time.
     scheduled.clear()
-    transcript_routes.transcript_job_status(video.id, job.id, background_tasks, db)
+    llm_api.get_llm_job(job.id, background_tasks, db)
     assert scheduled == []
 
 
@@ -1056,9 +1035,10 @@ def test_transcript_job_status_pending_while_queued(tmp_path):
     db.add(job)
     db.commit()
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert json.loads(response.body) == {"status": "pending"}
+    assert status.status == "pending"
+    assert status.documents is None
 
 
 def test_transcript_job_status_reports_failure(tmp_path):
@@ -1083,10 +1063,10 @@ def test_transcript_job_status_reports_failure(tmp_path):
     db.add(job)
     db.commit()
 
-    response = transcript_routes.transcript_job_status(video.id, job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert response.status_code == 400
-    assert "API indisponible." in json.loads(response.body)["message"]
+    assert status.status == "failed"
+    assert "API indisponible." in status.message
 
 
 def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
@@ -1101,17 +1081,11 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
 
-    response = transcript_routes.chat_about_video_transcript(
-        fetch_request(f"/videos/{video.id}/transcript/chat"),
-        video.id,
-        BackgroundTasks(),
-        "Question ?",
-        db,
+    queued = llm_api.ask_about_video(
+        video.id, QuestionCreate(question="Question ?"), BackgroundTasks(), db
     )
-    payload = json.loads(response.body)
-    assert payload["status"] == "queued"
 
-    job = db.get(LlmJob, payload["job_id"])
+    job = db.get(LlmJob, queued.job_id)
     assert job.kind == "chat"
     assert job.provider == "anthropic"
     assert job.question == "Question ?"
@@ -1121,26 +1095,21 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     job.result = "Réponse du LLM."
     db.commit()
 
-    resolved_response = transcript_routes.transcript_job_status(
-        video.id, job.id, BackgroundTasks(), db
-    )
-    resolved_payload = json.loads(resolved_response.body)
+    resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
 
-    assert resolved_payload["status"] == "ok"
-    assert resolved_payload["messages"] == [
+    assert resolved.status == "done"
+    assert [message.model_dump() for message in resolved.chat_messages] == [
         {"role": "user", "content": "Question ?"},
         {"role": "assistant", "content": "Réponse du LLM."},
     ]
     assert (folder / "transcript.chat.json").exists()
 
     # Re-polling must not duplicate the appended messages.
-    second_resolved = transcript_routes.transcript_job_status(
-        video.id, job.id, BackgroundTasks(), db
-    )
-    assert len(json.loads(second_resolved.body)["messages"]) == 2
+    second_resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    assert len(second_resolved.chat_messages) == 2
 
 
-def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(monkeypatch, tmp_path):
+def test_video_chat_queues_job_and_resolves_after_background_task(monkeypatch, tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
@@ -1174,35 +1143,18 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/chat",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
-
-    response = transcript_routes.chat_about_video_transcript(
-        request, video.id, background_tasks, "Question ?", db
-    )
-    payload = json.loads(response.body)
-
-    assert response.status_code == 200
-    assert payload["status"] == "queued"
-    job_id = payload["job_id"]
+    job_id = llm_api.ask_about_video(
+        video.id, QuestionCreate(question="Question ?"), background_tasks, db
+    ).job_id
     assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     # Simulate the background task the request scheduled.
     llm_jobs.run_llm_job(job_id)
 
-    resolved = transcript_routes.transcript_job_status(video.id, job_id, BackgroundTasks(), db)
-    resolved_payload = json.loads(resolved.body)
+    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
 
-    assert resolved_payload["status"] == "ok"
-    assert resolved_payload["messages"] == [
+    assert resolved.status == "done"
+    assert [message.model_dump() for message in resolved.chat_messages] == [
         {"role": "user", "content": "Question ?"},
         {"role": "assistant", "content": "Réponse à Question ?"},
     ]
@@ -1214,7 +1166,7 @@ def test_transcript_chat_fetch_queues_job_and_resolves_after_background_task(mon
     assert "Prompt envoyé sur Une vidéo à lire localement: Question ?" in job.message
 
 
-def test_transcript_chat_clear_fetch_returns_empty_messages(tmp_path):
+def test_clearing_the_video_chat_deletes_its_file(tmp_path):
     db = make_session()
     folder = tmp_path / "video"
     folder.mkdir()
@@ -1229,23 +1181,8 @@ def test_transcript_chat_clear_fetch_returns_empty_messages(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/transcript/chat/clear",
-            "headers": [(b"x-requested-with", b"fetch")],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
+    llm_api.clear_video_chat(video.id, db)
 
-    response = transcript_routes.clear_video_transcript_chat(request, video.id, db)
-    payload = json.loads(response.body)
-
-    assert response.status_code == 200
-    assert payload["status"] == "ok"
-    assert payload["messages"] == []
     assert not (folder / "transcript.chat.json").exists()
 
 
@@ -2769,19 +2706,8 @@ def test_videos_page_uses_separate_asset_and_category_filter_modes(monkeypatch):
 def test_video_categories_form_saves_presets_and_custom_labels():
     db = make_session()
     video = add_video(db)
-    request = Request(
-        {
-            "type": "http",
-            "method": "POST",
-            "path": f"/videos/{video.id}/categories",
-            "headers": [],
-            "scheme": "http",
-            "server": ("testserver", 80),
-        }
-    )
 
     response = videos_routes.update_video_categories_form(
-        request,
         video.id,
         preset_categories=["maker", "science"],
         custom_categories="Interview, maker",

@@ -186,8 +186,8 @@ web ; chacune ouvre sa propre session DB.
 | `download_requests` | Côté requête de ces tâches, partagé par les formulaires et `/api` : validation et mise en file depuis la page d'import (`queue_manual_download`), une fiche (`queue_media_download`, `queue_transcript_retry`), une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) ou les formats manquants d'une playlist (`queue_playlist_downloads`) ; import synchrone du partage iOS (`import_shared_video`) ; état (`job_status`) et arrêt (`cancel_job`) d'un job |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
-| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), partagés par les routes HTML et `/api` |
+| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
-| `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques |
+| `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques ; scan lancé à la main depuis `/settings` |
 
 Voir [13 Jobs, logs et planification](13-jobs-logs-planification.md).

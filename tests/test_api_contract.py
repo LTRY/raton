@@ -3,6 +3,7 @@
 import ast
 import inspect
 import textwrap
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -99,3 +100,24 @@ def test_html_routes_keep_fastapi_validation_answer(client):
 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)
+
+
+def test_html_routes_redirect_and_leave_json_to_the_api():
+    """The page scripts call `/api`; a form route only serves the no-JS fallback. The iOS
+    share shortcut is the one HTML route answering JSON, it cannot follow a redirect."""
+    routes_dir = Path(__file__).resolve().parents[1] / "app" / "web" / "routes"
+    answering_json = {
+        path.name
+        for path in routes_dir.glob("*.py")
+        if "JSONResponse(" in path.read_text(encoding="utf-8")
+    }
+    scripts = Path(__file__).resolve().parents[1] / "app"
+    fetch_header = [
+        str(path.relative_to(scripts))
+        for path in [*scripts.glob("static/js/*.js"), *scripts.glob("templates/**/*.html")]
+        if "X-Requested-With" in path.read_text(encoding="utf-8")
+    ]
+
+    assert answering_json == {"videos.py"}
+    assert "def share_import_video" in (routes_dir / "videos.py").read_text(encoding="utf-8")
+    assert fetch_header == []

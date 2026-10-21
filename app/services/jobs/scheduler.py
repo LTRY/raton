@@ -9,7 +9,8 @@ from app.core.config import get_settings
 from app.core.logging import log_event, logged_job
 from app.db.session import SessionLocal
 from app.services.common.settings import get_setting, set_setting
-from app.services.ingest.scanner import run_scan
+from app.services.ingest import scan_events
+from app.services.ingest.scanner import run_scan, scan_lock
 from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_note_index_backfill_job,
@@ -99,6 +100,29 @@ def scheduled_scan() -> None:
         record_scan_result(db, result)
     finally:
         db.close()
+
+
+class ScanAlreadyRunningError(ValueError):
+    pass
+
+
+def start_manual_scan() -> int:
+    """Announce a scan asked from `/settings`; the caller then runs `run_manual_scan_job` in the
+    background. Returns the last event id before it, where the viewer's feed starts."""
+    if scan_lock.locked():
+        raise ScanAlreadyRunningError("Un scan est déjà en cours.")
+    _, after = scan_events.events_after(0)
+    scan_events.emit("Scan lancé à la demande.")
+    return after
+
+
+def run_manual_scan_job() -> None:
+    """The same run as the 3am cron; a failure still ends the viewer's feed."""
+    try:
+        scheduled_scan()
+    except Exception as exc:
+        logger.exception("manual scan failed")
+        scan_events.emit(f"Scan en échec : {exc}", "error", final=True)
 
 
 @logged_job("scheduled_media_purge")

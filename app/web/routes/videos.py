@@ -171,7 +171,6 @@ def videos_page(
 
 @router.post("/videos/{video_id}/categories")
 def update_video_categories_form(
-    request: Request,
     video_id: int,
     preset_categories: list[str] = Form(default=[]),
     custom_categories: str = Form(""),
@@ -187,8 +186,6 @@ def update_video_categories_form(
         *parse_video_category_labels(form_text_value(custom_categories)),
     ]
     set_video_categories(db, video, submitted_categories)
-    if request.headers.get("x-requested-with") == "fetch":
-        return JSONResponse({"status": "ok", "categories": submitted_categories})
     return redirect(internal_return_path(return_to, f"/videos/{video_id}"))
 
 
@@ -208,20 +205,14 @@ def update_video_comment_form(
 
 
 @router.post("/videos/{video_id}/sponsors/fetch")
-def fetch_video_sponsorblock_segments(
-    request: Request, video_id: int, db: Session = Depends(get_db)
-):
+def fetch_video_sponsorblock_segments(video_id: int, db: Session = Depends(get_db)):
     video = db.get(Video, video_id)
     if video is None:
         raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    is_fetch = request.headers.get("x-requested-with") == "fetch"
     try:
         rows = refresh_sponsor_segments(db, video)
     except SponsorSegmentsFetchError as exc:
-        message = str(exc)
-        if is_fetch:
-            return JSONResponse({"status": "failed", "message": message}, status_code=400)
-        query = urlencode({"level": "error", "message": message})
+        query = urlencode({"level": "error", "message": str(exc)})
         return redirect(f"/videos/{video_id}?{query}#segments-sponsors")
     count = len(rows)
     message = (
@@ -229,8 +220,6 @@ def fetch_video_sponsorblock_segments(
         if count
         else "Aucun segment SponsorBlock trouvé."
     )
-    if is_fetch:
-        return JSONResponse({"status": "ok", "message": message})
     query = urlencode({"message": message})
     return redirect(f"/videos/{video_id}?{query}#segments-sponsors")
 

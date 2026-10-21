@@ -611,8 +611,8 @@ attribut `data-chat-config` :
   "defaultScope": "video",
   "llmProviderLabel": "...",
   "scopes": {
-    "video": {"askUrl": "...", "clearUrl": "...", "jobUrlTemplate": ".../{job_id}", "messages": [...]},
-    "library": {"askUrl": "/chat", "clearUrl": "/chat/clear", "jobUrlTemplate": "/chat/jobs/{job_id}", "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
+    "video": {"chatUrl": "/api/videos/{id}/chat", "messages": [...]},
+    "library": {"chatUrl": "/api/chat", "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
   }
 }
 ```
@@ -696,7 +696,7 @@ attribut `data-chat-config` :
   ("Ajoute la chaine de ") et y place le curseur, sans envoyer. Pour
   `library` : trouver une chaine, trouver une video, interroger les notes,
   ajouter une chaine YouTube (`LIBRARY_CHAT_SUGGESTIONS`,
-  `app/web/routes/library_chat.py`).
+  `app/web/library_chat.py`).
 - A la soumission, la question est affichee immediatement en bulle et
   suivie d'une bulle "en train d'ecrire" ; les deux sont remplacees par la
   liste de messages renvoyee par le serveur (ou retirees par un nouveau rendu
@@ -725,7 +725,7 @@ attribut `data-chat-config` :
   d'abord, en puces pleines (`.chat-channel-chip`), puis les videos.
 - `coverageNote` (scope `library` uniquement) affiche combien de videos sont
   actuellement indexees pour la recherche dans les notes (`"12/773 videos indexees..."`),
-  calcule cote serveur (`library_chat_scope_config`, `app/web/routes/library_chat.py`) a partir
+  calcule cote serveur (`library_chat_scope_config`, `app/web/library_chat.py`) a partir
   de `indexed_video_count`/`total_video_count` (voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)).
 - Les messages initiaux sont pre-rendus dans la config au chargement de la

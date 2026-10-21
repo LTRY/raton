@@ -124,6 +124,11 @@ metadonnees, segments, positions de reprise) viennent brutes de
 `app/services/videos/detail_view.py`, qui sert aussi tout autre client de
 la fiche.
 
+### `app/web/library_chat.py`
+
+Config du widget du chat de la bibliotheque sur l'accueil : messages deja
+echanges, note de couverture de l'index et requetes proposees par le menu.
+
 ### `app/web/routes/dashboard.py`
 
 Tableau de bord (`/`), pages `/dashboard/nouveautes` et
@@ -137,19 +142,16 @@ cloche (`auto-metadata`), import de metadonnees et suppression d'une chaine.
 
 ### `app/web/routes/videos.py`
 
-Bibliotheque `/videos`, page detail `/videos/{id}`, categories, note,
-titre, segments sponsors, telechargements manuels et
-leurs statuts de job, activite de lecture, etat de liste et notation.
+Bibliotheque `/videos`, page detail `/videos/{id}`, page d'import et replis
+sans JavaScript de ses formulaires (categories, commentaire, note, segments
+sponsors, telechargements manuels, import de fichier), plus l'import du
+raccourci iOS (`/videos/share-import`).
 
 ### `app/web/routes/transcript.py`
 
-Routes `/videos/{id}/transcript/*` : generation des documents,
-discussion par video, statut des jobs LLM,
-ainsi que les payloads JSON associes et les estimations de duree/cout.
-
-### `app/web/routes/library_chat.py`
-
-Routes `/chat*` de la discussion sur toute la bibliotheque et leur payload.
+Routes `/videos/{id}/transcript*` : redirection vers l'onglet transcript de
+la fiche et repli sans JavaScript de la generation des notes. La discussion
+et le suivi des jobs LLM n'existent que dans `/api` (`app/api/llm.py`).
 
 ### `app/web/routes/media.py`
 
@@ -178,7 +180,7 @@ import CSV des abonnements), `videos.py` (fiches et leurs actions),
 `imports.py` (telechargement manuel et import de fichier),
 `library.py` (`GET /api/library`), `playlists.py`, `llm.py` (demandes au LLM
 et leurs jobs), `jobs.py` (journal et etat des jobs de telechargement et
-d'import), `stats.py` (`/stats` et `/rag`), `settings.py`. `__init__.py` les
+d'import), `scan.py` (scan des chaines a la demande et son flux d'evenements), `stats.py` (`/stats` et `/rag`), `settings.py`. `__init__.py` les
 assemble en un seul routeur, inclus par `app/main.py` ; chaque module a son
 tag OpenAPI, et le schema (`/docs`) ne decrit que `/api` (les routes HTML en
 sont exclues). `lookups.py` trouve l'enregistrement qu'un chemin designe

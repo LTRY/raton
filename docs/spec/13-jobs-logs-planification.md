@@ -118,7 +118,7 @@ Le scheduler APScheduler (`app/services/jobs/scheduler.py`) demarre reellement a
 lifespan FastAPI (`app/main.py:lifespan`, appel a `start_scheduler()` juste
 apres `ensure_default_settings`, `stop_scheduler()` a l'arret) et enregistre
 un job cron quotidien a `DAILY_SCAN_HOUR` (3h, timezone
-`Europe/Paris`). Un declenchement a la demande (`POST /settings/scan`) et un
+`Europe/Paris`). Un declenchement a la demande (`POST /api/scan`) et un
 rattrapage au demarrage existent en plus du cron (voir ci-dessous).
 
 `scheduled_scan()` :
@@ -151,7 +151,8 @@ rattrapage au demarrage existent en plus du cron (voir ci-dessous).
 ## Scan a la demande et evenements
 
 `/settings` (carte "Suivi automatique") porte un bouton "Lancer le scan
-maintenant" : `POST /settings/scan` lance `scheduled_scan` en tache de fond,
+maintenant" : `POST /api/scan` (`start_manual_scan` puis `run_manual_scan_job`,
+`app/services/jobs/scheduler.py`) lance `scheduled_scan` en tache de fond,
 donc avec le meme verrou, la meme garde de stockage et la meme mise a jour de
 "Dernier scan automatique" que le cron.
 
@@ -160,7 +161,7 @@ Le scan (planifie ou manuel) publie ce qu'il fait dans un flux en memoire,
 nouveautes trouvees et plafond atteint, chaque fiche importee, chaque echec,
 "rien de nouveau", interruption par un 429, garde de stockage, fin avec le
 total et la duree. Le dernier evenement d'un scan porte `final = true`.
-La page parametres lit `GET /settings/scan/events` toutes les 1,5 s et affiche
+La page parametres lit `GET /api/scan/events` toutes les 1,5 s et affiche
 chaque evenement en notification (toast, rouge pour un echec) jusqu'a
 l'evenement final ; elle suit aussi un scan deja en cours a son ouverture. Le
 flux est volatil (500 evenements, perdu au redemarrage) : la trace durable
