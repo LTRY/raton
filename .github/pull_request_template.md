@@ -1,9 +1,13 @@
 ## What
 
-<!-- 1 to 3 concrete bullets: the page, button, route or behavior that changes. No background, no list of files or tests. -->
+<!-- Every change, one concrete bullet each: the page, button, route or behavior that changes. When the PR spans several areas, group the bullets under the title tags (FRONT, BACK, DB, CI, DOCS). -->
 
 ## Why
 
 <!-- One sentence: the problem or the request. -->
+
+## How
+
+<!-- The approach in a few bullets: where the rule lives, what was moved or replaced, any trade-off. -->
 
 <!-- [FRONT] PR: desktop and phone screenshots here. -->

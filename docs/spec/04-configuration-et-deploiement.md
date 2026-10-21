@@ -303,9 +303,12 @@ Regles :
   `pr-title.yml`) ;
 - le commit principal de la branche reprend le meme resume sans etiquette ;
 - la description est en anglais (les termes du glossaire restent tels quels),
-  suit `.github/pull_request_template.md` et reste courte et concrete :
-  « What » (1 a 3 puces sur ce qui change : page, bouton, route,
-  comportement), « Why » (une phrase), et les captures d'ecran pour tout
+  suit `.github/pull_request_template.md` et reste concrete : « What »
+  (une puce par changement, sans limite : page, bouton, route, comportement ;
+  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `DOCS` quand la PR en
+  touche plusieurs), « Why » (une phrase), « How » (l'approche en quelques
+  puces : ou vit la regle, ce qui est deplace ou remplace, les compromis),
+  et les captures d'ecran pour tout
   `[FRONT]` (bureau et telephone si la mise en page differe) ; pas de
   checklist, pas de liste de fichiers ou de tests, pas de compte rendu de
   `make ci` (la CI l'affiche) ;
