@@ -41,18 +41,6 @@
             <button type="submit">Ajouter</button>
           </form>
         </details>
-        <details class="page-action">
-          <summary>Importer des abonnements (CSV)</summary>
-          <p class="csv-import-hint">Exporte tes abonnements YouTube (Google Takeout) et dépose le fichier CSV ici.</p>
-          <form class="csv-dropzone-form" action="/channels/import-csv" method="post" enctype="multipart/form-data" data-csv-dropzone-form data-turbo="false">
-            <label class="csv-dropzone" data-csv-dropzone for="csv-file-input">
-              <input id="csv-file-input" name="csv_file" type="file" accept=".csv,text/csv" data-csv-dropzone-input required>
-              <span class="csv-dropzone-icon" aria-hidden="true">⇪</span>
-              <span class="csv-dropzone-text" data-csv-dropzone-text>Glisse le fichier CSV ici, ou clique pour le choisir</span>
-            </label>
-            <button type="submit">Analyser le fichier</button>
-          </form>
-        </details>
       </div>
     </details>
   </div>

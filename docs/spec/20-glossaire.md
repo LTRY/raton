@@ -155,6 +155,18 @@ Telechargement video ou audio demande par la personne.
 - **Code** : `download_source = "manual"`
 - **A ne pas confondre avec** : Un import manuel par formulaire (`imported_via_form`), filtre « Import manuel ».
 
+### Feuille d'import
+
+Panneau de verre ouvert par le bouton rond (trois points verticaux) en haut a
+droite des pages Chaines, Playlists et Bibliotheque. Elle ne porte que l'import
+de la page : video, playlist ou abonnements.
+
+- **Code** : `front/templates/_import_sheet.html`
+- **A ne pas confondre avec** : La feuille « Idees de Raton » du chat, ou la
+  page `/videos/import`, qui ne fait plus que renvoyer vers la feuille.
+
+Spec : [11 Interface HTML](11-interface-html.md).
+
 ### Ingestion
 
 Tout ce qui fait entrer une fiche dans la bibliotheque : le scan, l'import de

@@ -134,13 +134,19 @@ def video_cards_fragment(
     )
 
 
-@router.get("/videos/import", response_class=HTMLResponse)
-def import_video_page(request: Request, api: Api = Depends(get_api)):
-    styles = record(api.get("/categories"))
+@router.get("/videos/import")
+def import_video_page(request: Request):
+    """The import form is the sheet of the round button: forward to a page that shows it open."""
+    return redirect(append_query("/videos", {**request.query_params, "import": "video"}))
+
+
+@router.get("/import/categories", response_class=HTMLResponse)
+def import_categories(request: Request, api: Api = Depends(get_api)):
+    """Category chips of the import sheet: a lazy turbo-frame, so no other page pays for the call."""
     return templates.TemplateResponse(
         request,
-        "import_video.html",
-        {"category_filter_options": styles},
+        "_import_categories.html",
+        {"category_filter_options": record(api.get("/categories"))},
     )
 
 

@@ -227,14 +227,51 @@ Navigation principale :
   **Raton**, n'est pas affichee : seule la barre d'onglets reste
 - Chaines `/channels`
 - Playlists `/playlists`
-- Bibliotheque : menu deroulant **Bibliotheque** avec Import `/videos/import`
-  (en premier), Nouveautes `/dashboard/nouveautes`, Historique `/dashboard/historique`
-  et Exploration `/videos` (quatre liens, ni sous-bibliotheques ni Indexation RAG).
+- Bibliotheque : menu deroulant **Bibliotheque** avec Nouveautes `/dashboard/nouveautes`,
+  Historique `/dashboard/historique` et Exploration `/videos` (trois liens, ni
+  sous-bibliotheques ni Indexation RAG ; l'import est dans la feuille d'import, voir plus bas).
   Le panneau passe au-dessus du contenu de la page (la barre du haut a un
   `z-index` superieur a celui des avatars et bannieres de chaine)
 - Parametres `/settings`
 - Logs `/logs` (sur telephone, sans barre du haut ni onglet : par le lien
   « Voir tous les logs » de `/settings`)
+
+Bouton d'import (`.import-fab`, `_import_sheet.html` inclus par `base.html`
+sur les seules pages **Chaines**, **Playlists** et **Bibliotheque** —
+`/channels*`, `/playlists*`, `/videos` et `/dashboard/*`, pas la fiche d'une
+video ni les autres pages) : un bouton rond de 44 px en verre liquide (classe
+`lg` + `data-glass-light`), trois points verticaux, fixe en haut a droite — sur
+telephone aussi, ou la barre du haut est masquee. Il ouvre la **feuille
+d'import** (`details[data-import-fab]`, ferme par Echap, un clic dehors ou le
+bouton ✕ rond), qui ne porte que **l'import de sa page** (pas de bascule, pas
+de liste) : le formulaire s'affiche directement sous le titre.
+
+- **Bibliotheque** (`/videos`, `/dashboard/*`) : « Importer une vidéo », le
+  formulaire de telechargement par URL et la zone de depot d'un fichier local
+  (voir « Bibliotheque » plus bas). Les pastilles de categories sont un
+  `<turbo-frame>` paresseux (`GET /import/categories`), charge a l'ouverture :
+  aucune autre page ne paie cet appel ;
+- **Playlists** : « Ajouter une playlist », creation manuelle, import par URL
+  YouTube (avec apercu) et import du CSV Google Takeout (voir « Playlists ») ;
+- **Chaines** : « Importer des abonnements », la zone de depot du CSV, dont
+  l'analyse s'affiche sur `/channels` (voir « Chaines »).
+
+Les formulaires sont ceux qui etaient dans les pages, deplaces ici et retires de
+ces pages. Sur ordinateur, la feuille est un panneau de verre sous le bouton
+(460 px au plus, defilement interne). Sur **telephone (≤ 800 px)**, c'est une
+**languette tiree depuis le bas** qui prend toute la largeur et tout l'ecran,
+sauf une bande en haut (48 px + zone sure) ou la page precedente reste visible
+sous un voile sombre : coins hauts arrondis, poignee, bouton ✕ rond, titre,
+au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu) et se
+rabat en glissant la poignee ou le titre vers le bas (elle suit le doigt, se
+ferme au-dela de 110 px) ; sans animation avec `prefers-reduced-motion`.
+
+`?import=<page>` (`video`, `playlist` ou `abonnements`) ouvre la feuille des le
+rendu si c'est l'import de la page ; `app.js` retire ensuite le parametre de
+l'URL. `GET /videos/import` (cible du repli sans JavaScript) renvoie vers
+`/videos?import=video` en gardant `message`/`level`. Un import reussi recharge
+la page courante avec le message du job. Le bouton passe sous les notifications
+(`z-index` 60 contre 70).
 
 Barre d'onglets mobile (`.mobile-tabbar`, `front/templates/base.html`, visible
 sous 800 px) : cinq onglets avec icone SVG seule (pas de libelle visible ; le nom de la page
@@ -348,10 +385,9 @@ par `.chat-composer`.
   des graphiques, lecteur).
 - Test : `tests/test_glass_css.py`.
 
-Bibliotheque = quatre vues reliees par une barre de sous-navigation commune
-(macro `library_subnav` de `_macros.html`, `.library-subnav`) : **Import**
-`/videos/import`, **Nouveautes**
-`/dashboard/nouveautes`, **Historique** `/dashboard/historique`,
+Bibliotheque = trois vues reliees par une barre de sous-navigation commune
+(macro `library_subnav` de `_macros.html`, `.library-subnav`) :
+**Nouveautes** `/dashboard/nouveautes`, **Historique** `/dashboard/historique`,
 **Exploration** `/videos`.
 - Toute date affichee dans l'interface utilise le format francais long
   `Lun. 20 juil. 2026` (jour abrege + point, jour, mois abrege + point,
@@ -466,14 +502,13 @@ masque : il ne reste que la conversation. Ni metriques, ni
 Historique complet, ni temps de lecture : ils sont dans Bibliotheque et
 Parametres.
 
-## Bibliotheque : Import, Nouveautes, Historique, Exploration
+## Bibliotheque : Nouveautes, Historique, Exploration
 
-Les quatre vues partagent le titre `Bibliotheque` et la sous-navigation
+Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
 
-**Import** (`/videos/import`, `import_video.html`) : le formulaire de
-telechargement manuel par URL, sur sa propre page (il n'est plus un tiroir de
-`/videos`). Champs : URL YouTube, deux
+**Import** (feuille d'import de la Bibliotheque) : le formulaire de
+telechargement manuel par URL. Champs : URL YouTube, deux
 tuiles a cocher **Video** (MP4) et **Audio** (M4A), qualite video (segment
 `360p` a `4K`/`Max`, visible seulement quand « Video » est coche), categories
 (presets + custom). Les metadonnees et le transcript sont **toujours**
@@ -765,8 +800,8 @@ Contenu :
   par ajout recent (option « Ajoutees recemment » du menu de tri), la chaine
   ajoutee en tete. L'import CSV fait de meme avec `?message=...` (plusieurs
   chaines, pas de lien unique) ;
-- zone de depot (drag & drop ou clic) pour importer un CSV d'abonnements
-  YouTube (export Google Takeout) ; apres analyse, affiche la liste des
+- l'import du CSV d'abonnements YouTube (export Google Takeout) est la feuille d'import de
+  la page Chaines (zone de depot, drag & drop ou clic) ; apres analyse, affiche la liste des
   chaines trouvees avec une case a cocher par chaine (decochee et grisee
   "Deja importee" pour celles existantes, cochee par defaut pour les
   nouvelles, decochables individuellement, boutons "Tout selectionner"/"Tout
@@ -808,9 +843,9 @@ detail dans `front/static/js/playlist-player.js`.
 
 ### Index `/playlists`
 
-Deux colonnes qui s'empilent sur ecran etroit : la grille des playlists a
-gauche, le panneau **Ajouter** a droite (toujours visible, aucun menu a
-ouvrir).
+La page ne porte que la grille des playlists et sa recherche : les trois
+formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
+**Une playlist** de la feuille d'import.
 
 - Grille : une carte par playlist — vignette 16:9 de la premiere video (ou
   degrade neutre s'il n'y en a pas) posee sur deux couches decalees (effet de
@@ -825,7 +860,7 @@ ouvrir).
   au survol la carte monte de 4 px et les deux couches s'ecartent ; les trois
   formulaires du panneau arrivent l'un apres l'autre. Tout est coupe avec
   `prefers-reduced-motion`.
-- Panneau Ajouter, trois formulaires independants : creation manuelle (titre
+- Feuille d'import de la page Playlists, trois formulaires independants : creation manuelle (titre
   seul) ; import par URL YouTube (`data-async-job`, meme contrat fetch/poll que
   l'import metadata de chaine, precede d'une etape d'apercu : le bouton
   **Prévisualiser** (ou Entree dans le champ) appelle `POST /api/playlists/preview`

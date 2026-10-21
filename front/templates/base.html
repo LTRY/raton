@@ -23,6 +23,9 @@
         <span class="pull-refresh-spinner" aria-hidden="true"></span>
       </span>
     </div>
+    {% if current_path.startswith('/channels') or current_path.startswith('/playlists') or current_path == '/videos' or current_path.startswith('/dashboard') %}
+    {% include "_import_sheet.html" %}
+    {% endif %}
     <header class="topbar lg">
       <a class="brand" href="/">Raton</a>
       <nav>
@@ -31,7 +34,6 @@
         <details class="nav-library-menu">
           <summary>Bibliothèque</summary>
           <div class="nav-library-panel">
-            <a href="/videos/import">Import</a>
             <a href="/dashboard/nouveautes">Nouveautés</a>
             <a href="/dashboard/historique">Historique</a>
             <a href="/videos">Exploration</a>

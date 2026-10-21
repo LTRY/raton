@@ -10,10 +10,9 @@ l'ecran.
 
 ## Bibliotheque : Nouveautes, Historique, Exploration
 
-L'onglet central **Bibliotheque** regroupe quatre vues :
+L'onglet central **Bibliotheque** regroupe trois vues (l'import se fait depuis le bouton rond en haut a droite,
+voir [11 Interface HTML](11-interface-html.md)) :
 
-- **Import** (`/videos/import`) : telechargement manuel d'une video par URL,
-  avec le choix des formats et de la qualite ;
 - **Nouveautes** (`/dashboard/nouveautes`) : une pile de videos recentes par
   chaine suivie (au moins une des deux cloches active), pas seulement les fiches
   marquees `is_new` — une fiche deja visitee reste affichee tant qu'elle
@@ -32,7 +31,8 @@ stockage) et le temps de lecture par type de media sont dans `/settings`.
 
 ### Import d'un fichier local
 
-La page **Import** accepte aussi un fichier video ou audio depose depuis
+La feuille d'import de la Bibliotheque (telechargement manuel d'une video
+par URL, avec le choix des formats et de la qualite) accepte aussi un fichier video ou audio depose depuis
 l'appareil (glisser-deposer ou selecteur). Il est range sous la chaine
 `Fichiers locaux`, sans transcript ni metadonnees YouTube ; un contenu deja
 importe n'est pas duplique. Voir `POST /videos/upload` dans
@@ -152,7 +152,7 @@ Contraintes :
 
 La page `/videos` permet :
 
-- telechargement manuel par URL (page Import) ;
+- telechargement manuel par URL (feuille d'import) ;
 - choix du format initial : video ou audio (M4A) ;
 - choix de la qualite video (`360p` a `2160p`/meilleure disponible, defaut
   `1080p`), sur le formulaire manuel et sur le formulaire "Telecharger video"

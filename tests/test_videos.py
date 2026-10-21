@@ -1542,16 +1542,15 @@ def test_download_form_does_not_force_a_subtitle_language(monkeypatch):
     assert scheduled[0][5] is None
 
 
-def test_import_page_has_form_without_subtitle_language_and_menu_entry():
+def test_import_sheet_has_form_without_subtitle_language():
     db = make_session()
 
-    rendered = site(db).get("/videos/import").text
+    rendered = site(db).get("/videos?import=video").text
 
     assert 'action="/videos/download"' in rendered
     assert 'name="url"' in rendered
     assert "subtitle_language" not in rendered
     assert "subtitle_source" not in rendered
-    assert 'aria-current="page">Import</a>' in rendered
     # Metadata and transcript are always imported: hidden fields, no checkbox.
     assert '<input type="hidden" name="media_type" value="metadata">' in rendered
     assert '<input type="hidden" name="download_transcript" value="true">' in rendered
@@ -1563,16 +1562,18 @@ def test_import_page_has_form_without_subtitle_language_and_menu_entry():
     assert rendered.index('value="audio" data-media-format') < rendered.index(
         '<input type="hidden" name="media_type" value="metadata">'
     )
-    assert rendered.index('<a href="/videos/import">Import</a>') < rendered.index(
-        '<a href="/dashboard/nouveautes">Nouveautés</a>'
+    assert '<a href="/videos/import">' not in rendered
+
+
+def test_import_page_route_forwards_to_the_open_sheet():
+    response = site(make_session()).get(
+        "/videos/import?level=error&message=Oups", follow_redirects=False
     )
 
-
-def test_import_page_route_is_not_shadowed_by_video_detail():
-    response = site(make_session()).get("/videos/import")
-
-    assert response.status_code == 200
-    assert 'action="/videos/download"' in response.text
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("/videos?")
+    assert "import=video" in response.headers["location"]
+    assert "message=Oups" in response.headers["location"]
 
 
 def test_download_form_queues_job(monkeypatch):
@@ -1723,9 +1724,6 @@ def test_videos_page_shows_only_local_channel_videos(monkeypatch):
     assert "Explorer la suite" in rendered
     assert "Importer infos" not in rendered
     assert "UC123" not in rendered
-    assert "URL YouTube" not in rendered
-    assert 'name="media_type" type="checkbox" value="video" data-media-format>' not in rendered
-    assert 'name="media_type" type="checkbox" value="audio" data-media-format' not in rendered
     assert (
         'name="media_type" type="checkbox" value="metadata" data-metadata-format checked'
         not in rendered
@@ -1799,9 +1797,8 @@ def test_videos_page_search_ranks_title_matches_first_and_searches_notes(monkeyp
     assert 'name="q" type="search" value="ete Jardinage"' in rendered
 
     rendered = site(db).get("/videos?q=jardinage").text
-    frame = rendered[
-        rendered.index('<turbo-frame id="library-results"') : rendered.index("</turbo-frame>")
-    ]
+    start = rendered.index('<turbo-frame id="library-results"')
+    frame = rendered[start : rendered.index("</turbo-frame>", start)]
 
     # The note match is the most recent import, yet the title match comes first.
     assert frame.index("Jardinage d&#39;été") < frame.index("Episode 12")
@@ -3504,9 +3501,8 @@ def test_channels_page_search_ignores_accents_and_ranks_names_first():
     db.commit()
 
     rendered = site(db).get("/channels?rated=false&sort=alpha&q=CINEMA").text
-    frame = rendered[
-        rendered.index('<turbo-frame id="channel-results"') : rendered.index("</turbo-frame>")
-    ]
+    start = rendered.index('<turbo-frame id="channel-results"')
+    frame = rendered[start : rendered.index("</turbo-frame>", start)]
 
     # A-Z would put "Alpha" first; the name match outranks the label match.
     assert frame.index("Zoom Cinéma") < frame.index("Alpha")

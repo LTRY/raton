@@ -3539,6 +3539,156 @@ function initExplorer() {
 
 initExplorer();
 
+// Import sheet (_import_sheet.html): a <details> closed by Escape, a click outside or its close button.
+// The sheet's own form (video, playlist or subscriptions, depending on the page) is bound like any page form; the two
+// playlist helpers just below used to live in playlists.html.
+{
+  const form = document.querySelector("[data-playlist-csv-form]");
+  if (form) {
+    const input = form.querySelector("[data-playlist-csv-input]");
+    const titleField = form.querySelector("[data-playlist-csv-title]");
+    const label = form.querySelector("[data-playlist-csv-label]");
+    if (input && titleField) {
+      input.addEventListener("change", () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (label) label.textContent = file.name;
+        if (titleField.value.trim()) return;
+        const stem = file.name.replace(/\.csv$/i, "");
+        titleField.value = stem.replace(/^(vid[ée]os de|videos de|videos from)\s+/i, "");
+      });
+    }
+  }
+
+  // Preview step of the URL import: nothing is created until "Importer".
+  const urlForm = document.querySelector('form[action="/playlists/import-url"]');
+  if (urlForm) {
+    const urlField = urlForm.querySelector('input[name="url"]');
+    const previewButton = urlForm.querySelector("[data-playlist-preview-button]");
+    const status = urlForm.querySelector("[data-playlist-preview-status]");
+    const card = urlForm.querySelector("[data-playlist-preview]");
+    const field = (name) => card.querySelector(`[data-preview-${name}]`);
+    const plural = (n, one, many) => `${n} ${n > 1 ? many : one}`;
+    // "21 h 40 min" or "40 min", like the playlist header (format_long_duration).
+    const longDuration = (seconds) => {
+      const minutes = Math.floor((seconds || 0) / 60);
+      if (minutes <= 0) return null;
+      const hours = Math.floor(minutes / 60);
+      return hours ? `${hours} h ${String(minutes % 60).padStart(2, "0")} min` : `${minutes} min`;
+    };
+
+    const reset = () => {
+      card.hidden = true;
+      status.hidden = true;
+    };
+    const showStatus = (text) => {
+      status.textContent = text;
+      status.hidden = false;
+    };
+
+    const preview = async () => {
+      const url = urlField.value.trim();
+      if (!url) {
+        urlField.focus();
+        return;
+      }
+      card.hidden = true;
+      previewButton.disabled = true;
+      showStatus("Analyse de la playlist…");
+      try {
+        // The helper lives in app.js.
+        const data = await window.ratonApi("POST", "/api/playlists/preview", { url });
+
+        field("title").textContent = data.title;
+        field("channel").textContent = data.channel_name || "";
+        field("count").textContent = data.truncated ? `${data.video_count}+` : String(data.video_count);
+        const label = longDuration(data.duration_seconds);
+        field("duration").textContent = data.unknown_duration_count && label ? `≥ ${label}` : label || "—";
+        field("known").textContent = `${data.known_in_library_count} / ${data.video_count}`;
+        const notes = [];
+        if (data.unavailable_count) notes.push(plural(data.unavailable_count, "vidéo indisponible ou privée", "vidéos indisponibles ou privées"));
+        if (data.unknown_duration_count) notes.push(plural(data.unknown_duration_count, "vidéo sans durée connue", "vidéos sans durée connue"));
+        if (data.truncated) notes.push("Aperçu limité aux 2000 premières vidéos.");
+        field("notes").textContent = notes.join(" · ");
+        field("notes").hidden = !notes.length;
+        const list = field("titles");
+        list.replaceChildren(...data.sample_titles.map((title) => {
+          const item = document.createElement("li");
+          item.textContent = title;
+          return item;
+        }));
+        status.hidden = true;
+        card.hidden = false;
+      } catch (error) {
+        showStatus(error.message);
+      } finally {
+        previewButton.disabled = false;
+      }
+    };
+
+    previewButton.addEventListener("click", preview);
+    urlField.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        preview();
+      }
+    });
+    urlField.addEventListener("input", reset);
+    urlForm.querySelector("[data-playlist-preview-cancel]").addEventListener("click", reset);
+  }
+}
+
+document.querySelectorAll("[data-import-fab]").forEach((fab) => {
+  // `?import=` opens the sheet server-side (redirects, other pages): drop it so a reload does not reopen it.
+  const url = new URL(window.location.href);
+  if (fab.open && url.searchParams.has("import")) {
+    url.searchParams.delete("import");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }
+});
+
+// Phone sheet: pulled down by its grip or title, it follows the finger and closes past a threshold.
+document.querySelectorAll("[data-import-fab]").forEach((fab) => {
+  const sheet = fab.querySelector(".import-sheet");
+  let startY = null;
+  let delta = 0;
+  fab.querySelectorAll(".import-grip, .import-head").forEach((handle) => {
+    handle.addEventListener("pointerdown", (event) => {
+      if (!mobileViewport.matches || event.target.closest("[data-import-close]")) return;
+      startY = event.clientY;
+      delta = 0;
+      sheet.classList.add("is-dragging");
+      handle.setPointerCapture(event.pointerId);
+    });
+    handle.addEventListener("pointermove", (event) => {
+      if (startY === null) return;
+      delta = Math.max(0, event.clientY - startY);
+      sheet.style.transform = `translateY(${delta}px)`;
+    });
+    const release = () => {
+      if (startY === null) return;
+      startY = null;
+      sheet.classList.remove("is-dragging");
+      sheet.style.transform = "";
+      if (delta > 110) fab.removeAttribute("open");
+    };
+    handle.addEventListener("pointerup", release);
+    handle.addEventListener("pointercancel", release);
+  });
+});
+
+if (!window.__importFabBound) {
+  // Bound once on `document` (see the pull-to-refresh note below); Turbo swaps the <details> itself.
+  window.__importFabBound = true;
+  const closeImportFab = () => document.querySelectorAll("[data-import-fab][open]").forEach((fab) => fab.removeAttribute("open"));
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-import-fab]") || event.target.closest("[data-import-close]")) closeImportFab();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeImportFab();
+  });
+}
+
 initToasts();
 initMiniPlayer();
 bindPlayTrackButtons();

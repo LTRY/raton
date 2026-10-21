@@ -93,3 +93,45 @@ def test_records_turn_iso_datetimes_into_datetimes_and_keep_plain_dates():
     assert data.items[0].at == datetime(2026, 10, 21, 8, 30, tzinfo=UTC)
     assert data["day"] == "2026-10-21"
     assert data.get("missing", 1) == 1
+
+
+def test_import_sheet_carries_only_the_import_of_its_page(front_client):
+    client = front_client(make_session())
+    expected = {
+        "/channels": {"/channels/import-csv"},
+        "/playlists": {"/playlists", "/playlists/import-url", "/playlists/import-csv"},
+        "/videos": {"/videos/download", "/videos/upload"},
+        "/dashboard/nouveautes": {"/videos/download", "/videos/upload"},
+    }
+    every = {a for actions in expected.values() for a in actions}
+    for path, actions in expected.items():
+        html = client.get(path).text
+        assert "data-import-fab" in html, path
+        for action in every:
+            assert (f'action="{action}"' in html) == (action in actions), (path, action)
+
+
+def test_import_query_opens_the_sheet_of_its_page(front_client):
+    client = front_client(make_session())
+    assert "data-import-fab open" in client.get("/videos?import=video").text
+    assert "data-import-fab open" in client.get("/playlists?import=playlist").text
+    assert "data-import-fab open" not in client.get("/videos").text
+
+
+def test_import_categories_frame(front_client):
+    html = front_client(make_session()).get("/import/categories").text
+    assert '<turbo-frame id="import-categories">' in html
+
+
+def test_import_button_only_on_chaines_playlists_and_bibliotheque(front_client):
+    client = front_client(make_session())
+    for path in (
+        "/channels",
+        "/playlists",
+        "/videos",
+        "/dashboard/nouveautes",
+        "/dashboard/historique",
+    ):
+        assert "data-import-fab" in client.get(path).text, path
+    for path in ("/settings", "/", "/stats"):
+        assert "data-import-fab" not in client.get(path).text, path

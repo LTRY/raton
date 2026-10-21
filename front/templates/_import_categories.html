@@ -1,0 +1,17 @@
+<turbo-frame id="import-categories">
+    <div class="category-editor video-import-category-editor">
+      <span class="category-editor-title">Catégories</span>
+      <span class="category-filter-options" aria-label="Catégories prédéfinies">
+        {% for category in category_filter_options %}
+        <label class="asset-filter-chip">
+          <input name="preset_categories" type="checkbox" value="{{ category.label }}">
+          <span class="category-label" style="{{ video_category_css_style(category) }}">{{ category.label }}</span>
+        </label>
+        {% endfor %}
+      </span>
+      <label class="custom-category-field">
+        <span>Custom</span>
+        <input name="custom_categories" type="text" placeholder="ex. histoire, interview">
+      </label>
+    </div>
+</turbo-frame>

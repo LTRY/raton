@@ -124,7 +124,7 @@ sous-titres de createur en `fr`/`en`, sous-titres automatiques originaux
 n'importe quelle langue (une video arabe donne `ar-orig`). Aucune piste ne
 convient (video sans parole, seulement des traductions) : aucune requete, le
 transcript reste `missing`. `download_subtitles` l'applique quand aucune langue
-n'est imposee. Le formulaire de telechargement manuel (`/videos/import`) n'en
+n'est imposee. Le formulaire de telechargement manuel (feuille d'import) n'en
 impose plus (ni langue ni source) ; une langue passee explicitement a
 `POST /videos/download` reste respectee telle quelle.
 
@@ -213,7 +213,7 @@ bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best
 
 La qualite est choisie par l'utilisateur (defaut `1080p`) :
 
-- sur le formulaire de telechargement manuel par URL (`/videos/import`, segment
+- sur le formulaire de telechargement manuel par URL (feuille d'import, segment
   "Qualite video") ;
 - sur le formulaire "Telecharger video" de la page detail d'une video non
   encore telechargee (`/videos/{id}`, select "Qualite") ;
