@@ -13,7 +13,9 @@ from sqlalchemy.orm import sessionmaker
 from starlette.requests import Request
 
 from app import main
-from app.api import routes as api_routes
+from app.api import channels as api_channels
+from app.api import settings as api_settings
+from app.api import videos as api_videos
 from app.db.base import *  # noqa: F403
 from app.db.session import Base
 from app.models.channel import Channel
@@ -547,7 +549,7 @@ def test_api_sponsor_segments_returns_normalized_payload():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db)
 
     assert payload["skip_enabled"] is True
     assert payload["segments"] == [{"start": 0.0, "end": 8.0}, {"start": 30.0, "end": 60.0}]
@@ -578,7 +580,7 @@ def test_api_sponsor_segments_filters_out_unchecked_categories():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db)
 
     assert payload["segments"] == [{"start": 30.0, "end": 60.0}]
 
@@ -599,7 +601,7 @@ def test_api_sponsor_segments_reports_skip_disabled():
     )
     db.commit()
 
-    payload = api_routes.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db)
 
     # La route renvoie toujours les segments : c'est le client qui décide de les
     # armer ou non à partir de `skip_enabled` (app/static/js/app.js).
@@ -611,7 +613,7 @@ def test_api_sponsor_segments_raises_404_for_unknown_video():
     db = make_session()
 
     with pytest.raises(HTTPException) as excinfo:
-        api_routes.get_video_sponsor_segments(999, db)
+        api_videos.get_video_sponsor_segments(999, db)
 
     assert excinfo.value.status_code == 404
 
@@ -5165,7 +5167,9 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
         },
     )
 
-    channel = api_routes.create_channel(api_routes.ChannelCreate(url="Chaîne API"), db)
+    channel = api_channels.create_channel(
+        api_channels.ChannelCreate(url="Chaîne API"), BackgroundTasks(), db
+    )
 
     assert channel.name == "Chaîne API"
     assert channel.url == "https://www.youtube.com/@api-channel"
@@ -5191,7 +5195,9 @@ def test_api_create_channel_refuses_a_channel_added_under_another_url(monkeypatc
     )
 
     with pytest.raises(HTTPException) as exc:
-        api_routes.create_channel(api_routes.ChannelCreate(url="@api-channel"), db)
+        api_channels.create_channel(
+            api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db
+        )
 
     assert exc.value.status_code == 409
     assert db.scalar(select(func.count(Channel.id))) == 1
@@ -5210,7 +5216,7 @@ def test_api_and_form_delete_a_channel_with_its_profile_files(monkeypatch):
     db.add_all([first, second])
     db.commit()
 
-    api_routes.delete_channel(first.id, db)
+    api_channels.delete_channel(first.id, db)
     channels_routes.delete_channel_form(second.id, "/channels", db)
 
     assert removed == ["UCA", "UCB"]
@@ -5228,7 +5234,9 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
     )
 
     with pytest.raises(HTTPException) as exc:
-        api_routes.create_channel(api_routes.ChannelCreate(url="@missing-handle"), db)
+        api_channels.create_channel(
+            api_channels.ChannelCreate(url="@missing-handle"), BackgroundTasks(), db
+        )
 
     assert exc.value.status_code == 404
     # The service's French message reaches the client, as on the HTML form.
@@ -5658,7 +5666,7 @@ def test_videos_page_uses_custom_category_options_from_settings(monkeypatch):
 def test_settings_api_updates_media_root_and_quota(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             media_root=str(tmp_path),
             global_quota_bytes=100,
@@ -5682,7 +5690,7 @@ def test_settings_api_updates_media_root_and_quota(tmp_path):
 def test_settings_api_updates_category_label_colors(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             media_root=str(tmp_path),
             global_quota_bytes=100,
@@ -5708,7 +5716,7 @@ def test_settings_api_updates_category_label_colors(tmp_path):
 def test_settings_api_updates_video_library_views(tmp_path):
     db = make_session()
 
-    result = api_routes.update_settings(
+    result = api_settings.update_settings(
         SettingsUpdate(
             video_library_views=[
                 {

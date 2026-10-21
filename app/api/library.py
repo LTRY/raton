@@ -21,7 +21,7 @@ from app.services.videos.library_view import (
     library_saved_views,
 )
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["Bibliothèque"])
 
 
 def filters_read(filters: LibraryFilters) -> LibraryFiltersRead:

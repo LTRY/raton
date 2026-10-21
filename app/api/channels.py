@@ -1,12 +1,13 @@
-"""`/api` actions on a channel and the CSV import of YouTube subscriptions.
+"""`/api/channels`: reading, adding, editing and deleting channels, and the CSV import of
+YouTube subscriptions.
 
-Each route calls the service its HTML form twin calls (`app/web/routes/channels.py`). Listing,
-reading, adding and deleting a channel are in `app/api/routes.py`.
+Each route calls the service its HTML twin calls (`app/web/routes/channels.py`).
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.lookups import library_channel
 from app.db.session import get_db
 from app.models.channel import Channel
 from app.schemas.actions import JobQueuedRead
@@ -15,8 +16,13 @@ from app.schemas.channel import (
     ChannelBellRead,
     ChannelBellUpdate,
     ChannelCategoriesUpdate,
+    ChannelCreate,
+    ChannelDetailRead,
+    ChannelListItemRead,
     ChannelMetadataImport,
+    ChannelPageRead,
     ChannelProfileRefreshRead,
+    ChannelRead,
     ChannelStateRead,
     RatingUpdate,
     SubscriptionRowRead,
@@ -24,7 +30,13 @@ from app.schemas.channel import (
     SubscriptionsConfirm,
     SubscriptionsPreviewRead,
 )
-from app.services.channels.manage import set_channel_bell, set_channel_categories
+from app.services.channels import manage as channel_manage
+from app.services.channels.listing import channel_page, video_counts_by_channel
+from app.services.channels.manage import (
+    ChannelAlreadyInLibraryError,
+    set_channel_bell,
+    set_channel_categories,
+)
 from app.services.channels.subscriptions import (
     SubscriptionsCsvError,
     add_subscriptions,
@@ -33,6 +45,7 @@ from app.services.channels.subscriptions import (
 )
 from app.services.common.categories import parse_video_category_labels
 from app.services.common.ratings import InvalidRatingError, set_rating
+from app.services.common.search import normalized_search_query
 from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
@@ -42,15 +55,73 @@ from app.services.jobs.downloads import (
     queue_channel_metadata_import,
     run_channel_metadata_import_job,
 )
+from app.services.youtube.channel_info import ChannelNotFoundError
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["Chaînes"])
 
 
-def library_channel(db: Session, channel_id: int) -> Channel:
-    channel = db.get(Channel, channel_id)
-    if channel is None:
-        raise HTTPException(status_code=404, detail="Chaîne introuvable")
+@router.get("/channels", response_model=ChannelPageRead)
+def list_channels(
+    sort: str | None = None,
+    rated: bool = False,
+    q: str | None = None,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+) -> ChannelPageRead:
+    """Same sorts, Notées filter and search as `/channels`; unlike the page, every channel is
+    listed unless `rated=true`."""
+    listed = channel_page(db, sort, rated, normalized_search_query(q), page)
+    return ChannelPageRead(
+        items=[
+            ChannelListItemRead(
+                **ChannelRead.model_validate(entry["channel"]).model_dump(),
+                video_count=entry["video_count"],
+                last_played_at=entry["last_played_at"],
+            )
+            for entry in listed.entries
+        ],
+        sort=listed.sort,
+        page=listed.page,
+        total_pages=listed.total_pages,
+        total=listed.total,
+    )
+
+
+@router.get("/channels/{channel_id}", response_model=ChannelDetailRead)
+def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetailRead:
+    channel = library_channel(db, channel_id)
+    return ChannelDetailRead(
+        **ChannelRead.model_validate(channel).model_dump(),
+        description=channel.description,
+        keywords=channel.keyword_list,
+        avatar_url=f"/channels/{channel.id}/avatar" if channel.avatar_path else None,
+        banner_url=f"/channels/{channel.id}/banner" if channel.banner_path else None,
+        metadata_fetched_at=channel.metadata_fetched_at,
+        last_scanned_at=channel.last_scanned_at,
+        video_count=video_counts_by_channel(db, [channel.id]).get(channel.id, 0),
+    )
+
+
+@router.post("/channels", response_model=ChannelRead, status_code=201)
+def create_channel(
+    payload: ChannelCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> Channel:
+    try:
+        channel = channel_manage.create_channel(db, payload.url, rating=payload.rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ChannelNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ChannelAlreadyInLibraryError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    background_tasks.add_task(run_channel_profile_backfill_job)
     return channel
+
+
+@router.delete("/channels/{channel_id}", status_code=204)
+def delete_channel(channel_id: int, db: Session = Depends(get_db)) -> None:
+    channel = library_channel(db, channel_id)
+    channel_manage.delete_channel(db, channel)
 
 
 def channel_state(channel: Channel) -> ChannelStateRead:

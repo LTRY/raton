@@ -15,8 +15,9 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.api.lookups import fiche, library_playlist, playlist_item
 from app.db.session import get_db
-from app.models.playlist import Playlist, PlaylistItem
+from app.models.playlist import Playlist
 from app.schemas.actions import JobQueuedRead
 from app.schemas.playlist import (
     PlaylistCategoriesRead,
@@ -54,15 +55,12 @@ from app.services.jobs.playlists import (
     run_playlist_url_import_job,
 )
 from app.services.playlists.editing import (
-    PlaylistItemNotFoundError,
     PlaylistNotInLibraryError,
     add_video_to_playlist,
     apply_item_order,
     create_manual_playlist,
     delete_playlist,
     duplicate_playlist,
-    find_playlist,
-    find_playlist_item,
     move_item,
     remove_item,
     rename_playlist,
@@ -79,23 +77,8 @@ from app.services.playlists.listing import (
     playlist_stats,
     playlist_summary,
 )
-from app.services.videos.detail_view import VideoNotFoundError, find_video
 
-router = APIRouter(prefix="/api")
-
-
-def library_playlist(db: Session, playlist_id: int) -> Playlist:
-    try:
-        return find_playlist(db, playlist_id)
-    except PlaylistNotInLibraryError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-
-def playlist_item(db: Session, playlist_id: int, item_id: int) -> PlaylistItem:
-    try:
-        return find_playlist_item(db, playlist_id, item_id)
-    except PlaylistItemNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+router = APIRouter(prefix="/api", tags=["Playlists"])
 
 
 def playlist_fields(playlist: Playlist) -> dict:
@@ -328,10 +311,7 @@ def add_item(
 ) -> PlaylistDetailRead:
     """Appends the fiche, once: adding it again changes nothing."""
     playlist = library_playlist(db, playlist_id)
-    try:
-        video = find_video(db, payload.video_id)
-    except VideoNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    video = fiche(db, payload.video_id)
     add_video_to_playlist(db, playlist.id, video.id)
     return playlist_detail_read(load_playlist(db, playlist_id))
 

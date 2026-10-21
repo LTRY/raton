@@ -173,12 +173,16 @@ Contient :
 
 ### `app/api/`
 
-L'API interne sous `/api` : `routes.py` pour les chaines, fiches,
-statistiques et parametres, `library.py` pour `GET /api/library`,
-`video_actions.py` pour les actions sur une fiche et l'etat de leurs jobs,
-`channel_actions.py` pour les actions sur une chaine et l'import CSV des
-abonnements, `playlists.py` pour les playlists, `llm.py` pour les demandes au
-LLM (notes, discussion d'une fiche, chat bibliotheque) et leurs jobs.
+L'API JSON sous `/api`, un module par sujet : `channels.py` (chaines et
+import CSV des abonnements), `videos.py` (fiches et leurs actions),
+`library.py` (`GET /api/library`), `playlists.py`, `llm.py` (demandes au LLM
+et leurs jobs), `jobs.py` (journal et etat des jobs de telechargement et
+d'import), `stats.py` (`/stats` et `/rag`), `settings.py`. `__init__.py` les
+assemble en un seul routeur, inclus par `app/main.py` ; chaque module a son
+tag OpenAPI, et le schema (`/docs`) ne decrit que `/api` (les routes HTML en
+sont exclues). `lookups.py` trouve l'enregistrement qu'un chemin designe
+(fiche, chaine, playlist, element) ou repond `404` avec le message du
+service. Chaque route appelle le meme service que son equivalent HTML.
 
 ### `app/services/`
 

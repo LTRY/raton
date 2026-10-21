@@ -1,47 +1,61 @@
-"""`/api` actions on a fiche and the status of the jobs they start.
+"""`/api/videos`: reading a fiche or a page of them, and the actions on a fiche.
 
-Each route calls the service its HTML form twin calls (`app/web/routes/videos.py`, `media.py`).
+Each route calls the service its HTML twin calls (`app/web/routes/videos.py`, `media.py`). The
+library list with its filters is `/api/library`, the LLM requests on a fiche are in `llm.py`.
 """
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import true
 from sqlalchemy.orm import Session
 
+from app.api.lookups import fiche
 from app.db.session import get_db
 from app.models.video import Video
 from app.schemas.actions import (
     CategoriesUpdate,
     CommentUpdate,
     JobQueuedRead,
-    JobStatusRead,
     ListStateUpdate,
     MediaDownload,
     PlaybackActivity,
-    RecentJobRead,
     SponsorSegmentsFetchRead,
     VideoStateRead,
 )
 from app.schemas.channel import RatingUpdate
+from app.schemas.video import (
+    VideoDetailRead,
+    VideoDocumentsRead,
+    VideoMediaUrls,
+    VideoMetadataRead,
+    VideoPage,
+    VideoPlaylistRead,
+    VideoRead,
+)
 from app.services.common.categories import parse_video_category_labels
-from app.services.common.job_log import JOB_DONE_STATUSES, recent_jobs
 from app.services.common.ratings import InvalidRatingError, set_rating
-from app.services.common.settings import get_sponsor_skip_enabled
+from app.services.common.settings import (
+    get_sponsor_skip_enabled,
+)
 from app.services.jobs.downloads import (
     InvalidMediaFormatError,
-    JobNotFoundError,
-    job_status,
     queue_media_download,
     queue_transcript_retry,
     run_media_download_job,
     run_transcript_retry_job,
 )
 from app.services.media.media_storage import delete_video_media_file
-from app.services.videos.detail_view import VideoNotFoundError, find_video
+from app.services.videos.detail_view import (
+    VideoDetail,
+    video_detail,
+)
 from app.services.videos.editing import (
     mark_video_opened,
     set_video_categories,
     set_video_comment,
     set_video_list_state,
 )
+from app.services.videos.library_query import library_page
+from app.services.videos.library_view import LIBRARY_PAGE_SIZE
 from app.services.videos.playback import InvalidPlaybackMediaError, record_playback_activity
 from app.services.youtube.sponsor_segments import (
     SponsorSegmentsFetchError,
@@ -50,14 +64,85 @@ from app.services.youtube.sponsor_segments import (
     refresh_sponsor_segments,
 )
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", tags=["Fiches"])
 
 
-def fiche(db: Session, video_id: int) -> Video:
-    try:
-        return find_video(db, video_id)
-    except VideoNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+@router.get("/videos", response_model=VideoPage)
+def list_videos(
+    channel_id: int | None = None,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+) -> VideoPage:
+    where = Video.channel_id == channel_id if channel_id else true()
+    videos, page, total_pages, total = library_page(
+        db, where, "imported", "", page, LIBRARY_PAGE_SIZE
+    )
+    return VideoPage(
+        items=[VideoRead.model_validate(video) for video in videos],
+        page=page,
+        total_pages=total_pages,
+        total=total,
+    )
+
+
+def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
+    video = detail.video
+    metadata = detail.metadata
+    documents = detail.documents
+    return VideoDetailRead(
+        **VideoRead.model_validate(video).model_dump(),
+        is_new=video.is_new,
+        list_state=video.list_state,
+        comment=video.comment,
+        duration_seconds=video.duration_seconds,
+        watched_at=video.watched_at,
+        # Both paths can be set at once: check each column, never media_type.
+        media_urls=VideoMediaUrls(
+            video=f"/videos/{video.id}/video" if video.video_path else None,
+            audio=f"/videos/{video.id}/audio" if video.audio_path else None,
+            thumbnail=f"/videos/{video.id}/thumbnail" if video.thumbnail_path else None,
+            subtitles=f"/videos/{video.id}/subtitles" if video.subtitle_path else None,
+        ),
+        metadata=VideoMetadataRead(
+            description=metadata["description"],
+            tags=metadata["tags"],
+            chapters=metadata["chapters"],
+            duration_seconds=metadata["duration"],
+            view_count=metadata["view_count"],
+            like_count=metadata["like_count"],
+            comment_count=metadata["comment_count"],
+            uploader=metadata["uploader"],
+        ),
+        documents=VideoDocumentsRead.from_documents(documents),
+        sponsor_segments=detail.sponsor_segments,
+        sponsor_skip_enabled=detail.sponsor_skip_enabled,
+        skip_segments=detail.skip_segments,
+        resume_positions=detail.resume_positions,
+        playlists=[
+            VideoPlaylistRead(
+                playlist_id=item.playlist_id, title=item.playlist.title, item_id=item.id
+            )
+            for item in video.playlist_items
+        ],
+    )
+
+
+@router.get("/videos/{video_id}", response_model=VideoDetailRead)
+def get_video(video_id: int, db: Session = Depends(get_db)) -> VideoDetailRead:
+    """Read only: unlike the HTML page, it leaves the fiche in the Nouveautés."""
+    return video_detail_read(video_detail(db, fiche(db, video_id)))
+
+
+@router.get("/videos/{video_id}/sponsor-segments")
+def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> dict:
+    """The segments to skip, normalized, for the persistent mini player of base.html.
+
+    It survives Turbo navigations and starts from any list, so it cannot rely on the JSON block
+    the fiche's page renders.
+    """
+    video = fiche(db, video_id)
+    rows = active_sponsor_segments(db, video.id)
+    return {"skip_enabled": get_sponsor_skip_enabled(db), "segments": normalize_skip_segments(rows)}
 
 
 def video_state(video: Video) -> VideoStateRead:
@@ -201,30 +286,3 @@ def fetch_sponsor_segments(
         skip_enabled=get_sponsor_skip_enabled(db),
         segments=normalize_skip_segments(active_sponsor_segments(db, video.id)),
     )
-
-
-@router.get("/jobs", response_model=list[RecentJobRead])
-def list_jobs(
-    status: list[str] = Query(default=[]), db: Session = Depends(get_db)
-) -> list[RecentJobRead]:
-    """The 100 latest jobs, newest first; `status` (repeatable) keeps only those statuses."""
-    return [
-        RecentJobRead(
-            id=job.id,
-            status=job.status,
-            message=job.message,
-            channel_id=job.channel_id,
-            video_id=job.video_id,
-            created_at=job.created_at,
-            done=job.status in JOB_DONE_STATUSES,
-        )
-        for job in recent_jobs(db, statuses=status)
-    ]
-
-
-@router.get("/jobs/{job_id}", response_model=JobStatusRead, response_model_exclude_none=True)
-def get_job(job_id: int, db: Session = Depends(get_db)) -> dict:
-    try:
-        return job_status(db, job_id)
-    except JobNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc

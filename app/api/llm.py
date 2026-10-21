@@ -8,6 +8,7 @@ Each route calls the service its HTML twin calls (`app/web/routes/transcript.py`
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.lookups import fiche
 from app.db.session import get_db
 from app.models.video import Video
 from app.schemas.llm import (
@@ -30,17 +31,9 @@ from app.services.jobs.llm_requests import (
 )
 from app.services.library_chat.history import chat_messages, clear_chat, total_video_count
 from app.services.rag.retrieval import count_indexed_videos
-from app.services.videos.detail_view import VideoNotFoundError, find_video
 from app.services.videos.documents import clear_transcript_chat, read_transcript_documents
 
-router = APIRouter(prefix="/api")
-
-
-def fiche(db: Session, video_id: int) -> Video:
-    try:
-        return find_video(db, video_id)
-    except VideoNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+router = APIRouter(prefix="/api", tags=["IA"])
 
 
 def library_chat_read(db: Session) -> LibraryChatRead:
