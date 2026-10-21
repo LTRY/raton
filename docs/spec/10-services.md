@@ -127,7 +127,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 |---|---|
 | `imports` | Aperçu d'une playlist YouTube, lecture du CSV Google Takeout, ajout d'une entrée à la playlist, export CSV |
 | `editing` | Édition d'une playlist et de ses éléments ; recherche d'une playlist ou d'un élément (`find_playlist`, `find_playlist_item`), titre obligatoire (`playlist_title`) |
-| `listing` | Données des pages `/playlists` et `/playlists/{id}` et de leurs jumelles `/api`, en valeurs brutes : liste avec couvertures, détail chargé d'avance, lignes et compteurs |
+| `listing` | Données des pages `/playlists` et `/playlists/{id}` et de leurs jumelles `/api`, en valeurs brutes : liste avec couvertures, détail chargé d'avance, lignes et compteurs, export CSV (`playlist_csv_export`) |
 
 ### `videos/`
 

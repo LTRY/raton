@@ -105,7 +105,9 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   Les couvertures de `/playlists` sont chargees en une requete et rattachees a
   leur element (`list_playlists`, `app/services/playlists/listing.py`) : la
   carte d'identite de la session ne garde que des references faibles, s'y fier
-  coutait une requete par playlist.
+  coutait une requete par playlist. L'export CSV d'une playlist
+  (`playlist_csv_export`) charge aussi ses elements et leurs fiches d'avance
+  (il coutait une requete par fiche).
 - Verification : `tests/test_page_load.py` fixe un plafond du nombre de
   requetes pour une bibliotheque de 150 lectures, et verifie que `/`,
   `/dashboard/nouveautes`, `/videos`, `/playlists` et `/playlists/{id}` n'ouvrent aucun `metadata.json`,
