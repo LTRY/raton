@@ -10962,7 +10962,17 @@ body::before {
   display: none;
 }
 
+/* A closed <details> hides its content through ::details-content, without
+   `display: none`: the opening animations would play only the first time and
+   the phone backdrop would stay laid out. Hiding them here restarts the
+   animations on every opening. */
+.import-fab:not([open]) > .import-backdrop,
+.import-fab:not([open]) > .import-sheet {
+  display: none;
+}
+
 .import-sheet {
+  animation: import-sheet-unroll 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   background: var(--glass-fill-opaque);
   border-radius: var(--radius-lg);
   box-sizing: border-box;
@@ -11042,22 +11052,46 @@ body::before {
   margin: 0;
 }
 
+/* Closing: app.js adds `.is-closing`, waits for the end of the animation,
+   then closes the <details>. */
+.import-fab.is-closing > .import-sheet {
+  animation: import-sheet-fold 0.2s ease-in both;
+}
+
+@keyframes import-sheet-unroll {
+  from {
+    clip-path: inset(0 0 100% 0 round var(--radius-lg));
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0 round var(--radius-lg));
+  }
+}
+
+@keyframes import-sheet-fold {
+  to {
+    clip-path: inset(0 0 100% 0 round var(--radius-lg));
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Phone sheet: the veil is the sheet's own shadow, not a fixed layer. iOS
+   Safari tints the status bar from fixed elements at the top of the screen and
+   kept the veil's grey there after the sheet closed. */
 @keyframes import-sheet-rise {
   from {
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 100vmax rgba(43, 32, 24, 0);
     transform: translateY(100%);
   }
 }
 
-@keyframes import-veil-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .import-sheet,
-  .import-backdrop {
-    animation: none;
+@keyframes import-sheet-drop {
+  to {
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 100vmax rgba(43, 32, 24, 0);
+    transform: translateY(100%);
   }
 }
 
@@ -11081,9 +11115,8 @@ body::before {
     z-index: 1000;
   }
 
+  /* Transparent: it only catches the taps around the sheet. */
   .import-backdrop {
-    animation: import-veil-in 0.3s ease-out;
-    background: rgba(43, 32, 24, 0.45);
     display: block;
     inset: 0;
     position: fixed;
@@ -11093,6 +11126,7 @@ body::before {
     animation: import-sheet-rise 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
     border-radius: var(--radius-22) var(--radius-22) 0 0;
     bottom: 0;
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 100vmax rgba(43, 32, 24, 0.45);
     left: 0;
     max-height: none;
     padding: 10px 16px calc(24px + env(safe-area-inset-bottom, 0px));
@@ -11102,10 +11136,8 @@ body::before {
     width: auto;
   }
 
-  /* While a finger drags the sheet down, it follows without the animation. */
-  .import-sheet.is-dragging {
-    animation: none;
-    transition: none;
+  .import-fab.is-closing > .import-sheet {
+    animation: import-sheet-drop 0.26s ease-in both;
   }
 
   .import-grip,
@@ -11122,5 +11154,14 @@ body::before {
     height: 5px;
     justify-self: center;
     width: 48px;
+  }
+}
+
+/* After the phone rules, which would win otherwise. app.js closes without
+   waiting for an animation in this case. */
+@media (prefers-reduced-motion: reduce) {
+  .import-sheet,
+  .import-fab.is-closing > .import-sheet {
+    animation: none;
   }
 }

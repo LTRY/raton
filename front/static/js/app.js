@@ -3647,6 +3647,32 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
   }
 });
 
+// Closes the sheet once its closing animation (`.is-closing`, see the CSS) has played.
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+function closeImportFab(fab) {
+  if (!fab.open || fab.classList.contains("is-closing")) return;
+  const sheet = fab.querySelector(".import-sheet");
+  const finish = () => {
+    if (!fab.classList.contains("is-closing")) return; // Reopened meanwhile.
+    fab.classList.remove("is-closing");
+    fab.removeAttribute("open");
+    sheet.style.transform = "";
+  };
+  if (reducedMotion.matches) {
+    fab.classList.add("is-closing");
+    finish();
+    return;
+  }
+  fab.classList.add("is-closing");
+  sheet.addEventListener("animationend", function onEnd(event) {
+    if (event.target !== sheet) return;
+    sheet.removeEventListener("animationend", onEnd);
+    finish();
+  });
+  // In case the animation never runs (hidden tab, style not loaded).
+  setTimeout(finish, 600);
+}
+
 // Phone sheet: pulled down by its grip or title, it follows the finger and closes past a threshold.
 document.querySelectorAll("[data-import-fab]").forEach((fab) => {
   const sheet = fab.querySelector(".import-sheet");
@@ -3657,7 +3683,6 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
       if (!mobileViewport.matches || event.target.closest("[data-import-close]")) return;
       startY = event.clientY;
       delta = 0;
-      sheet.classList.add("is-dragging");
       handle.setPointerCapture(event.pointerId);
     });
     handle.addEventListener("pointermove", (event) => {
@@ -3668,9 +3693,9 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
     const release = () => {
       if (startY === null) return;
       startY = null;
-      sheet.classList.remove("is-dragging");
-      sheet.style.transform = "";
-      if (delta > 110) fab.removeAttribute("open");
+      // Past the threshold the closing animation starts from where the finger left the sheet.
+      if (delta > 110) closeImportFab(fab);
+      else sheet.style.transform = "";
     };
     handle.addEventListener("pointerup", release);
     handle.addEventListener("pointercancel", release);
@@ -3680,12 +3705,26 @@ document.querySelectorAll("[data-import-fab]").forEach((fab) => {
 if (!window.__importFabBound) {
   // Bound once on `document` (see the pull-to-refresh note below); Turbo swaps the <details> itself.
   window.__importFabBound = true;
-  const closeImportFab = () => document.querySelectorAll("[data-import-fab][open]").forEach((fab) => fab.removeAttribute("open"));
+  const closeAll = () => document.querySelectorAll("[data-import-fab][open]").forEach(closeImportFab);
   document.addEventListener("click", (event) => {
-    if (!event.target.closest("[data-import-fab]") || event.target.closest("[data-import-close]")) closeImportFab();
+    const button = event.target.closest(".import-fab-button");
+    const fab = button && button.closest("[data-import-fab]");
+    if (fab && fab.open) {
+      // The button closes an open sheet: animated, instead of the <details> default toggle. During the closing
+      // animation, it keeps the sheet open.
+      event.preventDefault();
+      if (fab.classList.contains("is-closing")) {
+        fab.classList.remove("is-closing");
+        fab.querySelector(".import-sheet").style.transform = "";
+      } else {
+        closeImportFab(fab);
+      }
+    } else if (!event.target.closest("[data-import-fab]") || event.target.closest("[data-import-close]")) {
+      closeAll();
+    }
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeImportFab();
+    if (event.key === "Escape") closeAll();
   });
 }
 

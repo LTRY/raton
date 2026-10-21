@@ -258,13 +258,23 @@ de liste) : le formulaire s'affiche directement sous le titre.
 
 Les formulaires sont ceux qui etaient dans les pages, deplaces ici et retires de
 ces pages. Sur ordinateur, la feuille est un panneau de verre sous le bouton
-(460 px au plus, defilement interne). Sur **telephone (≤ 800 px)**, c'est une
+(460 px au plus, defilement interne) qui se **deroule** de haut en bas en 280 ms
+a l'ouverture et se replie en fondu (200 ms) a la fermeture. Sur **telephone
+(≤ 800 px)**, c'est une
 **languette tiree depuis le bas** qui prend toute la largeur et tout l'ecran,
 sauf une bande en haut (48 px + zone sure) ou la page precedente reste visible
 sous un voile sombre : coins hauts arrondis, poignee, bouton ✕ rond, titre,
-au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu) et se
+au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu),
+redescend en 260 ms a la fermeture et se
 rabat en glissant la poignee ou le titre vers le bas (elle suit le doigt, se
 ferme au-dela de 110 px) ; sans animation avec `prefers-reduced-motion`.
+Toute fermeture (✕, clic dehors, Echap, bouton d'import, glisse) joue
+l'animation de fermeture avant de refermer le `<details>` (`app.js`). Le voile
+est l'ombre portee de la feuille, pas un calque fixe : Safari iOS teinte la
+barre d'etat d'apres les elements fixes du haut de l'ecran et y gardait le gris
+du voile apres la fermeture. Feuille et calque de clic sont en `display: none`
+quand le `<details>` est ferme (sinon le navigateur les garde en page et ne
+rejoue pas l'animation a la reouverture).
 
 `?import=<page>` (`video`, `playlist` ou `abonnements`) ouvre la feuille des le
 rendu si c'est l'import de la page ; `app.js` retire ensuite le parametre de
