@@ -95,24 +95,27 @@ def test_records_turn_iso_datetimes_into_datetimes_and_keep_plain_dates():
     assert data.get("missing", 1) == 1
 
 
-def test_import_sheet_holds_the_three_imports_on_every_page(front_client):
-    html = front_client(make_session()).get("/channels").text
-    assert "data-import-fab" in html
-    for action in (
-        "/videos/download",
-        "/playlists/import-url",
-        "/playlists/import-csv",
-        "/channels/import-csv",
-    ):
-        assert f'action="{action}"' in html
-    assert 'src="/import/categories"' in html
+def test_import_sheet_carries_only_the_import_of_its_page(front_client):
+    client = front_client(make_session())
+    expected = {
+        "/channels": {"/channels/import-csv"},
+        "/playlists": {"/playlists", "/playlists/import-url", "/playlists/import-csv"},
+        "/videos": {"/videos/download", "/videos/upload"},
+        "/dashboard/nouveautes": {"/videos/download", "/videos/upload"},
+    }
+    every = {a for actions in expected.values() for a in actions}
+    for path, actions in expected.items():
+        html = client.get(path).text
+        assert "data-import-fab" in html, path
+        for action in every:
+            assert (f'action="{action}"' in html) == (action in actions), (path, action)
 
 
-def test_import_query_opens_the_sheet_on_its_tab(front_client):
-    html = front_client(make_session()).get("/playlists?import=playlist").text
-    assert "data-import-fab open" in html
-    assert 'data-import-tab="playlist" aria-expanded="true"' in html
-    assert 'data-import-tab="video" aria-expanded="false"' in html
+def test_import_query_opens_the_sheet_of_its_page(front_client):
+    client = front_client(make_session())
+    assert "data-import-fab open" in client.get("/videos?import=video").text
+    assert "data-import-fab open" in client.get("/playlists?import=playlist").text
+    assert "data-import-fab open" not in client.get("/videos").text
 
 
 def test_import_categories_frame(front_client):

@@ -158,8 +158,8 @@ Telechargement video ou audio demande par la personne.
 ### Feuille d'import
 
 Panneau de verre ouvert par le bouton rond (trois points verticaux) en haut a
-droite des pages Chaines, Playlists et Bibliotheque : trois lignes (video, playlist, abonnements) qui deplient
-leur formulaire d'import.
+droite des pages Chaines, Playlists et Bibliotheque. Elle ne porte que l'import
+de la page : video, playlist ou abonnements.
 
 - **Code** : `front/templates/_import_sheet.html`
 - **A ne pas confondre avec** : La feuille « Idees de Raton » du chat, ou la

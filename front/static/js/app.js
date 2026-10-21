@@ -3539,8 +3539,8 @@ function initExplorer() {
 
 initExplorer();
 
-// Import sheet (_import_sheet.html): a <details> closed by Escape or a click outside, with three tabs.
-// The sheet's own forms (video, playlist, subscriptions) are bound like any page form; the two
+// Import sheet (_import_sheet.html): a <details> closed by Escape, a click outside or its close button.
+// The sheet's own form (video, playlist or subscriptions, depending on the page) is bound like any page form; the two
 // playlist helpers just below used to live in playlists.html.
 {
   const form = document.querySelector("[data-playlist-csv-form]");
@@ -3639,16 +3639,6 @@ initExplorer();
 }
 
 document.querySelectorAll("[data-import-fab]").forEach((fab) => {
-  const tabs = fab.querySelectorAll("[data-import-tab]");
-  tabs.forEach((tab) =>
-    tab.addEventListener("click", () => {
-      const opening = tab.getAttribute("aria-expanded") !== "true";
-      tabs.forEach((other) => other.setAttribute("aria-expanded", String(opening && other === tab)));
-      fab.querySelectorAll("[data-import-pane]").forEach((pane) => {
-        pane.hidden = !(opening && pane.dataset.importPane === tab.dataset.importTab);
-      });
-    }),
-  );
   // `?import=` opens the sheet server-side (redirects, other pages): drop it so a reload does not reopen it.
   const url = new URL(window.location.href);
   if (fab.open && url.searchParams.has("import")) {
