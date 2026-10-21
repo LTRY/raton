@@ -201,8 +201,11 @@ en isolation.
     propres plutôt que pronoms ou « cette vidéo »), car chaque section est
     indexée comme un chunk à part ; le transcript étant automatique, un nom
     propre écrit de plusieurs façons garde sa graphie la plus fréquente ;
-  - Résumé : `## Résumé court` (exactement 3 lignes, sujet + conclusion
-    principale), `## Questions suggérées` (3 à 5 questions concrètes en
+  - Résumé : `## Résumé court` (exactement 3 lignes séparées par un saut de
+    ligne, une phrase par ligne : le sujet, l'idée principale, la conclusion ;
+    pas de puces ni de paragraphe, et jamais de formule creuse du type « La
+    vidéo revient », « Selon la vidéo », « Selon le présentateur » ou « Le
+    présentateur conclut »), `## Questions suggérées` (3 à 5 questions concrètes en
     puces, pas génériques) ;
 - `app/services/llm/prompts.py:split_generation_result(text)` découpe
   d'abord la réponse sur les deux titres de niveau 1, puis délègue chaque

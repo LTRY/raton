@@ -143,8 +143,13 @@ SUMMARY_QUESTIONS_HEADER = "## Questions suggérées"
 _BULLET_LINE_RE = re.compile(r"^\s*[-*]\s+(.+?)\s*$", re.MULTILINE)
 
 
-SUMMARY_SHORT_DEFINITION = """Exactement 3 lignes qui donnent le sujet et la conclusion principale de la
-vidéo — de quoi se faire une idée sans l'avoir vue."""
+SUMMARY_SHORT_DEFINITION = """Exactement 3 lignes, séparées par un saut de ligne, une seule phrase par ligne :
+la première donne le sujet, la deuxième l'idée ou l'argument principal, la troisième la
+conclusion. De quoi se faire une idée de la vidéo sans l'avoir vue. Pas de ligne vide entre
+elles, pas de puces, pas de paragraphe.
+Va droit au contenu : n'écris jamais « La vidéo revient », « Selon la vidéo », « Selon le
+présentateur » ni « Le présentateur conclut », ni une formule équivalente qui parle de la
+vidéo ou du présentateur au lieu du sujet."""
 
 
 def _summary_rules() -> str:

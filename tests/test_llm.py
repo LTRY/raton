@@ -256,6 +256,13 @@ def test_video_chat_without_history_puts_the_transcript_before_the_question():
     ]
 
 
+def test_the_short_summary_is_three_one_sentence_lines_without_filler_openers():
+    for prompt in (build_generation_prompt("T."), build_auto_notes_prompt("T.")):
+        assert "Exactement 3 lignes, séparées par un saut de ligne" in prompt.system
+        assert "« La vidéo revient »" in prompt.system
+        assert "« Le présentateur conclut »" in prompt.system
+
+
 def test_every_prompt_wraps_the_transcript_in_xml_tags():
     prompts = (
         build_notes_prompt("T."),
