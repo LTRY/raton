@@ -24,10 +24,10 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
-from app.core.config import Settings
-from app.services.llm.prompts import Prompt, split_auto_notes_result, split_notes_sections
-from app.services.llm.provider import AnthropicProvider
-from app.services.rag.auto_notes import MIN_TRANSCRIPT_CHARS
+from back.core.config import Settings
+from back.services.llm.prompts import Prompt, split_auto_notes_result, split_notes_sections
+from back.services.llm.provider import AnthropicProvider
+from back.services.rag.auto_notes import MIN_TRANSCRIPT_CHARS
 
 DEFAULT_MODEL = "claude-haiku-5-5"  # what the nightly batch runs on
 DEFAULT_MEDIA_ROOT = Path(".local/media/YouTube")

@@ -100,11 +100,17 @@ def run_in_background(job: Job, command: list[str], log_file: Path) -> None:
     def run() -> None:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         with log_file.open("w") as log:
-            process = subprocess.run(
-                command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=False
-            )
+            try:
+                returncode = subprocess.run(
+                    command, cwd=REPO, stdout=log, stderr=subprocess.STDOUT, check=False
+                ).returncode
+            except OSError as error:
+                # A script that cannot start (not executable...) must still end the job, or the
+                # page shows it as running forever with an empty log.
+                log.write(f"Impossible de lancer {command[0]} : {error}\n")
+                returncode = 127
         with jobs_lock:
-            job.returncode = process.returncode
+            job.returncode = returncode
 
     threading.Thread(target=run, daemon=True).start()
 

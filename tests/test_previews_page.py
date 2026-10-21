@@ -1,3 +1,5 @@
+import time
+
 from scripts.previews import (
     Job,
     Preview,
@@ -90,3 +92,27 @@ def test_prod_status_reports_the_last_deploy():
     assert prod_status(None)[1] == "none"
     assert prod_status(Job("deploy", 0.0, returncode=0)) == ("Déployée", "ok")
     assert prod_status(Job("deploy", 0.0, returncode=2)) == ("Échec du déploiement", "error")
+
+
+def test_scripts_run_by_the_previews_page_are_executable():
+    import os
+
+    from scripts.previews import DEPLOY_SH, PREVIEW_SH
+
+    for script in (DEPLOY_SH, PREVIEW_SH):
+        assert os.access(script, os.X_OK), f"{script} must be executable (git mode 100755)"
+
+
+def test_a_script_that_cannot_start_ends_the_job_with_an_error(tmp_path):
+    from scripts.previews import run_in_background
+
+    job = Job("deploy", 0.0)
+    log_file = tmp_path / "prod.log"
+    run_in_background(job, [str(tmp_path / "missing.sh")], log_file)
+
+    for _ in range(100):
+        if job.returncode is not None:
+            break
+        time.sleep(0.05)
+    assert job.returncode == 127
+    assert "Impossible de lancer" in log_file.read_text()
