@@ -72,8 +72,7 @@ _NOTES_SECTION_HEADER_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
 
 def _notes_rules() -> str:
     """The notes rules without any role or "nothing before the first title" line, so that the
-    combined prompts can nest them under their own level-1 title. `_notes_system` wraps them
-    with a role and that line for the standalone prompt."""
+    combined prompts can nest them under their own level-1 title."""
     section_headers = "\n".join(f"## {name}" for name in NOTES_SECTION_NAMES)
     section_contents = "\n".join(f"- {name} : {text}" for name, text in NOTES_SECTIONS.items())
     return f"""Les notes sont structurées, exhaustives, et suivent exactement ces sections
@@ -98,14 +97,6 @@ Règles :
 - N'invente rien : si une information ne figure pas dans le transcript, ne
   l'ajoute pas. Base-toi uniquement sur le contenu de <{TRANSCRIPT_TAG}>.
 {_TRANSCRIPT_USAGE_RULE}"""
-
-
-def _notes_system() -> str:
-    """The system prompt of a notes-only completion."""
-    return f"""Tu es un expert en sciences de l'apprentissage et en prise de notes efficace.
-Produis des notes à partir de ce transcript, sans rien d'autre avant le premier titre.
-
-{_notes_rules()}"""
 
 
 def split_notes_sections(text: str) -> list[tuple[str, str]]:
@@ -158,17 +149,6 @@ quelle vidéo.
 
 Règle commune : n'invente rien, base-toi uniquement sur le contenu de <{TRANSCRIPT_TAG}>.
 {_TRANSCRIPT_USAGE_RULE}"""
-
-
-def _summary_system() -> str:
-    """The system prompt of a résumé-only completion."""
-    return f"""Tu es un rédacteur qui résume des vidéos parlées à partir de leur transcript.
-
-Produis deux éléments fidèles et autonomes à propos de cette vidéo, dans cet
-ordre exact, avec ces deux titres Markdown exacts et rien d'autre avant le
-premier titre :
-
-{_summary_rules()}"""
 
 
 def split_summary_result(text: str) -> tuple[str, list[str]]:

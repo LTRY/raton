@@ -223,62 +223,6 @@ def test_list_channel_entries_can_target_shorts_tab(monkeypatch):
     assert captured["url"] == "https://www.youtube.com/@test/shorts"
 
 
-def test_count_channel_entries_uses_playlist_count(monkeypatch):
-    captured = {}
-
-    class FakeYoutubeDL:
-        def __init__(self, opts):
-            captured.update(opts)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, traceback):
-            return False
-
-        def extract_info(self, url, download):
-            return {"playlist_count": 49}
-
-    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
-
-    count = channel_info.count_channel_entries(
-        Channel(url="https://example.test/channel", name="Test")
-    )
-
-    assert count == 49
-    assert captured["playlistend"] == 1
-
-
-def test_count_channel_entries_falls_back_to_full_flat_count(monkeypatch):
-    captured = []
-
-    class FakeYoutubeDL:
-        def __init__(self, opts):
-            captured.append(opts)
-            self.opts = opts
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, traceback):
-            return False
-
-        def extract_info(self, url, download):
-            if "playlistend" in self.opts:
-                return {"playlist_count": None, "entries": [{"id": "one"}]}
-            return {"playlist_count": 994, "entries": [{"id": "one"}]}
-
-    monkeypatch.setattr(channel_info, "YoutubeDL", FakeYoutubeDL)
-
-    count = channel_info.count_channel_entries(
-        Channel(url="https://example.test/channel", name="Test")
-    )
-
-    assert count == 994
-    assert captured[0]["playlistend"] == 1
-    assert "playlistend" not in captured[1]
-
-
 def test_choose_subtitle_track_never_picks_a_translation():
     choose = downloads.choose_subtitle_track
 
