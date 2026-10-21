@@ -108,12 +108,9 @@ Produis des notes à partir de ce transcript, sans rien d'autre avant le premier
 {_notes_rules()}"""
 
 
-def build_notes_prompt(transcript: str) -> Prompt:
-    return Prompt(_notes_system(), _transcript_turn(transcript))
-
-
 def split_notes_sections(text: str) -> list[tuple[str, str]]:
-    """Split a build_notes_prompt completion into (section_name, content) chunks.
+    """Split notes (the `# Notes` part of a `build_generation_prompt` completion) into
+    (section_name, content) chunks.
 
     One chunk per Markdown section, used both to render the notes tab and to
     index each section as a separate embedding for cross-video RAG search
@@ -174,12 +171,8 @@ premier titre :
 {_summary_rules()}"""
 
 
-def build_summary_prompt(transcript: str) -> Prompt:
-    return Prompt(_summary_system(), _transcript_turn(transcript))
-
-
 def split_summary_result(text: str) -> tuple[str, list[str]]:
-    """Split a build_summary_prompt completion into (short, questions).
+    """Split the `# Résumé` part of a `build_generation_prompt` completion into (short, questions).
 
     Falls back to (whole text as the short résumé, []) if the model didn't follow the
     header format — degrades gracefully instead of guessing.

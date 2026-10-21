@@ -167,17 +167,15 @@ en isolation.
   asynchrone par `BackgroundTasks` ;
 - **un seul appel LLM produit les deux documents**, pour n'envoyer le
   transcript qu'une seule fois (`app/services/llm/prompts.py:build_generation_prompt`) :
-  le prompt combine les instructions des deux anciens prompts à usage unique
-  (`build_notes_prompt`/`build_summary_prompt`, conservés et toujours
-  utilisables individuellement) sous deux titres Markdown de **niveau 1**
+  le prompt combine les instructions des notes et du résumé (les anciens
+  prompts séparés, inutilisés, ont été supprimés) sous deux titres Markdown de **niveau 1**
   exacts et dans cet ordre — `# Résumé`, `# Notes` (le résumé d'abord : c'est lui qui s'affiche pendant que la
   réponse arrive) — chacun suivi des mêmes sous-sections de niveau 2 qu'avant :
   - La règle « rien d'autre avant le premier titre » n'est énoncée qu'une fois,
     pour les titres de niveau 1 : les blocs de notes et de résumé imbriqués
     n'en portent pas (deux consignes imbriquées faisaient parfois écrire
     `## Notes` au lieu de `# Notes`) ;
-  - chaque builder (`build_notes_prompt`, `build_summary_prompt`,
-    `build_generation_prompt`, `build_auto_notes_prompt`, `build_chat_prompt`,
+  - chaque builder (`build_generation_prompt`, `build_auto_notes_prompt`, `build_chat_prompt`,
     `build_library_chat_prompt`) renvoie un `Prompt(system, messages)` : les
     consignes vont dans le paramètre `system` de l'API, les données (le
     transcript, la question) dans les messages `user`. Le job stocke ce

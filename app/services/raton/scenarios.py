@@ -21,25 +21,10 @@ LATE_HOUR = 22
 NIGHT_END_HOUR = 5
 
 
-MINUTES_LEFT_WARNING = 15
-
-
 CLOSING_RATIO = 1.0
 
 
-NEAR_LIMIT_RATIO = 0.9
-
-
 ART_DIR = Path(__file__).resolve().parents[2] / "static" / "img" / "raton"
-
-
-GROUPS = {
-    "moment": "Moment de la journée",
-    "temps_ecran": "Temps d'écran",
-    "bibliotheque": "Bibliothèque",
-    "assistant": "Assistant IA",
-    "ailleurs": "À trancher",
-}
 
 
 # Position of a scenario in the flow of a visit.

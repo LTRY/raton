@@ -16,8 +16,6 @@ from app.services.youtube.channel_info import extract_channel_info
 
 logger = logging.getLogger(__name__)
 
-BELL_SECTIONS = ("videos", "shorts")
-
 
 class ChannelAlreadyInLibraryError(Exception):
     def __init__(self, existing: Channel):

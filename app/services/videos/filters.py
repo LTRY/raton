@@ -29,14 +29,6 @@ def video_asset_kinds(video: Video) -> set[str]:
     return kinds
 
 
-def video_has_downloaded_media(video: Video) -> bool:
-    return bool(video.video_path or video.audio_path)
-
-
-def video_is_short(video: Video) -> bool:
-    return "/shorts/" in video.url
-
-
 def video_matches_filters(
     video: Video,
     asset_filters: set[str],
@@ -197,14 +189,9 @@ def video_filters_condition(
 
 
 def video_section_condition(section: str):
-    """SQL twin of `video_matches_channel_section`."""
+    """Shorts (their URL holds `/shorts/`) or the other fiches of a channel page."""
     is_short = Video.url.contains("/shorts/", autoescape=True)
     return is_short if section == "shorts" else ~is_short
-
-
-def video_matches_channel_section(video: Video, section: str) -> bool:
-    is_short = "/shorts/" in video.url
-    return is_short if section == "shorts" else not is_short
 
 
 def followed_video_condition():
