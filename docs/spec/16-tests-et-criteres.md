@@ -39,6 +39,34 @@ aux deux largeurs (egaux = pas de defilement horizontal de la page), puis arrete
 le serveur. Il n'est pas lance par la CI ; `tests/test_page_overflow_css.py`
 garde seulement le filet `overflow-x: clip` de `html`/`body`.
 
+### Évaluer un prompt
+
+`scripts/eval_prompts.py` compare deux variantes d'un prompt sur de vrais
+transcripts (la tâche du lot nocturne : notes + résumé court) :
+
+```
+uv run --python 3.14 python -m scripts.eval_prompts \
+    --a evals/notes/current.py --b evals/notes/candidate.py [--n 8] [--seed 1] \
+    [--model claude-haiku-5-5] [--media-root CHEMIN] [--env-file .env] [--dry-run]
+```
+
+- une variante est un fichier Python avec `build(transcript)` qui renvoie un
+  `Prompt` (voir `evals/notes/`) : `current.py` suit le prompt de l'application,
+  `candidate.py` est la copie à modifier ;
+- les mêmes `--n` transcripts (tirés avec `--seed`, parmi les `transcript.txt`
+  d'au moins `MIN_TRANSCRIPT_CHARS` octets sous `--media-root`, par défaut
+  `.local/media/YouTube`) passent dans les deux variantes ;
+- le rapport `.local/evals/<date>/report.html` (et `results.json`) montre les deux
+  sorties côte à côte, avec jetons, coût et durée, les sorties qui ne se
+  parsent pas (notes vides, résumé court qui n'a pas 3 phrases) signalées avec
+  leur réponse brute, et un vote A / B / égal par vidéo gardé dans le navigateur ;
+- une réponse est mise en cache (`.local/evals/cache/`) sous un hachage du modèle
+  et du `Prompt` envoyé : relancer après avoir modifié une variante ne paie que
+  celle-là ; `--dry-run` liste les appels à payer sans en faire ;
+- les rapports contiennent les transcripts : `.local/` est ignoré par git ;
+- l'appel passe par `AnthropicProvider.complete`, sans l'`effort` bas du lot
+  nocturne : le coût et la longueur de sortie peuvent différer un peu de ceux du lot.
+
 ## Couverture attendue
 
 ### Videos et pages

@@ -10,13 +10,17 @@ import sys
 TAGS = ("FRONT", "BACK", "DB", "CI", "DOCS")
 MAX_SUMMARY = 72
 TITLE_RE = re.compile(r"^((?:\[[A-Z]+\])+) (.+)$")
-TYPE_PREFIX_RE = re.compile(r"^(feat|fix|chore|docs|refactor|test|ci|build|perf|style)(\(.+\))?!?:", re.I)
+TYPE_PREFIX_RE = re.compile(
+    r"^(feat|fix|chore|docs|refactor|test|ci|build|perf|style)(\(.+\))?!?:", re.I
+)
 
 
 def check(title: str) -> list[str]:
     match = TITLE_RE.match(title)
     if not match:
-        return ["the title must be `[TAG] Summary` (tags glued together, one space, then the summary)"]
+        return [
+            "the title must be `[TAG] Summary` (tags glued together, one space, then the summary)"
+        ]
     tags = re.findall(r"\[([A-Z]+)\]", match.group(1))
     summary = match.group(2)
 
