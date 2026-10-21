@@ -3342,6 +3342,9 @@ def test_channels_page_shows_rated_channels_by_default():
     assert 'name="rated" value="true" type="checkbox" checked' in rendered
     # The count next to the title is every channel, not only the rated ones listed.
     assert '<h1>Chaînes <span class="page-count">2</span></h1>' in rendered
+    # Same search field as /playlists, on the title row.
+    assert '<label class="page-search">' in rendered
+    assert 'placeholder="Rechercher une chaîne"' in rendered
 
 
 def test_channels_page_shows_last_played_activity_without_video_title():

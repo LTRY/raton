@@ -13,6 +13,28 @@
 <section>
   <div class="page-head">
     <h1>Chaînes <span class="page-count">{{ channel_count }}</span></h1>
+    <form class="page-tools" action="/channels" method="get" data-auto-submit-filter data-live-search="channel-results">
+      <label class="page-search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input name="q" type="search" value="{{ search_query|default('') }}" placeholder="Rechercher une chaîne" aria-label="Rechercher une chaîne" autocomplete="off">
+      </label>
+      <label class="page-toggle">
+        <input name="rated" value="false" type="hidden">
+        <input name="rated" value="true" type="checkbox" {% if rated_filter|default(true) %}checked{% endif %}>
+        <span>★ Notées</span>
+      </label>
+      <label class="page-sort">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
+        <select name="sort" aria-label="Classer les chaînes">
+          <option value="activity" {% if selected_sort|default('activity') == "activity" %}selected{% endif %}>Dernier média joué</option>
+          <option value="rating" {% if selected_sort|default('activity') == "rating" %}selected{% endif %}>Note</option>
+          <option value="alpha" {% if selected_sort|default('activity') == "alpha" %}selected{% endif %}>A-Z</option>
+          <option value="added" {% if selected_sort|default('activity') == "added" %}selected{% endif %}>Ajoutées récemment</option>
+        </select>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </label>
+      <button class="visually-hidden" type="submit">Filtrer</button>
+    </form>
   </div>
 
   {% if youtube_search %}
@@ -86,27 +108,6 @@
     </form>
   </div>
   {% endif %}
-
-  <form class="inline-form asset-filter-form channel-filter-form" action="/channels" method="get" data-auto-submit-filter data-live-search="channel-results">
-    <label class="search-field">
-      <span>Recherche</span>
-      <input name="q" type="search" value="{{ search_query|default('') }}" placeholder="Nom, label, URL, ID" autocomplete="off">
-    </label>
-    <span class="asset-filter-options" aria-label="Filtrer les chaînes">
-      <label class="asset-filter-chip">
-        <input name="rated" value="false" type="hidden">
-        <input name="rated" value="true" type="checkbox" {% if rated_filter|default(true) %}checked{% endif %}>
-        <span class="asset-label asset-label-rating">★ Notées</span>
-      </label>
-    </span>
-    <select name="sort" aria-label="Classer les chaînes">
-      <option value="activity" {% if selected_sort|default('activity') == "activity" %}selected{% endif %}>Dernier média joué</option>
-      <option value="rating" {% if selected_sort|default('activity') == "rating" %}selected{% endif %}>Note</option>
-      <option value="alpha" {% if selected_sort|default('activity') == "alpha" %}selected{% endif %}>A-Z</option>
-      <option value="added" {% if selected_sort|default('activity') == "added" %}selected{% endif %}>Ajoutées récemment</option>
-    </select>
-    <button class="visually-hidden" type="submit">Filtrer</button>
-  </form>
 
   {# Everything that depends on `q` lives in this frame: live search swaps it
      alone, so the search field keeps focus while typing. #}

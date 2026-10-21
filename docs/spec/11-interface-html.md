@@ -45,7 +45,14 @@ ouvrent sur la meme ligne de titre `.page-head` (titre `h1` de 24 px a
 gauche, d'au moins 44 px de haut comme le champ de recherche des Playlists,
 recherche ou actions de la page poussees a droite, 24 px avant la suite),
 pour que le titre soit a la meme hauteur d'une page a l'autre, sur ordinateur
-comme sur telephone. Un
+comme sur telephone. Le champ de recherche de Playlists et de Chaines est le
+meme (`.page-search` : pilule de 44 px, loupe, texte « Rechercher une
+playlist » / « Rechercher une chaine »). Sur Chaines, il est suivi, dans la
+meme ligne (`.page-tools`), de deux commandes discretes : le filtre « ★ Notees »
+(`.page-toggle`, pilule sans fond, teintee quand il est actif) et le tri
+(`.page-sort` : un `<select>` natif habille en bouton texte, icone de tri et
+chevron, fond et bordure seulement au survol). Sur telephone, la recherche
+prend toute la ligne et les deux commandes partagent la suivante. Un
 compteur en pastille (`.page-count`) suit le titre de Chaines (toutes les
 chaines de la bibliotheque, `channel_count` de `GET /api/channels`) et de
 Playlists (toutes les playlists) ; il ignore la recherche et les filtres.
@@ -802,7 +809,8 @@ Template : `channels.html`
 
 Contenu :
 
-- titre « Chaines » suivi du nombre de chaines (voir « En-tete de page » dans
+- titre « Chaines » suivi du nombre de chaines, puis, sur la meme ligne, la
+  recherche, le filtre « Notees » et le tri (voir « En-tete de page » dans
   « Base ») ;
 - formulaire ajout chaine (avec categories), dans la feuille d'import (voir
   « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
