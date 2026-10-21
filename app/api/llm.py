@@ -8,6 +8,7 @@ Each route calls the service its HTML twin calls (`app/web/routes/transcript.py`
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.api.lookups import fiche
 from app.db.session import get_db
 from app.models.video import Video
@@ -44,7 +45,12 @@ def library_chat_read(db: Session) -> LibraryChatRead:
     )
 
 
-@router.post("/videos/{video_id}/notes/generate", response_model=LlmJobQueuedRead, status_code=202)
+@router.post(
+    "/videos/{video_id}/notes/generate",
+    response_model=LlmJobQueuedRead,
+    status_code=202,
+    responses=error_responses(400, 404, 422),
+)
 def generate_notes(
     video_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> LlmJobQueuedRead:
@@ -58,7 +64,12 @@ def generate_notes(
     return LlmJobQueuedRead.from_job(job)
 
 
-@router.post("/videos/{video_id}/chat", response_model=LlmJobQueuedRead, status_code=202)
+@router.post(
+    "/videos/{video_id}/chat",
+    response_model=LlmJobQueuedRead,
+    status_code=202,
+    responses=error_responses(400, 404, 422),
+)
 def ask_about_video(
     video_id: int,
     payload: QuestionCreate,
@@ -74,7 +85,7 @@ def ask_about_video(
     return LlmJobQueuedRead.from_job(job)
 
 
-@router.delete("/videos/{video_id}/chat", status_code=204)
+@router.delete("/videos/{video_id}/chat", status_code=204, responses=error_responses(404, 422))
 def clear_video_chat(video_id: int, db: Session = Depends(get_db)) -> None:
     clear_transcript_chat(fiche(db, video_id))
 
@@ -84,7 +95,9 @@ def get_library_chat(db: Session = Depends(get_db)) -> LibraryChatRead:
     return library_chat_read(db)
 
 
-@router.post("/chat", response_model=LlmJobQueuedRead, status_code=202)
+@router.post(
+    "/chat", response_model=LlmJobQueuedRead, status_code=202, responses=error_responses(400, 422)
+)
 def ask_library(
     payload: QuestionCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> LlmJobQueuedRead:
@@ -102,7 +115,9 @@ def clear_library_chat(db: Session = Depends(get_db)) -> None:
     clear_chat(db)
 
 
-@router.get("/llm-jobs/{job_id}", response_model=LlmJobStatusRead)
+@router.get(
+    "/llm-jobs/{job_id}", response_model=LlmJobStatusRead, responses=error_responses(404, 422)
+)
 def get_llm_job(
     job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> LlmJobStatusRead:

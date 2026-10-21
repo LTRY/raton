@@ -15,6 +15,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.api.lookups import fiche, library_playlist, playlist_item
 from app.db.session import get_db
 from app.models.playlist import Playlist
@@ -137,7 +138,9 @@ def get_playlists(db: Session = Depends(get_db)) -> list[PlaylistSummaryRead]:
     return summaries
 
 
-@router.post("/playlists", response_model=PlaylistRead, status_code=201)
+@router.post(
+    "/playlists", response_model=PlaylistRead, status_code=201, responses=error_responses(400, 422)
+)
 def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)) -> PlaylistRead:
     try:
         playlist = create_manual_playlist(db, payload.title)
@@ -146,7 +149,9 @@ def create_playlist(payload: PlaylistCreate, db: Session = Depends(get_db)) -> P
     return playlist_read(playlist)
 
 
-@router.post("/playlists/preview", response_model=PlaylistPreviewRead)
+@router.post(
+    "/playlists/preview", response_model=PlaylistPreviewRead, responses=error_responses(404, 422)
+)
 def preview(payload: PlaylistPreviewRequest, db: Session = Depends(get_db)) -> dict:
     """Summary of a playlist URL before `import-url`. Writes nothing."""
     try:
@@ -155,7 +160,12 @@ def preview(payload: PlaylistPreviewRequest, db: Session = Depends(get_db)) -> d
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/playlists/import-url", response_model=PlaylistImportRead, status_code=202)
+@router.post(
+    "/playlists/import-url",
+    response_model=PlaylistImportRead,
+    status_code=202,
+    responses=error_responses(404, 422),
+)
 def import_url(
     payload: PlaylistUrlImport, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> PlaylistImportRead:
@@ -168,7 +178,12 @@ def import_url(
     return PlaylistImportRead(playlist=playlist_read(playlist), job=JobQueuedRead.from_job(job))
 
 
-@router.post("/playlists/import-csv", response_model=PlaylistImportRead, status_code=202)
+@router.post(
+    "/playlists/import-csv",
+    response_model=PlaylistImportRead,
+    status_code=202,
+    responses=error_responses(400, 422),
+)
 def import_csv(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -184,7 +199,11 @@ def import_csv(
     return PlaylistImportRead(playlist=playlist_read(playlist), job=JobQueuedRead.from_job(job))
 
 
-@router.get("/playlists/{playlist_id}", response_model=PlaylistDetailRead)
+@router.get(
+    "/playlists/{playlist_id}",
+    response_model=PlaylistDetailRead,
+    responses=error_responses(404, 422),
+)
 def get_playlist(playlist_id: int, db: Session = Depends(get_db)) -> PlaylistDetailRead:
     try:
         return playlist_detail_read(load_playlist(db, playlist_id))
@@ -192,7 +211,14 @@ def get_playlist(playlist_id: int, db: Session = Depends(get_db)) -> PlaylistDet
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.get("/playlists/{playlist_id}/export.csv")
+@router.get(
+    "/playlists/{playlist_id}/export.csv",
+    response_class=Response,
+    responses={
+        200: {"content": {"text/csv": {}}, "description": "Le fichier CSV"},
+        **error_responses(404, 422),
+    },
+)
 def export_csv(playlist_id: int, db: Session = Depends(get_db)) -> Response:
     """The Google Takeout per-playlist layout, which `import-csv` reads back."""
     try:
@@ -206,13 +232,17 @@ def export_csv(playlist_id: int, db: Session = Depends(get_db)) -> Response:
     )
 
 
-@router.delete("/playlists/{playlist_id}", status_code=204)
+@router.delete("/playlists/{playlist_id}", status_code=204, responses=error_responses(404, 422))
 def remove_playlist(playlist_id: int, db: Session = Depends(get_db)) -> None:
     """Deletes the playlist, never the videos it held."""
     delete_playlist(db, library_playlist(db, playlist_id))
 
 
-@router.put("/playlists/{playlist_id}/title", response_model=PlaylistRead)
+@router.put(
+    "/playlists/{playlist_id}/title",
+    response_model=PlaylistRead,
+    responses=error_responses(400, 404, 422),
+)
 def update_title(
     playlist_id: int, payload: PlaylistTitleUpdate, db: Session = Depends(get_db)
 ) -> PlaylistRead:
@@ -224,7 +254,11 @@ def update_title(
     return playlist_read(playlist)
 
 
-@router.put("/playlists/{playlist_id}/categories", response_model=PlaylistCategoriesRead)
+@router.put(
+    "/playlists/{playlist_id}/categories",
+    response_model=PlaylistCategoriesRead,
+    responses=error_responses(404, 422),
+)
 def update_categories(
     playlist_id: int, payload: PlaylistCategoriesUpdate, db: Session = Depends(get_db)
 ) -> PlaylistCategoriesRead:
@@ -234,7 +268,11 @@ def update_categories(
     return PlaylistCategoriesRead(playlist=playlist_read(playlist), labelled_count=labelled)
 
 
-@router.put("/playlists/{playlist_id}/free-listening", response_model=PlaylistRead)
+@router.put(
+    "/playlists/{playlist_id}/free-listening",
+    response_model=PlaylistRead,
+    responses=error_responses(404, 422),
+)
 def update_free_listening(
     playlist_id: int, payload: PlaylistFreeListeningUpdate, db: Session = Depends(get_db)
 ) -> PlaylistRead:
@@ -243,7 +281,11 @@ def update_free_listening(
     return playlist_read(playlist)
 
 
-@router.put("/playlists/{playlist_id}/order", response_model=PlaylistDetailRead)
+@router.put(
+    "/playlists/{playlist_id}/order",
+    response_model=PlaylistDetailRead,
+    responses=error_responses(404, 409, 422),
+)
 def update_order(
     playlist_id: int, payload: PlaylistOrderUpdate, db: Session = Depends(get_db)
 ) -> PlaylistDetailRead:
@@ -254,7 +296,11 @@ def update_order(
     return playlist_detail_read(load_playlist(db, playlist_id))
 
 
-@router.post("/playlists/{playlist_id}/sort", response_model=PlaylistDetailRead)
+@router.post(
+    "/playlists/{playlist_id}/sort",
+    response_model=PlaylistDetailRead,
+    responses=error_responses(400, 404, 422),
+)
 def sort(
     playlist_id: int, payload: PlaylistSortUpdate, db: Session = Depends(get_db)
 ) -> PlaylistDetailRead:
@@ -265,12 +311,22 @@ def sort(
     return playlist_detail_read(load_playlist(db, playlist_id))
 
 
-@router.post("/playlists/{playlist_id}/duplicate", response_model=PlaylistRead, status_code=201)
+@router.post(
+    "/playlists/{playlist_id}/duplicate",
+    response_model=PlaylistRead,
+    status_code=201,
+    responses=error_responses(404, 422),
+)
 def duplicate(playlist_id: int, db: Session = Depends(get_db)) -> PlaylistRead:
     return playlist_read(duplicate_playlist(db, library_playlist(db, playlist_id)))
 
 
-@router.post("/playlists/{playlist_id}/refresh", response_model=JobQueuedRead, status_code=202)
+@router.post(
+    "/playlists/{playlist_id}/refresh",
+    response_model=JobQueuedRead,
+    status_code=202,
+    responses=error_responses(400, 404, 422),
+)
 def refresh(
     playlist_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> JobQueuedRead:
@@ -288,6 +344,7 @@ def refresh(
     "/playlists/{playlist_id}/download/{media_type}",
     response_model=PlaylistDownloadsRead,
     status_code=202,
+    responses=error_responses(400, 404, 422),
 )
 def download_missing(
     playlist_id: int,
@@ -305,7 +362,12 @@ def download_missing(
     return PlaylistDownloadsRead(jobs=[JobQueuedRead.from_job(job) for _, job in queued])
 
 
-@router.post("/playlists/{playlist_id}/items", response_model=PlaylistDetailRead, status_code=201)
+@router.post(
+    "/playlists/{playlist_id}/items",
+    response_model=PlaylistDetailRead,
+    status_code=201,
+    responses=error_responses(404, 422),
+)
 def add_item(
     playlist_id: int, payload: PlaylistItemCreate, db: Session = Depends(get_db)
 ) -> PlaylistDetailRead:
@@ -316,13 +378,19 @@ def add_item(
     return playlist_detail_read(load_playlist(db, playlist_id))
 
 
-@router.delete("/playlists/{playlist_id}/items/{item_id}", status_code=204)
+@router.delete(
+    "/playlists/{playlist_id}/items/{item_id}", status_code=204, responses=error_responses(404, 422)
+)
 def delete_item(playlist_id: int, item_id: int, db: Session = Depends(get_db)) -> None:
     """Removes the item (never the fiche) and renumbers the rest."""
     remove_item(db, playlist_item(db, playlist_id, item_id))
 
 
-@router.post("/playlists/{playlist_id}/items/{item_id}/move", response_model=PlaylistDetailRead)
+@router.post(
+    "/playlists/{playlist_id}/items/{item_id}/move",
+    response_model=PlaylistDetailRead,
+    responses=error_responses(404, 422),
+)
 def move(
     playlist_id: int, item_id: int, payload: PlaylistItemMove, db: Session = Depends(get_db)
 ) -> PlaylistDetailRead:

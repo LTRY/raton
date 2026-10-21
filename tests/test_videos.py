@@ -549,7 +549,7 @@ def test_api_sponsor_segments_returns_normalized_payload():
     )
     db.commit()
 
-    payload = api_videos.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     assert payload["skip_enabled"] is True
     assert payload["segments"] == [{"start": 0.0, "end": 8.0}, {"start": 30.0, "end": 60.0}]
@@ -580,7 +580,7 @@ def test_api_sponsor_segments_filters_out_unchecked_categories():
     )
     db.commit()
 
-    payload = api_videos.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     assert payload["segments"] == [{"start": 30.0, "end": 60.0}]
 
@@ -601,7 +601,7 @@ def test_api_sponsor_segments_reports_skip_disabled():
     )
     db.commit()
 
-    payload = api_videos.get_video_sponsor_segments(video.id, db)
+    payload = api_videos.get_video_sponsor_segments(video.id, db).model_dump()
 
     # La route renvoie toujours les segments : c'est le client qui décide de les
     # armer ou non à partir de `skip_enabled` (app/static/js/app.js).

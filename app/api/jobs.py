@@ -5,6 +5,7 @@ that start a download or an import answer with (`status_url`). LLM jobs are `/ap
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.db.session import get_db
 from app.schemas.actions import (
     JobStatusRead,
@@ -19,7 +20,7 @@ from app.services.jobs.downloads import (
 router = APIRouter(prefix="/api", tags=["Jobs"])
 
 
-@router.get("/jobs", response_model=list[RecentJobRead])
+@router.get("/jobs", response_model=list[RecentJobRead], responses=error_responses(422))
 def list_jobs(
     status: list[str] = Query(default=[]), db: Session = Depends(get_db)
 ) -> list[RecentJobRead]:
@@ -38,7 +39,12 @@ def list_jobs(
     ]
 
 
-@router.get("/jobs/{job_id}", response_model=JobStatusRead, response_model_exclude_none=True)
+@router.get(
+    "/jobs/{job_id}",
+    response_model=JobStatusRead,
+    response_model_exclude_none=True,
+    responses=error_responses(404, 422),
+)
 def get_job(job_id: int, db: Session = Depends(get_db)) -> dict:
     try:
         return job_status(db, job_id)

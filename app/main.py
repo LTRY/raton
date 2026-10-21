@@ -17,9 +17,11 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router as api_router
+from app.api.errors import validation_error_handler
 from app.core.config import get_settings
 from app.core.logging import configure_app_logging, log_event
 from app.db.session import Base, engine, get_db
@@ -91,6 +93,7 @@ app.add_middleware(RequestTimingMiddleware)
 # resolution order: do not reorder without checking that no path shadows another.
 # The OpenAPI schema (`/docs`) describes the JSON API only: the HTML routes are left out.
 app.include_router(api_router)
+app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.include_router(media_router, include_in_schema=False)
 app.include_router(settings_router, include_in_schema=False)
 app.include_router(stats_router, include_in_schema=False)

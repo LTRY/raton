@@ -7,6 +7,7 @@ Each route calls the service its HTML twin calls (`app/web/routes/channels.py`).
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.api.lookups import library_channel
 from app.db.session import get_db
 from app.models.channel import Channel
@@ -60,7 +61,7 @@ from app.services.youtube.channel_info import ChannelNotFoundError
 router = APIRouter(prefix="/api", tags=["Chaînes"])
 
 
-@router.get("/channels", response_model=ChannelPageRead)
+@router.get("/channels", response_model=ChannelPageRead, responses=error_responses(422))
 def list_channels(
     sort: str | None = None,
     rated: bool = False,
@@ -87,7 +88,9 @@ def list_channels(
     )
 
 
-@router.get("/channels/{channel_id}", response_model=ChannelDetailRead)
+@router.get(
+    "/channels/{channel_id}", response_model=ChannelDetailRead, responses=error_responses(404, 422)
+)
 def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetailRead:
     channel = library_channel(db, channel_id)
     return ChannelDetailRead(
@@ -102,7 +105,12 @@ def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetail
     )
 
 
-@router.post("/channels", response_model=ChannelRead, status_code=201)
+@router.post(
+    "/channels",
+    response_model=ChannelRead,
+    status_code=201,
+    responses=error_responses(400, 404, 409, 422),
+)
 def create_channel(
     payload: ChannelCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ) -> Channel:
@@ -118,7 +126,7 @@ def create_channel(
     return channel
 
 
-@router.delete("/channels/{channel_id}", status_code=204)
+@router.delete("/channels/{channel_id}", status_code=204, responses=error_responses(404, 422))
 def delete_channel(channel_id: int, db: Session = Depends(get_db)) -> None:
     channel = library_channel(db, channel_id)
     channel_manage.delete_channel(db, channel)
@@ -135,7 +143,11 @@ def channel_state(channel: Channel) -> ChannelStateRead:
     )
 
 
-@router.put("/channels/{channel_id}/rating", response_model=ChannelStateRead)
+@router.put(
+    "/channels/{channel_id}/rating",
+    response_model=ChannelStateRead,
+    responses=error_responses(400, 404, 422),
+)
 def update_rating(
     channel_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
 ) -> ChannelStateRead:
@@ -148,7 +160,11 @@ def update_rating(
     return channel_state(channel)
 
 
-@router.put("/channels/{channel_id}/categories", response_model=ChannelStateRead)
+@router.put(
+    "/channels/{channel_id}/categories",
+    response_model=ChannelStateRead,
+    responses=error_responses(404, 422),
+)
 def update_categories(
     channel_id: int, payload: ChannelCategoriesUpdate, db: Session = Depends(get_db)
 ) -> ChannelStateRead:
@@ -157,7 +173,11 @@ def update_categories(
     return channel_state(channel)
 
 
-@router.put("/channels/{channel_id}/bells/{section}", response_model=ChannelBellRead)
+@router.put(
+    "/channels/{channel_id}/bells/{section}",
+    response_model=ChannelBellRead,
+    responses=error_responses(404, 422),
+)
 def update_bell(
     channel_id: int,
     section: BellSection,
@@ -180,7 +200,10 @@ def update_bell(
 
 
 @router.post(
-    "/channels/{channel_id}/import-metadata", response_model=JobQueuedRead, status_code=202
+    "/channels/{channel_id}/import-metadata",
+    response_model=JobQueuedRead,
+    status_code=202,
+    responses=error_responses(404, 422),
 )
 def import_metadata(
     channel_id: int,
@@ -202,6 +225,7 @@ def import_metadata(
     "/channels/{channel_id}/refresh-profile",
     response_model=ChannelProfileRefreshRead,
     status_code=202,
+    responses=error_responses(404, 422),
 )
 def refresh_profile(
     channel_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
@@ -214,7 +238,11 @@ def refresh_profile(
     )
 
 
-@router.post("/channels/import-csv", response_model=SubscriptionsPreviewRead)
+@router.post(
+    "/channels/import-csv",
+    response_model=SubscriptionsPreviewRead,
+    responses=error_responses(400, 422),
+)
 def preview_subscriptions_csv(
     file: UploadFile = File(...), db: Session = Depends(get_db)
 ) -> SubscriptionsPreviewRead:
@@ -232,7 +260,11 @@ def preview_subscriptions_csv(
     )
 
 
-@router.post("/channels/import-csv/confirm", response_model=SubscriptionsAddedRead)
+@router.post(
+    "/channels/import-csv/confirm",
+    response_model=SubscriptionsAddedRead,
+    responses=error_responses(422),
+)
 def confirm_subscriptions_csv(
     payload: SubscriptionsConfirm,
     background_tasks: BackgroundTasks,

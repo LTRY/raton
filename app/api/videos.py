@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import true
 from sqlalchemy.orm import Session
 
+from app.api.errors import error_responses
 from app.api.lookups import fiche
 from app.db.session import get_db
 from app.models.video import Video
@@ -18,6 +19,7 @@ from app.schemas.actions import (
     ListStateUpdate,
     MediaDownload,
     PlaybackActivity,
+    SkipSegmentsRead,
     SponsorSegmentsFetchRead,
     VideoStateRead,
 )
@@ -67,7 +69,7 @@ from app.services.youtube.sponsor_segments import (
 router = APIRouter(prefix="/api", tags=["Fiches"])
 
 
-@router.get("/videos", response_model=VideoPage)
+@router.get("/videos", response_model=VideoPage, responses=error_responses(422))
 def list_videos(
     channel_id: int | None = None,
     page: int = Query(1, ge=1),
@@ -127,14 +129,20 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
     )
 
 
-@router.get("/videos/{video_id}", response_model=VideoDetailRead)
+@router.get(
+    "/videos/{video_id}", response_model=VideoDetailRead, responses=error_responses(404, 422)
+)
 def get_video(video_id: int, db: Session = Depends(get_db)) -> VideoDetailRead:
     """Read only: unlike the HTML page, it leaves the fiche in the Nouveautés."""
     return video_detail_read(video_detail(db, fiche(db, video_id)))
 
 
-@router.get("/videos/{video_id}/sponsor-segments")
-def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> dict:
+@router.get(
+    "/videos/{video_id}/sponsor-segments",
+    response_model=SkipSegmentsRead,
+    responses=error_responses(404, 422),
+)
+def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> SkipSegmentsRead:
     """The segments to skip, normalized, for the persistent mini player of base.html.
 
     It survives Turbo navigations and starts from any list, so it cannot rely on the JSON block
@@ -142,7 +150,9 @@ def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> 
     """
     video = fiche(db, video_id)
     rows = active_sponsor_segments(db, video.id)
-    return {"skip_enabled": get_sponsor_skip_enabled(db), "segments": normalize_skip_segments(rows)}
+    return SkipSegmentsRead(
+        skip_enabled=get_sponsor_skip_enabled(db), segments=normalize_skip_segments(rows)
+    )
 
 
 def video_state(video: Video) -> VideoStateRead:
@@ -157,7 +167,9 @@ def video_state(video: Video) -> VideoStateRead:
     )
 
 
-@router.post("/videos/{video_id}/open", response_model=VideoStateRead)
+@router.post(
+    "/videos/{video_id}/open", response_model=VideoStateRead, responses=error_responses(404, 422)
+)
 def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
     """What opening the fiche's page does: takes it out of the Nouveautés."""
     video = fiche(db, video_id)
@@ -165,7 +177,11 @@ def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
     return video_state(video)
 
 
-@router.put("/videos/{video_id}/rating", response_model=VideoStateRead)
+@router.put(
+    "/videos/{video_id}/rating",
+    response_model=VideoStateRead,
+    responses=error_responses(400, 404, 422),
+)
 def update_rating(
     video_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
 ) -> VideoStateRead:
@@ -178,7 +194,11 @@ def update_rating(
     return video_state(video)
 
 
-@router.put("/videos/{video_id}/list-state", response_model=VideoStateRead)
+@router.put(
+    "/videos/{video_id}/list-state",
+    response_model=VideoStateRead,
+    responses=error_responses(400, 404, 422),
+)
 def update_list_state(
     video_id: int, payload: ListStateUpdate, db: Session = Depends(get_db)
 ) -> VideoStateRead:
@@ -190,7 +210,11 @@ def update_list_state(
     return video_state(video)
 
 
-@router.put("/videos/{video_id}/categories", response_model=VideoStateRead)
+@router.put(
+    "/videos/{video_id}/categories",
+    response_model=VideoStateRead,
+    responses=error_responses(404, 422),
+)
 def update_categories(
     video_id: int, payload: CategoriesUpdate, db: Session = Depends(get_db)
 ) -> VideoStateRead:
@@ -199,7 +223,9 @@ def update_categories(
     return video_state(video)
 
 
-@router.put("/videos/{video_id}/comment", response_model=VideoStateRead)
+@router.put(
+    "/videos/{video_id}/comment", response_model=VideoStateRead, responses=error_responses(404, 422)
+)
 def update_comment(
     video_id: int, payload: CommentUpdate, db: Session = Depends(get_db)
 ) -> VideoStateRead:
@@ -208,7 +234,11 @@ def update_comment(
     return video_state(video)
 
 
-@router.post("/videos/{video_id}/activity", response_model=VideoStateRead)
+@router.post(
+    "/videos/{video_id}/activity",
+    response_model=VideoStateRead,
+    responses=error_responses(400, 404, 422),
+)
 def log_activity(
     video_id: int, payload: PlaybackActivity, db: Session = Depends(get_db)
 ) -> VideoStateRead:
@@ -232,6 +262,7 @@ def log_activity(
     "/videos/{video_id}/media/{media_type}/download",
     response_model=JobQueuedRead,
     status_code=202,
+    responses=error_responses(400, 404, 422),
 )
 def download_media(
     video_id: int,
@@ -250,7 +281,11 @@ def download_media(
     return JobQueuedRead.from_job(job)
 
 
-@router.delete("/videos/{video_id}/media/{media_type}", status_code=204)
+@router.delete(
+    "/videos/{video_id}/media/{media_type}",
+    status_code=204,
+    responses=error_responses(400, 404, 422),
+)
 def delete_media(video_id: int, media_type: str, db: Session = Depends(get_db)) -> None:
     video = fiche(db, video_id)
     try:
@@ -260,7 +295,10 @@ def delete_media(video_id: int, media_type: str, db: Session = Depends(get_db)) 
 
 
 @router.post(
-    "/videos/{video_id}/transcript/download", response_model=JobQueuedRead, status_code=202
+    "/videos/{video_id}/transcript/download",
+    response_model=JobQueuedRead,
+    status_code=202,
+    responses=error_responses(404, 422),
 )
 def retry_transcript(
     video_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
@@ -271,7 +309,11 @@ def retry_transcript(
     return JobQueuedRead.from_job(job)
 
 
-@router.post("/videos/{video_id}/sponsor-segments/fetch", response_model=SponsorSegmentsFetchRead)
+@router.post(
+    "/videos/{video_id}/sponsor-segments/fetch",
+    response_model=SponsorSegmentsFetchRead,
+    responses=error_responses(404, 422, 502),
+)
 def fetch_sponsor_segments(
     video_id: int, db: Session = Depends(get_db)
 ) -> SponsorSegmentsFetchRead:

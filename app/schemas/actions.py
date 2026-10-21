@@ -82,7 +82,13 @@ class RecentJobRead(BaseModel):
     done: bool
 
 
-class SponsorSegmentsFetchRead(BaseModel):
-    count: int
+class SkipSegmentsRead(BaseModel):
+    """The segments the players skip: sorted, merged, filtered by the enabled categories."""
+
     skip_enabled: bool
     segments: list[SkipSegmentRead]
+
+
+class SponsorSegmentsFetchRead(SkipSegmentsRead):
+    # Segments SponsorBlock returned for the enabled categories, before merging.
+    count: int

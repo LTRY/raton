@@ -7,6 +7,8 @@ from fastapi import APIRouter
 
 from app.api import channels, jobs, library, llm, playlists, settings, stats, videos
 
+MODULES = (channels, videos, library, playlists, llm, jobs, stats, settings)
+
 router = APIRouter()
-for module in (channels, videos, library, playlists, llm, jobs, stats, settings):
+for module in MODULES:
     router.include_router(module.router)

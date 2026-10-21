@@ -218,6 +218,16 @@ categories d'une chaine, d'une fiche ou d'une playlist se lisent toujours
 `categories`, une liste de libelles normalises (la colonne `category_labels`
 ne sort pas de l'API).
 
+Erreurs : toute erreur de `/api` repond `{"detail": "<message en francais>"}`
+(`ErrorRead`, `app/api/errors.py`). Un refus metier porte le message du
+service (`400`, `404`, `409`, `502`) ; une requete invalide repond `422` avec
+un `detail` lisible (`Requête invalide : state : champ obligatoire.`) et
+`errors`, la liste `{field, message}` des champs en cause (les routes HTML
+gardent la reponse `422` par defaut de FastAPI). Chaque route declare dans le
+schema OpenAPI les codes d'erreur qu'elle peut repondre, et toutes ses
+reponses sont typees ; le schema (`/docs`) ne decrit que `/api`.
+`tests/test_api_contract.py` verifie ces regles.
+
 - `GET /api/channels?sort=…&rated=true|false&q=…&page=N` : une page de 50
   chaines, memes tris (`activity` par defaut, `rating`, `alpha`, `added` ; un
   tri inconnu donne `activity`), meme recherche et meme filtre Notees que
