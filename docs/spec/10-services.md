@@ -99,7 +99,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `manage` | Ajout et suppression d'une chaîne, catégories, cloches |
+| `manage` | Ajout et suppression d'une chaîne, catégories, cloches (`set_channel_bell` dit si la cloche vient de passer à active) |
 | `listing` | Liste de `/channels` : tri, filtre Notées, recherche, nombre de fiches |
 | `lookup` | Chaîne de la bibliothèque qui correspond à une URL ou un identifiant YouTube |
 | `profile` | Avatar, bannière et description d'une chaîne |
@@ -126,7 +126,8 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | Module | Responsabilité |
 |---|---|
 | `imports` | Aperçu d'une playlist YouTube, lecture du CSV Google Takeout, ajout d'une entrée à la playlist, export CSV |
-| `editing` | Édition d'une playlist et de ses éléments |
+| `editing` | Édition d'une playlist et de ses éléments ; recherche d'une playlist ou d'un élément (`find_playlist`, `find_playlist_item`), titre obligatoire (`playlist_title`) |
+| `listing` | Données des pages `/playlists` et `/playlists/{id}` et de leurs jumelles `/api`, en valeurs brutes : liste avec couvertures, détail chargé d'avance, lignes et compteurs |
 
 ### `videos/`
 
@@ -142,7 +143,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
-| `charts` | Données de la page `/stats` et de `GET /api/stats/charts` |
+| `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
 
 ### `raton/`
 
@@ -160,7 +161,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `indexing` | Découpage et embedding des notes d'une fiche en `video_note_chunks`, rattrapages d'indexation |
 | `retrieval` | Recherche des passages de notes les plus pertinents pour une question |
 | `auto_notes` | Génération nocturne des notes et du résumé court des fiches qui n'en ont pas |
-| `dashboard`, `dashboard_stats` | Données de la page `/rag` : état de l'indexation, coûts, historique, échecs, couverture |
+| `dashboard`, `dashboard_stats` | Données de la page `/rag` et de `GET /api/rag` : état de l'indexation, coûts, historique, échecs, couverture |
 
 Voir [19 Indexation et recherche dans les notes](19-indexation-et-recherche-notes.md).
 
@@ -181,9 +182,10 @@ web ; chacune ouvre sa propre session DB.
 
 | Module | Responsabilité |
 |---|---|
-| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
-| `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout |
+| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) ou une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`), formats manquants d'une playlist (`queue_playlist_downloads`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
+| `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
+| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), partagés par les routes HTML et `/api` |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
 | `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques |
 

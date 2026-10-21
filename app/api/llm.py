@@ -1,0 +1,143 @@
+"""`/api` LLM requests: notes of a fiche, its discussion, the library chat, and their jobs.
+
+Each route calls the service its HTML twin calls (`app/web/routes/transcript.py`,
+`library_chat.py`). The discussion and the documents of a fiche are also in
+`GET /api/videos/{id}`.
+"""
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.video import Video
+from app.schemas.llm import (
+    LibraryChatRead,
+    LlmJobQueuedRead,
+    LlmJobStatusRead,
+    QuestionCreate,
+)
+from app.schemas.video import VideoDocumentsRead
+from app.services.jobs.llm_jobs import run_llm_job, run_notes_indexing_job
+from app.services.jobs.llm_requests import (
+    LlmJobFailedError,
+    LlmJobNotFoundError,
+    LlmRequestError,
+    find_llm_job,
+    queue_library_question,
+    queue_notes_generation,
+    queue_video_question,
+    resolve_llm_job,
+)
+from app.services.library_chat.history import chat_messages, clear_chat, total_video_count
+from app.services.rag.retrieval import count_indexed_videos
+from app.services.videos.detail_view import VideoNotFoundError, find_video
+from app.services.videos.documents import clear_transcript_chat, read_transcript_documents
+
+router = APIRouter(prefix="/api")
+
+
+def fiche(db: Session, video_id: int) -> Video:
+    try:
+        return find_video(db, video_id)
+    except VideoNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def library_chat_read(db: Session) -> LibraryChatRead:
+    return LibraryChatRead(
+        messages=chat_messages(db),
+        indexed_video_count=count_indexed_videos(db),
+        total_video_count=total_video_count(db),
+    )
+
+
+@router.post("/videos/{video_id}/notes/generate", response_model=LlmJobQueuedRead, status_code=202)
+def generate_notes(
+    video_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> LlmJobQueuedRead:
+    """Notes + résumé of the fiche from its transcript, in one LLM call; poll `status_url`."""
+    video = fiche(db, video_id)
+    try:
+        job = queue_notes_generation(db, video)
+    except LlmRequestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    background_tasks.add_task(run_llm_job, job.id)
+    return LlmJobQueuedRead.from_job(job)
+
+
+@router.post("/videos/{video_id}/chat", response_model=LlmJobQueuedRead, status_code=202)
+def ask_about_video(
+    video_id: int,
+    payload: QuestionCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> LlmJobQueuedRead:
+    video = fiche(db, video_id)
+    try:
+        job = queue_video_question(db, video, payload.question)
+    except LlmRequestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    background_tasks.add_task(run_llm_job, job.id)
+    return LlmJobQueuedRead.from_job(job)
+
+
+@router.delete("/videos/{video_id}/chat", status_code=204)
+def clear_video_chat(video_id: int, db: Session = Depends(get_db)) -> None:
+    clear_transcript_chat(fiche(db, video_id))
+
+
+@router.get("/chat", response_model=LibraryChatRead)
+def get_library_chat(db: Session = Depends(get_db)) -> LibraryChatRead:
+    return library_chat_read(db)
+
+
+@router.post("/chat", response_model=LlmJobQueuedRead, status_code=202)
+def ask_library(
+    payload: QuestionCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> LlmJobQueuedRead:
+    """A question to the library chat, which searches channels, fiches and notes with its tools."""
+    try:
+        job = queue_library_question(db, payload.question)
+    except LlmRequestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    background_tasks.add_task(run_llm_job, job.id)
+    return LlmJobQueuedRead.from_job(job)
+
+
+@router.delete("/chat", status_code=204)
+def clear_library_chat(db: Session = Depends(get_db)) -> None:
+    clear_chat(db)
+
+
+@router.get("/llm-jobs/{job_id}", response_model=LlmJobStatusRead)
+def get_llm_job(
+    job_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> LlmJobStatusRead:
+    """Where an LLM job stands. The first poll after it finished writes its result (notes,
+    answer), like the page's polling; a failed job answers 200 with `status: failed`."""
+    try:
+        job = find_llm_job(db, job_id)
+    except LlmJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    fields = {"id": job.id, "kind": job.kind, "video_id": job.video_id}
+    try:
+        outcome = resolve_llm_job(db, job)
+    except LlmJobFailedError as exc:
+        return LlmJobStatusRead(**fields, status="failed", message=str(exc))
+    if outcome.pending:
+        return LlmJobStatusRead(
+            **fields,
+            status="pending",
+            partial_short_summary=outcome.partial_short_summary,
+            tool_calls=outcome.tool_calls,
+        )
+    if outcome.notes_to_index is not None:
+        background_tasks.add_task(run_notes_indexing_job, *outcome.notes_to_index)
+    if job.kind == "library_chat":
+        return LlmJobStatusRead(**fields, status="done", library_chat=library_chat_read(db))
+    documents = read_transcript_documents(db.get(Video, job.video_id))
+    if job.kind == "generate":
+        return LlmJobStatusRead(
+            **fields, status="done", documents=VideoDocumentsRead.from_documents(documents)
+        )
+    return LlmJobStatusRead(**fields, status="done", chat_messages=documents["chat_messages"])

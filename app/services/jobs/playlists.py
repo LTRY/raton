@@ -1,4 +1,8 @@
-"""Background jobs of a playlist import, from a YouTube playlist URL or a Google Takeout CSV."""
+"""Background jobs of a playlist import, from a YouTube playlist URL or a Google Takeout CSV.
+
+`queue_*` create the playlist and the queued job a route answers with; the route then hands the
+matching `run_*` to its background tasks.
+"""
 
 from typing import Any
 
@@ -10,13 +14,63 @@ from app.models.job import DownloadJob
 from app.models.playlist import Playlist
 from app.services.common.job_log import log_job
 from app.services.ingest.throttle import RateLimitedError
+from app.services.playlists.editing import create_playlist, playlist_title_from_filename
 from app.services.playlists.imports import (
     MAX_PLAYLIST_IMPORT_PAGES,
     PLAYLIST_IMPORT_PAGE_SIZE,
+    extract_playlist_info,
     import_playlist_entry,
     list_playlist_entries,
+    parse_playlist_csv,
     playlist_import_summary,
 )
+
+
+class PlaylistNotRefreshableError(ValueError):
+    pass
+
+
+def _queue_import(db: Session, playlist: Playlist) -> DownloadJob:
+    return log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
+
+
+def queue_playlist_url_import(
+    db: Session, url: str, title: str = ""
+) -> tuple[Playlist, DownloadJob]:
+    """Resolve the URL now (PlaylistNotFoundError), create the playlist, queue the import of its
+    videos; run it with `run_playlist_url_import_job`. Without a title, YouTube's is used."""
+    info = extract_playlist_info(url)
+    playlist = create_playlist(
+        db,
+        title.strip() or info["title"],
+        source="url",
+        source_url=info["url"],
+        yt_playlist_id=info.get("yt_playlist_id"),
+    )
+    return playlist, _queue_import(db, playlist)
+
+
+def queue_playlist_csv_import(
+    db: Session, content: bytes, filename: str | None, title: str = ""
+) -> tuple[Playlist, DownloadJob, list[dict[str, Any]]]:
+    """Read the CSV now (PlaylistCsvError), create the playlist, queue the import of its rows;
+    run it with `run_playlist_csv_import_job`. Without a title, the file name gives one."""
+    rows = parse_playlist_csv(content)
+    playlist = create_playlist(
+        db,
+        title.strip() or playlist_title_from_filename(filename or "Playlist importée"),
+        source="csv",
+    )
+    return playlist, _queue_import(db, playlist), rows
+
+
+def queue_playlist_refresh(db: Session, playlist: Playlist) -> DownloadJob:
+    """A new URL import that appends the playlist's new videos; run `run_playlist_url_import_job`."""
+    if playlist.source != "url" or not playlist.source_url:
+        raise PlaylistNotRefreshableError(
+            "Seule une playlist importée depuis une URL peut être rafraîchie."
+        )
+    return _queue_import(db, playlist)
 
 
 @logged_job("playlist_url_import")

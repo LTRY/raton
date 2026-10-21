@@ -68,12 +68,6 @@ def video_state(video: Video) -> VideoStateRead:
     )
 
 
-def job_queued(job) -> JobQueuedRead:
-    return JobQueuedRead(
-        job_id=job.id, status=job.status, message=job.message, status_url=f"/api/jobs/{job.id}"
-    )
-
-
 @router.post("/videos/{video_id}/open", response_model=VideoStateRead)
 def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
     """What opening the fiche's page does: takes it out of the Nouveautés."""
@@ -151,7 +145,7 @@ def download_media(
     except InvalidMediaFormatError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     background_tasks.add_task(run_media_download_job, job.id, video.url, media_type, video_quality)
-    return job_queued(job)
+    return JobQueuedRead.from_job(job)
 
 
 @router.delete("/videos/{video_id}/media/{media_type}", status_code=204)
@@ -172,7 +166,7 @@ def retry_transcript(
     video = fiche(db, video_id)
     job = queue_transcript_retry(db, video)
     background_tasks.add_task(run_transcript_retry_job, job.id, video.id)
-    return job_queued(job)
+    return JobQueuedRead.from_job(job)
 
 
 @router.post("/videos/{video_id}/sponsor-segments/fetch", response_model=SponsorSegmentsFetchRead)

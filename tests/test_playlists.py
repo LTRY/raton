@@ -14,6 +14,7 @@ from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
 from app.services.common.job_log import log_job
 from app.services.ingest.throttle import RateLimitedError
+from app.services.jobs import downloads as downloads_jobs
 from app.services.jobs import playlists as playlists_jobs
 from app.services.jobs.playlists import run_playlist_csv_import_job
 from app.services.playlists import imports as playlists_service
@@ -395,7 +396,7 @@ def test_add_video_to_playlist_existing_and_new_branches():
 def test_import_playlist_url_route_schedules_background_job(monkeypatch):
     db = make_session()
     monkeypatch.setattr(
-        playlists_routes,
+        playlists_jobs,
         "extract_playlist_info",
         lambda url: {"url": url, "title": "Remote Title", "yt_playlist_id": "PL123"},
     )
@@ -431,7 +432,7 @@ def test_import_playlist_url_route_reports_not_found(monkeypatch):
     def fail(url):
         raise PlaylistNotFoundError(f"Playlist introuvable pour {url}")
 
-    monkeypatch.setattr(playlists_routes, "extract_playlist_info", fail)
+    monkeypatch.setattr(playlists_jobs, "extract_playlist_info", fail)
 
     response = playlists_routes.import_playlist_url(
         make_request(), BackgroundTasks(), url="bad", title="", db=db
@@ -602,7 +603,28 @@ def test_download_playlist_media_only_queues_missing_files(monkeypatch):
     assert len(background_tasks.tasks) == 2
     queued_urls = {task.args[1] for task in background_tasks.tasks}
     assert queued_urls == {videos[1].url, videos[2].url}
-    assert all(task.args[2] == ["audio", "metadata"] for task in background_tasks.tasks)
+    assert all(
+        task.func is downloads_jobs.run_media_download_job for task in background_tasks.tasks
+    )
+    assert all(task.args[2] == "audio" for task in background_tasks.tasks)
+
+
+def test_run_media_download_job_refreshes_metadata_and_leaves_the_transcript(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        downloads_jobs,
+        "run_manual_download_job",
+        lambda *args, **kwargs: calls.append((args, kwargs)),
+    )
+
+    downloads_jobs.run_media_download_job(7, "https://youtube.com/watch?v=x", "audio")
+
+    assert calls == [
+        (
+            (7, "https://youtube.com/watch?v=x", ["audio", "metadata"], False),
+            {"video_quality": "1080"},
+        )
+    ]
 
 
 # --- preview before import -------------------------------------------------

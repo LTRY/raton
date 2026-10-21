@@ -13,7 +13,6 @@ from fastapi import (
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
-from app.core.logging import log_event
 from app.db.session import get_db
 from app.models.channel import Channel
 from app.services.channels.listing import (
@@ -25,6 +24,7 @@ from app.services.channels.listing import (
 from app.services.channels.manage import (
     ChannelAlreadyInLibraryError,
     bell_section,
+    bell_section_label,
     create_channel,
     delete_channel,
     set_channel_categories,
@@ -37,7 +37,6 @@ from app.services.channels.subscriptions import (
     preview_subscriptions,
 )
 from app.services.common.categories import parse_video_category_labels, serialized_category_labels
-from app.services.common.job_log import log_job
 from app.services.common.ratings import InvalidRatingError, check_rating, set_rating
 from app.services.common.search import normalized_search_query
 from app.services.common.settings import (
@@ -47,7 +46,11 @@ from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
 )
-from app.services.jobs.downloads import run_channel_metadata_import_job
+from app.services.jobs.downloads import (
+    queue_channel_catalog_sync,
+    queue_channel_metadata_import,
+    run_channel_metadata_import_job,
+)
 from app.services.youtube.channel_info import (
     ChannelNotFoundError,
     is_channel_reference,
@@ -297,9 +300,8 @@ def toggle_channel_auto_metadata_form(
     if channel is None:
         raise HTTPException(status_code=404, detail="Chaîne introuvable")
     section = bell_section(section)
-    section_label = "shorts" if section == "shorts" else "vidéos"
+    section_label = bell_section_label(section)
     enabled = toggle_channel_bell(db, channel, section)
-    log_event(logger, "channel.bell", channel_id=channel.id, section=section, enabled=enabled)
     target = internal_return_path(return_to, "/channels")
     if not enabled:
         return redirect(
@@ -309,12 +311,8 @@ def toggle_channel_auto_metadata_form(
             )
         )
 
-    job = log_job(
-        db,
-        "queued",
-        f"Recherche automatique des nouveautés ({section_label}) de {channel.name} en file d'attente.",
-        channel_id=channel.id,
-    )
+    job = queue_channel_catalog_sync(db, channel, section)
+    # The existing catalogue is not news: mark_new stays off.
     background_tasks.add_task(
         run_channel_metadata_import_job, job.id, channel.id, 1, section, False
     )
@@ -349,13 +347,7 @@ def import_channel_metadata_form(
         return redirect(append_query(target, {"level": "error", "message": message}))
 
     section = bell_section(section)
-    section_label = "shorts" if section == "shorts" else "vidéos"
-    job = log_job(
-        db,
-        "queued",
-        f"Import des métadonnées {section_label} de {channel.name} en file d'attente.",
-        channel_id=channel.id,
-    )
+    job = queue_channel_metadata_import(db, channel, section)
     background_tasks.add_task(run_channel_metadata_import_job, job.id, channel.id, page, section)
 
     if request.headers.get("x-requested-with") == "fetch":

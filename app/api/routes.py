@@ -32,7 +32,9 @@ from app.services.common.settings import (
     save_settings,
 )
 from app.services.jobs.backfills import run_channel_profile_backfill_job
-from app.services.videos.charts import library_chart_data
+from app.services.llm.usage import llm_spend_by_month
+from app.services.rag.dashboard import rag_dashboard_data
+from app.services.videos.charts import library_stats
 from app.services.videos.detail_view import (
     VideoDetail,
     VideoNotFoundError,
@@ -142,13 +144,7 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
             comment_count=metadata["comment_count"],
             uploader=metadata["uploader"],
         ),
-        documents=VideoDocumentsRead(
-            transcript=documents["transcript"],
-            notes=documents["notes_transcript"],
-            short_summary=documents["short_summary"],
-            suggested_questions=documents["suggested_questions"],
-            chat_messages=documents["chat_messages"],
-        ),
+        documents=VideoDocumentsRead.from_documents(documents),
         sponsor_segments=detail.sponsor_segments,
         sponsor_skip_enabled=detail.sponsor_skip_enabled,
         skip_segments=detail.skip_segments,
@@ -214,7 +210,14 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, int]:
 
 @router.get("/stats/charts")
 def get_stats_charts(db: Session = Depends(get_db)) -> dict:
-    return library_chart_data(db)
+    """What `/stats` shows, with the full 12-month `monthly` window (the page draws a trimmed one)."""
+    return {**library_stats(db), "spend": llm_spend_by_month(db)}
+
+
+@router.get("/rag")
+def get_rag_dashboard(db: Session = Depends(get_db)) -> dict:
+    """What `/rag` shows about the notes indexing; `next_sweep_in` is an ISO 8601 duration."""
+    return rag_dashboard_data(db)
 
 
 @router.get("/settings", response_model=SettingsRead)

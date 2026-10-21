@@ -9,40 +9,57 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.playlist import Playlist, PlaylistItem
 from app.models.video import Video
 from app.services.common.categories import parse_video_category_labels
 from app.services.common.durations import format_duration
-from app.services.common.job_log import log_job
 from app.services.common.settings import get_video_category_label_styles
-from app.services.jobs.downloads import run_manual_download_job
-from app.services.jobs.playlists import run_playlist_csv_import_job, run_playlist_url_import_job
+from app.services.jobs.downloads import (
+    InvalidMediaFormatError,
+    queue_playlist_downloads,
+    run_media_download_job,
+)
+from app.services.jobs.playlists import (
+    PlaylistNotRefreshableError,
+    queue_playlist_csv_import,
+    queue_playlist_refresh,
+    queue_playlist_url_import,
+    run_playlist_csv_import_job,
+    run_playlist_url_import_job,
+)
 from app.services.playlists.editing import (
+    PlaylistItemNotFoundError,
+    PlaylistNotInLibraryError,
     add_video_to_playlist,
     apply_item_order,
+    create_manual_playlist,
     create_playlist,
     delete_playlist,
     duplicate_playlist,
+    find_playlist,
+    find_playlist_item,
     move_item,
-    playlist_title_from_filename,
     remove_item,
     rename_playlist,
     set_free_listening,
     set_playlist_categories,
     sort_playlist,
-    videos_missing_media,
 )
 from app.services.playlists.imports import (
     PlaylistCsvError,
     PlaylistNotFoundError,
-    extract_playlist_info,
-    parse_playlist_csv,
     playlist_to_csv,
     preview_playlist,
+)
+from app.services.playlists.listing import (
+    list_playlists,
+    load_playlist,
+    playlist_row,
+    playlist_stats,
+    playlist_summary,
 )
 from app.web.formatting import format_long_duration
 from app.web.shared import (
@@ -59,51 +76,20 @@ from app.web.shared import (
 router = APIRouter()
 
 
-def _playlist_summary(playlist: Playlist) -> dict:
-    first_item = playlist.items[0] if playlist.items else None
-    return {
-        "playlist": playlist,
-        "item_count": len(playlist.items),
-        "cover_video": first_item.video if first_item else None,
-    }
-
-
 def _playlist_row(item: PlaylistItem) -> dict:
-    video = item.video
-    # The column, not metadata.json: a playlist can hold hundreds of videos and the file is a ~140 KB dump.
-    seconds = video.duration_seconds or 0
-    return {
-        "item": item,
-        "video": video,
-        "title": video.title,
-        "channel_name": video.channel.name if video.channel else None,
-        "duration": format_duration(seconds),
-        "duration_seconds": seconds,
-        "has_audio": bool(video.audio_path),
-        "has_video": bool(video.video_path),
-        # watched_at is set by the 90% rule and cleared when the media is purged.
-        "seen": video.watched_at is not None,
-    }
+    row = playlist_row(item)
+    row["duration"] = format_duration(row["duration_seconds"])
+    return row
 
 
 @router.get("/playlists", response_class=HTMLResponse)
 def playlists_page(request: Request, db: Session = Depends(get_db)):
-    playlists = list(
-        db.scalars(
-            select(Playlist)
-            .options(selectinload(Playlist.items))
-            .order_by(Playlist.created_at.desc())
-        )
-    )
-    # One query for every cover: the lazy `item.video` loads then hit the session's identity map.
-    cover_ids = [playlist.items[0].video_id for playlist in playlists if playlist.items]
-    if cover_ids:
-        list(db.scalars(select(Video).where(Video.id.in_(cover_ids))))
+    playlists = list_playlists(db)
     return templates.TemplateResponse(
         request,
         "playlists.html",
         {
-            "playlist_summaries": [_playlist_summary(playlist) for playlist in playlists],
+            "playlist_summaries": [playlist_summary(playlist) for playlist in playlists],
             "message": request.query_params.get("message"),
             "message_level": request.query_params.get("level", "success"),
         },
@@ -112,12 +98,10 @@ def playlists_page(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/playlists")
 def create_playlist_manual(title: str = Form(...), db: Session = Depends(get_db)):
-    title = title.strip()
-    if not title:
-        return redirect(
-            append_query("/playlists", {"level": "error", "message": "Le titre est obligatoire."})
-        )
-    playlist = create_playlist(db, title)
+    try:
+        playlist = create_manual_playlist(db, title)
+    except ValueError as exc:
+        return redirect(append_query("/playlists", {"level": "error", "message": str(exc)}))
     return redirect(f"/playlists/{playlist.id}")
 
 
@@ -146,22 +130,12 @@ def import_playlist_url(
     db: Session = Depends(get_db),
 ):
     try:
-        info = extract_playlist_info(url)
+        playlist, job = queue_playlist_url_import(db, url, form_text_value(title))
     except PlaylistNotFoundError as exc:
         message = str(exc)
         if wants_json(request):
             return JSONResponse({"status": "failed", "message": message}, status_code=404)
         return redirect(append_query("/playlists", {"level": "error", "message": message}))
-
-    playlist = create_playlist(
-        db,
-        form_text_value(title) or info["title"],
-        source="url",
-        source_url=info["url"],
-        yt_playlist_id=info.get("yt_playlist_id"),
-    )
-
-    job = log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
     background_tasks.add_task(run_playlist_url_import_job, job.id, playlist.id)
 
     target = f"/playlists/{playlist.id}"
@@ -189,19 +163,14 @@ def import_playlist_csv(
     db: Session = Depends(get_db),
 ):
     try:
-        rows = parse_playlist_csv(csv_file.file.read())
+        playlist, job, rows = queue_playlist_csv_import(
+            db, csv_file.file.read(), csv_file.filename, form_text_value(title)
+        )
     except PlaylistCsvError as exc:
         message = str(exc)
         if wants_json(request):
             return JSONResponse({"status": "failed", "message": message}, status_code=400)
         return redirect(append_query("/playlists", {"level": "error", "message": message}))
-
-    playlist_title = form_text_value(title) or playlist_title_from_filename(
-        csv_file.filename or "Playlist importée"
-    )
-    playlist = create_playlist(db, playlist_title, source="csv")
-
-    job = log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
     background_tasks.add_task(run_playlist_csv_import_job, job.id, playlist.id, rows)
 
     target = f"/playlists/{playlist.id}"
@@ -220,19 +189,13 @@ def import_playlist_csv(
 
 @router.get("/playlists/{playlist_id}", response_class=HTMLResponse)
 def playlist_detail_page(request: Request, playlist_id: int, db: Session = Depends(get_db)):
-    playlist = db.scalars(
-        select(Playlist)
-        .where(Playlist.id == playlist_id)
-        .options(
-            selectinload(Playlist.items)
-            .selectinload(PlaylistItem.video)
-            .selectinload(Video.channel)
-        )
-    ).one_or_none()
-    if playlist is None:
-        raise HTTPException(status_code=404, detail="Playlist introuvable")
+    try:
+        playlist = load_playlist(db, playlist_id)
+    except PlaylistNotInLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     rows = [_playlist_row(item) for item in playlist.items]
+    stats = playlist_stats(rows)
     category_label_styles = get_video_category_label_styles(db)
     return templates.TemplateResponse(
         request,
@@ -244,13 +207,11 @@ def playlist_detail_page(request: Request, playlist_id: int, db: Session = Depen
             "category_style_map": category_style_map(category_label_styles),
             "rows": rows,
             "stats": {
-                "count": len(rows),
-                "total_duration": format_long_duration(
-                    sum(row["duration_seconds"] for row in rows)
-                ),
-                "seen_count": sum(1 for row in rows if row["seen"]),
-                "missing_audio": sum(1 for row in rows if not row["has_audio"]),
-                "missing_video": sum(1 for row in rows if not row["has_video"]),
+                "count": stats["count"],
+                "total_duration": format_long_duration(stats["total_duration_seconds"]),
+                "seen_count": stats["seen_count"],
+                "missing_audio": stats["missing_audio"],
+                "missing_video": stats["missing_video"],
             },
             "cover_video": rows[0]["video"] if rows else None,
             "next_path": f"/playlists/{playlist.id}",
@@ -269,10 +230,10 @@ def delete_playlist_route(playlist_id: int, db: Session = Depends(get_db)):
 
 
 def _get_playlist(db: Session, playlist_id: int) -> Playlist:
-    playlist = db.get(Playlist, playlist_id)
-    if playlist is None:
-        raise HTTPException(status_code=404, detail="Playlist introuvable")
-    return playlist
+    try:
+        return find_playlist(db, playlist_id)
+    except PlaylistNotInLibraryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _detail_redirect(playlist_id: int, message: str, level: str = "success"):
@@ -374,11 +335,10 @@ def refresh_playlist(
     playlist_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
     playlist = _get_playlist(db, playlist_id)
-    if playlist.source != "url" or not playlist.source_url:
-        return _detail_redirect(
-            playlist_id, "Seule une playlist importée depuis une URL peut être rafraîchie.", "error"
-        )
-    job = log_job(db, "queued", f"Import de la playlist {playlist.title} en file d'attente.")
+    try:
+        job = queue_playlist_refresh(db, playlist)
+    except PlaylistNotRefreshableError as exc:
+        return _detail_redirect(playlist_id, str(exc), "error")
     background_tasks.add_task(run_playlist_url_import_job, job.id, playlist.id)
     return _detail_redirect(playlist_id, "Rafraîchissement lancé en arrière-plan.")
 
@@ -391,14 +351,12 @@ def download_playlist_media(
     db: Session = Depends(get_db),
 ):
     playlist = _get_playlist(db, playlist_id)
-    if media_type not in {"audio", "video"}:
-        raise HTTPException(status_code=400, detail="Le format doit être vidéo ou audio.")
-    missing = videos_missing_media(playlist, media_type)
-    for video in missing:
-        job = log_job(db, "queued", "Téléchargement en file d'attente.", video_id=video.id)
-        background_tasks.add_task(
-            run_manual_download_job, job.id, video.url, [media_type, "metadata"], False
-        )
+    try:
+        missing = queue_playlist_downloads(db, playlist, media_type)
+    except InvalidMediaFormatError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    for video, job in missing:
+        background_tasks.add_task(run_media_download_job, job.id, video.url, media_type)
     label = "audio" if media_type == "audio" else "vidéo"
     if not missing:
         return _detail_redirect(
@@ -417,9 +375,10 @@ def remove_playlist_item(
     return_to: str = Form("", alias="next"),
     db: Session = Depends(get_db),
 ):
-    item = db.get(PlaylistItem, item_id)
-    if item is None or item.playlist_id != playlist_id:
-        raise HTTPException(status_code=404, detail="Élément introuvable")
+    try:
+        item = find_playlist_item(db, playlist_id, item_id)
+    except PlaylistItemNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     remove_item(db, item)
     return redirect(internal_return_path(return_to, f"/playlists/{playlist_id}"))
 
@@ -428,9 +387,10 @@ def remove_playlist_item(
 def move_playlist_item(
     playlist_id: int, item_id: int, direction: str = Form(...), db: Session = Depends(get_db)
 ):
-    item = db.get(PlaylistItem, item_id)
-    if item is None or item.playlist_id != playlist_id:
-        raise HTTPException(status_code=404, detail="Élément introuvable")
+    try:
+        item = find_playlist_item(db, playlist_id, item_id)
+    except PlaylistItemNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     move_item(db, item, direction)
     return redirect(f"/playlists/{playlist_id}")
 

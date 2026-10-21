@@ -117,7 +117,7 @@ Videos :
 - `GET /rag` : tableau de bord de l'indexation des notes (etape de chaque
   video, prochain lot, lot en cours, activite, cout, index, echecs, lexique) ;
   lecture seule, aucune route d'ecriture ; voir [11 Interface HTML](11-interface-html.md)
-  section "Indexation RAG".
+  section "Indexation RAG". Les memes donnees en JSON : `GET /api/rag`.
 - `GET /videos` : liste videos. Parametre `sort` : `imported`, `published`
   (defaut sur une chaine), `views` ou `rated` (note decroissante). Avec
   `channel_id` d'une chaine existante, rend `channel_videos.html` (page
@@ -271,11 +271,129 @@ scheduler ou par `POST /settings/scan` (voir
   compteurs que la page `/settings`.
 - `GET /api/stats/charts` : memes donnees que la page `/stats` (stockage et
   fiches par chaine, par format, par mois) — voir
-  [11 Interface HTML](11-interface-html.md).
+  [11 Interface HTML](11-interface-html.md). Chaque type de stockage et chaque
+  format porte sa part (`percent`) ; plus `purged` (fiches purgees par mois),
+  `spend` (depense LLM par mois), `quota_bytes` et `quota_percent`. `monthly`
+  garde toute la fenetre de 12 mois : la page, elle, en retire les premiers
+  mois vides et en tire son dessin (`monthly_view`).
+- `GET /api/rag` : ce que montre `/rag` (`rag_dashboard_data`) : `buckets`
+  (etape de chaque fiche), `pipeline` (etat du balayage, lot en cours,
+  prochain passage), `next_batch`, `in_flight_videos`, `jobs`, `history`,
+  `chunks`, `channels`, `failures`, `parameters`. Dates en ISO 8601,
+  `pipeline.next_sweep_in` en duree ISO 8601 (`PT17H35M…`) ; les libelles et
+  `family` (couleur) des etapes sont ceux de la page.
 - `GET /api/settings`
 - `PUT /api/settings`
 - `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`
   (tous statuts), la plus recente d'abord.
+
+### Actions sur une chaine
+
+Corps en JSON, memes services que les formulaires de `/channels` ;
+`404 Chaîne introuvable` si la chaine n'existe pas. Les routes qui modifient
+la chaine repondent son etat modifiable : `{id, name, rating, categories,
+auto_metadata_enabled, auto_shorts_enabled}`. La liste, l'ajout, la note et
+la suppression sont plus haut.
+
+- `PUT /api/channels/{id}/categories` `{categories: [...]}` : remplace les
+  categories de la chaine (normalisees).
+- `PUT /api/channels/{id}/bells/{videos|shorts}` `{enabled}` : regle une
+  cloche (idempotent, contrairement au formulaire qui bascule). Repond
+  `{channel, job}` : `job` est l'import du catalogue existant lance quand la
+  cloche vient de passer a active (sans marquer les fiches comme
+  Nouveautes), `null` sinon. Une autre section donne `422`.
+- `POST /api/channels/{id}/import-metadata` `{page, section}` (facultatif :
+  `1`, `videos`) : importe une page des videos ou des shorts de la chaine
+  (metadonnees seules), `202 {job_id, status, message, status_url}`.
+- `POST /api/channels/{id}/refresh-profile` : relance la recuperation du
+  profil (avatar, banniere, description) en arriere-plan, `202 {status,
+  message}`.
+- `POST /api/channels/import-csv` (multipart, champ `file`) : lit un CSV
+  d'abonnements Google Takeout sans rien ecrire, comme `POST
+  /channels/import-csv`. Repond `{rows, new_count, existing_count}` ; chaque
+  ligne `{channel_id, url, name, already_imported, token}`. `400` avec le
+  message du formulaire si le fichier n'est pas un export d'abonnements.
+- `POST /api/channels/import-csv/confirm` `{tokens: [...]}` : ajoute les
+  chaines des `token` de l'apercu qui ne sont pas deja dans la bibliotheque,
+  `{added}` ; lance le rattrapage des profils si au moins une est ajoutee.
+
+### Playlists
+
+Corps en JSON, memes services que les pages `/playlists` ; `404 Playlist
+introuvable` si la playlist n'existe pas. Une playlist se lit `{id, title,
+source, source_url, yt_playlist_id, categories, free_listening,
+created_at}`. L'export CSV reste `GET /playlists/{id}/export.csv`.
+
+- `GET /api/playlists` : toutes les playlists, la plus recente d'abord, plus
+  `item_count` et `cover_video_id` (premiere fiche, `null` si vide). Nombre de
+  requetes constant.
+- `POST /api/playlists` `{title}` : creation manuelle, `201` ; `400 Le titre
+  est obligatoire.` pour un titre vide.
+- `GET /api/playlists/{id}` : la playlist plus `stats` `{count,
+  total_duration_seconds, seen_count, missing_audio, missing_video}` et
+  `items` dans l'ordre (`{item_id, position, added_at, video_id, title,
+  channel_name, duration_seconds, has_audio, has_video, seen}`).
+- `DELETE /api/playlists/{id}` : `204`, ne supprime jamais les fiches.
+- `PUT /api/playlists/{id}/title` `{title}`, `PUT .../free-listening`
+  `{enabled}` : repondent la playlist.
+- `PUT /api/playlists/{id}/categories` `{categories}` : remplace les labels
+  et les copie sur ses fiches qui n'en ont aucun ; repond `{playlist,
+  labelled_count}`.
+- `PUT /api/playlists/{id}/order` `{item_ids}` : tous les elements, dans le
+  nouvel ordre ; `409` si la playlist a change entre-temps. `POST
+  .../sort` `{by}` (`added`, `duration`, `title`, `reverse` ; `400` sinon),
+  `POST .../items/{item_id}/move` `{direction: up|down}` : repondent le
+  detail.
+- `POST /api/playlists/{id}/items` `{video_id}` : ajoute la fiche a la fin,
+  une seule fois (`201`, detail) ; `404 Vidéo introuvable`. `DELETE
+  .../items/{item_id}` : retire l'element (jamais la fiche) et renumerote,
+  `204` ; `404 Élément introuvable` si l'element n'est pas dans cette
+  playlist.
+- `POST /api/playlists/{id}/duplicate` : copie manuelle, `201`.
+- `POST /api/playlists/preview` `{url}` : apercu d'une URL de playlist, rien
+  n'est ecrit (memes champs que `POST /playlists/preview`, sans
+  `duration_label`) ; `404` si introuvable.
+- `POST /api/playlists/import-url` `{url, title}` et `POST
+  /api/playlists/import-csv` (multipart : `file`, `title` facultatif) : creent
+  la playlist tout de suite et importent ses videos (metadonnees seules) en
+  arriere-plan ; `202 {playlist, job}`. Sans titre : celui de YouTube, ou le
+  nom du fichier (`Vidéos de X.csv` donne `X`). `404` pour une URL
+  introuvable, `400` pour un CSV refuse.
+- `POST /api/playlists/{id}/refresh` : relance l'import par URL (nouvelles
+  videos ajoutees a la fin), `202` + job ; `400` si la playlist ne vient pas
+  d'une URL.
+- `POST /api/playlists/{id}/download/{audio|video}` : un telechargement par
+  fiche qui n'a pas encore ce format, `202 {jobs: [...]}` (vide si rien ne
+  manque) ; `400` pour un autre format.
+
+### Demandes au LLM
+
+Memes services que les routes HTML de
+[09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) ; corps
+en JSON. Une demande repond `202 {job_id, status, status_url}` et tourne en
+arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
+
+- `POST /api/videos/{id}/notes/generate` : notes structurees, resume court et
+  questions suggerees depuis le transcript, en un appel ; `400` si la fiche
+  n'a pas de transcript (`Génération impossible : …`).
+- `POST /api/videos/{id}/chat` `{question}` : question sur le transcript de
+  la fiche, a la suite de sa discussion ; `400 La question est vide.`.
+  `DELETE /api/videos/{id}/chat` efface la discussion (`204`). La discussion
+  elle-meme se lit dans `GET /api/videos/{id}` (`documents.chat_messages`).
+- `GET /api/chat` : la conversation du chat bibliotheque (`messages`, chaque
+  reponse avec les `channels` et `citations` qu'elle cite) et
+  `indexed_video_count`/`total_video_count`. `POST /api/chat` `{question}` :
+  pose une question (`202`) ; `DELETE /api/chat` efface la conversation
+  (`204`).
+- `GET /api/llm-jobs/{id}` : `{id, kind, video_id, status}` avec `status`
+  `pending`, `done` ou `failed`. En attente : `partial_short_summary` (job
+  `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).
+  Le premier poll apres la fin ecrit le resultat (une seule fois, comme le
+  poll de la page) et repond `documents` (`generate`, avec les nouvelles
+  notes), `chat_messages` (`chat`) ou `library_chat` (`library_chat`) ;
+  apres une generation, l'indexation des notes part en arriere-plan. Un job
+  echoue repond `200` avec `status: failed` et `message` (`Génération
+  impossible : …`, `Réponse impossible : …`). `404 Tâche introuvable`.
 
 ### Actions sur une fiche
 

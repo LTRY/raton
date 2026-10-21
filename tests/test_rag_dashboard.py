@@ -236,3 +236,25 @@ def test_page_statement_count_does_not_grow_with_the_library(db):
 
     assert response.status_code == 200
     assert len(db.statements) <= MAX_STATEMENTS
+
+
+def test_api_serves_the_page_data_as_json(db):
+    channel = add_channel(db)
+    indexed = add_video(db, "indexed", channel)
+    add_chunk(db, indexed)
+    add_video(db, "waiting", channel)
+    db.commit()
+
+    payload = TestClient(app).get("/api/rag").json()
+
+    expected = rag_dashboard_data(db)
+    assert payload["total_videos"] == expected["total_videos"] == 2
+    assert [(bucket["key"], bucket["count"]) for bucket in payload["buckets"]] == [
+        (bucket["key"], bucket["count"]) for bucket in expected["buckets"]
+    ]
+    assert payload["next_batch"]["videos"][0]["title"] == "Titre waiting"
+    # Datetimes are ISO 8601; the delay before the sweep is an ISO 8601 duration.
+    assert payload["pipeline"]["next_sweep_at"].startswith(
+        expected["pipeline"]["next_sweep_at"].date().isoformat()
+    )
+    assert payload["pipeline"]["next_sweep_in"].startswith("P")

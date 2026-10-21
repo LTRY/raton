@@ -173,3 +173,38 @@ def test_playlist_pages_read_no_files_and_cost_constant_statements(db, monkeypat
     assert len(db.statements) < 15
     if "{id}" in path:
         assert "12:34" in response.text  # duration_seconds=754, from the column
+
+
+def test_playlists_page_cost_does_not_grow_with_the_playlists(db):
+    # Each playlist's cover must come from the one batched query, not from a load per playlist.
+    from app.models.playlist import Playlist, PlaylistItem
+
+    def add_playlist(index: int) -> None:
+        video = Video(
+            yt_video_id=f"cover{index}",
+            title=f"Cover {index}",
+            url=f"https://youtube.com/watch?v=cover{index}",
+            folder_path=f"/media/cover{index}",
+            thumbnail_path=f"/media/cover{index}/thumb.jpg",
+        )
+        playlist = Playlist(title=f"Playlist {index}", source="manual")
+        db.add_all([video, playlist])
+        db.flush()
+        db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
+        db.commit()
+
+    add_playlist(0)
+    db.expunge_all()
+    db.statements.clear()
+    TestClient(app).get("/playlists")
+    one = len(db.statements)
+    for index in range(1, 8):
+        add_playlist(index)
+    db.expunge_all()
+    db.statements.clear()
+
+    response = TestClient(app).get("/playlists")
+
+    assert response.status_code == 200
+    assert response.text.count("/thumbnail?w=320") == 8
+    assert len(db.statements) == one

@@ -14,12 +14,14 @@ from app.db.session import SessionLocal
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
+from app.services.channels.manage import bell_section_label
 from app.services.common.job_log import JOB_DONE_STATUSES, log_job
 from app.services.ingest.channel_exploration import channel_exploration_videos
 from app.services.ingest.manual_download import download_manual_media
 from app.services.ingest.metadata_import import import_video_metadata
 from app.services.ingest.scanner import scan_channel_section
 from app.services.ingest.transcript_retry import retry_transcript_download
+from app.services.playlists.editing import videos_missing_media
 from app.services.videos.download_options import normalize_video_quality
 
 logger = logging.getLogger(__name__)
@@ -62,9 +64,43 @@ def run_media_download_job(
     )
 
 
+def queue_playlist_downloads(
+    db: Session, playlist, media_type: str
+) -> list[tuple[Video, DownloadJob]]:
+    """One `queue_media_download` per video of the playlist without that format yet."""
+    if media_type not in FICHE_MEDIA_TYPES:
+        raise InvalidMediaFormatError("Le format doit être vidéo ou audio.")
+    return [
+        (video, queue_media_download(db, video, media_type))
+        for video in videos_missing_media(playlist, media_type)
+    ]
+
+
 def queue_transcript_retry(db: Session, video: Video) -> DownloadJob:
     """The queued job of a new transcript attempt; run it with `run_transcript_retry_job`."""
     return log_job(db, "queued", "Récupération du transcript en file d'attente.", video_id=video.id)
+
+
+def queue_channel_metadata_import(db: Session, channel: Channel, section: str) -> DownloadJob:
+    """The queued import of a page of a channel's metadata; run `run_channel_metadata_import_job`."""
+    return log_job(
+        db,
+        "queued",
+        f"Import des métadonnées {bell_section_label(section)} de {channel.name} en file d'attente.",
+        channel_id=channel.id,
+    )
+
+
+def queue_channel_catalog_sync(db: Session, channel: Channel, section: str) -> DownloadJob:
+    """The queued sync of the catalogue of a cloche just turned on; run its first page with
+    `run_channel_metadata_import_job`."""
+    return log_job(
+        db,
+        "queued",
+        f"Recherche automatique des nouveautés ({bell_section_label(section)}) de {channel.name}"
+        " en file d'attente.",
+        channel_id=channel.id,
+    )
 
 
 def job_status(db: Session, job_id: int) -> dict:

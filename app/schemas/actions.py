@@ -1,4 +1,5 @@
-"""Bodies and replies of the `/api` actions on a fiche and of `GET /api/jobs/{id}`."""
+"""Bodies and replies of the `/api` actions on a fiche, and the job replies (`JobQueuedRead`,
+`JobStatusRead`) of every `/api` action that starts a background job."""
 
 from datetime import datetime
 
@@ -48,6 +49,15 @@ class JobQueuedRead(BaseModel):
     status: str
     message: str
     status_url: str
+
+    @classmethod
+    def from_job(cls, job) -> JobQueuedRead:
+        return cls(
+            job_id=job.id,
+            status=job.status,
+            message=job.message,
+            status_url=f"/api/jobs/{job.id}",
+        )
 
 
 class JobStatusRead(BaseModel):

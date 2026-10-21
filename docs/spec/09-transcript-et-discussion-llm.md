@@ -251,6 +251,12 @@ indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". 
 
 `GET /videos/{id}/transcript/jobs/{job_id}`
 
+La mise en file (lecture du transcript, prompt, question vide refusee) et
+la resolution d'un job (en attente, echec, ecriture du resultat au premier
+poll) sont dans `app/services/jobs/llm_requests.py`, partagees par les
+routes HTML ci-dessous et par `/api` (`GET /api/llm-jobs/{id}`, voir
+[12 API et routes](12-api-et-routes.md)).
+
 - s'applique a tous les jobs `llm_jobs`, quel que soit le fournisseur
   (traites en tache de fond dans le process web via
   `app/services/jobs/llm_jobs.py:run_llm_job`) ;
