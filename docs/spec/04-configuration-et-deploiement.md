@@ -235,7 +235,9 @@ Le bouton demande une confirmation, est desactive pendant un deploiement, et la
 sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
 **Production** affiche l'etat du dernier deploiement lance depuis la page
 (« Deploiement en cours… », « Deployee », « Echec du deploiement ») ; il
-s'oublie quand la page redemarre. Comme le reste de la page, ce bouton n'a pas
+s'oublie quand la page redemarre. Un script qui ne peut pas demarrer (par exemple
+non executable) termine le travail en echec et l'ecrit dans le journal ; les
+scripts lances par la page restent donc en mode `100755` dans git. Comme le reste de la page, ce bouton n'a pas
 d'authentification : toute machine du reseau local peut redeployer la vraie
 instance (voir [15 Securite](15-securite.md), « Hypothese LAN »).
 
