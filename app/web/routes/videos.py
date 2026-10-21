@@ -53,7 +53,6 @@ from app.services.videos.download_options import (
 from app.services.videos.editing import (
     set_video_categories,
     set_video_comment,
-    set_video_list_state,
 )
 from app.services.videos.library_view import (
     downloaded_video_card,
@@ -61,10 +60,6 @@ from app.services.videos.library_view import (
     library_channels,
     library_listing,
     library_saved_views,
-)
-from app.services.videos.playback import (
-    InvalidPlaybackMediaError,
-    record_playback_activity,
 )
 from app.services.youtube.sponsor_segments import (
     SponsorSegmentsFetchError,
@@ -514,27 +509,6 @@ def retry_video_transcript_form(
     )
 
 
-@router.post("/videos/{video_id}/activity")
-def log_video_activity(
-    video_id: int,
-    media_type: str = Form("video"),
-    position_seconds: float = Form(0),
-    duration_seconds: float = Form(0),
-    watched_seconds: float = Form(0),
-    db: Session = Depends(get_db),
-):
-    video = db.get(Video, video_id)
-    if video is None:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable")
-    try:
-        record_playback_activity(
-            db, video, media_type, position_seconds, duration_seconds, watched_seconds
-        )
-    except InvalidPlaybackMediaError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"status": "logged"}
-
-
 @router.get("/jobs/{job_id}")
 def job_status(job_id: int, db: Session = Depends(get_db)):
     try:
@@ -565,30 +539,14 @@ def import_video_metadata_form(
     return redirect(f"{target}&{query}" if "?" in target else f"{target}?{query}")
 
 
-@router.post("/videos/{video_id}/list-state")
-def set_video_list_state_form(
-    video_id: int,
-    state: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    video = db.get(Video, video_id)
-    if not video:
-        raise HTTPException(status_code=404, detail="Vidéo introuvable.")
-    try:
-        set_video_list_state(db, video, state)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return JSONResponse({"state": video.list_state})
-
-
 @router.post("/videos/{video_id}/rating")
 def rate_video_form(
     video_id: int,
     rating: int = Form(...),
     return_to: str = Form("/videos", alias="next"),
     db: Session = Depends(get_db),
-    request: Request = None,
 ):
+    """The no-JS fallback of the stars, which app.js saves with PUT /api/.../rating."""
     video = db.get(Video, video_id)
     try:
         check_rating(rating)
@@ -596,8 +554,4 @@ def rate_video_form(
             set_rating(db, video, rating)
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if wants_json(request):
-        if not video:
-            raise HTTPException(status_code=404, detail="Vidéo introuvable.")
-        return JSONResponse({"rating": video.rating})
     return redirect(internal_return_path(return_to))

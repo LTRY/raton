@@ -95,7 +95,7 @@ def test_a_validation_error_answers_a_french_detail_and_its_fields(client):
 
 
 def test_html_routes_keep_fastapi_validation_answer(client):
-    response = client.post("/videos/1/list-state", data={})
+    response = client.post("/videos/1/rating", data={})
 
     assert response.status_code == 422
     assert isinstance(response.json()["detail"], list)

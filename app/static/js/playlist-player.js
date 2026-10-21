@@ -251,18 +251,14 @@
 
   function postActivity() {
     if (isFree() || !current || !Number.isFinite(media.duration) || media.duration <= 0) return;
-    const body = new FormData();
-    body.set("media_type", mode);
-    body.set("position_seconds", String(media.currentTime));
-    body.set("duration_seconds", String(media.duration));
-    body.set("watched_seconds", String(watchedAccum));
+    const watched = watchedAccum;
     watchedAccum = 0;
     lastPost = Date.now();
     if (media.currentTime / media.duration >= 0.9 && !flag(current, "seen")) {
       current.dataset.seen = "1";
       refreshRows();
     }
-    fetch(`/videos/${current.dataset.videoId}/activity`, { method: "POST", body, keepalive: true }).catch(() => {});
+    window.ratonReportPlayback?.(`/api/videos/${current.dataset.videoId}/activity`, mode, media, watched);
   }
 
   // Fill and buffer layers of the seek bar; the helper lives in app.js.

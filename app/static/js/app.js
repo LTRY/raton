@@ -3,6 +3,38 @@
 // the second visit to any page throws "Identifier has already been declared".
 (function () {
 
+// Calls to the JSON API (/api): the body goes as JSON, and an error answer's `detail` (a French
+// message, see docs/spec/12-api-et-routes.md) becomes the thrown Error's message.
+async function apiRequest(method, url, body, { keepalive = false } = {}) {
+  const options = { method, headers: { Accept: "application/json" }, keepalive };
+  if (body !== undefined) {
+    options.headers["Content-Type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(url, options);
+  const payload = response.status === 204 ? null : await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
+  return payload;
+}
+window.ratonApi = apiRequest;
+
+// A player's report to POST /api/videos/{id}/activity; it must never interrupt playback.
+function reportPlayback(url, mediaType, media, watchedSeconds) {
+  const seconds = (value) => (Number.isFinite(value) ? value : 0);
+  apiRequest(
+    "POST",
+    url,
+    {
+      media_type: mediaType,
+      position_seconds: seconds(media.currentTime),
+      duration_seconds: seconds(media.duration),
+      watched_seconds: Math.round(watchedSeconds),
+    },
+    { keepalive: true },
+  ).catch(() => {});
+}
+window.ratonReportPlayback = reportPlayback;
+
 function setAsyncFormState(form, message, level) {
   let status = form.querySelector(".async-form-status");
   if (!status) {
@@ -401,20 +433,8 @@ function bindResumableMedia(media) {
   function logActivity() {
     trackWatchedTime(true);
     if (!media.dataset.activityUrl || watchedSeconds < 1) return;
-    const formData = new FormData();
-    formData.set("media_type", media.dataset.mediaKind || "video");
-    formData.set("position_seconds", Number.isFinite(media.currentTime) ? media.currentTime.toString() : "0");
-    formData.set("duration_seconds", Number.isFinite(media.duration) ? media.duration.toString() : "0");
-    formData.set("watched_seconds", Math.round(watchedSeconds).toString());
+    reportPlayback(media.dataset.activityUrl, media.dataset.mediaKind || "video", media, watchedSeconds);
     watchedSeconds = 0;
-    fetch(media.dataset.activityUrl, {
-      method: "POST",
-      body: formData,
-      headers: { Accept: "application/json" },
-      keepalive: true,
-    }).catch(() => {
-      // Activity logging must never interrupt playback.
-    });
   }
 
   media.addEventListener("play", () => {
@@ -2186,9 +2206,9 @@ if (!window.__sameFormRedirectBound) {
   });
 }
 
-// Rating stars. The forms carry data-turbo="false": the note is saved by
-// fetch and the stars repainted in place, so the page neither reloads nor
-// scrolls back to the top. Delegated to the document because Turbo replaces
+// Rating stars. The forms carry data-turbo="false": the note is saved with
+// PUT on `data-rating-url` (/api) and the stars repainted in place, so the page
+// neither reloads nor scrolls back to the top; `action` is the no-JS fallback. Delegated to the document because Turbo replaces
 // the lists; bound once because this file runs again on every visit.
 function ratingFormValue(form) {
   const tier = [...form.classList].find((name) => name.startsWith("rating-tier-"));
@@ -2234,15 +2254,7 @@ async function submitRating(form, requested) {
   const previous = ratingFormValue(form);
   paintRating(action, requested);
   try {
-    const body = new FormData();
-    body.append("rating", String(requested));
-    const response = await fetch(action, {
-      method: "POST",
-      body,
-      headers: { "X-Requested-With": "fetch" },
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
+    const payload = await apiRequest("PUT", form.dataset.ratingUrl, { rating: requested });
     paintRating(action, payload.rating);
   } catch (error) {
     paintRating(action, previous, false);
@@ -2287,18 +2299,12 @@ async function submitListState(container, requested) {
     button.disabled = true;
   });
   try {
-    const body = new FormData();
-    body.append("state", requested);
-    const response = await fetch(`/videos/${container.dataset.videoId}/list-state`, {
-      method: "POST",
-      body,
+    const payload = await apiRequest("PUT", `/api/videos/${container.dataset.videoId}/list-state`, {
+      state: requested,
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    // `unwatched` est un forçage, pas un état visuel : il rend la ligne normale.
-    // `null` rend la main à la détection automatique, que seul le serveur connaît
-    // au rendu — on la relit depuis l'attribut posé par la macro.
-    let painted = payload.state;
+    // `unwatched` forces the normal look; `null` hands back to the automatic state, which only
+    // the server knows when rendering: it is read back from the attribute the macro sets.
+    let painted = payload.list_state;
     if (painted === "unwatched") painted = "normal";
     if (!painted) painted = container.dataset.listStateAuto || "normal";
     paintListState(container, painted);
@@ -2570,20 +2576,8 @@ function initMiniPlayer() {
     trackWatchedTime(true);
     const activityUrl = audio.dataset.activityUrl;
     if (!activityUrl || watchedSeconds < 1) return;
-    const formData = new FormData();
-    formData.set("media_type", "audio");
-    formData.set("position_seconds", Number.isFinite(audio.currentTime) ? audio.currentTime.toString() : "0");
-    formData.set("duration_seconds", Number.isFinite(audio.duration) ? audio.duration.toString() : "0");
-    formData.set("watched_seconds", Math.round(watchedSeconds).toString());
+    reportPlayback(activityUrl, "audio", audio, watchedSeconds);
     watchedSeconds = 0;
-    fetch(activityUrl, {
-      method: "POST",
-      body: formData,
-      headers: { Accept: "application/json" },
-      keepalive: true,
-    }).catch(() => {
-      // Activity logging must never interrupt playback.
-    });
   }
 
   function updatePlayPauseUI() {

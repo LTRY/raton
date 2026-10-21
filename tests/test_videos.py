@@ -32,6 +32,7 @@ from app.services.ingest.identity import channel_values_from_info
 from app.services.jobs import backfills, downloads, llm_jobs
 from app.services.jobs.scheduler import record_scan_result
 from app.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
+from app.services.videos import editing as videos_editing
 from app.services.videos import list_state as videos_list_state
 from app.services.videos import playback as videos_playback
 from app.services.youtube import channel_info, sponsor_segments
@@ -1311,7 +1312,7 @@ def test_audio_only_video_detail_renders_mini_player_trigger(monkeypatch, tmp_pa
     assert f'data-track-src="/videos/{video.id}/audio"' in rendered
     assert f'data-track-thumb="/videos/{video.id}/thumbnail"' in rendered
     assert f'data-track-resume-key="raton:media-position:{video.id}:audio"' in rendered
-    assert f'data-track-activity-url="/videos/{video.id}/activity"' in rendered
+    assert f'data-track-activity-url="/api/videos/{video.id}/activity"' in rendered
     assert f'data-track-detail-url="/videos/{video.id}"' in rendered
     assert '<audio controls preload="metadata" src="/videos/' not in rendered
     assert "Supprimer l’audio ?" in rendered
@@ -3298,14 +3299,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
     video = add_video(db)
     base = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
     for offset, media_type, position in ((0, "video", 120), (1, "audio", 45), (2, "video", 252.5)):
-        videos_routes.log_video_activity(
-            video.id,
-            media_type=media_type,
-            position_seconds=position,
-            duration_seconds=600,
-            watched_seconds=10,
-            db=db,
-        )
+        videos_playback.record_playback_activity(db, video, media_type, position, 600, 10)
         job = db.scalars(
             select(DownloadJob)
             .where(DownloadJob.status == "played")
@@ -3365,17 +3359,9 @@ def test_video_activity_logs_media_playback():
     db = make_session()
     video = add_video(db)
 
-    response = videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=252,
-        duration_seconds=600,
-        watched_seconds=83,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 252, 600, 83)
     job = db.scalar(select(DownloadJob).where(DownloadJob.status == "played"))
 
-    assert response == {"status": "logged"}
     assert job is not None
     assert job.video_id == video.id
     assert job.channel_id == video.channel_id
@@ -3392,24 +3378,10 @@ def test_video_activity_sets_watched_at_at_ninety_percent():
     db = make_session()
     video = add_video(db)
 
-    videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=300,
-        duration_seconds=600,
-        watched_seconds=10,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 300, 600, 10)
     assert db.get(Video, video.id).watched_at is None
 
-    videos_routes.log_video_activity(
-        video.id,
-        media_type="video",
-        position_seconds=540,
-        duration_seconds=600,
-        watched_seconds=10,
-        db=db,
-    )
+    videos_playback.record_playback_activity(db, video, "video", 540, 600, 10)
     assert db.get(Video, video.id).watched_at is not None
 
 
@@ -4811,21 +4783,13 @@ def test_channel_rating_updates_channel_and_returns_to_filter():
     assert response.headers["location"] == "/channels?rated=true"
 
 
-def test_rating_answers_json_to_fetch_instead_of_redirecting():
-    db = make_session()
-    video = add_video(db)
-    request = SimpleNamespace(headers={"x-requested-with": "fetch"})
-
-    video_response = videos_routes.rate_video_form(video.id, 4, "/videos", db, request)
-    channel_response = channels_routes.rate_channel_form(
-        video.channel.id, 3, "/channels", db, request
-    )
-
-    assert video.rating == 4
-    assert video_response.status_code == 200
-    assert json.loads(video_response.body) == {"rating": 4}
-    assert video.channel.rating == 3
-    assert json.loads(channel_response.body) == {"rating": 3}
+def test_rating_forms_hand_the_stars_to_the_api():
+    # app.js saves a note with PUT {rating} on data-rating-url; `action` stays the no-JS fallback.
+    for template in ("_macros.html", "channels.html", "channel_videos.html", "video_detail.html"):
+        source = (pathlib.Path("app/templates") / template).read_text(encoding="utf-8")
+        for form in re.findall(r'<form class="rating-control[^>]*>', source):
+            action = re.search(r'action="([^"]+)"', form).group(1)
+            assert f'data-rating-url="/api{action}"' in form, form
 
 
 def test_base_layout_keeps_scroll_position_on_page_refresh():
@@ -5814,38 +5778,26 @@ def test_set_video_list_state_persists_each_value():
     video = add_video(db)
 
     for state in ("watched", "unwatched", "hidden"):
-        videos_routes.set_video_list_state_form(video.id, state, db)
+        videos_editing.set_video_list_state(db, video, state)
         assert db.get(Video, video.id).list_state == state
 
 
 def test_set_video_list_state_clear_resets_to_null():
     db = make_session()
     video = add_video(db)
-    videos_routes.set_video_list_state_form(video.id, "hidden", db)
+    videos_editing.set_video_list_state(db, video, "hidden")
 
-    response = videos_routes.set_video_list_state_form(video.id, "clear", db)
+    videos_editing.set_video_list_state(db, video, "clear")
 
     assert db.get(Video, video.id).list_state is None
-    assert json.loads(response.body.decode()) == {"state": None}
 
 
 def test_set_video_list_state_rejects_unknown_value():
     db = make_session()
     video = add_video(db)
 
-    with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state_form(video.id, "bogus", db)
-
-    assert excinfo.value.status_code == 400
-
-
-def test_set_video_list_state_rejects_unknown_video():
-    db = make_session()
-
-    with pytest.raises(HTTPException) as excinfo:
-        videos_routes.set_video_list_state_form(9999, "hidden", db)
-
-    assert excinfo.value.status_code == 404
+    with pytest.raises(ValueError, match="État de liste inconnu."):
+        videos_editing.set_video_list_state(db, video, "bogus")
 
 
 def test_videos_page_hide_hidden_excludes_only_hidden_videos():

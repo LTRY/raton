@@ -64,7 +64,6 @@ from app.web.shared import (
     page_href_builder,
     redirect,
     templates,
-    wants_json,
 )
 
 logger = logging.getLogger(__name__)
@@ -242,8 +241,8 @@ def rate_channel_form(
     rating: int = Form(...),
     return_to: str = Form("/channels", alias="next"),
     db: Session = Depends(get_db),
-    request: Request = None,
 ):
+    """The no-JS fallback of the stars, which app.js saves with PUT /api/.../rating."""
     channel = db.get(Channel, channel_id)
     try:
         check_rating(rating)
@@ -251,10 +250,6 @@ def rate_channel_form(
             set_rating(db, channel, rating)
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if wants_json(request):
-        if not channel:
-            raise HTTPException(status_code=404, detail="Chaîne introuvable")
-        return JSONResponse({"rating": channel.rating})
     return redirect(internal_return_path(return_to))
 
 

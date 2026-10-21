@@ -93,7 +93,7 @@
             <button type="button" class="category-label category-label-add" id="playlist-widget-toggle" aria-expanded="false" aria-controls="playlist-widget-form">+ Playlists</button>
           </span>
         </span>
-        <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
+        <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" data-rating-url="/api/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
           <input type="hidden" name="next" value="/videos/{{ video.id }}">
           {% for value in range(1, 6) %}
           <button class="rating-star rating-star-option-{{ value }} {{ 'rating-star-filled' if video.rating >= value else 'rating-star-empty' }}" name="rating" value="{{ value }}" type="submit" aria-label="{{ value }} étoile{{ 's' if value > 1 else '' }}" title="{{ value }} / 5">
@@ -211,7 +211,7 @@
           </div>
           {% if video.video_path %}
           <section class="video-player-panel" aria-label="Lecteur vidéo">
-            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.thumbnail_path %}poster="/videos/{{ video.id }}/thumbnail"{% endif %}>
+            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.thumbnail_path %}poster="/videos/{{ video.id }}/thumbnail"{% endif %}>
               <source src="/videos/{{ video.id }}/video">
               {% if video.subtitle_path %}
               {# Pas d'attribut `default` : il réactiverait la piste à chaque chargement,
@@ -258,7 +258,7 @@
               data-track-resume-key="raton:media-position:{{ video.id }}:audio"
               {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
               data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
-              data-track-activity-url="/videos/{{ video.id }}/activity"
+              data-track-activity-url="/api/videos/{{ video.id }}/activity"
               data-track-detail-url="/videos/{{ video.id }}">
               <span data-play-track-icon aria-hidden="true">▶</span>
               <span data-play-track-label>Écouter</span>
@@ -266,7 +266,7 @@
           </section>
           {% elif video.audio_path %}
           <section class="audio-player-panel" aria-label="Lecteur audio">
-            <audio controls preload="metadata" src="/videos/{{ video.id }}/audio" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
+            <audio controls preload="metadata" src="/videos/{{ video.id }}/audio" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
           </section>
           {% endif %}
 
@@ -279,7 +279,7 @@
             data-track-resume-key="raton:media-position:{{ video.id }}:audio"
             {% if resume_positions.audio %}data-track-resume-server-position="{{ resume_positions.audio.position_seconds }}"
             data-track-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}
-            data-track-activity-url="/videos/{{ video.id }}/activity"
+            data-track-activity-url="/api/videos/{{ video.id }}/activity"
             data-track-detail-url="/videos/{{ video.id }}">
             <div class="media-panel-top">
               <p class="media-panel-label"><span class="mp-when-idle">Télécharger l'audio</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
