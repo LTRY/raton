@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
+from app.services.common.settings import get_global_quota_bytes
 
 TOP_CHANNELS = 10
 MONTHS_WINDOW = 12
@@ -303,4 +304,27 @@ def purged_media_by_month(db: Session, now: datetime | None = None) -> dict:
         "total": total,
         "current": months[-1]["count"] if months and keys[-1][0] == months[-1]["year"] else 0,
         "average": round(total / len(months)) if months else 0,
+    }
+
+
+def library_stats(db: Session) -> dict:
+    """`library_chart_data` plus what `/stats` shows around it: each file type's and format's
+    share, the purges, and the storage gauge. The page adds its drawing (`monthly_view`) and the
+    LLM spending (`llm_spend_by_month`), which lives with the LLM services."""
+    data = library_chart_data(db)
+    used_bytes = data["total_bytes"]
+    for kind in data["storage_by_kind"]:
+        kind["percent"] = round(kind["bytes"] / used_bytes * 100, 1) if used_bytes else 0
+    for item in data["cards_by_format"]:
+        item["percent"] = (
+            round(item["count"] / data["total_cards"] * 100, 1) if data["total_cards"] else 0
+        )
+    quota_bytes = get_global_quota_bytes(db)
+    return {
+        **data,
+        "purged": purged_media_by_month(db),
+        "quota_bytes": quota_bytes,
+        "quota_percent": round(min(used_bytes / quota_bytes * 100, 100), 1)
+        if quota_bytes > 0
+        else 0,
     }

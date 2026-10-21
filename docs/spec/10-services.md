@@ -143,7 +143,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
-| `charts` | Données de la page `/stats` et de `GET /api/stats/charts` |
+| `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
 
 ### `raton/`
 
@@ -161,7 +161,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `indexing` | Découpage et embedding des notes d'une fiche en `video_note_chunks`, rattrapages d'indexation |
 | `retrieval` | Recherche des passages de notes les plus pertinents pour une question |
 | `auto_notes` | Génération nocturne des notes et du résumé court des fiches qui n'en ont pas |
-| `dashboard`, `dashboard_stats` | Données de la page `/rag` : état de l'indexation, coûts, historique, échecs, couverture |
+| `dashboard`, `dashboard_stats` | Données de la page `/rag` et de `GET /api/rag` : état de l'indexation, coûts, historique, échecs, couverture |
 
 Voir [19 Indexation et recherche dans les notes](19-indexation-et-recherche-notes.md).
 

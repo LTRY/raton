@@ -117,7 +117,7 @@ Videos :
 - `GET /rag` : tableau de bord de l'indexation des notes (etape de chaque
   video, prochain lot, lot en cours, activite, cout, index, echecs, lexique) ;
   lecture seule, aucune route d'ecriture ; voir [11 Interface HTML](11-interface-html.md)
-  section "Indexation RAG".
+  section "Indexation RAG". Les memes donnees en JSON : `GET /api/rag`.
 - `GET /videos` : liste videos. Parametre `sort` : `imported`, `published`
   (defaut sur une chaine), `views` ou `rated` (note decroissante). Avec
   `channel_id` d'une chaine existante, rend `channel_videos.html` (page
@@ -271,7 +271,17 @@ scheduler ou par `POST /settings/scan` (voir
   compteurs que la page `/settings`.
 - `GET /api/stats/charts` : memes donnees que la page `/stats` (stockage et
   fiches par chaine, par format, par mois) — voir
-  [11 Interface HTML](11-interface-html.md).
+  [11 Interface HTML](11-interface-html.md). Chaque type de stockage et chaque
+  format porte sa part (`percent`) ; plus `purged` (fiches purgees par mois),
+  `spend` (depense LLM par mois), `quota_bytes` et `quota_percent`. `monthly`
+  garde toute la fenetre de 12 mois : la page, elle, en retire les premiers
+  mois vides et en tire son dessin (`monthly_view`).
+- `GET /api/rag` : ce que montre `/rag` (`rag_dashboard_data`) : `buckets`
+  (etape de chaque fiche), `pipeline` (etat du balayage, lot en cours,
+  prochain passage), `next_batch`, `in_flight_videos`, `jobs`, `history`,
+  `chunks`, `channels`, `failures`, `parameters`. Dates en ISO 8601,
+  `pipeline.next_sweep_in` en duree ISO 8601 (`PT17H35M…`) ; les libelles et
+  `family` (couleur) des etapes sont ceux de la page.
 - `GET /api/settings`
 - `PUT /api/settings`
 - `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`

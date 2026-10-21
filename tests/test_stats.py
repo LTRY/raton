@@ -150,6 +150,14 @@ def test_stats_page_and_api(db):
     payload = TestClient(app).get("/api/stats/charts").json()
     assert payload["total_cards"] == 1
     assert payload["total_bytes"] == 2048
+    # Everything the page shows around the charts, not only `library_chart_data`.
+    assert [kind["percent"] for kind in payload["storage_by_kind"] if kind["bytes"]] == [100.0]
+    assert [item["percent"] for item in payload["cards_by_format"] if item["count"]] == [100.0]
+    assert payload["quota_bytes"] > 0
+    assert payload["quota_percent"] == round(2048 / payload["quota_bytes"] * 100, 1)
+    assert payload["purged"]["total"] == 0
+    assert payload["spend"]["total"] == 0
+    assert len(payload["monthly"]) == MONTHS_WINDOW
 
 
 def test_monthly_view_drops_leading_empty_months_and_tells_the_story(db):
