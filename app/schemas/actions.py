@@ -1,4 +1,5 @@
-"""Bodies and replies of the `/api` actions on a fiche and of `GET /api/jobs/{id}`."""
+"""Bodies and replies of the `/api` actions on a fiche, and the job replies (`JobQueuedRead`,
+`JobStatusRead`) of every `/api` action that starts a background job."""
 
 from datetime import datetime
 

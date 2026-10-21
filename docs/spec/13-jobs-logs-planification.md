@@ -209,7 +209,7 @@ Evenements :
 | `ext.call` / `ext.error` | INFO / ERROR | appel yt-dlp, Voyage, Anthropic (duree, tokens) ; un 429 YouTube ou une video pas encore disponible est WARNING | `service`, `op`, `duration_ms`, `error` |
 | `scheduler.started`, `scheduler.catchup_check`, `scheduler.disabled`, `scheduler.stopped` | INFO | cycle de vie du scheduler | |
 | `setting.set` | INFO | ecriture d'un reglage | `key` (jamais la valeur) |
-| `channel.bell` | INFO | bascule d'une cloche | `channel_id`, `section`, `enabled` |
+| `channel.bell` | INFO | changement d'une cloche (formulaire ou `/api`) | `channel_id`, `section`, `enabled` |
 
 Garde-fous :
 

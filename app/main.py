@@ -18,6 +18,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.api.channel_actions import router as api_channel_actions_router
 from app.api.library import router as api_library_router
 from app.api.routes import router as api_router
 from app.api.video_actions import router as api_video_actions_router
@@ -93,6 +94,7 @@ app.add_middleware(RequestTimingMiddleware)
 app.include_router(api_router)
 app.include_router(api_library_router)
 app.include_router(api_video_actions_router)
+app.include_router(api_channel_actions_router)
 app.include_router(media_router)
 app.include_router(settings_router)
 app.include_router(stats_router)

@@ -1,7 +1,11 @@
-"""Adding and deleting a library channel, shared by the HTML pages and `/api`."""
+"""Adding and deleting a library channel, its categories and cloches, shared by the HTML pages
+and `/api`."""
+
+import logging
 
 from sqlalchemy.orm import Session
 
+from app.core.logging import log_event
 from app.models.channel import Channel
 from app.services.channels.lookup import find_channel
 from app.services.channels.profile import remove_channel_profile_files
@@ -9,6 +13,10 @@ from app.services.common.categories import serialized_category_labels
 from app.services.common.ratings import check_rating
 from app.services.common.settings import add_video_category_labels, get_media_root
 from app.services.youtube.channel_info import extract_channel_info
+
+logger = logging.getLogger(__name__)
+
+BELL_SECTIONS = ("videos", "shorts")
 
 
 class ChannelAlreadyInLibraryError(Exception):
@@ -82,10 +90,24 @@ def bell_section(section: str) -> str:
     return "shorts" if section in {"short", "shorts"} else "videos"
 
 
-def toggle_channel_bell(db: Session, channel: Channel, section: str) -> bool:
-    """Switch the cloche of `section` ("videos" or "shorts"); returns whether it is now on."""
+def bell_section_label(section: str) -> str:
+    return "shorts" if section == "shorts" else "vidéos"
+
+
+def set_channel_bell(db: Session, channel: Channel, section: str, enabled: bool) -> bool:
+    """Set the cloche of `section` ("videos" or "shorts"); returns whether it was just turned on.
+
+    A cloche turned on syncs the existing catalogue: the caller queues that import.
+    """
     bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
-    enabled = not getattr(channel, bell)
+    switched_on = enabled and not getattr(channel, bell)
     setattr(channel, bell, enabled)
     db.commit()
-    return enabled
+    log_event(logger, "channel.bell", channel_id=channel.id, section=section, enabled=enabled)
+    return switched_on
+
+
+def toggle_channel_bell(db: Session, channel: Channel, section: str) -> bool:
+    """Switch the cloche of `section`; returns whether it is now on."""
+    bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
+    return set_channel_bell(db, channel, section, not getattr(channel, bell))

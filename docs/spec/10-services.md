@@ -99,7 +99,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `manage` | Ajout et suppression d'une chaîne, catégories, cloches |
+| `manage` | Ajout et suppression d'une chaîne, catégories, cloches (`set_channel_bell` dit si la cloche vient de passer à active) |
 | `listing` | Liste de `/channels` : tri, filtre Notées, recherche, nombre de fiches |
 | `lookup` | Chaîne de la bibliothèque qui correspond à une URL ou un identifiant YouTube |
 | `profile` | Avatar, bannière et description d'une chaîne |
@@ -181,7 +181,7 @@ web ; chacune ouvre sa propre session DB.
 
 | Module | Responsabilité |
 |---|---|
-| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
+| `downloads` | Téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne ; mise en file depuis une fiche (`queue_media_download`, `queue_transcript_retry`) ou une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) et état d'un job (`job_status`), partagés par les formulaires et `/api` |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |

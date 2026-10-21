@@ -277,6 +277,36 @@ scheduler ou par `POST /settings/scan` (voir
 - `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`
   (tous statuts), la plus recente d'abord.
 
+### Actions sur une chaine
+
+Corps en JSON, memes services que les formulaires de `/channels` ;
+`404 Chaîne introuvable` si la chaine n'existe pas. Les routes qui modifient
+la chaine repondent son etat modifiable : `{id, name, rating, categories,
+auto_metadata_enabled, auto_shorts_enabled}`. La liste, l'ajout, la note et
+la suppression sont plus haut.
+
+- `PUT /api/channels/{id}/categories` `{categories: [...]}` : remplace les
+  categories de la chaine (normalisees).
+- `PUT /api/channels/{id}/bells/{videos|shorts}` `{enabled}` : regle une
+  cloche (idempotent, contrairement au formulaire qui bascule). Repond
+  `{channel, job}` : `job` est l'import du catalogue existant lance quand la
+  cloche vient de passer a active (sans marquer les fiches comme
+  Nouveautes), `null` sinon. Une autre section donne `422`.
+- `POST /api/channels/{id}/import-metadata` `{page, section}` (facultatif :
+  `1`, `videos`) : importe une page des videos ou des shorts de la chaine
+  (metadonnees seules), `202 {job_id, status, message, status_url}`.
+- `POST /api/channels/{id}/refresh-profile` : relance la recuperation du
+  profil (avatar, banniere, description) en arriere-plan, `202 {status,
+  message}`.
+- `POST /api/channels/import-csv` (multipart, champ `file`) : lit un CSV
+  d'abonnements Google Takeout sans rien ecrire, comme `POST
+  /channels/import-csv`. Repond `{rows, new_count, existing_count}` ; chaque
+  ligne `{channel_id, url, name, already_imported, token}`. `400` avec le
+  message du formulaire si le fichier n'est pas un export d'abonnements.
+- `POST /api/channels/import-csv/confirm` `{tokens: [...]}` : ajoute les
+  chaines des `token` de l'apercu qui ne sont pas deja dans la bibliotheque,
+  `{added}` ; lance le rattrapage des profils si au moins une est ajoutee.
+
 ### Actions sur une fiche
 
 Corps en JSON. Chaque route appelle le meme service que son formulaire HTML

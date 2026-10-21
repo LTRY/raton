@@ -14,6 +14,7 @@ from app.db.session import SessionLocal
 from app.models.channel import Channel
 from app.models.job import DownloadJob
 from app.models.video import Video
+from app.services.channels.manage import bell_section_label
 from app.services.common.job_log import JOB_DONE_STATUSES, log_job
 from app.services.ingest.channel_exploration import channel_exploration_videos
 from app.services.ingest.manual_download import download_manual_media
@@ -65,6 +66,28 @@ def run_media_download_job(
 def queue_transcript_retry(db: Session, video: Video) -> DownloadJob:
     """The queued job of a new transcript attempt; run it with `run_transcript_retry_job`."""
     return log_job(db, "queued", "Récupération du transcript en file d'attente.", video_id=video.id)
+
+
+def queue_channel_metadata_import(db: Session, channel: Channel, section: str) -> DownloadJob:
+    """The queued import of a page of a channel's metadata; run `run_channel_metadata_import_job`."""
+    return log_job(
+        db,
+        "queued",
+        f"Import des métadonnées {bell_section_label(section)} de {channel.name} en file d'attente.",
+        channel_id=channel.id,
+    )
+
+
+def queue_channel_catalog_sync(db: Session, channel: Channel, section: str) -> DownloadJob:
+    """The queued sync of the catalogue of a cloche just turned on; run its first page with
+    `run_channel_metadata_import_job`."""
+    return log_job(
+        db,
+        "queued",
+        f"Recherche automatique des nouveautés ({bell_section_label(section)}) de {channel.name}"
+        " en file d'attente.",
+        channel_id=channel.id,
+    )
 
 
 def job_status(db: Session, job_id: int) -> dict:

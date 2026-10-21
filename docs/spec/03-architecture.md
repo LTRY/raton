@@ -175,7 +175,9 @@ Contient :
 
 L'API interne sous `/api` : `routes.py` pour les chaines, fiches,
 statistiques et parametres, `library.py` pour `GET /api/library`,
-`video_actions.py` pour les actions sur une fiche et l'etat de leurs jobs.
+`video_actions.py` pour les actions sur une fiche et l'etat de leurs jobs,
+`channel_actions.py` pour les actions sur une chaine et l'import CSV des
+abonnements.
 
 ### `app/services/`
 
