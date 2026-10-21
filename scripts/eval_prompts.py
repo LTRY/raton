@@ -18,6 +18,7 @@ import html
 import importlib.util
 import json
 import random
+import re
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -102,6 +103,15 @@ def answer_for(provider, prompt: Prompt, cache_dir: Path, *, call_api: bool = Tr
     return answer
 
 
+_SENTENCE_END = re.compile(r"(?<=[.!?…])\s+(?=[A-ZÀ-ÖØ-Þ«\"'])")
+
+
+def count_sentences(text: str) -> int:
+    """Sentences of `text`, told apart by a full stop followed by a capital: close enough to flag a
+    résumé that is one run-on sentence or five."""
+    return len([part for part in _SENTENCE_END.split(text.strip()) if part.strip()])
+
+
 def check_answer(text: str) -> tuple[str, str, list[str]]:
     """(notes, résumé court, problems) of a notes + résumé court answer, parsed like the app does."""
     notes, summary = split_auto_notes_result(text)
@@ -111,8 +121,8 @@ def check_answer(text: str) -> tuple[str, str, list[str]]:
         problems.append("aucune note exploitable")
     if not summary:
         problems.append("pas de résumé court")
-    elif len(summary.splitlines()) != 3:
-        problems.append(f"résumé court de {len(summary.splitlines())} lignes (3 attendues)")
+    elif (count := count_sentences(summary)) != 3:
+        problems.append(f"résumé court de {count} phrases (3 attendues)")
     return notes, summary, problems
 
 

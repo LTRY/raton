@@ -58,7 +58,7 @@ uv run --python 3.14 python -m scripts.eval_prompts \
   `.local/media/YouTube`) passent dans les deux variantes ;
 - le rapport `.local/evals/<date>/report.html` (et `results.json`) montre les deux
   sorties côte à côte, avec jetons, coût et durée, les sorties qui ne se
-  parsent pas (notes vides, résumé court qui n'a pas 3 lignes) signalées avec
+  parsent pas (notes vides, résumé court qui n'a pas 3 phrases) signalées avec
   leur réponse brute, et un vote A / B / égal par vidéo gardé dans le navigateur ;
 - une réponse est mise en cache (`.local/evals/cache/`) sous un hachage du modèle
   et du `Prompt` envoyé : relancer après avoir modifié une variante ne paie que

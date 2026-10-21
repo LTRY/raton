@@ -7,6 +7,7 @@ from scripts.eval_prompts import (
     answer_for,
     cache_key,
     check_answer,
+    count_sentences,
     load_variant,
     render_report,
     sample_transcripts,
@@ -82,8 +83,16 @@ def test_check_answer_flags_what_does_not_parse():
     assert summary == "Une.\nDeux.\nTrois." and "Un fait." in notes and problems == []
 
     assert "aucune note exploitable" in check_answer("du texte libre")[2]
-    two_lines = GOOD_ANSWER.replace("Trois.", "")
-    assert any("2 lignes" in problem for problem in check_answer(two_lines)[2])
+    two_sentences = GOOD_ANSWER.replace("Trois.", "")
+    assert any("2 phrases" in problem for problem in check_answer(two_sentences)[2])
+
+
+def test_count_sentences_handles_one_paragraph_and_accents():
+    paragraph = "Une phrase d'IA. Une deuxième (Exploit Gym), avec 3,5 %. « Et la troisième ? »"
+
+    assert count_sentences(paragraph) == 3
+    assert count_sentences("Une seule phrase sans point final") == 1
+    assert count_sentences("A.\nB.\nC.") == 3
 
 
 def test_load_variant_reads_name_and_build(tmp_path):
