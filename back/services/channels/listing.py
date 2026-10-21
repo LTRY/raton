@@ -25,7 +25,7 @@ class ChannelPage:
     total_pages: int
     total: int
     sort: str
-    # Every channel of the library, whatever the filter and search: the count next to the title.
+    # The channels the Notées filter keeps, whatever the search: the count next to the title.
     channel_count: int
 
 
@@ -107,13 +107,16 @@ def channel_page(
     counts = video_counts_by_channel(db, [entry["channel"].id for entry in page_entries])
     for entry in page_entries:
         entry["video_count"] = counts.get(entry["channel"].id, 0)
+    count_query = select(func.count(Channel.id))
+    if rated_only:
+        count_query = count_query.where(Channel.rating > 0)
     return ChannelPage(
         entries=page_entries,
         page=page,
         total_pages=total_pages,
         total=len(entries),
         sort=sort,
-        channel_count=db.scalar(select(func.count(Channel.id))) or 0,
+        channel_count=db.scalar(count_query) or 0,
     )
 
 
