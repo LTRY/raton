@@ -32,12 +32,12 @@ sont ceux de [00 Vision](00-vision.md).
 3. Sur la page d'une chaine, « Explorer la suite » importe depuis YouTube les
    fiches suivantes (par pages), sans telecharger les medias.
 4. Une video absente de la DB s'ajoute aussi en collant son URL
-   (`/videos/import`) ou via le partage iOS (`/videos/share-import`).
+   (feuille d'import) ou via le partage iOS (`/videos/share-import`).
 5. Une video connue ouvre sa fiche `/videos/{id}`.
 
 ### Importer un fichier local ou une playlist
 
-1. Sur la page d'import, l'utilisateur depose un fichier video ou audio de son
+1. Dans la feuille d'import, l'utilisateur depose un fichier video ou audio de son
    appareil : il est range sous la chaine `Fichiers locaux`, sans transcript ni
    metadonnees YouTube.
 2. Ou il colle l'URL d'une playlist YouTube : l'application en affiche un apercu

@@ -3335,37 +3335,7 @@ body.hide-thumbnails .pl-cover img {
   color: var(--status-error-fg);
 }
 
-/* Add panel */
-.pl-add {
-  display: grid;
-  flex: 1 1 300px;
-  gap: 12px;
-  margin-top: 4px;
-  max-width: 100%;
-}
-
-.pl-add h2 {
-  font-size: 18px;
-  line-height: 1.3;
-  margin: 0;
-}
-
-.pl-add > * {
-  animation: pl-card-in 300ms ease-out backwards;
-}
-
-.pl-add > :nth-child(2) {
-  animation-delay: 80ms;
-}
-
-.pl-add > :nth-child(3) {
-  animation-delay: 160ms;
-}
-
-.pl-add > :nth-child(4) {
-  animation-delay: 240ms;
-}
-
+/* Add cards: they live in the import sheet (`.import-pane-playlist`). */
 .pl-add-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -4370,7 +4340,6 @@ body.hide-thumbnails .pld-thumb img {
 
 @media (prefers-reduced-motion: reduce) {
   .pl-card,
-  .pl-add > *,
   .pld-row,
   .pl-layer,
   .pl-cover,
@@ -10989,40 +10958,75 @@ body::before {
   outline-offset: 2px;
 }
 
-.import-fab-menu {
+.import-sheet {
   background: var(--glass-fill-opaque);
   border-radius: var(--radius-lg);
-  display: grid;
-  gap: 2px;
-  min-width: 260px;
-  padding: 8px;
+  box-sizing: border-box;
+  max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px;
   position: absolute;
   right: 0;
   top: calc(100% + 10px);
+  width: min(460px, calc(100vw - 28px));
 }
 
-.import-fab-menu a {
-  align-items: center;
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  display: flex;
-  font-size: 15px;
-  font-weight: 700;
-  gap: 12px;
-  padding: 11px 12px;
-  white-space: nowrap;
-}
-
-.import-fab-menu a:hover,
-.import-fab-menu a:focus-visible {
+.import-tabs {
   background: var(--color-tint);
+  border-radius: var(--radius-pill);
+  display: grid;
+  gap: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 10px;
+  padding: 3px;
+}
+
+.import-tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  min-width: 0;
+  padding: 8px 6px;
+}
+
+.import-tabs button[aria-selected="true"] {
+  background: var(--color-white);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-shadow-warm) 22%, transparent);
   color: var(--color-primary);
 }
 
-.import-fab-menu svg {
-  flex: none;
-  height: 20px;
-  width: 20px;
+.import-pane {
+  display: grid;
+  gap: 12px;
+}
+
+.import-pane[hidden] {
+  display: none;
+}
+
+/* The pages' own cards, flattened: the sheet is already the card. */
+.import-sheet .download-form {
+  background: transparent;
+  border: 0;
+  margin: 0;
+  max-width: none;
+  padding: 4px;
+}
+
+.import-sheet .csv-import-hint {
+  margin: 0;
+  padding: 0 4px;
+}
+
+.import-sheet .csv-dropzone-form,
+.import-sheet .import-dropzone-form {
+  margin: 0;
 }
 
 /* The button floats over the first row of a phone page: keep its titles and
@@ -11036,5 +11040,11 @@ body::before {
   main .section-heading,
   main .pl-head {
     padding-right: 56px;
+  }
+
+  .import-sheet {
+    position: fixed;
+    right: 14px;
+    top: calc(76px + env(safe-area-inset-top, 0px));
   }
 }

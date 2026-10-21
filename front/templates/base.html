@@ -23,25 +23,7 @@
         <span class="pull-refresh-spinner" aria-hidden="true"></span>
       </span>
     </div>
-    <details class="import-fab" data-import-fab>
-      <summary class="import-fab-button lg" data-glass-light aria-label="Importer" title="Importer">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-      </summary>
-      <div class="import-fab-menu lg" role="menu" aria-label="Importer">
-        <a role="menuitem" href="/videos/import">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9.5 5 2.5-5 2.5z"/></svg>
-          Ajouter une vidéo
-        </a>
-        <a role="menuitem" href="/playlists#pl-add">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h12M4 12h12M4 17h6"/><path d="M15 15.5v5l4.5-2.5z"/></svg>
-          Ajouter une playlist
-        </a>
-        <a role="menuitem" href="/channels?import=abonnements">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="m8 3 4 4 4-4"/></svg>
-          Importer des abonnements
-        </a>
-      </div>
-    </details>
+    {% include "_import_sheet.html" %}
     <header class="topbar lg">
       <a class="brand" href="/">Raton</a>
       <nav>
@@ -50,7 +32,6 @@
         <details class="nav-library-menu">
           <summary>Bibliothèque</summary>
           <div class="nav-library-panel">
-            <a href="/videos/import">Import</a>
             <a href="/dashboard/nouveautes">Nouveautés</a>
             <a href="/dashboard/historique">Historique</a>
             <a href="/videos">Exploration</a>

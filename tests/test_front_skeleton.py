@@ -95,14 +95,25 @@ def test_records_turn_iso_datetimes_into_datetimes_and_keep_plain_dates():
     assert data.get("missing", 1) == 1
 
 
-def test_import_button_is_on_every_page_with_the_three_imports(front_client):
+def test_import_sheet_holds_the_three_imports_on_every_page(front_client):
     html = front_client(make_session()).get("/channels").text
     assert "data-import-fab" in html
-    for href in ("/videos/import", "/playlists#pl-add", "/channels?import=abonnements"):
-        assert f'href="{href}"' in html
+    for action in (
+        "/videos/download",
+        "/playlists/import-url",
+        "/playlists/import-csv",
+        "/channels/import-csv",
+    ):
+        assert f'action="{action}"' in html
+    assert 'src="/import/categories"' in html
 
 
-def test_channels_import_link_opens_the_csv_menu(front_client):
-    html = front_client(make_session()).get("/channels?import=abonnements").text
-    assert 'class="page-actions-menu" open' in html
-    assert 'class="page-action" open' in html
+def test_import_query_opens_the_sheet_on_its_tab(front_client):
+    html = front_client(make_session()).get("/playlists?import=playlist").text
+    assert "data-import-fab open" in html
+    assert 'data-import-tab="playlist" aria-selected="true"' in html
+
+
+def test_import_categories_frame(front_client):
+    html = front_client(make_session()).get("/import/categories").text
+    assert '<turbo-frame id="import-categories">' in html

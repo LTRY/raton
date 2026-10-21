@@ -465,7 +465,6 @@
 
 {% macro library_subnav(active) %}
 <nav class="library-subnav" aria-label="Sections de la bibliothèque">
-  <a class="lg" href="/videos/import" {% if active == 'import' %}aria-current="page"{% endif %}>Import</a>
   <a class="lg" href="/dashboard/nouveautes" {% if active == 'nouveautes' %}aria-current="page"{% endif %}>Nouveautés</a>
   <a class="lg" href="/dashboard/historique" {% if active == 'historique' %}aria-current="page"{% endif %}>Historique</a>
   <a class="lg" href="/videos" {% if active == 'exploration' %}aria-current="page"{% endif %}>Exploration</a>
