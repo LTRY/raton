@@ -305,7 +305,10 @@ Regles :
 - la description contient : un resume du changement et de sa raison, les
   fichiers de spec mis a jour, les captures d'ecran pour tout `[FRONT]`
   (bureau et telephone si la mise en page differe), et le resultat de
-  `make ci`.
+  `make ci` ;
+- ni la description, ni les messages de commit, ni les commentaires GitHub ne
+  contiennent de lien vers une session Claude Code
+  (`https://claude.ai/code/session_...`, trailer `Claude-Session:`).
 
 ## Regle post-modification
 
