@@ -8928,8 +8928,10 @@ body.has-mini-player .explorer-raton {
   padding: 0 26px;
 }
 
-/* Also a link: the "Ajouter une playlist" of the empty Playlists page. */
+/* Also a link: the "Ajouter une playlist" of the empty Playlists page.
+   border-box like a <button>, or the phone's `width: 100%` adds the padding. */
 a.channel-explore-btn {
+  box-sizing: border-box;
   text-decoration: none;
 }
 
