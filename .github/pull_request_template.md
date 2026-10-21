@@ -1,9 +1,9 @@
-## Résumé
+## Quoi
 
-<!-- Ce que change la PR et pourquoi. -->
+<!-- 1 à 3 puces concrètes : la page, le bouton, la route ou le comportement qui change. Pas de contexte général, pas de liste de fichiers ni de tests. -->
 
-## Checklist
+## Pourquoi
 
-- [ ] `make ci` passe
-- [ ] Spec (`docs/spec/`) et tests mis à jour
-- [ ] Captures d'écran (bureau et téléphone) pour tout changement d'interface
+<!-- Une phrase : le problème ou la demande. -->
+
+<!-- PR [FRONT] : captures d'écran bureau et téléphone ici. -->
