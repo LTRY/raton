@@ -212,11 +212,33 @@ scheduler ou par `POST /settings/scan` (voir
 
 ## API interne `/api`
 
-- `GET /api/channels`
-- `POST /api/channels` : lance aussi le rattrapage du profil en arriere-plan ;
-  `409` si la chaine est deja dans la bibliotheque, reconnue par son identifiant
-  YouTube quelle que soit l'URL donnee (meme regle que le formulaire de `/channels`)
-- `POST /api/channels/{id}/rating?rating=0..5`
+Conventions communes : une modification envoie un corps JSON (`PUT` pour
+fixer une valeur) et repond l'etat modifiable de ce qu'elle a change ; les
+categories d'une chaine, d'une fiche ou d'une playlist se lisent toujours
+`categories`, une liste de libelles normalises (la colonne `category_labels`
+ne sort pas de l'API).
+
+- `GET /api/channels?sort=…&rated=true|false&q=…&page=N` : une page de 50
+  chaines, memes tris (`activity` par defaut, `rating`, `alpha`, `added` ; un
+  tri inconnu donne `activity`), meme recherche et meme filtre Notees que
+  `/channels` (`channel_page`). Contrairement a la page, toutes les chaines
+  sont listees sauf `rated=true`. Repond `{items, sort, page, total_pages,
+  total}` ; chaque chaine `{id, url, name, yt_channel_id, rating,
+  categories, auto_metadata_enabled, auto_shorts_enabled, created_at,
+  video_count, last_played_at}` (`last_played_at` : derniere lecture d'une de
+  ses fiches, `null` sinon). Le nombre de requetes ne depend pas du nombre de
+  chaines affichees.
+- `GET /api/channels/{id}` : la chaine plus son profil : `description`,
+  `keywords` (liste), `avatar_url` et `banner_url` (`/channels/{id}/avatar`,
+  `/channels/{id}/banner`, `null` sans image), `metadata_fetched_at`,
+  `last_scanned_at`, `video_count`.
+- `POST /api/channels` `{url, rating}` (`rating` facultatif, `1`) : lance aussi
+  le rattrapage du profil en arriere-plan ; `409` si la chaine est deja dans
+  la bibliotheque, reconnue par son identifiant YouTube quelle que soit l'URL
+  donnee (meme regle que le formulaire de `/channels`) ; `400 La note doit
+  être comprise entre 0 et 5.` pour une note hors bornes.
+- `PUT /api/channels/{id}/rating` `{rating}` : note de 0 a 5, repond l'etat de
+  la chaine (voir Actions sur une chaine) ; `400` avec le meme message sinon.
 - `DELETE /api/channels/{id}` : supprime aussi le dossier de profil de la chaine
 - `GET /api/videos?channel_id=<id>&page=N` : fiches les plus recemment
   importees d'abord, 50 par page (meme taille et meme requete SQL que la
@@ -258,7 +280,9 @@ scheduler ou par `POST /settings/scan` (voir
   `saved_views` les vues enregistrees avec `active`. `404` si `channel_id`
   ne designe aucune chaine. Le nombre de requetes SQL ne depend pas de la
   taille de la bibliotheque.
-- `POST /api/videos/{id}/rating?rating=0..5`
+- `PUT /api/videos/{id}/rating` `{rating}` : note de 0 a 5, repond l'etat de
+  la fiche (voir Actions sur une fiche) ; `400 La note doit être comprise
+  entre 0 et 5.` sinon.
 - `GET /api/videos/{id}/sponsor-segments` : segments a sauter pour cette video,
   au service du mini-lecteur persistant (qui se lance depuis n'importe quelle
   liste et n'a donc pas les segments dans le DOM de la page courante).
@@ -284,8 +308,11 @@ scheduler ou par `POST /settings/scan` (voir
   `family` (couleur) des etapes sont ceux de la page.
 - `GET /api/settings`
 - `PUT /api/settings`
-- `GET /api/errors` : les 100 lignes les plus recentes de `download_jobs`
-  (tous statuts), la plus recente d'abord.
+- `GET /api/jobs?status=…` : les 100 derniers jobs du journal
+  (`download_jobs`, comme `/logs`), le plus recent d'abord : `{id, status,
+  message, channel_id, video_id, created_at, done}` ; `status` (repetable)
+  ne garde que ces statuts. Remplace `GET /api/errors`, qui listait deja tous
+  les statuts.
 
 ### Actions sur une chaine
 

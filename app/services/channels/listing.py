@@ -1,4 +1,7 @@
-"""The channel list of /channels: sort, Notées filter, search, fiche counts."""
+"""The channel list of /channels and `GET /api/channels`: sort, Notées filter, search, page,
+fiche counts."""
+
+from dataclasses import dataclass
 
 from sqlalchemy import desc, func, nullslast, select
 from sqlalchemy.orm import Session
@@ -9,6 +12,18 @@ from app.models.video import Video
 from app.services.common.search import channel_search_rank
 
 CHANNEL_SORTS = ("rating", "activity", "alpha", "added")
+DEFAULT_CHANNEL_SORT = "activity"
+CHANNEL_PAGE_SIZE = 50
+
+
+@dataclass
+class ChannelPage:
+    # `channel_entries` rows of the page, each with its `video_count`.
+    entries: list[dict]
+    page: int
+    total_pages: int
+    total: int
+    sort: str
 
 
 def channel_entries(db: Session, sort: str, rated_only: bool, search_query: str) -> list[dict]:
@@ -70,3 +85,25 @@ def channels_by_yt_id(db: Session, yt_channel_ids: list[str]) -> dict[str, Chann
         channel.yt_channel_id: channel
         for channel in db.scalars(select(Channel).where(Channel.yt_channel_id.in_(yt_channel_ids)))
     }
+
+
+def channel_page(
+    db: Session, sort: str | None, rated_only: bool, search_query: str, page: int
+) -> ChannelPage:
+    """One page of `channel_entries`; an unknown sort falls back to the default one.
+
+    The whole list is sorted in Python (the search ranks in Python), which stays cheap: a library
+    holds hundreds of channels, not thousands of fiches. Fiches are counted for the page only.
+    """
+    sort = sort if sort in CHANNEL_SORTS else DEFAULT_CHANNEL_SORT
+    entries = channel_entries(db, sort, rated_only, search_query)
+    total_pages = max(1, -(-len(entries) // CHANNEL_PAGE_SIZE))
+    page = min(max(page, 1), total_pages)
+    start = (page - 1) * CHANNEL_PAGE_SIZE
+    page_entries = entries[start : start + CHANNEL_PAGE_SIZE]
+    counts = video_counts_by_channel(db, [entry["channel"].id for entry in page_entries])
+    for entry in page_entries:
+        entry["video_count"] = counts.get(entry["channel"].id, 0)
+    return ChannelPage(
+        entries=page_entries, page=page, total_pages=total_pages, total=len(entries), sort=sort
+    )

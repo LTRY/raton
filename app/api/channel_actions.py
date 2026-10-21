@@ -1,7 +1,7 @@
 """`/api` actions on a channel and the CSV import of YouTube subscriptions.
 
 Each route calls the service its HTML form twin calls (`app/web/routes/channels.py`). Listing,
-adding, rating and deleting a channel are in `app/api/routes.py`.
+reading, adding and deleting a channel are in `app/api/routes.py`.
 """
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
@@ -18,6 +18,7 @@ from app.schemas.channel import (
     ChannelMetadataImport,
     ChannelProfileRefreshRead,
     ChannelStateRead,
+    RatingUpdate,
     SubscriptionRowRead,
     SubscriptionsAddedRead,
     SubscriptionsConfirm,
@@ -31,6 +32,7 @@ from app.services.channels.subscriptions import (
     preview_subscriptions,
 )
 from app.services.common.categories import parse_video_category_labels
+from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
@@ -60,6 +62,19 @@ def channel_state(channel: Channel) -> ChannelStateRead:
         auto_metadata_enabled=channel.auto_metadata_enabled,
         auto_shorts_enabled=channel.auto_shorts_enabled,
     )
+
+
+@router.put("/channels/{channel_id}/rating", response_model=ChannelStateRead)
+def update_rating(
+    channel_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
+) -> ChannelStateRead:
+    """0 to 5 stars; 400 with the service's message otherwise."""
+    channel = library_channel(db, channel_id)
+    try:
+        set_rating(db, channel, payload.rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return channel_state(channel)
 
 
 @router.put("/channels/{channel_id}/categories", response_model=ChannelStateRead)

@@ -70,6 +70,18 @@ class JobStatusRead(BaseModel):
     videos: list[dict] | None = None
 
 
+class RecentJobRead(BaseModel):
+    """A row of the jobs journal (`download_jobs`), as `/logs` lists them."""
+
+    id: int
+    status: str
+    message: str
+    channel_id: int | None
+    video_id: int | None
+    created_at: datetime
+    done: bool
+
+
 class SponsorSegmentsFetchRead(BaseModel):
     count: int
     skip_enabled: bool

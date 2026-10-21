@@ -3,7 +3,7 @@
 Each route calls the service its HTML form twin calls (`app/web/routes/videos.py`, `media.py`).
 """
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -16,10 +16,14 @@ from app.schemas.actions import (
     ListStateUpdate,
     MediaDownload,
     PlaybackActivity,
+    RecentJobRead,
     SponsorSegmentsFetchRead,
     VideoStateRead,
 )
+from app.schemas.channel import RatingUpdate
 from app.services.common.categories import parse_video_category_labels
+from app.services.common.job_log import JOB_DONE_STATUSES, recent_jobs
+from app.services.common.ratings import InvalidRatingError, set_rating
 from app.services.common.settings import get_sponsor_skip_enabled
 from app.services.jobs.downloads import (
     InvalidMediaFormatError,
@@ -73,6 +77,19 @@ def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
     """What opening the fiche's page does: takes it out of the Nouveautés."""
     video = fiche(db, video_id)
     mark_video_opened(db, video)
+    return video_state(video)
+
+
+@router.put("/videos/{video_id}/rating", response_model=VideoStateRead)
+def update_rating(
+    video_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
+) -> VideoStateRead:
+    """0 to 5 stars; 400 with the service's message otherwise."""
+    video = fiche(db, video_id)
+    try:
+        set_rating(db, video, payload.rating)
+    except InvalidRatingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return video_state(video)
 
 
@@ -184,6 +201,25 @@ def fetch_sponsor_segments(
         skip_enabled=get_sponsor_skip_enabled(db),
         segments=normalize_skip_segments(active_sponsor_segments(db, video.id)),
     )
+
+
+@router.get("/jobs", response_model=list[RecentJobRead])
+def list_jobs(
+    status: list[str] = Query(default=[]), db: Session = Depends(get_db)
+) -> list[RecentJobRead]:
+    """The 100 latest jobs, newest first; `status` (repeatable) keeps only those statuses."""
+    return [
+        RecentJobRead(
+            id=job.id,
+            status=job.status,
+            message=job.message,
+            channel_id=job.channel_id,
+            video_id=job.video_id,
+            created_at=job.created_at,
+            done=job.status in JOB_DONE_STATUSES,
+        )
+        for job in recent_jobs(db, statuses=status)
+    ]
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusRead, response_model_exclude_none=True)

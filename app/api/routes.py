@@ -1,13 +1,19 @@
 from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import select, true
+from sqlalchemy import true
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.channel import Channel
 from app.models.video import Video
-from app.schemas.channel import ChannelCreate, ChannelRead
+from app.schemas.channel import (
+    ChannelCreate,
+    ChannelDetailRead,
+    ChannelListItemRead,
+    ChannelPageRead,
+    ChannelRead,
+)
 from app.schemas.settings import SettingsRead, SettingsUpdate
 from app.schemas.video import (
     VideoDetailRead,
@@ -19,9 +25,10 @@ from app.schemas.video import (
     VideoRead,
 )
 from app.services.channels import manage as channel_manage
+from app.services.channels.listing import channel_page, video_counts_by_channel
 from app.services.channels.manage import ChannelAlreadyInLibraryError
-from app.services.common.job_log import recent_jobs
-from app.services.common.ratings import InvalidRatingError, set_rating
+from app.services.common.ratings import InvalidRatingError
+from app.services.common.search import normalized_search_query
 from app.services.common.settings import (
     get_global_quota_bytes,
     get_media_root,
@@ -54,9 +61,48 @@ CHANNEL_NOT_FOUND = "Chaîne introuvable"
 VIDEO_NOT_FOUND = "Vidéo introuvable"
 
 
-@router.get("/channels", response_model=list[ChannelRead])
-def list_channels(db: Session = Depends(get_db)) -> list[Channel]:
-    return list(db.scalars(select(Channel).order_by(Channel.name)))
+@router.get("/channels", response_model=ChannelPageRead)
+def list_channels(
+    sort: str | None = None,
+    rated: bool = False,
+    q: str | None = None,
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+) -> ChannelPageRead:
+    """Same sorts, Notées filter and search as `/channels`; unlike the page, every channel is
+    listed unless `rated=true`."""
+    listed = channel_page(db, sort, rated, normalized_search_query(q), page)
+    return ChannelPageRead(
+        items=[
+            ChannelListItemRead(
+                **ChannelRead.model_validate(entry["channel"]).model_dump(),
+                video_count=entry["video_count"],
+                last_played_at=entry["last_played_at"],
+            )
+            for entry in listed.entries
+        ],
+        sort=listed.sort,
+        page=listed.page,
+        total_pages=listed.total_pages,
+        total=listed.total,
+    )
+
+
+@router.get("/channels/{channel_id}", response_model=ChannelDetailRead)
+def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetailRead:
+    channel = db.get(Channel, channel_id)
+    if channel is None:
+        raise HTTPException(status_code=404, detail=CHANNEL_NOT_FOUND)
+    return ChannelDetailRead(
+        **ChannelRead.model_validate(channel).model_dump(),
+        description=channel.description,
+        keywords=channel.keyword_list,
+        avatar_url=f"/channels/{channel.id}/avatar" if channel.avatar_path else None,
+        banner_url=f"/channels/{channel.id}/banner" if channel.banner_path else None,
+        metadata_fetched_at=channel.metadata_fetched_at,
+        last_scanned_at=channel.last_scanned_at,
+        video_count=video_counts_by_channel(db, [channel.id]).get(channel.id, 0),
+    )
 
 
 @router.post("/channels", response_model=ChannelRead)
@@ -73,20 +119,6 @@ def create_channel(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if background_tasks is not None:
         background_tasks.add_task(run_channel_profile_backfill_job)
-    return channel
-
-
-@router.post("/channels/{channel_id}/rating", response_model=ChannelRead)
-def rate_channel(
-    channel_id: int,
-    rating: int = Query(..., ge=0, le=5),
-    db: Session = Depends(get_db),
-) -> Channel:
-    channel = db.get(Channel, channel_id)
-    if channel is None:
-        raise HTTPException(status_code=404, detail=CHANNEL_NOT_FOUND)
-    set_rating(db, channel, rating)
-    db.refresh(channel)
     return channel
 
 
@@ -168,20 +200,6 @@ def get_video(video_id: int, db: Session = Depends(get_db)) -> VideoDetailRead:
     return video_detail_read(video_detail(db, video))
 
 
-@router.post("/videos/{video_id}/rating", response_model=VideoRead)
-def rate_video(
-    video_id: int,
-    rating: int = Query(..., ge=0, le=5),
-    db: Session = Depends(get_db),
-) -> Video:
-    video = db.get(Video, video_id)
-    if video is None:
-        raise HTTPException(status_code=404, detail=VIDEO_NOT_FOUND)
-    set_rating(db, video, rating)
-    db.refresh(video)
-    return video
-
-
 @router.get("/videos/{video_id}/sponsor-segments")
 def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> dict:
     """Segments à sauter pour une vidéo, déjà normalisés.
@@ -245,18 +263,3 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> S
         library_views=payload.video_library_views,
     )
     return read_settings(db)
-
-
-@router.get("/errors")
-def list_errors(db: Session = Depends(get_db)) -> list[dict[str, str | int | None]]:
-    return [
-        {
-            "id": job.id,
-            "channel_id": job.channel_id,
-            "video_id": job.video_id,
-            "status": job.status,
-            "message": job.message,
-            "created_at": job.created_at.isoformat(),
-        }
-        for job in recent_jobs(db)
-    ]

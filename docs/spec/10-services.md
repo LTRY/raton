@@ -64,7 +64,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
 | `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; nettoyage de la saisie (`normalized_search_query`) ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
-| `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/errors`) et les statuts après lesquels un job ne change plus |
+| `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/jobs`) et les statuts après lesquels un job ne change plus |
 
 ### `youtube/`
 
@@ -100,7 +100,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | Module | Responsabilité |
 |---|---|
 | `manage` | Ajout et suppression d'une chaîne, catégories, cloches (`set_channel_bell` dit si la cloche vient de passer à active) |
-| `listing` | Liste de `/channels` : tri, filtre Notées, recherche, nombre de fiches |
+| `listing` | Liste de `/channels` et de `GET /api/channels` : tri, filtre Notées, recherche, page (`channel_page`), nombre de fiches |
 | `lookup` | Chaîne de la bibliothèque qui correspond à une URL ou un identifiant YouTube |
 | `profile` | Avatar, bannière et description d'une chaîne |
 | `subscriptions` | Aperçu et import du CSV d'abonnements YouTube |
