@@ -45,9 +45,20 @@
         </details>
       </article>
       {% else %}
-      <p class="empty-state">Aucune playlist pour le moment.</p>
+      {# Same empty state as a channel without cards. #}
+      <div class="channel-empty">
+        <img class="channel-empty-image" src="/static/img/raccoon-empty.png?v={{ static_asset_version('img/raccoon-empty.png') }}" alt="" width="189" height="254">
+        <p class="channel-empty-message">Aucune playlist pour le moment.</p>
+      </div>
       {% endfor %}
     </div>
+    {% if not playlist_summaries %}
+    {# Under the dashed line, like "Commencer l'exploration"; opens the import sheet (`?import=` without JS). #}
+    <div class="channel-explore">
+      <a class="channel-explore-btn" href="/playlists?import=playlist" data-import-open>Ajouter une playlist <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg></a>
+      <p>Crée-la à la main, depuis une URL YouTube ou un CSV Google Takeout</p>
+    </div>
+    {% endif %}
     <p class="empty-state" data-playlist-no-match hidden>Aucune playlist ne correspond à cette recherche.</p>
   </div>
 

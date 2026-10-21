@@ -253,18 +253,33 @@ de liste) : le formulaire s'affiche directement sous le titre.
   aucune autre page ne paie cet appel ;
 - **Playlists** : « Ajouter une playlist », creation manuelle, import par URL
   YouTube (avec apercu) et import du CSV Google Takeout (voir « Playlists ») ;
-- **Chaines** : « Importer des abonnements », la zone de depot du CSV, dont
-  l'analyse s'affiche sur `/channels` (voir « Chaines »).
+- **Chaines** : « Ajouter des chaînes », le formulaire d'ajout d'une chaine
+  (nom, URL ou `@handle`, categories par le meme `<turbo-frame>` paresseux que
+  la Bibliotheque) puis la zone de depot du CSV d'abonnements, dont l'analyse
+  s'affiche sur `/channels` (voir « Chaines »). La page n'a plus d'autre bouton
+  d'ajout.
 
 Les formulaires sont ceux qui etaient dans les pages, deplaces ici et retires de
 ces pages. Sur ordinateur, la feuille est un panneau de verre sous le bouton
-(460 px au plus, defilement interne). Sur **telephone (≤ 800 px)**, c'est une
+(460 px au plus, defilement interne) qui se **deroule** de haut en bas en 280 ms
+a l'ouverture et se replie en fondu (200 ms) a la fermeture. Sur **telephone
+(≤ 800 px)**, c'est une
 **languette tiree depuis le bas** qui prend toute la largeur et tout l'ecran,
 sauf une bande en haut (48 px + zone sure) ou la page precedente reste visible
 sous un voile sombre : coins hauts arrondis, poignee, bouton ✕ rond, titre,
-au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu) et se
+au-dessus de la barre d'onglets. Elle monte en 380 ms (voile en fondu),
+redescend en 260 ms a la fermeture et se
 rabat en glissant la poignee ou le titre vers le bas (elle suit le doigt, se
 ferme au-dela de 110 px) ; sans animation avec `prefers-reduced-motion`.
+Toute fermeture (✕, clic dehors, Echap, bouton d'import, glisse) joue
+l'animation de fermeture (le voile s'efface en fondu) avant de refermer le
+`<details>` (`app.js`). Le voile est un calque fixe peint : Safari iOS teinte
+la barre d'etat d'apres les elements fixes du haut de l'ecran, elle s'assombrit
+donc avec le voile. Feuille et voile sont en `display: none` quand le
+`<details>` est ferme : sinon le navigateur les garde en page, la barre d'etat
+restait grise apres la fermeture et l'animation ne rejouait pas a la
+reouverture. Le contenu de la feuille s'empile en haut (`align-content:
+start`), sans s'etirer sur la hauteur de l'ecran.
 
 `?import=<page>` (`video`, `playlist` ou `abonnements`) ouvre la feuille des le
 rendu si c'est l'import de la page ; `app.js` retire ensuite le parametre de
@@ -777,8 +792,9 @@ Template : `channels.html`
 
 Contenu :
 
-- formulaire ajout chaine (avec categories) : une URL ou un `@handle` ajoute
-  la chaine directement ; tout autre texte est un nom a chercher ;
+- formulaire ajout chaine (avec categories), dans la feuille d'import (voir
+  « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
+  tout autre texte est un nom a chercher ;
 - panneau "Chaines YouTube pour « nom »" quand `/channels` recoit
   `?youtube_q=<nom>` : une ligne par candidate (avatar, nom, handle, nombre
   d'abonnes, debut de description) avec un bouton "Ajouter" qui poste son URL
@@ -856,6 +872,13 @@ formulaires d'ajout (voir « Panneau Ajouter » ci-dessous) sont l'onglet
   qu'au survol ou au focus sur les pointeurs qui survolent, et reste visible
   sur ecran tactile. Un champ de recherche filtre les cartes par titre cote
   client.
+- Sans aucune playlist : le meme etat vide qu'une chaine sans fiche (Raton,
+  `raccoon-empty.png`) avec « Aucune playlist pour le moment. », puis, sous le
+  meme filet pointille que « Commencer l'exploration » (`.channel-explore`), un
+  bouton **Ajouter une playlist** de meme style et la mention « Crée-la à la
+  main, depuis une URL YouTube ou un CSV Google Takeout ». Le bouton ouvre la
+  feuille d'import (`data-import-open`, lien
+  `/playlists?import=playlist` sans JavaScript).
 - Animations : entree des cartes en 260 ms, echelonnee sur les 7 premieres ;
   au survol la carte monte de 4 px et les deux couches s'ecartent ; les trois
   formulaires du panneau arrivent l'un apres l'autre. Tout est coupe avec

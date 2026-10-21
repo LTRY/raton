@@ -3564,14 +3564,19 @@ def test_channels_page_renders_channel_category_picker_and_badges():
     response = site(db).get("/channels")
     rendered = response.text
 
-    assert 'class="download-form channel-create-form" action="/channels" method="post"' in rendered
-    assert 'name="preset_categories" type="checkbox" value="maker"' in rendered
+    # The add form is in the import sheet; its category chips load lazily from /import/categories.
+    assert 'class="pl-add-card channel-create-form" action="/channels" method="post"' in rendered
+    assert '<turbo-frame id="import-categories" src="/import/categories"' in rendered
+    assert (
+        'name="preset_categories" type="checkbox" value="maker"'
+        in site(db).get("/import/categories").text
+    )
     assert f'action="/channels/{channel.id}/categories"' not in rendered
     assert (
         rendered.count(
             '<span class="category-label" style="--category-bg: #2563eb; --category-border: #2563eb; --category-text: #ffffff;">maker</span>'
         )
-        == 2
+        == 1
     )
 
 

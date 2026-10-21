@@ -1618,8 +1618,11 @@ button.secondary {
   border-color: var(--color-primary);
 }
 
+/* Still focusable and `required`, but invisible: iOS draws even a 1px file
+   input as a small box. */
 .csv-dropzone input[type="file"] {
   height: 1px;
+  opacity: 0;
   overflow: hidden;
   position: absolute;
   width: 1px;
@@ -1999,76 +2002,6 @@ button.secondary {
 
 .import-form [data-video-quality][hidden] {
   display: none;
-}
-
-.page-actions-menu {
-  position: relative;
-}
-
-.page-actions-menu summary {
-  align-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  display: inline-flex;
-  font-weight: 600;
-  list-style: none;
-  padding: 6px 12px;
-  transition: color 150ms ease, border-color 150ms ease;
-}
-
-.page-actions-menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.page-actions-menu summary:hover,
-.page-actions-menu summary:focus-visible {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
-.page-actions-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 14px 30px rgba(43, 32, 24, 0.14);
-  display: grid;
-  gap: 4px;
-  max-width: 420px;
-  min-width: 320px;
-  padding: 8px;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  z-index: 20;
-}
-
-.page-action summary {
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-weight: 700;
-  list-style-position: inside;
-  padding: 10px;
-}
-
-.page-action summary:hover,
-.page-action summary:focus-visible {
-  background: var(--color-surface-muted);
-}
-
-.page-action .csv-import-hint {
-  margin: 8px 0 0;
-  padding: 0 10px;
-}
-
-.page-action .download-form {
-  border: 0;
-  border-radius: 0;
-  border-top: 1px solid var(--color-border);
-  margin: 0;
-  max-width: none;
-  padding: 10px;
 }
 
 .async-form-status {
@@ -4502,10 +4435,6 @@ body.hide-thumbnails .pld-thumb img {
     max-width: 220px;
     width: 100%;
   }
-}
-
-.channel-create-form {
-  max-width: 760px;
 }
 
 /* Channel cards: a banner strip (the real banner, or the same fallback gradient as the channel page),
@@ -7986,14 +7915,6 @@ turbo-frame {
     position: static;
   }
 
-  .page-actions-panel {
-    box-shadow: none;
-    margin-top: 6px;
-    max-width: none;
-    min-width: 0;
-    position: static;
-  }
-
   .download-form {
     padding: 16px;
   }
@@ -9005,6 +8926,13 @@ body.has-mini-player .explorer-raton {
   height: 48px;
   justify-content: center;
   padding: 0 26px;
+}
+
+/* Also a link: the "Ajouter une playlist" of the empty Playlists page.
+   border-box like a <button>, or the phone's `width: 100%` adds the padding. */
+a.channel-explore-btn {
+  box-sizing: border-box;
+  text-decoration: none;
 }
 
 .channel-explore-btn:hover {
@@ -10962,7 +10890,18 @@ body::before {
   display: none;
 }
 
+/* A closed <details> hides its content through ::details-content, without
+   `display: none`: the opening animations would play only the first time and
+   the phone backdrop would stay laid out. Hiding them here restarts the
+   animations on every opening. */
+.import-fab:not([open]) > .import-backdrop,
+.import-fab:not([open]) > .import-sheet {
+  display: none;
+}
+
 .import-sheet {
+  align-content: start;
+  animation: import-sheet-unroll 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   background: var(--glass-fill-opaque);
   border-radius: var(--radius-lg);
   box-sizing: border-box;
@@ -11042,8 +10981,40 @@ body::before {
   margin: 0;
 }
 
+/* Closing: app.js adds `.is-closing`, waits for the end of the animation,
+   then closes the <details>. */
+.import-fab.is-closing > .import-sheet {
+  animation: import-sheet-fold 0.2s ease-in both;
+}
+
+@keyframes import-sheet-unroll {
+  from {
+    clip-path: inset(0 0 100% 0 round var(--radius-lg));
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    clip-path: inset(0 0 0 0 round var(--radius-lg));
+  }
+}
+
+@keyframes import-sheet-fold {
+  to {
+    clip-path: inset(0 0 100% 0 round var(--radius-lg));
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
 @keyframes import-sheet-rise {
   from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes import-sheet-drop {
+  to {
     transform: translateY(100%);
   }
 }
@@ -11054,10 +11025,9 @@ body::before {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .import-sheet,
-  .import-backdrop {
-    animation: none;
+@keyframes import-veil-out {
+  to {
+    opacity: 0;
   }
 }
 
@@ -11081,12 +11051,21 @@ body::before {
     z-index: 1000;
   }
 
+  /* A painted fixed layer, not a shadow of the sheet: iOS Safari tints the
+     status bar from the fixed elements at the top of the screen, so the bar
+     darkens with the veil (a shadow left it as a white strip). The rule hiding
+     the closed sheet removes it from the layout, which gives the bar back its
+     color. */
   .import-backdrop {
     animation: import-veil-in 0.3s ease-out;
     background: rgba(43, 32, 24, 0.45);
     display: block;
     inset: 0;
     position: fixed;
+  }
+
+  .import-fab.is-closing > .import-backdrop {
+    animation: import-veil-out 0.26s ease-in both;
   }
 
   .import-sheet {
@@ -11102,10 +11081,8 @@ body::before {
     width: auto;
   }
 
-  /* While a finger drags the sheet down, it follows without the animation. */
-  .import-sheet.is-dragging {
-    animation: none;
-    transition: none;
+  .import-fab.is-closing > .import-sheet {
+    animation: import-sheet-drop 0.26s ease-in both;
   }
 
   .import-grip,
@@ -11122,5 +11099,16 @@ body::before {
     height: 5px;
     justify-self: center;
     width: 48px;
+  }
+}
+
+/* After the phone rules, which would win otherwise. app.js closes without
+   waiting for an animation in this case. */
+@media (prefers-reduced-motion: reduce) {
+  .import-sheet,
+  .import-backdrop,
+  .import-fab.is-closing > .import-sheet,
+  .import-fab.is-closing > .import-backdrop {
+    animation: none;
   }
 }
