@@ -43,6 +43,15 @@ def youtube_channel_search(request: Request, api: Api) -> dict | None:
     return search
 
 
+def youtube_search_href(request: Request, query: str) -> str | None:
+    """Link of the last channel card: runs the YouTube search on the typed text."""
+    if not query or request.query_params.get(YOUTUBE_SEARCH_PARAM, "").strip() == query:
+        return None
+    # The search lands on the first page of the same list, panel open on top.
+    path = current_request_path(request, exclude=(*ONE_SHOT_PARAMS, "page"))
+    return append_query(path, {YOUTUBE_SEARCH_PARAM: query})
+
+
 def rated_filter(request: Request) -> bool:
     """The Notées switch: on by default; `favorite` is its old name in bookmarked links."""
     for name in ("rated", "favorite"):
@@ -64,6 +73,7 @@ def channels_context(request: Request, page: int, api: Api) -> dict:
         )
     )
     styles = record(api.get("/categories"))
+    search_query = " ".join((request.query_params.get("q") or "").split())
     added_channel_id = request.query_params.get(ADDED_CHANNEL_PARAM, "")
     added_channel = None
     if added_channel_id.isdecimal():
@@ -76,7 +86,8 @@ def channels_context(request: Request, page: int, api: Api) -> dict:
         "channel_entries": [{"channel": item, **vars(item)} for item in listed.items],
         "channel_count": listed.channel_count,
         "rated_filter": rated,
-        "search_query": " ".join((request.query_params.get("q") or "").split()),
+        "search_query": search_query,
+        "youtube_search_href": youtube_search_href(request, search_query),
         "selected_sort": listed.sort,
         "current_channels_path": current_request_path(request, exclude=ONE_SHOT_PARAMS),
         "category_filter_options": styles,

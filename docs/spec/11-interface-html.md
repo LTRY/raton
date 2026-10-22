@@ -824,13 +824,20 @@ Contenu :
 - formulaire ajout chaine (avec categories), dans la feuille d'import (voir
   « Bouton d'import ») : une URL ou un `@handle` ajoute la chaine directement ;
   tout autre texte est un nom a chercher ;
+- pendant une recherche (`q` non vide), la derniere carte de la grille (sur
+  la derniere page ; seule carte quand aucune chaine ne correspond) est
+  "Chercher « q » sur YouTube" : un lien vers la meme liste avec
+  `youtube_q=<q>`, qui ouvre le panneau ci-dessous. Elle suit la recherche
+  en direct comme les autres cartes, et disparait quand le panneau affiche
+  deja ce texte ;
 - panneau "Chaines YouTube pour « nom »" quand `/channels` recoit
   `?youtube_q=<nom>` : une ligne par candidate (avatar, nom, handle, nombre
   d'abonnes, debut de description) avec un bouton "Ajouter" qui poste son URL
   et les categories choisies dans le formulaire (`youtube_categories`), ou un
   badge "Deja ajoutee" (lien vers la chaine) si elle est dans la
   bibliotheque. Pas de lien vers YouTube. Lien "Fermer" pour replier le
-  panneau ; erreur de recherche et absence de resultat sont affichees dans le
+  panneau ; il fait partie des resultats de la recherche en direct : retaper
+  dans la recherche le remplace par la liste habituelle ; erreur de recherche et absence de resultat sont affichees dans le
   panneau. Comme `added_channel_id`, ces parametres ne sont pas repris dans
   les `next`/liens de pagination, pour ne pas relancer la recherche au retour
   d'une autre action ;
