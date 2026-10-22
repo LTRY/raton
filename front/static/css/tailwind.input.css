@@ -11207,7 +11207,7 @@ body::before {
   /* SponsorBlock segments that get skipped, drawn on the shared bar by
      `bindPagerSeek` (left/width in % of the duration). */
   .media-seek-sponsor {
-    background: #9be3a6;
+    background: color-mix(in srgb, var(--color-success) 45%, var(--color-white));
     border-radius: 1px;
     height: 100%;
     position: absolute;
