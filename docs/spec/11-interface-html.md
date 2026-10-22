@@ -1072,11 +1072,11 @@ Contenu :
 - sous le titre, seulement la chaine (sauf dans une pile de Nouveautes) : la
   date de publication est dans le menu ⋮ de la carte ;
 - menu ⋮ discret (`details.video-row-more`, `data-pop` : un clic dehors ou
-  Echap le ferme) centre verticalement sur le bord droit de la carte ; il
-  ouvre a sa gauche un petit panneau « Publiée le <date> ». Il n'existe pas
-  sur la page d'une chaine, qui garde sa ligne de date ;
-- les etoiles de notation sont calees sur le bord droit de la carte (juste
-  avant le menu ⋮), apres Vu/Ecartee ;
+  Echap le ferme) dans le coin haut droit de la carte ; il ouvre a sa gauche
+  un petit panneau « Publiée le <date> ». Il n'existe pas sur la page d'une
+  chaine, qui garde sa ligne de date ;
+- les etoiles de notation sont calees contre le bord droit de la carte (6px),
+  sous le menu ⋮, apres Vu/Ecartee ;
 - sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
   `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis

@@ -2602,18 +2602,32 @@ button.secondary {
   padding: 6px 0;
 }
 
-/* Library card (not the channel page): a discreet ⋮ on the right edge opens a
-   small panel with the publication date. Absolute, so the row's grid columns
-   (shared with the channel page's phone rows) stay as they are. */
+/* Library card (not the channel page): a discreet ⋮ in the top right corner
+   opens a small panel with the publication date. Absolute, so the row's grid
+   columns (shared with the channel page's phone rows) stay as they are; the
+   stars below it sit close to the card's right edge. */
 .video-row:has(> .video-row-more) {
-  padding-right: 30px;
+  padding-right: 6px;
+}
+
+.video-row:has(> .video-row-more) .video-row-title-line {
+  padding-right: 22px;
+}
+
+.video-row:has(> .video-row-more) .list-state-actions {
+  margin-right: 24px;
+}
+
+/* The minimal rating's fixed width is narrower than its five stars: they ran
+   past the card's right edge. */
+.video-row:has(> .video-row-more) .video-row-rating {
+  width: auto;
 }
 
 .video-row-more {
   position: absolute;
   right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 4px;
   z-index: 2;
 }
 
@@ -2656,8 +2670,7 @@ button.secondary {
   padding: 6px 10px;
   position: absolute;
   right: calc(100% + 4px);
-  top: 50%;
-  transform: translateY(-50%);
+  top: 4px;
   white-space: nowrap;
 }
 
