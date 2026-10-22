@@ -1408,9 +1408,9 @@ Contenu ordonne :
    (meme convention "presets + champ libre" que l'editeur de categories) ;
    sous 800 px les labels techniques sont masques (seuls restent les labels
    categories et les playlists), chaque groupe occupe sa propre ligne sous la
-   chaine et son bouton "+ Categories"/"+ Playlists", a la taille de son
-   texte, se place a droite de cette ligne (sur la ligne suivante, toujours a
-   droite, quand les labels la remplissent) ;
+   chaine, aligne sur le bord droit, et commence par son bouton
+   "+ Categories"/"+ Playlists", a la taille de son texte, suivi de ses
+   labels ;
 3. titre ;
 4. chaine ;
 5. note sur 5 étoiles ;

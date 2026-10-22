@@ -11103,8 +11103,8 @@ body::before {
   }
 
   /* Labels of the fiche: categories and playlists only (the Audio/Vidéo files
-     are the dots and the slides already), each group on its own line with its
-     "+" at the right, sized to its text. */
+     are the dots and the slides already), each group on its own line against
+     the right edge, its "+" first and sized to its text. */
   .video-detail-heading-side .video-detail-label-groups {
     align-self: stretch;
   }
@@ -11113,8 +11113,12 @@ body::before {
     display: none;
   }
 
+  .video-detail-label-groups .category-labels {
+    justify-content: flex-end;
+  }
+
   .video-detail-heading .video-detail-label-groups .category-label-add {
-    margin-left: auto;
+    order: -1;
     width: auto;
   }
 }
