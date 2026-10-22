@@ -4858,7 +4858,7 @@ def test_video_detail_wraps_players_in_media_pager():
     assert re.search(r'data-media-dot="video"[^>]*>\s*<svg', rendered)
     assert re.search(r'data-media-dot="audio"[^>]*>\s*<svg', rendered)
     assert rendered.index('data-media-dot="video"') < rendered.index('data-media-dot="audio"')
-    # Phone "more" popover: description, segments and transcript retry.
+    # Phone "more" popover: segments, files and transcript retry.
     assert 'class="video-more"' in rendered
     assert 'data-click-proxy="#transcript-retry-button"' in rendered
     assert rendered.count('id="transcript-retry-button"') == 1

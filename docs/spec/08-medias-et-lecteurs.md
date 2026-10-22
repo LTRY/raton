@@ -102,8 +102,18 @@ a droite, `.media-pager-dots`) indique le volet actif et sert aussi de
 boutons ; ses boutons restent `data-media-dot`. Chaque volet fait la meme
 hauteur (16:9 sur toute la largeur de l'ecran, sans cadre ni ombre) : passer de
 la video a l'audio ne deplace donc rien dans le reste de la page. Le volet
-Audio y loge une pochette carree a gauche et la lecture (barre, ±15 s) a
-droite. Au-dela de 800 px le carrousel est transparent : les sections
+Audio y loge une pochette carree (168 px) centree dans le volet, le bouton
+lecture (ou telechargement) au milieu de la pochette, en verre liquide
+transparent (fond blanc translucide, flou, liseré clair), et les boutons
+±15 s de part et d'autre de la pochette. Entre les volets et le selecteur, une **barre de progression unique**
+(`.media-pager-seek`, `bindPagerSeek`) suit le volet affiche : sur le volet
+Video elle suit et deplace le `<video>` (qui garde ses controles natifs, donc
+aussi sa propre barre), sur le volet Audio le mini-lecteur ; le temps courant
+et la duree s'affichent dessous. Quand le saut des sponsors est actif, les
+segments SponsorBlock sautes (le meme `sponsor_skip_payload` que le moteur de
+saut) sont dessines sur la barre (`.media-seek-sponsor`), des que la duree de la
+source affichee est connue : en vert clair devant la tete de lecture, en rouge
+clair pour la partie deja lue. Au-dela de 800 px le carrousel est transparent : les sections
 historiques (`.video-player-panel`, `.audio-player-panel`) restent empilees et
 le choix Audio/Video se fait avec les boutons de la barre d'actions.
 
@@ -126,25 +136,32 @@ bouton (`format-toggle-loading`, `-active`, `-error`).
   et rouvre le carrousel sur le volet que le lecteur regardait.
 - **Volet audio** : sans fichier, un bouton « Telecharger l'audio » (copie de la piste du fichier video quand il existe et que la piste n'est pas degradee, sinon yt-dlp : voir `07-youtube-et-telechargements.md`). Une fois
   l'audio present (au chargement ou apres telechargement), les commandes
-  reculer 15 s / lecture-pause / avancer 15 s, le curseur de temps et les durees
-  s'affichent. Le curseur (`.media-seek`, `role="slider"`) suit le design commun des barres
+  reculer 15 s / lecture-pause / avancer 15 s s'affichent. La barre commune
+  sous les volets (`.media-seek`, `role="slider"`) suit le design commun des barres
   de progression (voir « Barre de progression commune ») : piste de 6 px avec
-  couche tampon et remplissage orange, curseur vertical de 4 x 22 px, hauteur tactile de 80 px,
+  couche tampon et remplissage orange, curseur vertical de 4 x 22 px, hauteur tactile de 44 px,
   `touch-action: none` pour que le glissement ne fasse pas defiler le carrousel
   (`pan-y` laisserait le navigateur annuler le pointeur des que le doigt devie
   verticalement). Pendant le glissement une bulle affiche le temps vise et le temps
   courant suit la poignee ; la position n'est appliquee qu'au relachement
   (`seekTo`). Les fleches du clavier avancent/reculent de 5 s, PageUp/PageDown de 30 s,
-  Home/End vont au debut/a la fin. Le curseur n'agit
+  Home/End vont au debut/a la fin. Sur le volet Audio, la barre n'agit
   que lorsque cette video est la piste chargee dans le mini-lecteur et que sa
-  duree est connue (avant la premiere lecture il reste inerte et attenue, `.is-inert`). Les commandes
+  duree est connue ; sur le volet Video, des que la duree du `<video>` est
+  connue (sinon elle reste inerte et attenuee, `.is-inert`). Les commandes
   pilotent le mini-lecteur persistant (`window.ratonMiniPlayer`,
   methodes `load`, `toggle`, `skip`, `seekTo`, `audioElement`), jamais une balise
   `<audio>` locale. Apres un telechargement, la coche devient le bouton lecture
   et les commandes se deploient (animation `is-revealing`, desactivee avec
   `prefers-reduced-motion`).
-- **Suppression** : (uniquement si la barre d'actions autorise la suppression) un bouton « Supprimer » (avec `confirm`) apparait dans
-  l'en-tete d'un volet `ready` et declenche la suppression existante.
+- **Suppression** : (uniquement si la barre d'actions autorise la suppression)
+  les volets n'affichent ni en-tete ni badge de format (le selecteur a deux
+  icones suffit) ; leur bouton « Supprimer » (avec `confirm`) reste dans le DOM
+  mais masque, et le panneau « ⋮ » de la fiche porte un bloc « Fichiers » avec
+  « Supprimer la video » et « Supprimer l'audio », qui relaient leur clic vers
+  ce bouton (`data-click-proxy`) et ferment le panneau. Chacun n'apparait que
+  tant que son volet est `ready` (CSS `:has()` sur le `data-state`), le bloc
+  disparait quand aucun ne l'est. La suppression reste celle decrite plus haut.
 
 ## Reprise de la position de lecture
 

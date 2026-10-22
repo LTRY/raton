@@ -1379,14 +1379,22 @@ Contenu ordonne :
    selon cette page : "Retour a la playlist" (detail d'une playlist),
    "Retour a la chaine" (bibliotheque filtree sur une chaine), sinon
    "Retour a la bibliotheque" ; sous 800 px, ce lien partage sa ligne avec un
-   bouton « ⋮ » en verre (`details.video-more[data-pop]`) qui ouvre un panneau
-   « Description » (description et tags), « Segments » (liste + bouton
-   « Rechercher les segments sponsors ») et « Transcription » (bouton
-   « Recuperer la transcription » quand `video.transcript_path` est vide, qui
+   bouton « ⋮ » en verre (`details.video-more[data-pop]`) qui ouvre un menu
+   (`.video-more-panel`, 300 px) : groupes separes par un filet, chacun sous
+   un petit libelle gris en capitales, et des lignes pleine largeur avec une
+   icone (`.video-more-item`, 44 px de haut, sous-titre gris eventuel). Groupes :
+   « Segments sponsors » (liste des segments, puis « Rechercher » — sous-titre
+   « Aucun segment detecte pour l'instant » — ou « Rechercher a nouveau »
+   quand il y en a), « Fichiers » (« Supprimer la video » / « Supprimer
+   l'audio » en rouge, voir « Carrousel video / audio » dans
+   [08 Medias et lecteurs](08-medias-et-lecteurs.md)) et « Transcription »
+   (« Recuperer la transcription » quand `video.transcript_path` est vide, qui
    relaie son clic vers `#transcript-retry-button` par `data-click-proxy`) ;
-   sous 800 px, les onglets « Plus d'informations » et « Segments » et le bouton
-   de recuperation de la barre d'actions sont masques par CSS (leurs panneaux
-   et leurs ids restent), le panneau « ⋮ » prend leur place ; une ancre
+   sous 800 px, l'onglet « Segments » et le bouton de recuperation de la barre
+   d'actions sont masques par CSS (leurs panneaux et leurs ids restent), le
+   panneau « ⋮ » prend leur place ; la description reste dans l'onglet « Plus
+   d'informations », visible sur telephone a cote des autres onglets
+   (Transcript, Notes structurees, Commentaire...) ; une ancre
    `#segments-sponsors` ouvre alors ce panneau, un clic sur un segment le
    ferme, et le statut de la recuperation y est repete
    (`data-retry-status-mirror`, bouton desactive pendant la requete) ;
@@ -1404,6 +1412,11 @@ Contenu ordonne :
    deja cette video (avec un lien "Retirer" par playlist), un select vers une
    playlist existante et un champ texte pour en creer une nouvelle a la volee
    (meme convention "presets + champ libre" que l'editeur de categories) ;
+   sous 800 px les labels techniques sont masques (seuls restent les labels
+   categories et les playlists), chaque groupe occupe sa propre ligne sous la
+   chaine, aligne sur le bord droit, et commence par son bouton
+   "+ Categories"/"+ Playlists", a la taille de son texte, suivi de ses
+   labels ;
 3. titre ;
 4. chaine ;
 5. note sur 5 étoiles ;
