@@ -164,10 +164,7 @@ chaque requete, une ligne `raton.timing` :
   (`front/static/fonts/*.woff2`, police variable 200-800, licence OFL, sous-ensembles
   `latin` et `latin-ext`), declaree par `@font-face` dans
   `front/static/css/tailwind.input.css` avec `font-display: swap`, et prechargee
-  depuis `<head>`. La police pixel Pixelify Sans (licence OFL,
-  sous-ensemble latin avec les accents francais,
-  `pixelify-sans-latin.woff2`) ne sert qu'a l'introduction de Raton et n'est
-  pas prechargee. Aucune requete vers un autre domaine n'est necessaire pour
+  depuis `<head>`. Aucune requete vers un autre domaine n'est necessaire pour
   afficher une page : l'application fonctionne hors ligne.
 - Les reponses texte (HTML, CSS, JS, JSON, SVG) de plus de 1 Ko sont compressees
   en gzip quand le navigateur l'accepte (`TextGZipMiddleware`,
@@ -552,22 +549,21 @@ Prototype. A la premiere ouverture de Raton sur un appareil, une scene plein
 ecran (`_intro.html`, inclus dans `base.html` ; `initIntro` dans `app.js`)
 presente Raton a la maniere de l'introduction d'un RPG Game Boy : Raton entre
 en rebondissant sur un fond creme, puis enchaine quelques repliques dans un
-encadre de dialogue de Game Boy : ecran gris-vert (`--color-gb-screen`), filet
-noir fin a l'exterieur puis cadre noir epais a l'interieur, plus lourd a droite
-et en bas, coins presque carres, texte en majuscules dans une police pixel
-(Pixelify Sans) tape lettre par lettre, fleche ▼ noire pleine quand la replique
-est complete.
+encadre de texte en verre liquide moderne (translucide, flou et saturation de
+ce qui passe dessous, liseré clair, arete du haut brillante, ombre chaude,
+coins tres arrondis ; un halo chaud est pose derriere lui pour que le verre se
+lise sur le creme), dans la police de l'application. Il garde les habitudes des
+dialogues de Game Boy : texte tape lettre par lettre, fleche ▼ quand la
+replique est complete.
 
 - Les repliques sont les `<li>` de `_intro.html`, dans l'ordre ; `data-art`
   nomme le dessin de `static/img/raton/` montre avec la replique (Raton saute
   quand le dessin change).
-- Sous l'encadre, les commandes d'une Game Boy en verre liquide incolore
-  (translucide, liseré clair, arete du haut brillante, lumiere qui s'accumule
-  en bas, bord legerement assombri et ombre chaude pour se detacher du fond
-  creme ; un halo chaud est pose derriere elles) : croix directionnelle a
-  gauche, boutons ronds **B** (plus bas) et **A** (plus haut) a droite, pilules
-  inclinees **Select** et **Start** au milieu, leurs noms en dessous dans la
-  police de
+- Sous l'encadre, les commandes d'une Game Boy, toutes en verre transparent
+  teinte aux couleurs de la console : croix directionnelle noire a gauche,
+  boutons ronds **B** (plus bas) et **A** (plus haut) magenta a droite
+  (`--color-gb-button`), pilules grises inclinees **Select** et **Start**
+  au milieu (`--color-gb-pill`), leurs noms en dessous dans la police de
   l'application. **A** (ou →) termine la replique en cours de frappe, sinon
   passe a la suivante, et ferme la scene apres la derniere ; **B** (ou ←)
   revient a la replique precedente (inactifs sur la premiere) ; **Start**

@@ -31,16 +31,6 @@
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* Pixel font of Raton's introduction only (OFL, Latin subset with French
-   accents); not preloaded, the scene waits for its entrance anyway. */
-@font-face {
-  font-family: "Pixelify Sans";
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url("/static/fonts/pixelify-sans-latin.woff2") format("woff2");
-}
-
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -107,8 +97,9 @@
 
   --color-text-soft: #5c4d3d;      /* between text and text-muted: descriptions, field labels */
   --color-border-strong: #d8cbb6;  /* dashed zones, light icons, input borders */
-  --color-gb-screen: #d3d5c0;      /* Raton's introduction: the Game Boy screen behind the text */
-  --color-gb-ink: #1d1e1a;         /* ...and its black */
+  --color-gb-ink: #1d1e1a;         /* Raton's introduction: the black of the Game Boy controls */
+  --color-gb-button: #8f3c74;      /* ...the magenta of its A and B */
+  --color-gb-pill: #6c7480;        /* ...the grey of Select and Start */
   --glass-fill: rgba(255, 255, 255, 0.58);        /* bars and controls */
   --glass-fill-strong: rgba(255, 255, 255, 0.66); /* layers that carry text */
   --glass-rim: rgba(255, 255, 255, 0.85);
@@ -11375,8 +11366,8 @@ html.intro-open {
     radial-gradient(420px 320px at 50% 34%, rgba(255, 255, 255, 0.95), transparent 72%),
     radial-gradient(360px 300px at 12% 88%, color-mix(in srgb, var(--color-primary) 26%, transparent), transparent 70%),
     radial-gradient(380px 320px at 92% 96%, color-mix(in srgb, var(--color-amber) 30%, transparent), transparent 70%),
-    /* Behind the controls: clear glass on flat cream would vanish. */
-    radial-gradient(560px 220px at 50% 100%, color-mix(in srgb, var(--color-primary) 16%, transparent), transparent 75%),
+    /* Behind the text box: glass on flat cream would read as a plain card. */
+    radial-gradient(620px 260px at 50% 74%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 75%),
     var(--color-bg);
   display: flex;
   flex-direction: column;
@@ -11457,46 +11448,56 @@ html.intro-open {
   width: 100%;
 }
 
-/* The Game Boy text box (DMG dialogue): grey-green screen, a thin outer
-   line, a gap, then a thick inner frame heavier on the right and bottom, near
-   square corners, pixel font, solid black ▼. */
+/* The text box: modern liquid glass (translucent, blurred and saturated
+   backdrop, light rim, bright top edge, sheen fading down, warm shadow),
+   carrying the Game Boy dialogue habits: typed text and a ▼ when done. */
 .intro-box {
-  background: var(--color-gb-screen);
-  border: 3px solid var(--color-gb-ink);
-  border-radius: var(--radius-xs);
-  box-shadow: 0 6px 0 rgba(32, 24, 17, 0.14);
+  background: var(--glass-fill-strong);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--radius-28);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.5),
+    0 0 0 0.5px color-mix(in srgb, var(--color-shadow-warm) 12%, transparent),
+    0 18px 40px color-mix(in srgb, var(--color-shadow-warm) 16%, transparent);
   cursor: pointer;
-  min-height: calc(3 * 1.5em + 52px);
-  padding: 24px 28px;
+  isolation: isolate;
+  min-height: calc(3 * 1.55em + 48px);
+  padding: 22px 24px 26px;
   position: relative;
   user-select: none;
   -webkit-user-select: none;
 }
 
 .intro-box::before {
-  border: 4px solid var(--color-gb-ink);
-  border-bottom-width: 6px;
-  border-radius: 3px;
-  border-right-width: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%);
+  border-radius: inherit;
   content: "";
-  inset: 4px;
+  inset: 0;
   pointer-events: none;
   position: absolute;
+  z-index: -1;
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .intro-box {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    background: var(--glass-fill);
+  }
 }
 
 .intro-text {
-  color: var(--color-gb-ink);
-  font: 500 21px/1.5 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
-  letter-spacing: 0.04em;
+  color: var(--color-text);
+  font: 600 18px/1.55 var(--font-sans);
   margin: 0;
   overflow-wrap: anywhere;
-  text-transform: uppercase;
 }
 
 .intro-next {
-  bottom: 16px;
-  color: var(--color-gb-ink);
-  font-size: 20px;
+  bottom: 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
   line-height: 1;
   opacity: 0;
   position: absolute;
@@ -11511,15 +11512,17 @@ html.intro-open {
 /* Position in the dialogue, in the corner of the screen. */
 .intro-step {
   bottom: 16px;
-  color: color-mix(in srgb, var(--color-gb-ink) 55%, transparent);
-  font: 500 14px/1 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
+  color: var(--color-text-muted);
+  font: 600 12px/1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   left: 24px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   position: absolute;
 }
 
 /* The console's controls, laid out like on a DMG: cross on the left, B low
-   and A high on the right, Select and Start below in the middle. */
+   and A high on the right, Select and Start below in the middle. Every piece
+   is see-through glass tinted with the console's colour. */
 .intro-pad {
   align-items: center;
   column-gap: 12px;
@@ -11539,33 +11542,22 @@ html.intro-open {
   width: 108px;
 }
 
-/* The cross: a clipped glass layer, plus a ring of the same shape as its rim
-   (a border cannot follow a clip-path). Neither is the parent of the keys: a
+/* The cross itself: one clipped glass layer. Not the parent of the keys, a
    clip-path on an ancestor would cut the keys' backdrop off. */
-.intro-dpad::before,
-.intro-dpad-rim {
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-}
-
 .intro-dpad::before {
   background:
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 0 8px, rgba(255, 255, 255, 0.55) 9px, rgba(255, 255, 255, 0) 12px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.35)),
-    var(--glass-fill-strong);
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.22) 0 9px, transparent 10px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 45%),
+    color-mix(in srgb, var(--color-gb-ink) 86%, transparent);
   clip-path: path("M42 0H66A6 6 0 0 1 72 6V36H102A6 6 0 0 1 108 42V66A6 6 0 0 1 102 72H72V102A6 6 0 0 1 66 108H42A6 6 0 0 1 36 102V72H6A6 6 0 0 1 0 66V42A6 6 0 0 1 6 36H36V6A6 6 0 0 1 42 0Z");
-}
-
-.intro-dpad-rim {
-  background: linear-gradient(180deg, var(--glass-highlight), color-mix(in srgb, var(--color-shadow-warm) 18%, transparent) 55%, var(--glass-rim));
-  clip-path: path(evenodd, "M42 0H66A6 6 0 0 1 72 6V36H102A6 6 0 0 1 108 42V66A6 6 0 0 1 102 72H72V102A6 6 0 0 1 66 108H42A6 6 0 0 1 36 102V72H6A6 6 0 0 1 0 66V42A6 6 0 0 1 6 36H36V6A6 6 0 0 1 42 0Z M42 1.5H66A4.5 4.5 0 0 1 70.5 6V37.5H102A4.5 4.5 0 0 1 106.5 42V66A4.5 4.5 0 0 1 102 70.5H70.5V102A4.5 4.5 0 0 1 66 106.5H42A4.5 4.5 0 0 1 37.5 102V70.5H6A4.5 4.5 0 0 1 1.5 66V42A4.5 4.5 0 0 1 6 37.5H37.5V6A4.5 4.5 0 0 1 42 1.5Z");
+  content: "";
+  inset: 0;
+  position: absolute;
 }
 
 /* The cross's shadow on the ground. */
 .intro-dpad::after {
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--color-shadow-warm) 24%, transparent), transparent);
+  background: radial-gradient(closest-side, rgba(32, 24, 17, 0.2), transparent);
   bottom: -14px;
   content: "";
   height: 20px;
@@ -11580,9 +11572,9 @@ html.intro-open {
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     background:
-      radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0) 0 8px, rgba(255, 255, 255, 0.55) 9px, rgba(255, 255, 255, 0) 12px),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.35)),
-      rgba(255, 255, 255, 0.22);
+      radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.22) 0 9px, transparent 10px),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 45%),
+      color-mix(in srgb, var(--color-gb-ink) 62%, transparent);
   }
 }
 
@@ -11611,7 +11603,7 @@ html.intro-open {
 .intro-dpad-left:active,
 .intro-dpad-right:active,
 .intro-dpad-key.is-pressed {
-  background: color-mix(in srgb, var(--color-shadow-warm) 12%, transparent);
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .intro-buttons {
@@ -11639,41 +11631,39 @@ html.intro-open {
   letter-spacing: 0.12em;
 }
 
-/* A, B, Select and Start: clear liquid glass, colourless like the system
-   controls of a recent phone: a light rim, a bright line on the top edge,
-   light pooling at the bottom, a soft warm shadow. Without backdrop-filter
-   they keep the near-opaque `--glass-fill-strong`. */
-.intro-btn,
-.intro-pill {
+/* A and B: magenta glass marbles, a specular spot on the upper left, a light
+   rim and a shade at the bottom. Without backdrop-filter they keep a
+   near-opaque body. */
+.intro-btn {
   -webkit-tap-highlight-color: transparent;
   background:
-    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
-    var(--glass-fill-strong);
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 42%),
+    color-mix(in srgb, var(--color-gb-button) 90%, white);
   border: 1px solid var(--glass-rim);
-  /* Bright top edge, light pooling at the bottom, a faint darker edge where
-     the glass bends the light (it outlines the control on light grounds). */
+  border-radius: 50%;
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 -1px 1px rgba(255, 255, 255, 0.6),
-    inset 0 -10px 16px rgba(255, 255, 255, 0.3),
-    inset 0 0 10px color-mix(in srgb, var(--color-shadow-warm) 9%, transparent),
-    0 0 0 0.5px color-mix(in srgb, var(--color-shadow-warm) 18%, transparent),
-    0 12px 26px color-mix(in srgb, var(--color-shadow-warm) 18%, transparent),
-    0 2px 6px color-mix(in srgb, var(--color-shadow-warm) 12%, transparent);
+    inset 0 -8px 14px color-mix(in srgb, var(--color-gb-button) 45%, black 20%),
+    0 10px 22px color-mix(in srgb, var(--color-gb-button) 30%, transparent);
   cursor: pointer;
-  padding: 0;
-}
-
-.intro-btn {
-  border-radius: 50%;
   height: 60px;
+  padding: 0;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   width: 60px;
 }
 
+/* Select and Start: slanted grey glass pills. */
 .intro-pill {
+  -webkit-tap-highlight-color: transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--color-gb-pill) 92%, white);
+  border: 1px solid var(--glass-rim);
   border-radius: var(--radius-pill);
-  height: 14px;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-gb-pill) 35%, transparent);
+  cursor: pointer;
+  height: 13px;
+  padding: 0;
   transform: rotate(-25deg);
   transition: transform 0.12s ease;
   width: 48px;
@@ -11688,9 +11678,18 @@ html.intro-open {
   .intro-pill {
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+
+  .intro-btn {
     background:
-      radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0) 55%),
-      rgba(255, 255, 255, 0.22);
+      radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 42%),
+      color-mix(in srgb, var(--color-gb-button) 58%, transparent);
+  }
+
+  .intro-pill {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+      color-mix(in srgb, var(--color-gb-pill) 62%, transparent);
   }
 }
 
@@ -11707,8 +11706,8 @@ html.intro-open {
 .intro-btn.is-pressed {
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 6px 14px color-mix(in srgb, var(--color-shadow-warm) 12%, transparent),
-    0 3px 8px color-mix(in srgb, var(--color-shadow-warm) 12%, transparent);
+    inset 0 6px 14px color-mix(in srgb, var(--color-gb-button) 45%, black 25%),
+    0 3px 8px color-mix(in srgb, var(--color-gb-button) 24%, transparent);
   transform: translateY(2px) scale(0.92);
 }
 
@@ -11739,7 +11738,7 @@ html.intro-open {
   }
 
   .intro-text {
-    font-size: 24px;
+    font-size: 20px;
   }
 }
 
