@@ -277,14 +277,6 @@
             data-track-detail-url="/videos/{{ video.id }}">
             <div class="media-panel-top">
               <p class="media-panel-label"><span class="mp-when-idle">Télécharger l'audio</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
-              <div class="media-wave-block mp-when-ready">
-                <div class="media-seek" data-media-seek role="slider" tabindex="0" aria-label="Position de lecture" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00">
-                  <span class="media-seek-track"><span class="media-seek-buffer"></span><span class="media-seek-fill"></span></span>
-                  <span class="media-seek-thumb"></span>
-                  <span class="media-seek-bubble" data-media-seek-bubble hidden>0:00</span>
-                </div>
-                <div class="media-wave-times"><span data-media-time-current>0:00</span><span data-media-time-duration>--:--</span></div>
-              </div>
             </div>
             <div class="media-panel-actions">
               <button type="button" class="media-skip media-skip-back mp-when-ready" data-audio-skip="-15" aria-label="Reculer de 15 secondes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>
@@ -296,6 +288,16 @@
             </div>
           </div>
         </div>
+      </div>
+      {# One progress bar for both slides: it follows the shown slide (the
+         <video> or the mini player's audio), see `bindPagerSeek`. #}
+      <div class="media-pager-seek" data-pager-seek>
+        <div class="media-seek is-inert" data-media-seek role="slider" tabindex="0" aria-label="Position de lecture" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="0:00">
+          <span class="media-seek-track"><span class="media-seek-buffer"></span><span class="media-seek-fill"></span></span>
+          <span class="media-seek-thumb"></span>
+          <span class="media-seek-bubble" data-media-seek-bubble hidden>0:00</span>
+        </div>
+        <div class="media-wave-times"><span data-media-time-current>0:00</span><span data-media-time-duration>--:--</span></div>
       </div>
       <div class="media-pager-dots" role="group" aria-label="Choisir vidéo ou audio">
         <button type="button" class="media-pager-dot media-pager-dot-active" data-media-dot="video" aria-label="Version vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2.5"/><path d="M17 10.5l4-2.5v8l-4-2.5"/></svg></button>

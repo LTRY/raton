@@ -2978,6 +2978,7 @@ function bindMediaPager(pager) {
   });
 
   bindPagerAudioControls(pager);
+  bindPagerSeek(pager);
 }
 
 function bindPagerAudioControls(pager) {
@@ -2986,10 +2987,6 @@ function bindPagerAudioControls(pager) {
   if (!panel || !player) return;
   const id = panel.dataset.trackId;
   const playButton = panel.querySelector("[data-audio-play]");
-  const seekEl = panel.querySelector("[data-media-seek]");
-  const bubbleEl = panel.querySelector("[data-media-seek-bubble]");
-  const currentEl = panel.querySelector("[data-media-time-current]");
-  const durationEl = panel.querySelector("[data-media-time-duration]");
   const audio = player.audioElement();
 
   playButton?.addEventListener("click", () => {
@@ -3002,22 +2999,72 @@ function bindPagerAudioControls(pager) {
     });
   });
 
-  // The slider is only live once this video is the loaded track: before that
-  // there is nothing to seek in.
+  const events = ["play", "pause", "ended", "emptied"];
+  function sync() {
+    // The mini player's <audio> outlives this page (Turbo permanent node):
+    // stop listening once the panel has been swapped out.
+    if (!panel.isConnected) {
+      events.forEach((name) => audio.removeEventListener(name, sync));
+      return;
+    }
+    panel.classList.toggle("is-playing", player.isPlaying(id));
+  }
+  events.forEach((name) => audio.addEventListener(name, sync));
+  sync();
+}
+
+// The one progress bar under the pager's slides. It follows the slide shown
+// (the active dot): the video slide's <video>, or the mini player's <audio>
+// once this video is its loaded track. Before that there is nothing to seek in
+// and the bar stays inert.
+function bindPagerSeek(pager) {
+  const bar = pager.querySelector("[data-pager-seek]");
+  const seekEl = bar?.querySelector("[data-media-seek]");
+  if (!seekEl) return;
+  const bubbleEl = bar.querySelector("[data-media-seek-bubble]");
+  const currentEl = bar.querySelector("[data-media-time-current]");
+  const durationEl = bar.querySelector("[data-media-time-duration]");
+  const track = pager.querySelector("[data-media-pager-track]");
+  const dots = [...pager.querySelectorAll("[data-media-dot]")];
+  const video = pager.querySelector("[data-media-slide='video'] video");
+  const player = window.ratonMiniPlayer;
+  const audio = player?.audioElement();
+  const id = pager.querySelector("[data-media-panel='audio']")?.dataset.trackId;
+
+  const sources = {
+    video: video && {
+      element: video,
+      ready: () => true,
+      seekTo: (seconds) => {
+        video.currentTime = seconds;
+      },
+    },
+    audio: audio && {
+      element: audio,
+      ready: () => player.isCurrent(id),
+      seekTo: (seconds) => player.seekTo(id, seconds),
+    },
+  };
+
+  function source() {
+    const active = dots.find((dot) => dot.classList.contains("media-pager-dot-active"));
+    return sources[active?.dataset.mediaDot || "video"] || null;
+  }
+
+  function duration(src) {
+    const value = src?.ready() ? src.element.duration : NaN;
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+
   let dragging = false;
   let dragFraction = 0;
   const SEEK_PADDING = 16; // keep in sync with .media-seek-track in the CSS
 
-  function seekable() {
-    return player.isCurrent(id) && Number.isFinite(audio.duration) && audio.duration > 0;
-  }
-
-  function renderSeek(fraction) {
-    if (!seekEl) return;
+  function renderSeek(fraction, total, src) {
     const percent = Math.min(1, Math.max(0, fraction)) * 100;
-    const seconds = (percent / 100) * (Number.isFinite(audio.duration) ? audio.duration : 0);
+    const seconds = (percent / 100) * total;
     seekEl.style.setProperty("--seek-progress", String(percent));
-    seekEl.style.setProperty("--seek-buffered", String(player.isCurrent(id) ? bufferedPercent(audio) : 0));
+    seekEl.style.setProperty("--seek-buffered", String(src?.ready() ? bufferedPercent(src.element) : 0));
     seekEl.setAttribute("aria-valuenow", String(Math.round(percent)));
     seekEl.setAttribute("aria-valuetext", formatMiniPlayerTime(seconds));
     if (bubbleEl) bubbleEl.textContent = formatMiniPlayerTime(seconds);
@@ -3030,75 +3077,85 @@ function bindPagerAudioControls(pager) {
     return Math.min(1, Math.max(0, (event.clientX - rect.left - SEEK_PADDING) / usable));
   }
 
+  function seekBy(step) {
+    const src = source();
+    const total = duration(src);
+    if (total) src.seekTo(Math.min(total, Math.max(0, src.element.currentTime + step)));
+  }
+
   function endDrag(commit) {
     if (!dragging) return;
     dragging = false;
     seekEl.classList.remove("is-dragging");
     if (bubbleEl) bubbleEl.hidden = true;
     // Seek once, on release: seeking a streamed file on every move is jerky.
-    if (commit && seekable()) player.seekTo(id, dragFraction * audio.duration);
+    const src = source();
+    const total = duration(src);
+    if (commit && total) src.seekTo(dragFraction * total);
     sync();
   }
 
-  if (seekEl) {
-    seekEl.addEventListener("pointerdown", (event) => {
-      // Primary button / touch / pen only: a right click would open a context
-      // menu and never deliver the pointerup.
-      if (event.button > 0 || !seekable()) return;
-      dragging = true;
-      seekEl.classList.add("is-dragging");
-      if (bubbleEl) bubbleEl.hidden = false;
-      try {
-        seekEl.setPointerCapture(event.pointerId);
-      } catch (error) {
-        // Capture is a convenience: the slider still follows the pointer without it.
-      }
-      dragFraction = fractionFromPointer(event);
-      renderSeek(dragFraction);
-    });
-    seekEl.addEventListener("pointermove", (event) => {
-      if (!dragging) return;
-      dragFraction = fractionFromPointer(event);
-      renderSeek(dragFraction);
-    });
-    seekEl.addEventListener("pointerup", () => endDrag(true));
-    seekEl.addEventListener("pointercancel", () => endDrag(false));
-    // Capture lost without pointerup (released outside the window, ...). After
-    // a normal pointerup this is a no-op: endDrag already ran.
-    seekEl.addEventListener("lostpointercapture", () => endDrag(false));
-    seekEl.addEventListener("keydown", (event) => {
-      const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5, PageDown: -30, PageUp: 30 }[event.key];
-      if (step !== undefined) {
-        event.preventDefault();
-        player.skip(id, step);
-      } else if ((event.key === "Home" || event.key === "End") && seekable()) {
-        event.preventDefault();
-        player.seekTo(id, event.key === "Home" ? 0 : audio.duration);
-      }
-    });
-  }
+  seekEl.addEventListener("pointerdown", (event) => {
+    // Primary button / touch / pen only: a right click would open a context
+    // menu and never deliver the pointerup.
+    if (event.button > 0 || !duration(source())) return;
+    dragging = true;
+    seekEl.classList.add("is-dragging");
+    if (bubbleEl) bubbleEl.hidden = false;
+    try {
+      seekEl.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // Capture is a convenience: the slider still follows the pointer without it.
+    }
+    dragFraction = fractionFromPointer(event);
+    renderSeek(dragFraction, duration(source()), source());
+  });
+  seekEl.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    dragFraction = fractionFromPointer(event);
+    renderSeek(dragFraction, duration(source()), source());
+  });
+  seekEl.addEventListener("pointerup", () => endDrag(true));
+  seekEl.addEventListener("pointercancel", () => endDrag(false));
+  // Capture lost without pointerup (released outside the window, ...). After
+  // a normal pointerup this is a no-op: endDrag already ran.
+  seekEl.addEventListener("lostpointercapture", () => endDrag(false));
+  seekEl.addEventListener("keydown", (event) => {
+    const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5, PageDown: -30, PageUp: 30 }[event.key];
+    const src = source();
+    const total = duration(src);
+    if (step !== undefined) {
+      event.preventDefault();
+      seekBy(step);
+    } else if ((event.key === "Home" || event.key === "End") && total) {
+      event.preventDefault();
+      src.seekTo(event.key === "Home" ? 0 : total);
+    }
+  });
 
-  const events = ["play", "pause", "ended", "timeupdate", "progress", "loadedmetadata", "durationchange", "emptied"];
+  const events = ["timeupdate", "progress", "loadedmetadata", "durationchange", "emptied", "seeked"];
   function sync() {
     // The mini player's <audio> outlives this page (Turbo permanent node):
-    // stop listening once the panel has been swapped out.
-    if (!panel.isConnected) {
-      events.forEach((name) => audio.removeEventListener(name, sync));
+    // stop listening once the bar has been swapped out.
+    if (!bar.isConnected) {
+      if (audio) events.forEach((name) => audio.removeEventListener(name, sync));
       return;
     }
-    const current = player.isCurrent(id);
-    panel.classList.toggle("is-playing", player.isPlaying(id));
-    seekEl?.classList.toggle("is-inert", !seekable());
-    const position = current && Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-    const duration = current && Number.isFinite(audio.duration) ? audio.duration : 0;
-    if (durationEl) durationEl.textContent = duration > 0 ? formatMiniPlayerTime(duration) : "--:--";
+    const src = source();
+    const total = duration(src);
+    seekEl.classList.toggle("is-inert", !total);
+    if (durationEl) durationEl.textContent = total ? formatMiniPlayerTime(total) : "--:--";
     // While the thumb is being dragged it shows the target, not the playback position.
     if (dragging) return;
-    if (currentEl) currentEl.textContent = formatMiniPlayerTime(position);
-    renderSeek(duration > 0 ? position / duration : 0);
+    const position = total && Number.isFinite(src.element.currentTime) ? src.element.currentTime : 0;
+    renderSeek(total ? position / total : 0, total, src);
   }
-  events.forEach((name) => audio.addEventListener(name, sync));
-  sync();
+  [video, audio].filter(Boolean).forEach((element) => events.forEach((name) => element.addEventListener(name, sync)));
+  // Swiping to the other slide (or a dot) switches the source; the dots are
+  // updated on the same frame, before this runs.
+  track?.addEventListener("scroll", () => window.requestAnimationFrame(sync), { passive: true });
+  dots.forEach((dot) => dot.addEventListener("click", () => window.setTimeout(sync, 400)));
+  window.requestAnimationFrame(() => window.requestAnimationFrame(sync));
 }
 
 // Mini-player track description carried by data-track-* attributes (the
