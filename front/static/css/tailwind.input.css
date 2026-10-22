@@ -11205,10 +11205,19 @@ body::before {
   }
 
   /* SponsorBlock segments that get skipped, drawn on the shared bar by
-     `bindPagerSeek` (left/width in % of the duration). */
+     `bindPagerSeek` (--sponsor-start/--sponsor-end in % of the duration): light
+     green ahead of the playhead, light red for the part already played (the
+     same --seek-progress as the fill, inherited from .media-seek). */
   .media-seek-sponsor {
-    background: color-mix(in srgb, var(--color-success) 45%, var(--color-white));
+    --sponsor-played: clamp(0%, (var(--seek-progress) - var(--sponsor-start)) / (var(--sponsor-end) - var(--sponsor-start)) * 100%, 100%);
+    background: linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-danger) 45%, var(--color-white)) var(--sponsor-played),
+      color-mix(in srgb, var(--color-success) 45%, var(--color-white)) var(--sponsor-played)
+    );
     border-radius: 1px;
+    left: calc(var(--sponsor-start) * 1%);
+    width: calc((var(--sponsor-end) - var(--sponsor-start)) * 1%);
     height: 100%;
     position: absolute;
     top: 0;

@@ -111,8 +111,9 @@ Video elle suit et deplace le `<video>` (qui garde ses controles natifs, donc
 aussi sa propre barre), sur le volet Audio le mini-lecteur ; le temps courant
 et la duree s'affichent dessous. Quand le saut des sponsors est actif, les
 segments SponsorBlock sautes (le meme `sponsor_skip_payload` que le moteur de
-saut) sont dessines en vert clair sur la barre (`.media-seek-sponsor`), des que
-la duree de la source affichee est connue. Au-dela de 800 px le carrousel est transparent : les sections
+saut) sont dessines sur la barre (`.media-seek-sponsor`), des que la duree de la
+source affichee est connue : en vert clair devant la tete de lecture, en rouge
+clair pour la partie deja lue. Au-dela de 800 px le carrousel est transparent : les sections
 historiques (`.video-player-panel`, `.audio-player-panel`) restent empilees et
 le choix Audio/Video se fait avec les boutons de la barre d'actions.
 

@@ -3155,8 +3155,8 @@ function bindPagerSeek(pager) {
       if (end <= start) return;
       const mark = document.createElement("span");
       mark.className = "media-seek-sponsor";
-      mark.style.left = `${(start / total) * 100}%`;
-      mark.style.width = `${((end - start) / total) * 100}%`;
+      mark.style.setProperty("--sponsor-start", String((start / total) * 100));
+      mark.style.setProperty("--sponsor-end", String((end / total) * 100));
       seekTrack.appendChild(mark);
     });
   }
