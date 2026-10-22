@@ -2972,7 +2972,7 @@ def test_dashboard_renders_media_playback_as_progress_bar():
     assert video.title in rendered
     # Fully watched media hides the progress bar entirely (row is greyed out instead).
     assert "0:11 / 0:11" not in rendered
-    assert 'class="video-card-progress"' not in rendered
+    assert 'class="video-row-progress"' not in rendered
     assert 'style="width: 100.0%"' not in rendered
 
 
@@ -2984,7 +2984,7 @@ def test_base_template_disables_turbo_hover_prefetch():
     assert '<meta name="turbo-prefetch" content="false">' in rendered
 
 
-def test_videos_page_renders_playback_progress_without_percent_label():
+def test_videos_page_renders_playback_progress_on_the_thumbnail():
     db = make_session()
     video = add_video(db)
     db.add(
@@ -3009,8 +3009,8 @@ def test_videos_page_renders_playback_progress_without_percent_label():
 
     rendered = site(db).get("/videos").text
 
-    assert "4:35 / 20:42" in rendered
-    assert 'class="video-card-progress"' in rendered
+    assert 'aria-label="Progression 4:35 sur 20:42"' in rendered
+    assert 'class="video-row-progress"' in rendered
     assert "22%" not in rendered
     assert 'style="width: 22.14%"' in rendered
 
@@ -3040,7 +3040,7 @@ def test_videos_page_hides_progress_bar_and_dims_fully_watched_video():
 
     rendered = site(db).get("/videos").text
 
-    assert 'class="video-card-progress"' not in rendered
+    assert 'class="video-row-progress"' not in rendered
     assert 'class="video-row video-row-watched"' in rendered
 
 
@@ -3070,7 +3070,7 @@ def test_videos_page_hides_progress_bar_without_dimming_for_musique_category():
 
     rendered = site(db).get("/videos").text
 
-    assert 'class="video-card-progress"' not in rendered
+    assert 'class="video-row-progress"' not in rendered
     assert 'class="video-row video-row-watched"' not in rendered
 
 
@@ -4729,12 +4729,9 @@ def test_css_hides_progress_bar_inside_watched_and_hidden_rows():
         / "tailwind.input.css"
     ).read_text(encoding="utf-8")
 
-    for row_class in (
-        "video-row-watched",
-        "video-row-hidden",
-        "dashboard-media-row-completed",
-        "dashboard-media-row-hidden",
-    ):
+    for row_class in ("video-row-watched", "video-row-hidden"):
+        assert f".{row_class} .video-row-progress" in css
+    for row_class in ("dashboard-media-row-completed", "dashboard-media-row-hidden"):
         assert f".{row_class} .video-card-progress" in css
 
 

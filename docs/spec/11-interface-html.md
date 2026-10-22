@@ -1066,6 +1066,17 @@ Contenu :
   (titre sur 2 lignes, barre de progression) : la liste porte
   `grid-auto-rows: 1fr` (hors grille d'une chaine, qui dimensionne ses
   tuiles elle-meme) ;
+- barre de progression de lecture sur le bord bas de la vignette
+  (`.video-row-progress`, 4px, sans texte : la position et la duree sont dans
+  son `aria-label`), comme sur la page d'une chaine ;
+- sous le titre, seulement la chaine (sauf dans une pile de Nouveautes) : la
+  date de publication est dans le menu ⋮ de la carte ;
+- menu ⋮ discret (`details.video-row-more`, `data-pop` : un clic dehors ou
+  Echap le ferme) centre verticalement sur le bord droit de la carte ; il
+  ouvre a sa gauche un petit panneau « Publiée le <date> ». Il n'existe pas
+  sur la page d'une chaine, qui garde sa ligne de date ;
+- les etoiles de notation sont calees sur le bord droit de la carte (juste
+  avant le menu ⋮), apres Vu/Ecartee ;
 - sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
   `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis
@@ -1073,10 +1084,9 @@ Contenu :
   elargit toute la page du dashboard sous Safari iOS) ;
 - carte en conteneur etroit : meme disposition dans toutes les listes
   (`/videos`, detail d'une playlist, piles de Nouveautes) — titre limite a 2
-  lignes, chaine et date sur la meme ligne, puis les actions dans la colonne
-  de droite, sous le titre et la date (jamais en barre pleine largeur sous la
-  vignette) : Audio/Video (qui servent aussi a supprimer le fichier), puis la
-  notation, avec retour a la ligne si la colonne est trop etroite ; avec les vignettes masquees, la colonne de vignette disparait
+  lignes, la chaine dessous, puis les actions dans la colonne
+  de droite, sous le titre et la chaine (jamais en barre pleine largeur sous la
+  vignette) : Vu/Ecartee a gauche, la notation poussee a droite ; avec les vignettes masquees, la colonne de vignette disparait
   (seule une carte "audio seule" garde la largeur de son bouton play) ;
 - sur ecran tactile (`hover: none` et `pointer: coarse`), les boutons
   Vu/Ecartee ne sont affiches dans aucune liste, Historique compris : ils sont
@@ -1313,7 +1323,9 @@ simple survol ferait croire que la video est vue.
 
 Une ligne vue ou ecartee n'affiche pas sa barre de progression. Le serveur omet
 deja le markup au rendu ; quatre regles CSS (`.video-row-watched
-.video-card-progress` et ses trois equivalents) couvrent en plus la bascule au
+.video-row-progress` et `.video-row-hidden .video-row-progress` pour les
+cartes, leurs equivalents `.dashboard-media-row-* .video-card-progress` pour
+Historique) couvrent en plus la bascule au
 clic, ou la ligne change de classe sans rechargement. Seul cas non couvert sans
 rechargement : une ligne deja vue a l'arrivee sur la page n'a pas de markup de
 progression du tout, donc la repasser en non-vue ne fait pas reapparaitre la

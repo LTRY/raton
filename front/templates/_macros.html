@@ -208,9 +208,9 @@
 </div>
 {% endmacro %}
 
-{# `channel_mode` is the channel page: grid cards (list rows on a phone) with a "Nouveau" chip, the progress bar on the
-   thumbnail, only a date line (no channel; none on a short tile) and a rating dot that opens into stars on hover. `feature` marks the big tiles of
-   the shorts mosaic; `index` staggers the entrance animation. #}
+{# `channel_mode` is the channel page: grid cards (list rows on a phone) with a "Nouveau" chip, only a date line (no channel;
+   none on a short tile) and a rating dot that opens into stars on hover. Elsewhere the date sits in the card's ⋮ menu. `feature`
+   marks the big tiles of the shorts mosaic; `index` staggers the entrance animation. #}
 {% macro video_card(card, next_path, category_style_map, channel_mode=False, feature=False, index=0, short_tile=False) %}
 {# `card` is a fiche of an /api list (LibraryVideoRead): the API says how it is greyed out. #}
 {% set is_replay_category = card.replay_category %}
@@ -239,7 +239,7 @@
       {% endif %}
       {% if card.duration %}<span class="video-row-duration">{{ card.duration }}</span>{% endif %}
       {% if channel_mode and card.is_new %}<span class="video-row-new">Nouveau</span>{% endif %}
-      {% if channel_mode and card.playback and not is_watched and not is_replay_category %}
+      {% if card.playback and not is_watched and not is_replay_category %}
       <span class="video-row-progress" role="img" aria-label="Progression {{ card.playback.position_label }} sur {{ card.playback.duration_label }}"><span style="width: {{ card.playback.progress_percent }}%"></span></span>
       {% endif %}
     {% if short_download %}
@@ -268,24 +268,13 @@
       <a class="video-title" href="/videos/{{ card.id }}?next={{ next_path | urlencode }}" title="{{ card.title }}">{{ card.title }}</a>
     </div>
     {% if not channel_mode %}
+    {% if card.channel_name %}
     <p class="video-meta">
-      {% if card.channel_name %}
       <span class="video-meta-channel"><a class="video-meta-link" href="/videos?channel_id={{ card.channel_id }}">{{ card.channel_name }}</a></span>
-      {% endif %}
-      {% if card.published_at %}
-      <span>{{ format_french_date(card.published_at) }}</span>
-      {% endif %}
     </p>
+    {% endif %}
     {% elif card.published_at and not short_tile %}
     <p class="video-meta video-meta-date"><span>{{ format_french_date(card.published_at) }}</span></p>
-    {% endif %}
-    {% if not channel_mode and card.playback and not is_watched and not is_replay_category %}
-    <div class="video-card-progress" aria-label="Progression {{ card.playback.position_label }} sur {{ card.playback.duration_label }}">
-      <span>{{ card.playback.position_label }} / {{ card.playback.duration_label }}</span>
-      <div class="media-progress-track">
-        <span style="width: {{ card.playback.progress_percent }}%"></span>
-      </div>
-    </div>
     {% endif %}
   </div>
   <div class="video-row-actions">
@@ -307,6 +296,16 @@
     </div>
     {% endif %}
   </div>
+  {% if not channel_mode %}
+  <details class="video-row-more" data-pop>
+    <summary class="video-row-more-button" aria-label="Plus d'informations sur {{ card.title }}" title="Plus d'informations">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+    </summary>
+    <div class="video-row-more-panel">
+      {% if card.published_at %}Publiée le {{ format_french_date(card.published_at) }}{% else %}Date de publication inconnue{% endif %}
+    </div>
+  </details>
+  {% endif %}
 </article>
 {% endmacro %}
 
