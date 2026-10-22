@@ -2251,10 +2251,15 @@ button.secondary {
 }
 
 /* Exploration: every card takes the height of the tallest one (a two-line
-   title, a progress bar), so the list reads as an even column. The channel
-   grid sizes its own tiles. */
+   title, a progress bar), so the list reads as an even column. The cards are
+   spaced out, each with its own frame, so the list itself drops its frame.
+   The channel grid sizes its own tiles. */
 .video-row-list:not(.channel-video-grid) {
+  background: transparent;
+  border: 0;
   grid-auto-rows: 1fr;
+  overflow: visible;
+  row-gap: 8px;
 }
 
 .video-row-list .empty-state {
@@ -2385,6 +2390,17 @@ button.secondary {
 
 .video-row:last-child {
   border-bottom: 0;
+}
+
+/* :where() keeps the background at .video-row's weight, so Vu/Ecartee still repaint it. */
+:where(.video-row-list:not(.channel-video-grid)) > .video-row {
+  background: var(--color-surface);
+}
+
+.video-row-list:not(.channel-video-grid) > .video-row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
 }
 
 .video-row-watched {
@@ -8218,6 +8234,12 @@ turbo-frame {
     border-right: 0;
     margin-left: calc(50% - 50vw);
     margin-right: calc(50% - 50vw);
+  }
+
+  .video-row-list:not(.channel-video-grid) > .video-row {
+    border-left: 0;
+    border-radius: 0;
+    border-right: 0;
   }
 
   .video-card-main {

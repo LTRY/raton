@@ -35,8 +35,8 @@ chaque spec.
 il lance l'application sur une DB sqlite jetable remplie par
 `scripts/demo_seed.py` (trois chaines, une quinzaine de fiches variees : titres
 courts et longs, etoiles, Vu, Ecartee, lectures en cours pour la barre de
-progression ; aucun fichier media, donc Exploration ne les montre qu'une fois le
-filtre de type de fichier vide), prend une capture a 1280 px (`desktop.png`) et une
+progression, chemins video/audio/metadonnees sans fichier derriere : Exploration
+les montre avec son filtre de type de fichier par defaut), prend une capture a 1280 px (`desktop.png`) et une
 a 390 px (`phone.png`) avec Playwright, affiche `scrollWidth` et `clientWidth`
 aux deux largeurs (egaux = pas de defilement horizontal de la page), puis arrete
 le serveur. Il n'est pas lance par la CI ; `tests/test_page_overflow_css.py`

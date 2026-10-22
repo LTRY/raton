@@ -1073,6 +1073,9 @@ Contenu :
   (titre sur 2 lignes, barre de progression) : la liste porte
   `grid-auto-rows: 1fr` (hors grille d'une chaine, qui dimensionne ses
   tuiles elle-meme) ;
+- les cartes sont espacees de 8px (`row-gap`) : chacune porte son cadre (filet,
+  coins arrondis, fond), la liste n'en a plus ; sur mobile elles perdent leur
+  filet lateral et leurs coins comme la liste ;
 - barre de progression de lecture sur le bord bas de la vignette
   (`.video-row-progress`, 4px, sans texte : la position et la duree sont dans
   son `aria-label`), comme sur la page d'une chaine ;

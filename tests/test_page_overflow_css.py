@@ -29,3 +29,11 @@ def test_library_cards_share_one_height():
         r"^\.video-row-list:not\(\.channel-video-grid\)\s*\{([^}]*)\}", CSS, re.MULTILINE
     )
     assert rule and re.search(r"grid-auto-rows:\s*1fr\s*;", rule.group(1))
+
+
+def test_library_cards_are_spaced_out():
+    # Exploration: the cards stand apart from each other, not stacked edge to edge.
+    rule = re.search(
+        r"^\.video-row-list:not\(\.channel-video-grid\)\s*\{([^}]*)\}", CSS, re.MULTILINE
+    )
+    assert rule and re.search(r"row-gap:\s*8px\s*;", rule.group(1))
