@@ -31,6 +31,16 @@
     U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* Pixel font of Raton's introduction only (OFL, Latin subset with French
+   accents); not preloaded, the scene waits for its entrance anyway. */
+@font-face {
+  font-family: "Pixelify Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/static/fonts/pixelify-sans-latin.woff2") format("woff2");
+}
+
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -97,6 +107,8 @@
 
   --color-text-soft: #5c4d3d;      /* between text and text-muted: descriptions, field labels */
   --color-border-strong: #d8cbb6;  /* dashed zones, light icons, input borders */
+  --color-gb-screen: #d3d5c0;      /* Raton's introduction: the Game Boy screen behind the text */
+  --color-gb-ink: #1d1e1a;         /* ...and its black */
   --glass-fill: rgba(255, 255, 255, 0.58);        /* bars and controls */
   --glass-fill-strong: rgba(255, 255, 255, 0.66); /* layers that carry text */
   --glass-rim: rgba(255, 255, 255, 0.85);
@@ -11443,39 +11455,50 @@ html.intro-open {
   width: 100%;
 }
 
-/* The Game Boy text box: thick dark frame, a light inner gap, then a thin
-   orange line, square-ish corners. */
+/* The Game Boy text box (DMG dialogue): grey-green screen, a thin outer
+   line, a gap, then a thick inner frame heavier on the right and bottom, near
+   square corners, pixel font, solid black ▼. */
 .intro-box {
-  background: var(--color-surface);
-  border: 4px solid var(--color-text);
-  border-radius: var(--radius-10);
-  box-shadow:
-    inset 0 0 0 3px var(--color-surface),
-    inset 0 0 0 5px var(--color-primary),
-    0 6px 0 rgba(32, 24, 17, 0.18);
+  background: var(--color-gb-screen);
+  border: 3px solid var(--color-gb-ink);
+  border-radius: var(--radius-xs);
+  box-shadow: 0 6px 0 rgba(32, 24, 17, 0.14);
   cursor: pointer;
-  min-height: calc(3 * 1.6em + 36px);
-  padding: 18px 20px;
+  min-height: calc(3 * 1.5em + 52px);
+  padding: 24px 28px;
   position: relative;
   user-select: none;
   -webkit-user-select: none;
 }
 
+.intro-box::before {
+  border: 4px solid var(--color-gb-ink);
+  border-bottom-width: 6px;
+  border-radius: 3px;
+  border-right-width: 6px;
+  content: "";
+  inset: 4px;
+  pointer-events: none;
+  position: absolute;
+}
+
 .intro-text {
-  color: var(--color-text);
-  font: 700 17px/1.6 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  letter-spacing: 0.01em;
+  color: var(--color-gb-ink);
+  font: 500 21px/1.5 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
   margin: 0;
   overflow-wrap: anywhere;
+  text-transform: uppercase;
 }
 
 .intro-next {
-  bottom: 10px;
-  color: var(--color-primary);
-  font-size: 13px;
+  bottom: 16px;
+  color: var(--color-gb-ink);
+  font-size: 20px;
+  line-height: 1;
   opacity: 0;
   position: absolute;
-  right: 14px;
+  right: 22px;
 }
 
 .intro-box.is-done .intro-next {
@@ -11493,7 +11516,7 @@ html.intro-open {
 
 .intro-step {
   color: var(--color-text-muted);
-  font: 700 13px/1 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font: 500 15px/1 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
   letter-spacing: 0.08em;
 }
 
@@ -11571,7 +11594,7 @@ html.intro-open {
   }
 
   .intro-text {
-    font-size: 19px;
+    font-size: 24px;
   }
 }
 

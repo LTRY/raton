@@ -164,7 +164,10 @@ chaque requete, une ligne `raton.timing` :
   (`front/static/fonts/*.woff2`, police variable 200-800, licence OFL, sous-ensembles
   `latin` et `latin-ext`), declaree par `@font-face` dans
   `front/static/css/tailwind.input.css` avec `font-display: swap`, et prechargee
-  depuis `<head>`. Aucune requete vers un autre domaine n'est necessaire pour
+  depuis `<head>`. La police pixel Pixelify Sans (licence OFL,
+  sous-ensemble latin avec les accents francais,
+  `pixelify-sans-latin.woff2`) ne sert qu'a l'introduction de Raton et n'est
+  pas prechargee. Aucune requete vers un autre domaine n'est necessaire pour
   afficher une page : l'application fonctionne hors ligne.
 - Les reponses texte (HTML, CSS, JS, JSON, SVG) de plus de 1 Ko sont compressees
   en gzip quand le navigateur l'accepte (`TextGZipMiddleware`,
@@ -549,9 +552,11 @@ Prototype. A la premiere ouverture de Raton sur un appareil, une scene plein
 ecran (`_intro.html`, inclus dans `base.html` ; `initIntro` dans `app.js`)
 presente Raton a la maniere de l'introduction d'un RPG Game Boy : Raton entre
 en rebondissant sur un fond creme, puis enchaine quelques repliques dans un
-encadre de texte facon Game Boy (cadre sombre epais, filet orange interieur,
-police a chasse fixe, texte tape lettre par lettre, fleche ▼ quand la replique
-est complete).
+encadre de dialogue de Game Boy : ecran gris-vert (`--color-gb-screen`), filet
+noir fin a l'exterieur puis cadre noir epais a l'interieur, plus lourd a droite
+et en bas, coins presque carres, texte en majuscules dans une police pixel
+(Pixelify Sans) tape lettre par lettre, fleche ▼ noire pleine quand la replique
+est complete.
 
 - Les repliques sont les `<li>` de `_intro.html`, dans l'ordre ; `data-art`
   nomme le dessin de `static/img/raton/` montre avec la replique (Raton saute
