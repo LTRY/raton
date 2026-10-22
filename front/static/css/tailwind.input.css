@@ -10798,8 +10798,8 @@ body::before {
 
 /* Video detail, phone layout: full-width 16:9 player at the top, video on the
    left and audio on the right (swipe or the two icons under it), the card frame
-   gone, and a "⋮" popover holding the description, the sponsor segments and the
-   transcript retry. Every slide has the same 16:9 height, so switching format
+   gone, and a "⋮" popover holding the sponsor segments, the file deletes and
+   the transcript retry. Every slide has the same 16:9 height, so switching format
    never moves the rest of the page. Above 800px nothing here applies and the
    popover stays hidden. */
 .video-topbar {
@@ -10885,7 +10885,6 @@ body::before {
     overflow-wrap: anywhere;
   }
 
-  .transcript-tab[data-tab="info"],
   .transcript-tab[data-tab="segments"],
   .video-detail-action-bar .transcript-retry {
     display: none;

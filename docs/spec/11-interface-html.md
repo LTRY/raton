@@ -1380,15 +1380,17 @@ Contenu ordonne :
    "Retour a la chaine" (bibliotheque filtree sur une chaine), sinon
    "Retour a la bibliotheque" ; sous 800 px, ce lien partage sa ligne avec un
    bouton « ⋮ » en verre (`details.video-more[data-pop]`) qui ouvre un panneau
-   « Description » (description et tags), « Segments » (liste + bouton
+   « Segments » (liste + bouton
    « Rechercher les segments sponsors »), « Fichiers » (« Supprimer la
    video » / « Supprimer l'audio », voir « Carrousel video / audio » dans
    [08 Medias et lecteurs](08-medias-et-lecteurs.md)) et « Transcription » (bouton
    « Recuperer la transcription » quand `video.transcript_path` est vide, qui
    relaie son clic vers `#transcript-retry-button` par `data-click-proxy`) ;
-   sous 800 px, les onglets « Plus d'informations » et « Segments » et le bouton
-   de recuperation de la barre d'actions sont masques par CSS (leurs panneaux
-   et leurs ids restent), le panneau « ⋮ » prend leur place ; une ancre
+   sous 800 px, l'onglet « Segments » et le bouton de recuperation de la barre
+   d'actions sont masques par CSS (leurs panneaux et leurs ids restent), le
+   panneau « ⋮ » prend leur place ; la description reste dans l'onglet « Plus
+   d'informations », visible sur telephone a cote des autres onglets
+   (Transcript, Notes structurees, Commentaire...) ; une ancre
    `#segments-sponsors` ouvre alors ce panneau, un clic sur un segment le
    ferme, et le statut de la recuperation y est repete
    (`data-retry-status-mirror`, bouton desactive pendant la requete) ;

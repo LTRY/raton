@@ -5,8 +5,8 @@
   <div class="video-topbar">
     <p class="back-link"><a href="{{ back_path }}">← {{ back_label }}</a></p>
     {# Phone only (hidden by CSS above 800px, where the tabs and the action bar
-       carry the same things). The description, the sponsor segments, the
-       delete of the downloaded files and the transcript retry live here. The retry
+       carry the same things). The sponsor segments, the delete of the
+       downloaded files and the transcript retry live here. The retry
        button proxies a click to the real one (`#transcript-retry-button`), so
        its handler and ids stay single. #}
     <details class="video-more" data-pop>
@@ -14,21 +14,6 @@
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
       </summary>
       <div class="video-more-panel lg">
-        <section class="video-more-block">
-          <h2>Description</h2>
-          {% if extended_metadata is defined and extended_metadata.description %}
-          <p class="video-metadata-description">{{ extended_metadata.description }}</p>
-          {% else %}
-          <p class="empty-state">Aucune description disponible.</p>
-          {% endif %}
-          {% if extended_metadata is defined and extended_metadata.tags %}
-          <div class="video-metadata-tags" aria-label="Tags">
-            {% for tag in extended_metadata.tags %}
-            <span class="asset-label">{{ tag }}</span>
-            {% endfor %}
-          </div>
-          {% endif %}
-        </section>
         <section class="video-more-block">
           <h2>Segments</h2>
           {% if sponsor_segments %}
@@ -685,9 +670,9 @@
   };
   let activeTab = "";
   let hashTab = HASH_TABS[window.location.hash];
-  // Under 800px the "info" and "segments" tabs are hidden: their content is in
-  // the "⋮" popover, so an anchor to them opens it instead of a tab-less panel.
-  if ((hashTab === "info" || hashTab === "segments") && window.matchMedia("(max-width: 800px)").matches) {
+  // Under 800px the "segments" tab is hidden: its content is in the "⋮"
+  // popover, so an anchor to it opens it instead of a tab-less panel.
+  if (hashTab === "segments" && window.matchMedia("(max-width: 800px)").matches) {
     document.querySelector("details.video-more")?.setAttribute("open", "");
     hashTab = "";
   }
