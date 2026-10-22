@@ -1381,7 +1381,9 @@ Contenu ordonne :
    "Retour a la bibliotheque" ; sous 800 px, ce lien partage sa ligne avec un
    bouton « ⋮ » en verre (`details.video-more[data-pop]`) qui ouvre un panneau
    « Description » (description et tags), « Segments » (liste + bouton
-   « Rechercher les segments sponsors ») et « Transcription » (bouton
+   « Rechercher les segments sponsors »), « Fichiers » (« Supprimer la
+   video » / « Supprimer l'audio », voir « Carrousel video / audio » dans
+   [08 Medias et lecteurs](08-medias-et-lecteurs.md)) et « Transcription » (bouton
    « Recuperer la transcription » quand `video.transcript_path` est vide, qui
    relaie son clic vers `#transcript-retry-button` par `data-click-proxy`) ;
    sous 800 px, les onglets « Plus d'informations » et « Segments » et le bouton
@@ -1404,6 +1406,11 @@ Contenu ordonne :
    deja cette video (avec un lien "Retirer" par playlist), un select vers une
    playlist existante et un champ texte pour en creer une nouvelle a la volee
    (meme convention "presets + champ libre" que l'editeur de categories) ;
+   sous 800 px les labels techniques sont masques (seuls restent les labels
+   categories et les playlists), chaque groupe occupe sa propre ligne sous la
+   chaine et son bouton "+ Categories"/"+ Playlists", a la taille de son
+   texte, se place a droite de cette ligne (sur la ligne suivante, toujours a
+   droite, quand les labels la remplissent) ;
 3. titre ;
 4. chaine ;
 5. note sur 5 étoiles ;

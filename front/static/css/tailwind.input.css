@@ -11079,6 +11079,44 @@ body::before {
     box-shadow: var(--shadow-sm, 0 1px 3px rgba(43, 32, 24, 0.15));
     color: var(--color-primary);
   }
+  /* The slides lose their head (format badge, "Supprimer"): the dots already say
+     which format is shown, and the delete moves to the "⋮" popover. The head's
+     delete buttons stay in the DOM for the popover's proxies. */
+  .media-pager .media-slide-head {
+    display: none;
+  }
+
+  .video-more-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .video-more-files h2 {
+    flex-basis: 100%;
+  }
+
+  .video-detail:not(:has([data-media-slide="video"][data-state="ready"] [data-media-delete])) [data-more-delete="video"],
+  .video-detail:not(:has([data-media-slide="audio"][data-state="ready"] [data-media-delete])) [data-more-delete="audio"],
+  .video-detail:not(:has([data-media-slide][data-state="ready"] [data-media-delete])) .video-more-files {
+    display: none;
+  }
+
+  /* Labels of the fiche: categories and playlists only (the Audio/Vidéo files
+     are the dots and the slides already), each group on its own line with its
+     "+" at the right, sized to its text. */
+  .video-detail-heading-side .video-detail-label-groups {
+    align-self: stretch;
+  }
+
+  .video-detail-label-groups .asset-labels {
+    display: none;
+  }
+
+  .video-detail-heading .video-detail-label-groups .category-label-add {
+    margin-left: auto;
+    width: auto;
+  }
 }
 
 /* Import button: one round liquid-glass control at the top right of every page

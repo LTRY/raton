@@ -143,8 +143,14 @@ bouton (`format-toggle-loading`, `-active`, `-error`).
   `<audio>` locale. Apres un telechargement, la coche devient le bouton lecture
   et les commandes se deploient (animation `is-revealing`, desactivee avec
   `prefers-reduced-motion`).
-- **Suppression** : (uniquement si la barre d'actions autorise la suppression) un bouton « Supprimer » (avec `confirm`) apparait dans
-  l'en-tete d'un volet `ready` et declenche la suppression existante.
+- **Suppression** : (uniquement si la barre d'actions autorise la suppression)
+  les volets n'affichent ni en-tete ni badge de format (le selecteur a deux
+  icones suffit) ; leur bouton « Supprimer » (avec `confirm`) reste dans le DOM
+  mais masque, et le panneau « ⋮ » de la fiche porte un bloc « Fichiers » avec
+  « Supprimer la video » et « Supprimer l'audio », qui relaient leur clic vers
+  ce bouton (`data-click-proxy`) et ferment le panneau. Chacun n'apparait que
+  tant que son volet est `ready` (CSS `:has()` sur le `data-state`), le bloc
+  disparait quand aucun ne l'est. La suppression reste celle decrite plus haut.
 
 ## Reprise de la position de lecture
 

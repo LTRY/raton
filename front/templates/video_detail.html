@@ -5,8 +5,8 @@
   <div class="video-topbar">
     <p class="back-link"><a href="{{ back_path }}">← {{ back_label }}</a></p>
     {# Phone only (hidden by CSS above 800px, where the tabs and the action bar
-       carry the same things). The description, the sponsor segments and the
-       transcript retry live here instead of in the transcript tabs. The retry
+       carry the same things). The description, the sponsor segments, the
+       delete of the downloaded files and the transcript retry live here. The retry
        button proxies a click to the real one (`#transcript-retry-button`), so
        its handler and ids stay single. #}
     <details class="video-more" data-pop>
@@ -48,6 +48,15 @@
           <form action="/videos/{{ video.id }}/sponsors/fetch" method="post">
             <button class="secondary" type="submit">Rechercher les segments sponsors</button>
           </form>
+        </section>
+        {# Delete the downloaded files: proxies to the slides' own delete buttons
+           (hidden on phones with the slide head), so the confirm and the delete
+           flow stay in `bindMediaPager`. Each button only shows while its slide
+           is `ready` (CSS `:has()` on the slide state). #}
+        <section class="video-more-block video-more-files">
+          <h2>Fichiers</h2>
+          <button type="button" class="secondary video-more-delete" data-more-delete="video" data-pop-close data-click-proxy="[data-media-slide='video'] [data-media-delete]">Supprimer la vidéo</button>
+          <button type="button" class="secondary video-more-delete" data-more-delete="audio" data-pop-close data-click-proxy="[data-media-slide='audio'] [data-media-delete]">Supprimer l'audio</button>
         </section>
         {% if not video.has_transcript %}
         <section class="video-more-block">
