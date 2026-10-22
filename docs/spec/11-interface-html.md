@@ -543,6 +543,37 @@ masque : il ne reste que la conversation. Ni metriques, ni
 Historique complet, ni temps de lecture : ils sont dans Bibliotheque et
 Parametres.
 
+### Introduction de Raton
+
+Prototype. A la premiere ouverture de Raton sur un appareil, une scene plein
+ecran (`_intro.html`, inclus dans `base.html` ; `initIntro` dans `app.js`)
+presente Raton a la maniere de l'introduction d'un RPG Game Boy : Raton entre
+en rebondissant sur un fond creme, puis enchaine quelques repliques dans un
+encadre de texte facon Game Boy (cadre sombre epais, filet orange interieur,
+police a chasse fixe, texte tape lettre par lettre, fleche ▼ quand la replique
+est complete).
+
+- Les repliques sont les `<li>` de `_intro.html`, dans l'ordre ; `data-art`
+  nomme le dessin de `static/img/raton/` montre avec la replique (Raton saute
+  quand le dessin change).
+- Deux boutons ronds en verre liquide teinte terracotta, inclines comme sur la
+  console : **A** termine la replique en cours de frappe, sinon passe a la
+  suivante, et ferme la scene apres la derniere ; **B** revient a la replique
+  precedente (inactif sur la premiere). Toucher l'encadre vaut A. Clavier :
+  Entree, Espace, `a` ou → pour A ; Retour arriere, `b` ou ← pour B ; Echap
+  ferme. Un compteur `n/total` est affiche a gauche des boutons.
+- « Passer » (pilule de verre en haut a droite) ferme la scene a tout moment.
+- « Vue » est retenu par appareil dans le `localStorage`
+  (`raton:intro-seen`), pas dans la DB. `?intro=1` sur n'importe quelle page la
+  rejoue (lien « Revoir l'introduction de Raton » dans la carte Raton des
+  Parametres) ; le parametre est retire de l'URL.
+- La scene passe au-dessus de toutes les couches flottantes et bloque le
+  defilement de la page tant qu'elle est ouverte. Avec
+  `prefers-reduced-motion`, les repliques s'affichent d'un coup et rien ne
+  bouge.
+- `scripts/screenshot.sh` marque l'introduction comme vue, pour que les
+  captures montrent la page demandee (sauf avec `?intro=1`).
+
 ## Bibliotheque : Nouveautes, Historique, Exploration
 
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
@@ -1493,8 +1524,9 @@ Permet de modifier :
 - vues sauvegardees de la bibliotheque video ;
 - limites de temps d'ecran par type (`video`/`short`/`podcast`/`music`) et par
   periode (`today`/`week`/`month`) ;
-- carte "Raton" : simple lien vers la page `/raton/variations` (toutes les
-  repliques de Raton), voir [18 Raton](18-raton-scenarios.md).
+- carte "Raton" : lien vers la page `/raton/variations` (toutes les
+  repliques de Raton), voir [18 Raton](18-raton-scenarios.md), et lien
+  « Revoir l'introduction de Raton » (`/?intro=1`, voir "Introduction de Raton").
 
 Affiche aussi, en lecture seule (section "Couts LLM", pas de champ de
 formulaire) : le cout reel cumule par type de job LLM, calcule a partir des

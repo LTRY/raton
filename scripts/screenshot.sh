@@ -56,6 +56,9 @@ const [url, outDir] = process.argv.slice(2);
   const browser = await chromium.launch();
   for (const [name, width, height] of [["desktop", 1280, 700], ["phone", 390, 844]]) {
     const page = await browser.newPage({ viewport: { width, height } });
+    // A fresh browser has never seen Raton's introduction and would get it over every page:
+    // mark it seen, unless the shot is of the introduction itself (`?intro=1`).
+    await page.addInitScript(() => window.localStorage.setItem("raton:intro-seen", "1"));
     await page.goto(url, { waitUntil: "networkidle" });
     await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: name === "phone" });
     const { scrollWidth, clientWidth } = await page.evaluate(() => ({
