@@ -271,6 +271,13 @@ Assistant de la page d'accueil `/` : choisit une replique et un dessin a chaque 
 - **Code** : paquet `back/services/raton/` (catalogue `scenarios.py`, tirage `picker.py`, visites `visits.py`)
 - **A ne pas confondre avec** : Un composant de chat.
 
+### Introduction
+
+Scene plein ecran ou Raton se presente en quelques repliques, a la premiere ouverture de Raton sur un appareil. Voir [11 Interface HTML](11-interface-html.md#introduction-de-raton).
+
+- **Code** : `_intro.html`, `initIntro`, cle `raton:intro-seen` du `localStorage`
+- **A ne pas confondre avec** : Une replique de Raton sur l'accueil (moteur de scenarios) : l'introduction ne passe pas par le back.
+
 ### Dashboard
 
 Pages d'accueil et de suivi (Nouveautes, historique...).

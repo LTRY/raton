@@ -3171,6 +3171,171 @@ function initToasts() {
   });
 }
 
+// Raton's introduction (`_intro.html`): opens once per device, or again with
+// `?intro=1` (link in the settings). A (or →) finishes the line being typed,
+// then moves on; B (or ←) goes back one line; Start closes. Spec: docs/spec/11-interface-html.md,
+// "Introduction de Raton".
+const INTRO_SEEN_KEY = "raton:intro-seen";
+
+function initIntro() {
+  const root = document.querySelector("[data-intro]");
+  if (!root) return;
+  const url = new URL(window.location.href);
+  const forced = url.searchParams.has("intro");
+  if (forced) {
+    url.searchParams.delete("intro");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }
+  let seen = false;
+  try {
+    seen = window.localStorage.getItem(INTRO_SEEN_KEY) === "1";
+  } catch {
+    // Storage blocked (private mode): show it, the flag simply won't stick.
+  }
+  if (seen && !forced) return;
+
+  const lines = [...root.querySelectorAll("[data-intro-lines] li")].map((li) => ({
+    text: li.textContent.trim(),
+    art: li.dataset.art,
+  }));
+  if (!lines.length) return;
+  const box = root.querySelector("[data-intro-box]");
+  const textEl = root.querySelector("[data-intro-text]");
+  const live = root.querySelector("[data-intro-live]");
+  const step = root.querySelector("[data-intro-step]");
+  const art = root.querySelector("[data-intro-art]");
+  const buttonA = root.querySelector("[data-intro-a]");
+  const buttonB = root.querySelector("[data-intro-b]");
+  const keyLeft = root.querySelector("[data-intro-left]");
+  const keyRight = root.querySelector("[data-intro-right]");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const artSrc = (name) => `/static/img/raton/${name}.webp`;
+  // Warm the cache so a drawing change does not flash an empty frame.
+  new Set(lines.map((line) => line.art).filter(Boolean)).forEach((name) => {
+    new Image().src = artSrc(name);
+  });
+
+  const controller = new AbortController();
+  const { signal } = controller;
+  let index = 0;
+  let shown = 0;
+  let timer = 0;
+  let currentArt = "";
+
+  const finishLine = () => {
+    window.clearTimeout(timer);
+    shown = lines[index].text.length;
+    textEl.textContent = lines[index].text;
+    box.classList.add("is-done");
+  };
+
+  const typeNext = () => {
+    const { text } = lines[index];
+    shown += 1;
+    textEl.textContent = text.slice(0, shown);
+    if (shown >= text.length) {
+      box.classList.add("is-done");
+      return;
+    }
+    // A short beat after punctuation, like the dialogue of the games.
+    timer = window.setTimeout(typeNext, /[.!?…,]/.test(text[shown - 1]) ? 160 : 28);
+  };
+
+  const show = (next) => {
+    window.clearTimeout(timer);
+    index = next;
+    shown = 0;
+    box.classList.remove("is-done");
+    textEl.textContent = "";
+    live.textContent = lines[index].text;
+    step.textContent = `${index + 1}/${lines.length}`;
+    buttonB.disabled = index === 0;
+    keyLeft.disabled = index === 0;
+    const name = lines[index].art;
+    if (name && name !== currentArt) {
+      art.src = artSrc(name);
+      // The first drawing already has its entrance animation.
+      if (currentArt) {
+        art.classList.remove("is-swap");
+        void art.offsetWidth;
+        art.classList.add("is-swap");
+      }
+      currentArt = name;
+    }
+    if (reduced) finishLine();
+    else timer = window.setTimeout(typeNext, next === 0 ? 700 : 120);
+  };
+
+  const close = () => {
+    window.clearTimeout(timer);
+    controller.abort();
+    try {
+      window.localStorage.setItem(INTRO_SEEN_KEY, "1");
+    } catch {
+      // See above.
+    }
+    const done = () => {
+      root.hidden = true;
+      root.classList.remove("is-closing");
+      document.documentElement.classList.remove("intro-open");
+    };
+    if (reduced) {
+      done();
+      return;
+    }
+    root.classList.add("is-closing");
+    root.addEventListener("animationend", done, { once: true });
+  };
+
+  const pressA = () => {
+    if (shown < lines[index].text.length) finishLine();
+    else if (index < lines.length - 1) show(index + 1);
+    else close();
+  };
+  const pressB = () => {
+    if (index > 0) show(index - 1);
+  };
+  // Lights the on-screen control matching a key press.
+  const flash = (button) => {
+    button.classList.add("is-pressed");
+    window.setTimeout(() => button.classList.remove("is-pressed"), 120);
+  };
+
+  buttonA.addEventListener("click", pressA, { signal });
+  buttonB.addEventListener("click", pressB, { signal });
+  keyRight.addEventListener("click", pressA, { signal });
+  keyLeft.addEventListener("click", pressB, { signal });
+  root.querySelector("[data-intro-start]").addEventListener("click", close, { signal });
+  box.addEventListener("click", pressA, { signal });
+  root.querySelector("[data-intro-skip]").addEventListener("click", close, { signal });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.target instanceof HTMLButtonElement && (event.key === "Enter" || event.key === " ")) return;
+      const key = event.key.toLowerCase();
+      if (key === "enter" || key === " " || key === "a" || key === "arrowright") {
+        event.preventDefault();
+        flash(key === "arrowright" ? keyRight : buttonA);
+        pressA();
+      } else if (key === "backspace" || key === "b" || key === "arrowleft") {
+        event.preventDefault();
+        flash(key === "arrowleft" ? keyLeft : buttonB);
+        pressB();
+      } else if (key === "escape") {
+        close();
+      }
+    },
+    { signal },
+  );
+  // A Turbo visit replaces the overlay: drop the listeners bound to the old one.
+  document.addEventListener("turbo:before-render", () => controller.abort(), { signal, once: true });
+
+  document.documentElement.classList.add("intro-open");
+  root.hidden = false;
+  show(0);
+  root.focus({ preventScroll: true });
+}
+
 // For results that arrive without a page load (the server-rendered toasts in
 // base.html only exist after one).
 window.showToast = function (message, level, href) {
@@ -3739,6 +3904,7 @@ if (!window.__importFabBound) {
 }
 
 initToasts();
+initIntro();
 initMiniPlayer();
 bindPlayTrackButtons();
 document.querySelectorAll("[data-media-pager]").forEach(bindMediaPager);

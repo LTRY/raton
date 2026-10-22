@@ -1,0 +1,56 @@
+{# Raton's introduction on the first visit of a device (static/js/app.js, initIntro).
+   One <li> per dialogue line; `data-art` names the drawing in static/img/raton/.
+   Spec: docs/spec/11-interface-html.md, "Introduction de Raton". #}
+<div class="intro" data-intro role="dialog" aria-modal="true" aria-label="Introduction de Raton" tabindex="-1" hidden>
+  <button class="intro-skip lg" type="button" data-intro-skip>Passer</button>
+  <div class="intro-stage">
+    <div class="intro-raton">
+      <img class="intro-raton-art" data-intro-art src="/static/img/raton/popcorn.webp?v={{ static_asset_version('img/raton/popcorn.webp') }}" alt="" width="220" height="220">
+      <span class="intro-raton-floor" aria-hidden="true"></span>
+    </div>
+  </div>
+  <div class="intro-console">
+    <div class="intro-box" data-intro-box>
+      <p class="intro-text" aria-hidden="true"><span data-intro-text></span><span class="intro-next" data-intro-next>▼</span></p>
+      <span class="intro-step" data-intro-step aria-hidden="true"></span>
+      <p class="visually-hidden" data-intro-live aria-live="polite"></p>
+    </div>
+    {# The controls of the console. Only ← → A B and Start act; ↑ ↓ and Select are there for the look. #}
+    <div class="intro-pad">
+      <div class="intro-dpad">
+        <button class="intro-dpad-key intro-dpad-up" type="button" tabindex="-1" aria-hidden="true"></button>
+        <button class="intro-dpad-key intro-dpad-left" type="button" data-intro-left aria-label="Retour"></button>
+        <button class="intro-dpad-key intro-dpad-right" type="button" data-intro-right aria-label="Suivant"></button>
+        <button class="intro-dpad-key intro-dpad-down" type="button" tabindex="-1" aria-hidden="true"></button>
+      </div>
+      <div class="intro-buttons">
+        <span class="intro-btn-slot intro-btn-slot-b">
+          <button class="intro-btn" type="button" data-intro-b aria-label="Retour"></button>
+          <span class="intro-btn-label" aria-hidden="true">B</span>
+        </span>
+        <span class="intro-btn-slot intro-btn-slot-a">
+          <button class="intro-btn" type="button" data-intro-a aria-label="Suivant"></button>
+          <span class="intro-btn-label" aria-hidden="true">A</span>
+        </span>
+      </div>
+      <div class="intro-menu">
+        <span class="intro-pill-slot">
+          <button class="intro-pill" type="button" tabindex="-1" aria-hidden="true"></button>
+          <span class="intro-btn-label" aria-hidden="true">SELECT</span>
+        </span>
+        <span class="intro-pill-slot">
+          <button class="intro-pill" type="button" data-intro-start aria-label="Passer l’introduction"></button>
+          <span class="intro-btn-label" aria-hidden="true">START</span>
+        </span>
+      </div>
+    </div>
+  </div>
+  <ol hidden data-intro-lines>
+    <li data-art="popcorn">Bonjour ! Bienvenue dans le monde de RATON !</li>
+    <li data-art="popcorn">Je m’appelle Raton. Mais tout le monde m’appelle le PROFESSEUR RATON !</li>
+    <li data-art="laptop">Ce monde est peuplé de vidéos. Des milliers ! Certaines t’apprennent des choses… d’autres te volent ton après-midi.</li>
+    <li data-art="dossiers">Ici, chaque vidéo devient une fiche, rangée bien au chaud dans ta bibliothèque.</li>
+    <li data-art="facteur">Allume la cloche d’une chaîne : ses nouvelles vidéos t’attendront chaque matin dans les Nouveautés.</li>
+    <li data-art="cinema">Ton aventure commence maintenant ! Un monde de vidéos t’attend. En route !</li>
+  </ol>
+</div>
