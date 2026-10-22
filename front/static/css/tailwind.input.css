@@ -4576,6 +4576,7 @@ body.hide-thumbnails .pld-thumb img {
   border-style: dashed;
   flex-direction: row;
   gap: 14px;
+  justify-content: space-between;
   min-height: 120px;
   padding: 16px;
 }
