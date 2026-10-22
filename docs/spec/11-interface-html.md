@@ -561,11 +561,13 @@ est complete.
 - Les repliques sont les `<li>` de `_intro.html`, dans l'ordre ; `data-art`
   nomme le dessin de `static/img/raton/` montre avec la replique (Raton saute
   quand le dessin change).
-- Sous l'encadre, les commandes d'une Game Boy, toutes en verre transparent
-  teinte aux couleurs de la console : croix directionnelle noire a gauche,
-  boutons ronds **B** (plus bas) et **A** (plus haut) magenta a droite
-  (`--color-gb-button`), pilules grises inclinees **Select** et **Start**
-  au milieu (`--color-gb-pill`), leurs noms en dessous dans la police de
+- Sous l'encadre, les commandes d'une Game Boy en verre liquide incolore
+  (translucide, liseré clair, arete du haut brillante, lumiere qui s'accumule
+  en bas, bord legerement assombri et ombre chaude pour se detacher du fond
+  creme ; un halo chaud est pose derriere elles) : croix directionnelle a
+  gauche, boutons ronds **B** (plus bas) et **A** (plus haut) a droite, pilules
+  inclinees **Select** et **Start** au milieu, leurs noms en dessous dans la
+  police de
   l'application. **A** (ou →) termine la replique en cours de frappe, sinon
   passe a la suivante, et ferme la scene apres la derniere ; **B** (ou ←)
   revient a la replique precedente (inactifs sur la premiere) ; **Start**
