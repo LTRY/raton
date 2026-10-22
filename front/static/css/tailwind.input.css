@@ -8236,10 +8236,16 @@ turbo-frame {
     margin-right: calc(50% - 50vw);
   }
 
+  /* Exploration's cards stand apart, so they keep the page margins and their
+     rounded frame: edge to edge, the gaps between them read as a broken table. */
+  .video-row-list:not(.channel-video-grid) {
+    margin-left: 0;
+    margin-right: 0;
+    row-gap: 10px;
+  }
+
   .video-row-list:not(.channel-video-grid) > .video-row {
-    border-left: 0;
-    border-radius: 0;
-    border-right: 0;
+    box-shadow: 0 1px 2px rgb(60 40 20 / 0.06), 0 4px 14px rgb(60 40 20 / 0.06);
   }
 
   .video-card-main {

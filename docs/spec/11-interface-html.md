@@ -1074,8 +1074,10 @@ Contenu :
   `grid-auto-rows: 1fr` (hors grille d'une chaine, qui dimensionne ses
   tuiles elle-meme) ;
 - les cartes sont espacees de 8px (`row-gap`) : chacune porte son cadre (filet,
-  coins arrondis, fond), la liste n'en a plus ; sur mobile elles perdent leur
-  filet lateral et leurs coins comme la liste ;
+  coins arrondis, fond), la liste n'en a plus ; sur mobile (moins de 800px)
+  elles restent dans les marges de la page (pas de pleine largeur : bord a
+  bord, les espaces entre cartes font un tableau casse), espacees de 10px,
+  avec une ombre legere ;
 - barre de progression de lecture sur le bord bas de la vignette
   (`.video-row-progress`, 4px, sans texte : la position et la duree sont dans
   son `aria-label`), comme sur la page d'une chaine ;
@@ -1088,7 +1090,7 @@ Contenu :
 - les etoiles de notation sont calees contre le bord droit de la carte (6px),
   sous le menu ⋮, apres Vu/Ecartee ;
 - sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
-  `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
+  `.video-stack-list`, hors liste d'Exploration ci-dessus) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis
   (marges negatives uniquement, jamais de `width: 100vw` : une largeur fixe
   elargit toute la page du dashboard sous Safari iOS) ;
