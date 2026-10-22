@@ -102,12 +102,17 @@ a droite, `.media-pager-dots`) indique le volet actif et sert aussi de
 boutons ; ses boutons restent `data-media-dot`. Chaque volet fait la meme
 hauteur (16:9 sur toute la largeur de l'ecran, sans cadre ni ombre) : passer de
 la video a l'audio ne deplace donc rien dans le reste de la page. Le volet
-Audio y loge une pochette carree a gauche et les boutons de lecture (±15 s)
-a droite. Entre les volets et le selecteur, une **barre de progression unique**
+Audio y loge une pochette carree (168 px) centree dans le volet, le bouton
+lecture (ou telechargement) au milieu de la pochette, en verre liquide
+transparent (fond blanc translucide, flou, liseré clair), et les boutons
+±15 s de part et d'autre de la pochette. Entre les volets et le selecteur, une **barre de progression unique**
 (`.media-pager-seek`, `bindPagerSeek`) suit le volet affiche : sur le volet
 Video elle suit et deplace le `<video>` (qui garde ses controles natifs, donc
 aussi sa propre barre), sur le volet Audio le mini-lecteur ; le temps courant
-et la duree s'affichent dessous. Au-dela de 800 px le carrousel est transparent : les sections
+et la duree s'affichent dessous. Quand le saut des sponsors est actif, les
+segments SponsorBlock sautes (le meme `sponsor_skip_payload` que le moteur de
+saut) sont dessines en vert clair sur la barre (`.media-seek-sponsor`), des que
+la duree de la source affichee est connue. Au-dela de 800 px le carrousel est transparent : les sections
 historiques (`.video-player-panel`, `.audio-player-panel`) restent empilees et
 le choix Audio/Video se fait avec les boutons de la barre d'actions.
 

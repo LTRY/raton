@@ -3133,6 +3133,34 @@ function bindPagerSeek(pager) {
     }
   });
 
+  // Skipped SponsorBlock segments (the same payload as initSponsorSkip), drawn
+  // once the duration of the shown source is known.
+  let sponsorSegments = [];
+  try {
+    const payload = JSON.parse(document.querySelector("script[data-sponsor-skip]")?.textContent || "{}");
+    if (payload.enabled && Array.isArray(payload.segments)) sponsorSegments = payload.segments;
+  } catch {
+    // No payload: no segments to draw.
+  }
+  const seekTrack = seekEl.querySelector(".media-seek-track");
+  let drawnFor = 0;
+  function drawSponsorSegments(total) {
+    if (!seekTrack || total === drawnFor) return;
+    drawnFor = total;
+    seekTrack.querySelectorAll(".media-seek-sponsor").forEach((mark) => mark.remove());
+    if (!total) return;
+    sponsorSegments.forEach((segment) => {
+      const start = Math.max(0, Math.min(total, segment.start));
+      const end = Math.max(start, Math.min(total, segment.end));
+      if (end <= start) return;
+      const mark = document.createElement("span");
+      mark.className = "media-seek-sponsor";
+      mark.style.left = `${(start / total) * 100}%`;
+      mark.style.width = `${((end - start) / total) * 100}%`;
+      seekTrack.appendChild(mark);
+    });
+  }
+
   const events = ["timeupdate", "progress", "loadedmetadata", "durationchange", "emptied", "seeked"];
   function sync() {
     // The mini player's <audio> outlives this page (Turbo permanent node):
@@ -3144,6 +3172,7 @@ function bindPagerSeek(pager) {
     const src = source();
     const total = duration(src);
     seekEl.classList.toggle("is-inert", !total);
+    drawSponsorSegments(total);
     if (durationEl) durationEl.textContent = total ? formatMiniPlayerTime(total) : "--:--";
     // While the thumb is being dragged it shows the target, not the playback position.
     if (dragging) return;
