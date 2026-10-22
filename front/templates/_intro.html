@@ -12,13 +12,36 @@
   <div class="intro-console">
     <div class="intro-box" data-intro-box>
       <p class="intro-text" aria-hidden="true"><span data-intro-text></span><span class="intro-next" data-intro-next>▼</span></p>
+      <span class="intro-step" data-intro-step aria-hidden="true"></span>
       <p class="visually-hidden" data-intro-live aria-live="polite"></p>
     </div>
+    {# The controls of the console. Only ← → A B and Start act; ↑ ↓ and Select are there for the look. #}
     <div class="intro-pad">
-      <span class="intro-step" data-intro-step aria-hidden="true"></span>
+      <div class="intro-dpad">
+        <button class="intro-dpad-key intro-dpad-up" type="button" tabindex="-1" aria-hidden="true"></button>
+        <button class="intro-dpad-key intro-dpad-left" type="button" data-intro-left aria-label="Retour"></button>
+        <button class="intro-dpad-key intro-dpad-right" type="button" data-intro-right aria-label="Suivant"></button>
+        <button class="intro-dpad-key intro-dpad-down" type="button" tabindex="-1" aria-hidden="true"></button>
+      </div>
       <div class="intro-buttons">
-        <button class="intro-btn intro-btn-b" type="button" data-intro-b aria-label="Retour"><span>B</span></button>
-        <button class="intro-btn intro-btn-a" type="button" data-intro-a aria-label="Suivant"><span>A</span></button>
+        <span class="intro-btn-slot intro-btn-slot-b">
+          <button class="intro-btn" type="button" data-intro-b aria-label="Retour"></button>
+          <span class="intro-btn-label" aria-hidden="true">B</span>
+        </span>
+        <span class="intro-btn-slot intro-btn-slot-a">
+          <button class="intro-btn" type="button" data-intro-a aria-label="Suivant"></button>
+          <span class="intro-btn-label" aria-hidden="true">A</span>
+        </span>
+      </div>
+      <div class="intro-menu">
+        <span class="intro-pill-slot">
+          <button class="intro-pill" type="button" tabindex="-1" aria-hidden="true"></button>
+          <span class="intro-btn-label" aria-hidden="true">SELECT</span>
+        </span>
+        <span class="intro-pill-slot">
+          <button class="intro-pill" type="button" data-intro-start aria-label="Passer l’introduction"></button>
+          <span class="intro-btn-label" aria-hidden="true">START</span>
+        </span>
       </div>
     </div>
   </div>

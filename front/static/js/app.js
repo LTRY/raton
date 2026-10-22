@@ -3172,8 +3172,8 @@ function initToasts() {
 }
 
 // Raton's introduction (`_intro.html`): opens once per device, or again with
-// `?intro=1` (link in the settings). A finishes the line being typed, then
-// moves on; B goes back one line. Spec: docs/spec/11-interface-html.md,
+// `?intro=1` (link in the settings). A (or →) finishes the line being typed,
+// then moves on; B (or ←) goes back one line; Start closes. Spec: docs/spec/11-interface-html.md,
 // "Introduction de Raton".
 const INTRO_SEEN_KEY = "raton:intro-seen";
 
@@ -3206,6 +3206,8 @@ function initIntro() {
   const art = root.querySelector("[data-intro-art]");
   const buttonA = root.querySelector("[data-intro-a]");
   const buttonB = root.querySelector("[data-intro-b]");
+  const keyLeft = root.querySelector("[data-intro-left]");
+  const keyRight = root.querySelector("[data-intro-right]");
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const artSrc = (name) => `/static/img/raton/${name}.webp`;
   // Warm the cache so a drawing change does not flash an empty frame.
@@ -3248,6 +3250,7 @@ function initIntro() {
     live.textContent = lines[index].text;
     step.textContent = `${index + 1}/${lines.length}`;
     buttonB.disabled = index === 0;
+    keyLeft.disabled = index === 0;
     const name = lines[index].art;
     if (name && name !== currentArt) {
       art.src = artSrc(name);
@@ -3292,7 +3295,7 @@ function initIntro() {
   const pressB = () => {
     if (index > 0) show(index - 1);
   };
-  // Lights the on-screen button while its key is held.
+  // Lights the on-screen control matching a key press.
   const flash = (button) => {
     button.classList.add("is-pressed");
     window.setTimeout(() => button.classList.remove("is-pressed"), 120);
@@ -3300,6 +3303,9 @@ function initIntro() {
 
   buttonA.addEventListener("click", pressA, { signal });
   buttonB.addEventListener("click", pressB, { signal });
+  keyRight.addEventListener("click", pressA, { signal });
+  keyLeft.addEventListener("click", pressB, { signal });
+  root.querySelector("[data-intro-start]").addEventListener("click", close, { signal });
   box.addEventListener("click", pressA, { signal });
   root.querySelector("[data-intro-skip]").addEventListener("click", close, { signal });
   document.addEventListener(
@@ -3309,11 +3315,11 @@ function initIntro() {
       const key = event.key.toLowerCase();
       if (key === "enter" || key === " " || key === "a" || key === "arrowright") {
         event.preventDefault();
-        flash(buttonA);
+        flash(key === "arrowright" ? keyRight : buttonA);
         pressA();
       } else if (key === "backspace" || key === "b" || key === "arrowleft") {
         event.preventDefault();
-        flash(buttonB);
+        flash(key === "arrowleft" ? keyLeft : buttonB);
         pressB();
       } else if (key === "escape") {
         close();

@@ -561,12 +561,18 @@ est complete.
 - Les repliques sont les `<li>` de `_intro.html`, dans l'ordre ; `data-art`
   nomme le dessin de `static/img/raton/` montre avec la replique (Raton saute
   quand le dessin change).
-- Deux boutons ronds en verre liquide teinte terracotta, inclines comme sur la
-  console : **A** termine la replique en cours de frappe, sinon passe a la
-  suivante, et ferme la scene apres la derniere ; **B** revient a la replique
-  precedente (inactif sur la premiere). Toucher l'encadre vaut A. Clavier :
-  Entree, Espace, `a` ou → pour A ; Retour arriere, `b` ou ← pour B ; Echap
-  ferme. Un compteur `n/total` est affiche a gauche des boutons.
+- Sous l'encadre, les commandes d'une Game Boy, toutes en verre transparent
+  teinte aux couleurs de la console : croix directionnelle noire a gauche,
+  boutons ronds **B** (plus bas) et **A** (plus haut) magenta a droite
+  (`--color-gb-button`), pilules grises inclinees **Select** et **Start**
+  au milieu (`--color-gb-pill`), leurs noms en dessous dans la police de
+  l'application. **A** (ou →) termine la replique en cours de frappe, sinon
+  passe a la suivante, et ferme la scene apres la derniere ; **B** (ou ←)
+  revient a la replique precedente (inactifs sur la premiere) ; **Start**
+  ferme la scene. ↑, ↓ et Select ne font rien. Toucher l'encadre vaut A.
+  Clavier : Entree, Espace, `a` ou → pour A ; Retour arriere, `b` ou ← pour B ;
+  Echap ferme ; la touche allume la commande correspondante a l'ecran. Le
+  compteur `n/total` est dans le coin bas gauche de l'encadre.
 - « Passer » (pilule de verre en haut a droite) ferme la scene a tout moment.
 - « Vue » est retenu par appareil dans le `localStorage`
   (`raton:intro-seen`), pas dans la DB. `?intro=1` sur n'importe quelle page la

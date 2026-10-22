@@ -109,6 +109,8 @@
   --color-border-strong: #d8cbb6;  /* dashed zones, light icons, input borders */
   --color-gb-screen: #d3d5c0;      /* Raton's introduction: the Game Boy screen behind the text */
   --color-gb-ink: #1d1e1a;         /* ...and its black */
+  --color-gb-button: #8f3c74;      /* ...the magenta of its A and B */
+  --color-gb-pill: #6c7480;        /* ...the grey of Select and Start */
   --glass-fill: rgba(255, 255, 255, 0.58);        /* bars and controls */
   --glass-fill-strong: rgba(255, 255, 255, 0.66); /* layers that carry text */
   --glass-rim: rgba(255, 255, 255, 0.85);
@@ -11506,83 +11508,223 @@ html.intro-open {
   opacity: 1;
 }
 
+/* Position in the dialogue, in the corner of the screen. */
+.intro-step {
+  bottom: 16px;
+  color: color-mix(in srgb, var(--color-gb-ink) 55%, transparent);
+  font: 500 14px/1 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
+  left: 24px;
+  letter-spacing: 0.08em;
+  position: absolute;
+}
+
+/* The console's controls, laid out like on a DMG: cross on the left, B low
+   and A high on the right, Select and Start below in the middle. Every piece
+   is see-through glass tinted with the console's colour. */
 .intro-pad {
   align-items: center;
-  display: flex;
-  justify-content: space-between;
-  /* The tilt lifts A above the row: room so it never covers the text box. */
-  padding: 22px 8px 0 4px;
+  column-gap: 12px;
+  display: grid;
+  grid-template-areas:
+    "dpad . ab"
+    "menu menu menu";
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 8px 6px 0;
+  row-gap: 10px;
 }
 
-.intro-step {
-  color: var(--color-text-muted);
-  font: 500 15px/1 "Pixelify Sans", ui-monospace, Menlo, Consolas, monospace;
-  letter-spacing: 0.08em;
+.intro-dpad {
+  grid-area: dpad;
+  height: 108px;
+  position: relative;
+  width: 108px;
 }
 
-/* B low-left, A high-right, the pair tilted like on the console. */
+/* The cross itself: one clipped glass layer. Not the parent of the keys, a
+   clip-path on an ancestor would cut the keys' backdrop off. */
+.intro-dpad::before {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.22) 0 9px, transparent 10px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 45%),
+    color-mix(in srgb, var(--color-gb-ink) 86%, transparent);
+  clip-path: path("M42 0H66A6 6 0 0 1 72 6V36H102A6 6 0 0 1 108 42V66A6 6 0 0 1 102 72H72V102A6 6 0 0 1 66 108H42A6 6 0 0 1 36 102V72H6A6 6 0 0 1 0 66V42A6 6 0 0 1 6 36H36V6A6 6 0 0 1 42 0Z");
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+/* The cross's shadow on the ground. */
+.intro-dpad::after {
+  background: radial-gradient(closest-side, rgba(32, 24, 17, 0.2), transparent);
+  bottom: -14px;
+  content: "";
+  height: 20px;
+  left: 10px;
+  position: absolute;
+  right: 10px;
+  z-index: -1;
+}
+
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .intro-dpad::before {
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    background:
+      radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.22) 0 9px, transparent 10px),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 45%),
+      color-mix(in srgb, var(--color-gb-ink) 62%, transparent);
+  }
+}
+
+.intro-dpad-key {
+  -webkit-tap-highlight-color: transparent;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  height: 36px;
+  padding: 0;
+  position: absolute;
+  transition: background-color 0.1s ease;
+  width: 36px;
+}
+
+.intro-dpad-up { left: 36px; top: 0; border-radius: var(--radius-xs) var(--radius-xs) 0 0; }
+.intro-dpad-down { bottom: 0; left: 36px; border-radius: 0 0 var(--radius-xs) var(--radius-xs); }
+.intro-dpad-left { left: 0; top: 36px; border-radius: var(--radius-xs) 0 0 var(--radius-xs); }
+.intro-dpad-right { right: 0; top: 36px; border-radius: 0 var(--radius-xs) var(--radius-xs) 0; }
+
+.intro-dpad-up,
+.intro-dpad-down {
+  cursor: default;
+}
+
+.intro-dpad-left:active,
+.intro-dpad-right:active,
+.intro-dpad-key.is-pressed {
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .intro-buttons {
   align-items: flex-start;
   display: flex;
-  gap: 16px;
-  transform: rotate(-24deg);
+  gap: 18px;
+  grid-area: ab;
 }
 
-.intro-btn-b {
-  margin-top: 26px;
+.intro-btn-slot,
+.intro-pill-slot {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* Liquid-glass buttons tinted like the console's: a translucent terracotta
-   body, a specular spot on the upper left, a light rim and an inner shade at
-   the bottom. Without backdrop-filter they keep a near-opaque body. */
+.intro-btn-slot-b {
+  margin-top: 30px;
+}
+
+.intro-btn-label {
+  color: var(--color-text-soft);
+  font: 700 12px/1 var(--font-sans);
+  letter-spacing: 0.12em;
+}
+
+/* A and B: magenta glass marbles, a specular spot on the upper left, a light
+   rim and a shade at the bottom. Without backdrop-filter they keep a
+   near-opaque body. */
 .intro-btn {
   -webkit-tap-highlight-color: transparent;
   background:
-    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 42%),
-    color-mix(in srgb, var(--color-primary) 88%, white);
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 42%),
+    color-mix(in srgb, var(--color-gb-button) 90%, white);
   border: 1px solid var(--glass-rim);
   border-radius: 50%;
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 -8px 14px color-mix(in srgb, var(--color-shadow-warm) 30%, transparent),
-    0 10px 22px color-mix(in srgb, var(--color-shadow-warm) 28%, transparent);
-  color: var(--color-white);
+    inset 0 -8px 14px color-mix(in srgb, var(--color-gb-button) 45%, black 20%),
+    0 10px 22px color-mix(in srgb, var(--color-gb-button) 30%, transparent);
   cursor: pointer;
-  display: grid;
-  font: 800 22px/1 var(--font-sans);
-  height: 64px;
+  height: 60px;
   padding: 0;
-  place-items: center;
-  text-shadow: 0 1px 2px rgba(124, 45, 18, 0.45);
   transition: transform 0.12s ease, box-shadow 0.12s ease;
-  width: 64px;
+  width: 60px;
+}
+
+/* Select and Start: slanted grey glass pills. */
+.intro-pill {
+  -webkit-tap-highlight-color: transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+    color-mix(in srgb, var(--color-gb-pill) 92%, white);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-gb-pill) 35%, transparent);
+  cursor: pointer;
+  height: 13px;
+  padding: 0;
+  transform: rotate(-25deg);
+  transition: transform 0.12s ease;
+  width: 48px;
+}
+
+.intro-pill[aria-hidden="true"] {
+  cursor: default;
 }
 
 @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .intro-btn {
+  .intro-btn,
+  .intro-pill {
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
-    background:
-      radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 42%),
-      color-mix(in srgb, var(--color-primary) 52%, transparent);
   }
+
+  .intro-btn {
+    background:
+      radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0) 42%),
+      color-mix(in srgb, var(--color-gb-button) 58%, transparent);
+  }
+
+  .intro-pill {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%),
+      color-mix(in srgb, var(--color-gb-pill) 62%, transparent);
+  }
+}
+
+.intro-menu {
+  display: flex;
+  gap: 26px;
+  grid-area: menu;
+  justify-content: center;
+  /* Like on the console, the pair sits a little left of the middle. */
+  padding-right: 24px;
 }
 
 .intro-btn:active,
 .intro-btn.is-pressed {
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
-    inset 0 6px 14px color-mix(in srgb, var(--color-shadow-warm) 34%, transparent),
-    0 3px 8px color-mix(in srgb, var(--color-shadow-warm) 24%, transparent);
+    inset 0 6px 14px color-mix(in srgb, var(--color-gb-button) 45%, black 25%),
+    0 3px 8px color-mix(in srgb, var(--color-gb-button) 24%, transparent);
   transform: translateY(2px) scale(0.92);
 }
 
-.intro-btn:disabled {
+.intro-pill:not([aria-hidden="true"]):active {
+  transform: rotate(-25deg) scale(0.9);
+}
+
+.intro-btn:disabled,
+.intro-dpad-key:disabled {
   cursor: default;
-  opacity: 0.45;
+}
+
+.intro-btn:disabled {
+  opacity: 0.5;
 }
 
 .intro-btn:focus-visible,
+.intro-pill:focus-visible,
+.intro-dpad-key:focus-visible,
 .intro-skip:focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 3px;
