@@ -2250,6 +2250,13 @@ button.secondary {
   overflow: hidden;
 }
 
+/* Exploration: every card takes the height of the tallest one (a two-line
+   title, a progress bar), so the list reads as an even column. The channel
+   grid sizes its own tiles. */
+.video-row-list:not(.channel-video-grid) {
+  grid-auto-rows: 1fr;
+}
+
 .video-row-list .empty-state {
   border: 0;
   border-radius: 0;
@@ -2388,8 +2395,6 @@ button.secondary {
 /* Une ligne vue ou écartée n'affiche plus sa progression. Le serveur omet deja
    le markup au rendu ; ces regles couvrent la bascule au clic, ou la ligne
    change de classe sans rechargement. */
-.video-row-watched .video-card-progress,
-.video-row-hidden .video-card-progress,
 .dashboard-media-row-completed .video-card-progress,
 .dashboard-media-row-hidden .video-card-progress {
   display: none;
@@ -2595,6 +2600,78 @@ button.secondary {
   gap: 6px;
   justify-self: end;
   padding: 6px 0;
+}
+
+/* Library card (not the channel page): a discreet ⋮ in the top right corner
+   opens a small panel with the publication date. Absolute, so the row's grid
+   columns (shared with the channel page's phone rows) stay as they are; the
+   stars below it sit close to the card's right edge. */
+.video-row:has(> .video-row-more) {
+  padding-right: 6px;
+}
+
+.video-row:has(> .video-row-more) .video-row-title-line {
+  padding-right: 22px;
+}
+
+.video-row:has(> .video-row-more) .list-state-actions {
+  margin-right: 24px;
+}
+
+/* The minimal rating's fixed width is narrower than its five stars: they ran
+   past the card's right edge. */
+.video-row:has(> .video-row-more) .video-row-rating {
+  width: auto;
+}
+
+.video-row-more {
+  position: absolute;
+  right: 2px;
+  top: 4px;
+  z-index: 2;
+}
+
+.video-row-more-button {
+  align-items: center;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  height: 32px;
+  justify-content: center;
+  list-style: none;
+  opacity: 0.55;
+  transition: opacity 100ms ease, background-color 100ms ease;
+  width: 26px;
+}
+
+.video-row-more-button::-webkit-details-marker {
+  display: none;
+}
+
+.video-row-more-button svg {
+  height: 16px;
+  width: 16px;
+}
+
+.video-row-more-button:hover,
+.video-row-more[open] .video-row-more-button {
+  background: var(--color-surface-muted);
+  opacity: 1;
+}
+
+.video-row-more-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-10);
+  box-shadow: 0 6px 16px rgba(43, 32, 24, 0.16);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 4px;
+  white-space: nowrap;
 }
 
 .video-row-format-actions {
@@ -2980,6 +3057,11 @@ button.secondary {
 
   .video-row-actions .video-row-rating {
     width: auto;
+  }
+
+  /* Library card: the stars sit at the card's right edge, after Vu/Ecartee. */
+  .video-row:has(> .video-row-more) .video-row-rating {
+    margin-left: auto;
   }
 
   .video-row-actions .rating-star {

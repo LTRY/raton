@@ -3903,7 +3903,7 @@ if (!window.__formatPopoverScrollBound) {
 }
 })();
 
-// Channel page. Popovers are <details data-pop>: only one stays open, an outside click or
+// Popovers are <details data-pop>: only one stays open, an outside click or
 // Escape closes it, and the "Fermer" button (`data-pop-close`) too. Bound once: this file
 // runs again on every Turbo visit but the listeners live on the document.
 if (!window.__channelPopsBound) {
