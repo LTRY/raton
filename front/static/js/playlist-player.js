@@ -133,7 +133,7 @@
     const channel = row.dataset.channel ? `${row.dataset.channel} · ` : "";
     nowSub.textContent = `${channel}${all.indexOf(row) + 1} sur ${all.length}`;
     if (row.dataset.thumb === "1") {
-      artImg.src = `/videos/${row.dataset.videoId}/thumbnail`;
+      artImg.src = `/api/videos/${row.dataset.videoId}/thumbnail`;
       artImg.hidden = false;
     } else {
       artImg.hidden = true;
@@ -157,9 +157,9 @@
       updatePlayIcon();
       return;
     }
-    media.src = `/videos/${row.dataset.videoId}/${mode}`;
+    media.src = `/api/videos/${row.dataset.videoId}/${mode}`;
     if (row.dataset.thumb === "1" && mode === "video") {
-      media.poster = `/videos/${row.dataset.videoId}/thumbnail`;
+      media.poster = `/api/videos/${row.dataset.videoId}/thumbnail`;
     } else {
       media.removeAttribute("poster");
     }
