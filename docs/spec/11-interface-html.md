@@ -1142,7 +1142,10 @@ recherche sans resultat garde le texte « Aucun resultat pour « q ». ».
 **En-tete** (`.channel-hero`), de haut en bas :
 
 - la banniere (si enregistree ; sinon un degrade terracotta) et, qui la
-  chevauche, l'avatar (ou la pastille d'initiale) a gauche du nom. Le **nom de
+  chevauche, l'avatar (ou la pastille d'initiale) a gauche du nom. Seul
+  l'avatar chevauche la banniere : le nom commence juste sous son bord et un
+  nom long passe a la ligne vers le bas (il pousse les actions), sans jamais
+  recouvrir la banniere. Le **nom de
   la chaine est le lien vers YouTube** (`.channel-youtube-link`, nouvel
   onglet, `noopener noreferrer`, fleche discrete qui s'eclaircit au survol) ;
   il n'y a plus de ligne de statistiques ni de lien "YouTube ↗" separe ;

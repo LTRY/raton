@@ -17,10 +17,11 @@ from back.models.channel import Channel
 from back.models.video import Video
 from back.services.videos.playback import record_playback_activity
 
+# One long name, so the channel page header is shown wrapping onto two lines.
 DEMO_CHANNELS = [
     ("Atelier du code", "UCdemo000000000000000001", True),
     ("Carnets de cuisine", "UCdemo000000000000000002", False),
-    ("Chroniques d'histoire", "UCdemo000000000000000003", True),
+    ("Chroniques d'histoire de la Méditerranée antique", "UCdemo000000000000000003", True),
 ]
 
 # (title, rating, list_state, share of the video already played): enough variety for every
