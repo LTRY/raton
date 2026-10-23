@@ -111,8 +111,12 @@ COPY --from=docker:28-cli /usr/local/libexec/docker/cli-plugins /usr/local/libex
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # The repository belongs to the host user, not to root; GH_TOKEN (env) authenticates git over HTTPS.
+# The image has no ssh client nor keys: an SSH origin of the host checkout (git@github.com:...)
+# is fetched over HTTPS instead, without touching the checkout's own config.
 RUN git config --global --add safe.directory '*' \
-    && git config --global credential.helper '!gh auth git-credential'
+    && git config --global credential.helper '!gh auth git-credential' \
+    && git config --global url.'https://github.com/'.insteadOf 'git@github.com:' \
+    && git config --global --add url.'https://github.com/'.insteadOf 'ssh://git@github.com/'
 
 WORKDIR /app
 EXPOSE 8999

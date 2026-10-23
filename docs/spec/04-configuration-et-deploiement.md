@@ -294,8 +294,10 @@ le merge ne deploie rien.
   `raton-ops` (voir « Docker Compose »), qui sert `scripts/previews.py`
   (bibliotheque standard Python seulement) sur le port `8999` (`PREVIEWS_PORT`),
   sur l'interface d'`APP_BIND` du `.env`. `gh` y est authentifie par `GH_TOKEN`
-  (`.env`), qui sert aussi a git en HTTPS (`git fetch origin main`) : le remote
-  `origin` doit donc etre en HTTPS, avec un jeton qui lit le depot. Elle
+  (`.env`), qui sert aussi a git en HTTPS (`git fetch origin main`), avec un
+  jeton qui lit le depot. L'image n'a pas de client ssh : un remote `origin` en
+  SSH (`git@github.com:...`) est lu en HTTPS dans le conteneur (`insteadOf` de
+  la config git de l'image), sans changer la config du depot. Elle
   liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
