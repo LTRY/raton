@@ -89,8 +89,12 @@ cmd_up() {
   if ! compose "$pr" up -d --build --force-recreate --remove-orphans; then
     echo "preview.sh: la construction de la preview $pr a échoué" >&2; exit 1
   fi
-  # Inside the host, 0.0.0.0 (APP_BIND opened to the LAN) is reached on loopback.
-  address="$(compose "$pr" port app 8000 | sed 's/^0\.0\.0\.0:/127.0.0.1:/')"
+  # The preview's port is published on the host. In the raton-ops container, loopback is the
+  # container itself, so the host is reached by name; elsewhere 0.0.0.0 (APP_BIND opened to the
+  # LAN) is reached on loopback.
+  local host=127.0.0.1
+  [ -f /.dockerenv ] && host=host.docker.internal
+  address="$(compose "$pr" port app 8000 | sed "s/^0\.0\.0\.0:/$host:/;s/^127\.0\.0\.1:/$host:/")"
   for _ in $(seq 1 60); do
     if curl -fs -o /dev/null "http://$address/"; then
       # A rebuild moves the image tags and leaves the previous build dangling.

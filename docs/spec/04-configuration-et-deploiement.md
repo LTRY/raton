@@ -313,7 +313,9 @@ le merge ne deploie rien.
 - **Script** : `scripts/preview.sh up <N>` recupere la tete de la PR
   (`refs/pull/<N>/head`) dans un worktree git `.local/previews/pr-<N>`, puis
   construit et lance le projet compose `raton-pr-<N>`
-  (`docker-compose.preview.yml`) ; `down <N>` supprime conteneurs, images,
+  (`docker-compose.preview.yml`), puis attend qu'elle reponde (depuis `raton-ops`,
+  la boucle locale est le conteneur lui-meme : le script joint l'hote par
+  `host.docker.internal`) ; `down <N>` supprime conteneurs, images,
   worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees.
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
 - **DB** : la preview tourne sur le serveur Postgres de la pile reelle
