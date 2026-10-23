@@ -44,6 +44,7 @@ class Preview:
     port: int
     sha: str
     state: str  # docker's container state: running, exited, created...
+    db: str = "-"  # "shared" (the real DB), "copy" (a migrated copy), "-" when unknown
 
 
 @dataclass
@@ -67,9 +68,9 @@ def parse_previews(text: str) -> dict[int, Preview]:
     previews = {}
     for line in text.splitlines():
         parts = line.split()
-        if len(parts) == 4 and parts[0].isdigit():
+        if len(parts) == 5 and parts[0].isdigit():
             pr = int(parts[0])
-            previews[pr] = Preview(pr, int(parts[1]), parts[2], parts[3])
+            previews[pr] = Preview(pr, int(parts[1]), parts[2], parts[3], parts[4])
     return previews
 
 
@@ -239,6 +240,9 @@ footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items
 """
 
 
+DB_LABELS = {"shared": "DB réelle", "copy": "copie de la DB"}
+
+
 def render_row(
     host: str | None, number: int, pr: dict, preview: Preview | None, job: Job | None
 ) -> str:
@@ -275,6 +279,8 @@ def render_row(
     if job is not None:
         actions.append(f'<a class="log" href="/prs/{number}/log">Journal</a>')
     port = f" · port {preview.port}" if preview is not None else ""
+    if preview is not None and preview.db in DB_LABELS:
+        port += f" · {DB_LABELS[preview.db]}"
     return (
         f'<div class="pr"><div class="info"><div class="title">{title}</div>'
         f'<div class="meta">{" · ".join(meta)}{port}</div>'

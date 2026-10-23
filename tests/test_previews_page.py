@@ -23,11 +23,11 @@ OPEN_PR = {
 
 
 def test_parse_previews_reads_the_lines_of_preview_sh_list():
-    previews = parse_previews(f"31 9031 {'a' * 40} running\n7 9007 - exited\nnoise\n")
+    previews = parse_previews(f"31 9031 {'a' * 40} running copy\n7 9007 - exited -\nnoise\n")
 
     assert previews == {
-        31: Preview(31, 9031, "a" * 40, "running"),
-        7: Preview(7, 9007, "-", "exited"),
+        31: Preview(31, 9031, "a" * 40, "running", "copy"),
+        7: Preview(7, 9007, "-", "exited", "-"),
     }
 
 
@@ -57,7 +57,7 @@ def test_page_escapes_titles_and_lists_previews_of_closed_prs():
     page = render_page(
         "nas:8999",
         [OPEN_PR, {**OPEN_PR, "number": 32, "isCrossRepository": True}],
-        {5: Preview(5, 9005, "c" * 40, "running")},
+        {5: Preview(5, 9005, "c" * 40, "running", "shared")},
         {},
         None,
     )
@@ -67,6 +67,7 @@ def test_page_escapes_titles_and_lists_previews_of_closed_prs():
     assert 'action="/prs/32/up"' not in page  # a fork never gets a deploy button
     assert 'action="/prs/5/down"' in page
     assert 'href="http://nas:9005/"' in page
+    assert "DB réelle" in page
     assert "http-equiv" not in page  # no auto-refresh while nothing is building
 
 

@@ -1,4 +1,4 @@
-"""Transcripts of a few demo fiches (by title), so a preview can try the LLM features on them."""
+"""Transcripts of a few demo fiches (by title), so a demo instance can try the LLM features on them."""
 
 DEMO_TRANSCRIPTS = {
     "Pâte à pizza : le secret de l'hydratation": """\

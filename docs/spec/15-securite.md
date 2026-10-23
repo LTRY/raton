@@ -26,9 +26,10 @@ atteint la page ou le conteneur controle le Docker de l'hote. Il recoit aussi
 previews et du deploiement ; la page reste donc sur l'interface d'`APP_BIND`
 (loopback par defaut).
 
-Une preview tourne avec la cle Anthropic du `.env` (voir « Previews des PR »
-dans [04](04-configuration-et-deploiement.md)) : le code d'une PR non mergee
-peut donc l'utiliser ou la lire. D'ou le refus des PR de fork, et le
+Une preview tourne avec la cle Anthropic du `.env` et le mot de passe de la DB
+reelle (voir « Previews des PR » dans [04](04-configuration-et-deploiement.md)) :
+le code d'une PR non mergee peut donc utiliser la cle et lire ou modifier les
+vraies donnees. D'ou le refus des PR de fork, et le
 deploiement d'une preview reste un geste manuel.
 
 ## Garde-fous sans authentification

@@ -1,9 +1,11 @@
 # One PR preview, driven by scripts/preview.sh (compose project raton-pr-<PR>): the PR's back and
-# front, built from its git worktree (PREVIEW_SRC), on port PREVIEW_PORT. Throwaway on purpose:
-# a sqlite DB inside the `api` container filled with the demo data, no media, no scheduler — a
-# preview never touches the real stack, its DB or its media. Its only secret is the Anthropic key
-# of the real stack's .env (read by compose from the repo root), so the LLM features can be tried.
-# See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+# front, built from its git worktree (PREVIEW_SRC), on port PREVIEW_PORT, on the Postgres server
+# of the real stack (raton-db, reached on its network PREVIEW_DB_NETWORK). preview.sh picks the
+# database (PREVIEW_DB_NAME): the real one when the PR has no migration to run, else a copy it
+# migrates (PREVIEW_MIGRATE=1). The real media folder is mounted read-only and the scheduler is
+# off: a preview never deletes a file nor runs the jobs of the real stack. Its secrets are the
+# Postgres password and the Anthropic key of the real stack's .env (read by compose from the repo
+# root). See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 services:
   api:
     build:
@@ -11,20 +13,23 @@ services:
       target: back
     image: raton-preview-api:pr-${PREVIEW_PR:?set by scripts/preview.sh}
     volumes:
-      # The demo seed is not in the back image (scripts/ is not copied): read it from the PR's worktree.
-      - ${PREVIEW_SRC}/scripts:/app/scripts:ro
+      - ${MEDIA_HOST_ROOT:-./.local/media/YouTube}:/media/youtube:ro
+    networks:
+      - default
+      - real
     environment:
-      DATABASE_URL: sqlite+pysqlite:////tmp/raton.db
-      MEDIA_ROOT: /tmp/media
-      APP_AUTO_CREATE_TABLES: "true"
+      DATABASE_URL: postgresql+psycopg://raton:${POSTGRES_PASSWORD:-raton}@raton-db:5432/${PREVIEW_DB_NAME:?set by scripts/preview.sh}
+      MEDIA_ROOT: /media/youtube
       APP_SCHEDULER_ENABLED: "false"
       LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+      PREVIEW_MIGRATE: ${PREVIEW_MIGRATE:-0}
     command:
       - sh
       - -c
-      - mkdir -p /tmp/media && python -m scripts.demo_seed && uvicorn back.main:app --host 0.0.0.0 --port 8001
+      # The real DB is never migrated by a preview: only its copy is.
+      - '{ [ "$$PREVIEW_MIGRATE" != 1 ] || alembic upgrade head; } && exec uvicorn back.main:app --host 0.0.0.0 --port 8001'
 
   app:
     build:
@@ -33,12 +38,18 @@ services:
     image: raton-preview:pr-${PREVIEW_PR}
     depends_on:
       - api
-    # scripts/preview.sh finds the previews, and the commit each one runs, through these labels.
+    # scripts/preview.sh finds the previews, the commit and the DB each one runs, through these labels.
     labels:
       raton.preview.pr: "${PREVIEW_PR}"
       raton.preview.sha: "${PREVIEW_SHA:-}"
+      raton.preview.db: "${PREVIEW_DB_MODE:-}"
     ports:
       # Same interface as the real stack (APP_BIND in .env): loopback unless opened to the LAN.
       - "${APP_BIND:-127.0.0.1}:${PREVIEW_PORT:?set by scripts/preview.sh}:8000"
     environment:
       RATON_API_URL: http://api:8001
+
+networks:
+  real:
+    external: true
+    name: ${PREVIEW_DB_NETWORK:?set by scripts/preview.sh}

@@ -27,7 +27,7 @@ format:
 compose-config:
 	docker compose config
 	docker compose -f docker-compose.docs.yml config
-	PREVIEW_PR=0 PREVIEW_PORT=9000 PREVIEW_SRC=. docker compose -f docker-compose.preview.yml config
+	PREVIEW_PR=0 PREVIEW_PORT=9000 PREVIEW_SRC=. PREVIEW_DB_NAME=raton PREVIEW_DB_NETWORK=raton_default docker compose -f docker-compose.preview.yml config
 
 css:
 	./scripts/build_css.sh

@@ -1,11 +1,11 @@
-"""Demo data for throwaway instances (PR previews).
+"""Demo data for throwaway instances (the screenshots of scripts/screenshot.sh).
 
 Run as `python -m scripts.demo_seed` against an empty sqlite database: it
 creates the tables and a handful of channels and videos, then does nothing on
 the following runs. No media files exist behind these rows, so players have
 nothing to play, but every list and detail page has something to show. A few fiches get a
 transcript (`DEMO_TRANSCRIPTS`), so the LLM features (notes, quiz, discussion) have something
-to work on when the preview has an API key.
+to work on when the instance has an API key.
 """
 
 from datetime import UTC, datetime, timedelta
