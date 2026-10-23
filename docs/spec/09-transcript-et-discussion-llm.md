@@ -96,7 +96,10 @@ Affichage additionnel dans le panneau `text` :
 Le declencheur de la generation (notes + résumé) ne vit pas dans la
 barre d'outils du transcript mais **en haut de la page**, sur la meme ligne
 que les actions formats Audio/Vidéo (`.video-detail-action-bar`), pour rester
-visible sans defiler jusqu'a la section transcript :
+visible sans defiler jusqu'a la section transcript. Sous 800 px, cette barre
+est masquee et le menu « ⋮ » de la fiche porte un item « Generer avec l'IA »
+qui relaie son clic vers ce bouton (voir « Detail video » dans
+[11 Interface HTML](11-interface-html.md)) :
 
 - bouton icone `.ai-generate-button` (robot SVG, rond, sans libelle) qui
   soumet `#generate-form` : le script appelle `POST /api/videos/{id}/notes/generate`

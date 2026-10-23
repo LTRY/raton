@@ -6423,8 +6423,8 @@ turbo-frame {
     justify-content: center;
   }
 
-  .media-pager .media-pager-dot,
-  .media-pager .media-pager-dot:hover {
+  .media-pager-dots .media-pager-dot,
+  .media-pager-dots .media-pager-dot:hover {
     background: transparent;
     border: none;
     border-radius: 0;
@@ -10800,8 +10800,21 @@ body::before {
   position: relative;
 }
 
-.video-topbar .back-link {
-  margin: 0;
+/* Same round glass as the phone "⋮" toggle next to it. */
+.video-back {
+  align-items: center;
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  display: flex;
+  flex: none;
+  height: 44px;
+  justify-content: center;
+  width: 44px;
+}
+
+.video-back svg {
+  height: 20px;
+  width: 20px;
 }
 
 .video-more {
@@ -10946,8 +10959,11 @@ body::before {
     overflow-wrap: anywhere;
   }
 
+  /* Everything in the action bar has its phone place elsewhere (slides, "⋮"),
+     so the bar goes whole, margin included; its buttons stay in the DOM for
+     the proxies. */
   .transcript-tab[data-tab="segments"],
-  .video-detail-action-bar .transcript-retry {
+  .video-detail-card > .video-detail-action-bar {
     display: none;
   }
 
@@ -11085,19 +11101,20 @@ body::before {
     width: 22px;
   }
 
-  /* Icon toggle under the player; the dots JS still sets the active class. */
+  /* Icon toggle in the top bar, between the back button and the "⋮"; the
+     dots JS still sets the active class. */
   .media-pager-dots {
     background: var(--color-surface-muted);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-pill);
     gap: 0;
-    margin: 10px auto 0;
+    margin: 0;
     padding: 3px;
     width: max-content;
   }
 
-  .media-pager .media-pager-dot,
-  .media-pager .media-pager-dot:hover {
+  .media-pager-dots .media-pager-dot,
+  .media-pager-dots .media-pager-dot:hover {
     align-items: center;
     background: transparent;
     border-radius: var(--radius-pill);
@@ -11109,28 +11126,28 @@ body::before {
     width: 46px;
   }
 
-  .media-pager .media-pager-dot svg {
+  .media-pager-dots .media-pager-dot svg {
     height: 17px;
     width: 17px;
   }
 
   /* The pill stays 30px tall; an invisible extension brings the tap target to 44px. */
-  .media-pager .media-pager-dot {
+  .media-pager-dots .media-pager-dot {
     position: relative;
   }
 
-  .media-pager .media-pager-dot::before {
+  .media-pager-dots .media-pager-dot::before {
     content: "";
     inset: -7px 0;
     position: absolute;
   }
 
-  .media-pager .media-pager-dot::after {
+  .media-pager-dots .media-pager-dot::after {
     display: none;
   }
 
-  .media-pager .media-pager-dot-active,
-  .media-pager .media-pager-dot-active:hover {
+  .media-pager-dots .media-pager-dot-active,
+  .media-pager-dots .media-pager-dot-active:hover {
     background: var(--color-surface);
     box-shadow: var(--shadow-sm, 0 1px 3px rgba(43, 32, 24, 0.15));
     color: var(--color-primary);

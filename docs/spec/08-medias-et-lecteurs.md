@@ -97,15 +97,17 @@ volets (`.media-pager`, CSS `scroll-snap`, glissement natif) : **Video** a
 gauche, **Audio** a droite. Une video audio seule s'ouvre sur le volet Audio, de
 meme qu'une URL en `#audio` (lien du mini-lecteur), qui l'emporte sur le volet
 memorise (le rechargement apres telechargement retire le `#`).
-Sous le carrousel, un petit selecteur a deux icones (camera a gauche, ondes
-a droite, `.media-pager-dots`) indique le volet actif et sert aussi de
-boutons ; ses boutons restent `data-media-dot`. Chaque volet fait la meme
+Un petit selecteur a deux icones (camera a gauche, ondes a droite,
+`.media-pager-dots`) indique le volet actif et sert aussi de boutons ; il
+est place au-dessus du carrousel, au centre de la ligne du bouton de retour
+et du bouton « ⋮ » (`.video-topbar`), hors de `.media-pager` : les scripts
+du carrousel cherchent ses boutons (`data-media-dot`) dans `.video-detail`. Chaque volet fait la meme
 hauteur (16:9 sur toute la largeur de l'ecran, sans cadre ni ombre) : passer de
 la video a l'audio ne deplace donc rien dans le reste de la page. Le volet
 Audio y loge une pochette carree (168 px) centree dans le volet, le bouton
 lecture (ou telechargement) au milieu de la pochette, en verre liquide
 transparent (fond blanc translucide, flou, liseré clair), et les boutons
-±15 s de part et d'autre de la pochette. Entre les volets et le selecteur, une **barre de progression unique**
+±15 s de part et d'autre de la pochette. Sous les volets, une **barre de progression unique**
 (`.media-pager-seek`, `bindPagerSeek`) suit le volet affiche : sur le volet
 Video elle suit et deplace le `<video>` (qui garde ses controles natifs, donc
 aussi sa propre barre), sur le volet Audio le mini-lecteur ; le temps courant
