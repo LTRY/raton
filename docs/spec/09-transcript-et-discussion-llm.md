@@ -466,7 +466,7 @@ ensuite ces references, **sans les retirer** : une reference vers un id
 « garanti » reste dans `content`, vers un autre id (le modele ne peut pas
 faire apparaitre un element invente) elle est remplacee par son seul libelle
 (supprimee s'il n'y en a pas). Un id est garanti quand un outil l'a renvoye
-pendant ce job **ou** qu'une reponse precedente de la discussion l'a deja cite
+pendant ce job **ou** qu'une reponse precedente de la **meme** discussion l'a deja cite
 (`library_chat_messages.sources` / `channel_sources`) : le modele recoit
 l'historique avec ses `[[...]]` et peut les reprendre au tour suivant. Le
 libelle ecrit par le modele n'est qu'un repli : l'interface affiche le nom
@@ -488,17 +488,35 @@ ce format) reste affiche en puces sous la reponse : les
 chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
 `/videos/{id}`).
 
+### Discussions
+
+Le chat bibliotheque garde plusieurs discussions
+(`library_chat_conversations`, voir [05](05-modele-de-donnees.md)) : chaque
+question suit une discussion, et le modele ne relit que celle-ci. Une
+question posee sans discussion en ouvre une nouvelle, nommee d'apres cette
+question (`conversation_title` : sur une ligne, 80 caracteres au plus). Une
+discussion dont la premiere question n'a jamais eu de reponse (job echoue)
+n'a aucun message : elle n'est pas listee, et la question suivante du widget
+la reprend. La liste donne les 50 discussions les plus recemment repondues ;
+les plus anciennes restent dans la DB. Supprimer une discussion supprime ses
+messages ; un job encore en cours pour elle echoue au poll
+(`Discussion supprimée`) au lieu d'ecrire sa reponse ailleurs.
+
 ### Routes
 
-`POST /api/chat` `{question}` :
+`POST /api/chat` `{question, conversation_id}` :
 
-- refuse les questions vides (`400`) ;
-- construit le prompt a partir des 10 derniers messages du fil
+- refuse les questions vides (`400`) et une discussion inconnue (`404
+  Discussion introuvable.`) ;
+- sans `conversation_id`, ouvre une nouvelle discussion
+  (`history.py:start_conversation`) ;
+- construit le prompt a partir des 10 derniers messages de la discussion
   (`library_chat_messages`) et de la question — aucune recherche n'est faite
   dans la requete HTTP ;
-- cree un job (`llm_jobs`, `kind="library_chat"`, `video_id=null`) et repond
-  `202 {job_id, status, status_url}`, meme mecanique asynchrone
-  (`BackgroundTasks`) que les autres jobs LLM.
+- cree un job (`llm_jobs`, `kind="library_chat"`, `video_id=null`,
+  `conversation_id`) et repond `202 {job_id, status, status_url,
+  conversation_id}`, meme mecanique asynchrone (`BackgroundTasks`) que les
+  autres jobs LLM.
 
 Les messages envoyes au modele sont construits par
 `prompts.py:build_library_chat_prompt` : les 10 derniers messages de la
@@ -529,19 +547,23 @@ cites dans `llm_jobs.sources`.
   `null` tant que l'outil tourne puis devient un resume d'une ligne
   (« Chaine Underscore_ trouvee. », « Aucune video trouvee. ») ;
 - a l'application (`done`), insere un message `user` et un message
-  `assistant` dans `library_chat_messages`, ce dernier avec les videos
-  (`sources`) et les chaines (`channel_sources`) lues dans `llm_jobs.sources` ;
-- reponse : `library_chat` `{messages: [{role, content, channels:
-  [{channel_id, name}], citations: [{video_id, title}]}, ...],
-  indexed_video_count, total_video_count}`, comme `GET /api/chat`. Les chaines et videos
+  `assistant` dans la discussion du job (`library_chat_messages`), ce dernier
+  avec les videos (`sources`) et les chaines (`channel_sources`) lues dans
+  `llm_jobs.sources`, et avance son `updated_at` ;
+- reponse : `library_chat` `{conversation_id, title, messages: [{role,
+  content, channels: [{channel_id, name}], citations: [{video_id, title}]},
+  ...], conversations: [{id, title, updated_at}], indexed_video_count,
+  total_video_count}`, comme `GET /api/chat`. Les chaines et videos
   supprimees depuis la reponse sont retirees de `channels`/`citations`.
   `indexed_video_count`/`total_video_count` alimentent la note de couverture
   du widget : combien de videos la recherche dans les notes peut voir (une
   video n'est indexee que si ses notes ont ete (re)generees au format a
   sections, voir la section Notes structurees ci-dessus).
 
-`DELETE /api/chat` : vide entierement `library_chat_messages` (fil unique,
-pas de portee par utilisateur).
+`GET /api/chat` : la discussion la plus recente (celle qu'ouvre l'accueil),
+meme reponse. `GET /api/chat/conversations/{id}` : une discussion donnee.
+`DELETE /api/chat/conversations/{id}` : supprime la discussion et ses
+messages (`204`). Pas de portee par utilisateur.
 
 ## Fournisseur LLM
 

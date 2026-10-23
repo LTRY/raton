@@ -150,7 +150,9 @@ def test_the_library_chat_shows_its_tools_then_its_answer(client, db, video, tas
     )
     done = client.get(f"/api/llm-jobs/{job_id}").json()
     chat = client.get("/api/chat").json()
-    cleared = client.delete("/api/chat")
+    conversation_url = f"/api/chat/conversations/{queued.json()['conversation_id']}"
+    opened = client.get(conversation_url).json()
+    deleted = client.delete(conversation_url)
 
     assert running["tool_calls"] == [{"name": "search_videos"}]
     assert done["status"] == "done"
@@ -159,8 +161,14 @@ def test_the_library_chat_shows_its_tools_then_its_answer(client, db, video, tas
     assert answer["citations"] == [{"video_id": video.id, "title": "Fiche"}]
     assert chat["messages"] == done["library_chat"]["messages"]
     assert chat["total_video_count"] == 1
-    assert cleared.status_code == 204
+    assert chat["conversation_id"] == queued.json()["conversation_id"]
+    assert chat["title"] == "Quelles vidéos ?"
+    assert [item["title"] for item in chat["conversations"]] == ["Quelles vidéos ?"]
+    assert opened == chat
+    assert deleted.status_code == 204
+    assert client.get(conversation_url).status_code == 404
     assert client.get("/api/chat").json()["messages"] == []
+    assert client.get("/api/chat").json()["conversation_id"] is None
 
 
 def test_a_failed_job_is_reported_with_its_reason(client, db, video, tasks):

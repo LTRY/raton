@@ -69,7 +69,7 @@
 {% macro chat_widget(widget_id, title, config, extra_class="") %}
 {% set has_multiple_scopes = config.scopes.keys() | list | length > 1 %}
 {# data-chat-empty is kept in sync by initChatWidget; rendering it here avoids a layout jump before the script runs. #}
-<section class="chat-widget {{ extra_class }}" id="{{ widget_id }}" data-chat-widget data-chat-empty="{{ 'false' if config.scopes[config.defaultScope].messages else 'true' }}" data-chat-config='{{ config | tojson }}'{% if not title %} aria-label="Assistant"{% endif %}>
+<section class="chat-widget {{ extra_class }}" id="{{ widget_id }}" data-chat-widget data-chat-empty="{{ 'false' if config.scopes[config.defaultScope].messages else 'true' }}" data-chat-has-conversations="{{ 'true' if config.scopes[config.defaultScope].conversations else 'false' }}" data-chat-config='{{ config | tojson }}'{% if not title %} aria-label="Assistant"{% endif %}>
   <div class="discussion-header">
     {% if title %}
     <div class="chat-title">
@@ -92,6 +92,28 @@
         {% endfor %}
       </div>
       {% endif %}
+      {# Discussions of the library scope (`conversationsUrl` in its config); initChatWidget shows them. #}
+      <div class="chat-conversations" data-chat-conversations hidden>
+        <button type="button" class="chat-clear chat-conversations-toggle" data-chat-conversations-toggle aria-haspopup="dialog" aria-expanded="false" title="Discussions précédentes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>
+          <span>Discussions</span>
+        </button>
+        <div class="chat-suggest-backdrop chat-conversations-backdrop" data-chat-conversations-backdrop aria-hidden="true"></div>
+        <div class="chat-suggest-menu chat-conversations-menu" data-chat-conversations-menu role="dialog" aria-label="Discussions" hidden>
+          <span class="chat-suggest-grip" aria-hidden="true"></span>
+          <div class="chat-suggest-head">
+            <button type="button" class="chat-suggest-close" data-chat-conversations-close aria-label="Fermer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+            <span class="chat-suggest-title">Discussions</span>
+          </div>
+          <ul class="chat-conversation-list" data-chat-conversations-list></ul>
+        </div>
+        <button type="button" class="chat-clear chat-new" data-chat-new title="Nouvelle discussion" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Nouvelle</span>
+        </button>
+      </div>
       <form class="chat-clear-form" data-chat-clear data-turbo="false" hidden>
         <button class="chat-clear" type="submit" title="Effacer la discussion">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7m3 0-.7 12a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5.5 7"/></svg>

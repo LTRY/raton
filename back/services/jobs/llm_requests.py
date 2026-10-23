@@ -19,7 +19,11 @@ from back.services.jobs.llm_jobs import (
     apply_transcript_chat_result,
     enqueue_llm_job,
 )
-from back.services.library_chat.history import chat_history
+from back.services.library_chat.history import (
+    chat_history,
+    get_conversation,
+    start_conversation,
+)
 from back.services.llm.prompts import (
     build_chat_prompt,
     build_generation_prompt,
@@ -102,11 +106,17 @@ def queue_video_question(db: Session, video: Video, question: str) -> LlmJob:
         raise LlmRequestError(f"Réponse impossible : {exc}") from exc
 
 
-def queue_library_question(db: Session, question: str) -> LlmJob:
-    """A question to the library chat, following its single conversation."""
+def queue_library_question(db: Session, question: str, conversation_id: int | None) -> LlmJob:
+    """A question to the library chat, following the discussion `conversation_id`, or starting
+    a new one when it is None. Raises `ConversationNotFoundError` for an unknown discussion."""
     question = _question(question)
+    conversation = (
+        start_conversation(db, question)
+        if conversation_id is None
+        else get_conversation(db, conversation_id)
+    )
     try:
-        prompt = build_library_chat_prompt(chat_history(db), question)
+        prompt = build_library_chat_prompt(chat_history(db, conversation.id), question)
         return enqueue_llm_job(
             db,
             kind="library_chat",
@@ -114,6 +124,7 @@ def queue_library_question(db: Session, question: str) -> LlmJob:
             video_id=None,
             prompt=prompt.to_json(),
             question=question,
+            conversation_id=conversation.id,
         )
     except Exception as exc:
         raise LlmRequestError(f"Réponse impossible : {exc}") from exc

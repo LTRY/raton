@@ -1879,8 +1879,17 @@ function initChatWidget(root) {
   const suggestList = root.querySelector("[data-chat-suggest-list]");
   const suggestClose = root.querySelector("[data-chat-suggest-close]");
   const suggestBackdrop = root.querySelector("[data-chat-suggest-backdrop]");
+  const conversationsEl = root.querySelector("[data-chat-conversations]");
+  const conversationsToggle = root.querySelector("[data-chat-conversations-toggle]");
+  const conversationsMenu = root.querySelector("[data-chat-conversations-menu]");
+  const conversationsList = root.querySelector("[data-chat-conversations-list]");
+  const conversationsClose = root.querySelector("[data-chat-conversations-close]");
+  const conversationsBackdrop = root.querySelector("[data-chat-conversations-backdrop]");
+  const newButton = root.querySelector("[data-chat-new]");
   let currentScope = config.scopes[config.defaultScope] ? config.defaultScope : Object.keys(config.scopes)[0];
   let statusTimer;
+  // True while an answer is awaited: the discussion must not change under it.
+  let busy = false;
 
   function scopeConfig() {
     return config.scopes[currentScope];
@@ -1989,6 +1998,143 @@ function initChatWidget(root) {
     messagesEl?.lastElementChild?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
+  // A scope with `conversationsUrl` (library) keeps several discussions: the
+  // header lists them and starts a new one instead of erasing the only one.
+  const hasConversations = () => Boolean(scopeConfig().conversationsUrl);
+  const dayFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
+  const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
+
+  function conversationDate(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toDateString() === new Date().toDateString() ? timeFormat.format(date) : dayFormat.format(date);
+  }
+
+  function closeConversations() {
+    if (!conversationsMenu || conversationsMenu.hidden) return;
+    conversationsMenu.hidden = true;
+    conversationsToggle.setAttribute("aria-expanded", "false");
+  }
+
+  function renderConversations() {
+    if (!conversationsEl) return;
+    const scope = scopeConfig();
+    if (!hasConversations()) {
+      conversationsEl.hidden = true;
+      root.dataset.chatHasConversations = "false";
+      return;
+    }
+    const conversations = scope.conversations || [];
+    conversationsEl.hidden = false;
+    root.dataset.chatHasConversations = conversations.length ? "true" : "false";
+    conversationsToggle.hidden = !conversations.length;
+    conversationsToggle.disabled = busy;
+    newButton.hidden = !(scope.messages || []).length;
+    newButton.disabled = busy;
+    if (!conversations.length) closeConversations();
+    conversationsList.replaceChildren(
+      ...conversations.map((conversation) => {
+        const item = document.createElement("li");
+        item.className = "chat-conversation";
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "chat-conversation-open";
+        if (conversation.id === scope.conversationId) open.setAttribute("aria-current", "true");
+        const title = document.createElement("span");
+        title.className = "chat-conversation-title";
+        title.textContent = conversation.title;
+        const date = document.createElement("span");
+        date.className = "chat-conversation-date";
+        date.textContent = conversationDate(conversation.updated_at);
+        open.append(title, date);
+        open.addEventListener("click", () => openConversation(conversation.id));
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "chat-conversation-delete";
+        remove.setAttribute("aria-label", `Supprimer la discussion « ${conversation.title} »`);
+        remove.title = "Supprimer la discussion";
+        remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7m3 0-.7 12a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5.5 7"/></svg>';
+        remove.addEventListener("click", () => deleteConversation(conversation));
+        item.append(open, remove);
+        return item;
+      }),
+    );
+  }
+
+  // The server's view of a library discussion (`LibraryChatRead`) becomes the scope's state.
+  function applyLibraryChat(scope, chat) {
+    scope.conversationId = chat.conversation_id;
+    scope.messages = chat.messages;
+    scope.conversations = chat.conversations;
+  }
+
+  function startConversation() {
+    const scope = scopeConfig();
+    scope.conversationId = null;
+    scope.messages = [];
+    closeConversations();
+    renderMessages();
+    focusInputAtEnd();
+  }
+
+  async function openConversation(conversationId) {
+    closeConversations();
+    if (busy || conversationId === scopeConfig().conversationId) return;
+    try {
+      const scope = scopeConfig();
+      applyLibraryChat(scope, await apiRequest("GET", `${scope.conversationsUrl}/${conversationId}`));
+      renderMessages();
+    } catch (error) {
+      setStatus(error.message, "error");
+    }
+  }
+
+  async function deleteConversation(conversation) {
+    if (busy || !window.confirm(`Supprimer la discussion « ${conversation.title} » ?`)) return;
+    const scope = scopeConfig();
+    try {
+      await apiRequest("DELETE", `${scope.conversationsUrl}/${conversation.id}`);
+    } catch (error) {
+      // Already gone (deleted from another tab): drop it from the list all the same.
+      if (error.status !== 404) {
+        setStatus(error.message, "error");
+        return;
+      }
+    }
+    scope.conversations = (scope.conversations || []).filter((item) => item.id !== conversation.id);
+    if (conversation.id === scope.conversationId) {
+      scope.conversationId = null;
+      scope.messages = [];
+    }
+    renderMessages();
+    setStatus("Discussion supprimée.", "success");
+  }
+
+  if (conversationsToggle && conversationsMenu) {
+    conversationsToggle.addEventListener("click", () => {
+      if (!conversationsMenu.hidden) {
+        closeConversations();
+        return;
+      }
+      if (input) input.blur();
+      conversationsMenu.hidden = false;
+      conversationsToggle.setAttribute("aria-expanded", "true");
+      const current = conversationsList.querySelector("[aria-current='true']") || conversationsList.querySelector("button");
+      if (current) current.focus({ preventScroll: true });
+    });
+    conversationsBackdrop?.addEventListener("click", closeConversations);
+    conversationsClose?.addEventListener("click", () => {
+      closeConversations();
+      conversationsToggle.focus({ preventScroll: true });
+    });
+    conversationsEl.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape" || conversationsMenu.hidden) return;
+      closeConversations();
+      conversationsToggle.focus();
+    });
+  }
+  newButton?.addEventListener("click", startConversation);
+
   function renderMessages() {
     if (!messagesEl) return;
     const scope = scopeConfig();
@@ -1998,7 +2144,8 @@ function initChatWidget(root) {
     // (`.chat-messages:empty`) and only the composer is left.
     messages.forEach((message) => messagesEl.append(buildMessageNode(message)));
     root.dataset.chatEmpty = messages.length ? "false" : "true";
-    if (clearForm) clearForm.hidden = !messages.length;
+    if (clearForm) clearForm.hidden = !messages.length || hasConversations();
+    renderConversations();
     if (coverageEl) {
       coverageEl.hidden = !scope.coverageNote || !messages.length;
       coverageEl.textContent = scope.coverageNote || "";
@@ -2144,12 +2291,12 @@ function initChatWidget(root) {
     button.addEventListener("click", () => setScope(button.dataset.chatScope));
   });
 
-  // Polls /api/llm-jobs/{id} until the answer is written; returns the conversation with it.
+  // Polls /api/llm-jobs/{id} until the answer is written; returns the finished job.
   async function waitForAnswer(statusUrl, onProgress) {
     for (;;) {
       const job = await apiRequest("GET", statusUrl);
       if (job.status === "failed") throw new Error(job.message || "Réponse impossible.");
-      if (job.status === "done") return job.chat_messages || job.library_chat.messages;
+      if (job.status === "done") return job;
       onProgress(job.tool_calls);
       await new Promise((resolve) => window.setTimeout(resolve, 2000));
     }
@@ -2184,6 +2331,9 @@ function initChatWidget(root) {
       syncField();
       const question = readInput().trim();
       button.disabled = true;
+      busy = true;
+      renderConversations();
+      closeConversations();
       if (input) input.contentEditable = "false";
       // Show the question and a typing bubble right away; both are replaced by
       // the server's own message list once the answer lands (or dropped again
@@ -2196,11 +2346,20 @@ function initChatWidget(root) {
       setStatus("Préparation de la réponse...", "loading");
 
       try {
-        const job = await apiRequest("POST", scopeConfig().chatUrl, { question });
+        const scope = config.scopes[submittedScope];
+        const body = scope.conversationsUrl ? { question, conversation_id: scope.conversationId ?? null } : { question };
+        const job = await apiRequest("POST", scope.chatUrl, body);
+        // A first question opens a discussion: a retry after a failure stays in it.
+        if (job.conversation_id) scope.conversationId = job.conversation_id;
         form.reset();
         writeInput("");
         setStatus("Préparation de la réponse, cela peut prendre un moment...", "loading");
-        config.scopes[submittedScope].messages = await waitForAnswer(job.status_url, renderToolSteps);
+        const answered = await waitForAnswer(job.status_url, renderToolSteps);
+        if (answered.library_chat) {
+          applyLibraryChat(scope, answered.library_chat);
+        } else {
+          scope.messages = answered.chat_messages;
+        }
         if (submittedScope === currentScope) {
           renderMessages();
           revealLatest();
@@ -2213,6 +2372,8 @@ function initChatWidget(root) {
         // when the job ends up failing rather than making the user retype it.
         if (!readInput().trim()) writeInput(question);
       } finally {
+        busy = false;
+        renderConversations();
         setTyping(false);
         button.disabled = false;
         if (input) input.contentEditable = "plaintext-only";

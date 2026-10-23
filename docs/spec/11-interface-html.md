@@ -741,7 +741,7 @@ attribut `data-chat-config` :
   "llmProviderLabel": "...",
   "scopes": {
     "video": {"chatUrl": "/api/videos/{id}/chat", "messages": [...]},
-    "library": {"chatUrl": "/api/chat", "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
+    "library": {"chatUrl": "/api/chat", "conversationsUrl": "/api/chat/conversations", "conversationId": 3, "conversations": [{"id": 3, "title": "...", "updated_at": "..."}], "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
   }
 }
 ```
@@ -752,7 +752,8 @@ attribut `data-chat-config` :
   l'utilise aujourd'hui, le support reste dans la macro).
 - Mise en page : en-tete (icone, titre, `llmProviderLabel` en sous-titre,
   bascule de portee, bouton "Effacer" affiche seulement quand la portee
-  courante a des messages), conversation, ligne de statut, puis le composeur.
+  courante a des messages et ne garde pas de discussions — voir ci-dessous),
+  conversation, ligne de statut, puis le composeur.
   La conversation **coule dans la page** (aucun cadre a defilement interne :
   il piege le balayage sur iPhone) ; `initChatWidget` la suit vers le bas
   pendant qu'une reponse s'ecrit (`scrollIntoView`, debut du dernier message :
@@ -815,7 +816,28 @@ attribut `data-chat-config` :
   `initChatWidget`). Sur le dashboard et `/videos/{id}` (`.chat-bar`), la barre vide
   se reduit au seul champ de saisie : ni carte, ni en-tete, ni aide clavier ;
   la carte, le bouton "Effacer" et `coverageNote` n'apparaissent qu'une fois
-  la discussion entamee.
+  la discussion entamee. Seule exception : une portee qui a des discussions
+  precedentes (`data-chat-has-conversations="true"`) garde son en-tete, avec
+  le seul bouton « Discussions », au-dessus du champ.
+- Discussions (portee avec `conversationsUrl`, donc `library`) : au lieu
+  d'« Effacer », l'en-tete porte « Discussions » (affiche des qu'une
+  discussion existe) et « Nouvelle » (affiche quand la discussion courante a
+  des messages). « Nouvelle » vide l'affichage et remet `conversationId` a
+  `null` : la question suivante ouvre une discussion (voir
+  [09](09-transcript-et-discussion-llm.md)), dont le `conversation_id`
+  renvoye par `POST /api/chat` est garde pour la question suivante.
+  « Discussions » ouvre la meme feuille collee au bas de l'ecran que « Idees
+  de Raton » (poignee, ✕, titre « Discussions », voile ; ✕, Echap ou le voile
+  la referment), une ligne par discussion : son titre (tronque sur une
+  ligne), la date de sa derniere reponse (l'heure si c'est aujourd'hui, sinon
+  « 21 oct. ») et une corbeille. La discussion affichee est entouree
+  (`aria-current`). Choisir une ligne charge la discussion
+  (`GET {conversationsUrl}/{id}`) sans recharger la page ; la corbeille
+  demande confirmation puis la supprime (`DELETE`), et si c'etait celle
+  affichee, le widget revient a une nouvelle discussion. Pendant l'attente
+  d'une reponse, les deux boutons sont desactives : la discussion ne change
+  pas sous la reponse. L'accueil ouvre la discussion la plus recente
+  (`GET /api/chat`).
 - `placeholder` (optionnel) remplace le texte d'invite du champ pour la
   portee courante ("Demander…" pour `library`).
 - `suggestions` (optionnel) : liste des demandes que l'assistant sait
@@ -859,7 +881,7 @@ attribut `data-chat-config` :
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)).
 - Les messages initiaux sont pre-rendus dans la config au chargement de la
   page (pas de fetch initial) ; changer de portee ne fait donc pas d'appel
-  reseau, seulement un nouveau rendu local.
+  reseau, seulement un nouveau rendu local (changer de discussion, si).
 - `initChatWidget` remplace l'ancienne implementation JS locale a
   `video_detail.html` (dupliquee entre elle et `app.js`
   avant cette unification) — l'autre implementation de polling

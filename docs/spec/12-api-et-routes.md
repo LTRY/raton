@@ -442,11 +442,18 @@ arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
   la fiche, a la suite de sa discussion ; `400 La question est vide.`.
   `DELETE /api/videos/{id}/chat` efface la discussion (`204`). La discussion
   elle-meme se lit dans `GET /api/videos/{id}` (`documents.chat_messages`).
-- `GET /api/chat` : la conversation du chat bibliotheque (`messages`, chaque
-  reponse avec les `channels` et `citations` qu'elle cite) et
-  `indexed_video_count`/`total_video_count`. `POST /api/chat` `{question}` :
-  pose une question (`202`) ; `DELETE /api/chat` efface la conversation
-  (`204`).
+- `GET /api/chat` : la derniere discussion du chat bibliotheque
+  (`conversation_id`, `title`, `messages`, chaque reponse avec les `channels`
+  et `citations` qu'elle cite ; `conversation_id` `null` et aucun message
+  s'il n'y en a pas), la liste `conversations` (`[{id, title, updated_at}]`,
+  les 50 plus recentes) et `indexed_video_count`/`total_video_count`.
+  `GET /api/chat/conversations/{id}` : meme reponse pour une discussion
+  donnee ; `DELETE /api/chat/conversations/{id}` la supprime (`204`) ;
+  `404 Discussion introuvable.`. `POST /api/chat` `{question,
+  conversation_id}` : pose une question a la suite de cette discussion, ou en
+  ouvre une nouvelle sans `conversation_id` (`202`, la reponse porte le
+  `conversation_id`) ; `400 La question est vide.`, `404 Discussion
+  introuvable.`.
 - `GET /api/llm-jobs/{id}` : `{id, kind, video_id, status}` avec `status`
   `pending`, `done` ou `failed`. En attente : `partial_short_summary` (job
   `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).

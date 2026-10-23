@@ -1,30 +1,95 @@
-"""The library chat's conversation, kept in `library_chat_messages`."""
+"""The library chat's discussions (`library_chat_conversations`) and their messages."""
 
-from sqlalchemy import func, select
+from datetime import UTC, datetime
+
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from back.models.channel import Channel
+from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.library_chat_message import LibraryChatMessage
 from back.models.video import Video
 from back.services.library_chat.tools import parse_source_ids
+
+TITLE_LENGTH = 80
+# The discussions list shows the latest ones; older ones stay in the DB.
+LISTED_CONVERSATIONS = 50
+
+
+class ConversationNotFoundError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("Discussion introuvable.")
 
 
 def _join_source_ids(ids: list[int]) -> str | None:
     return ",".join(str(item_id) for item_id in ids) or None
 
 
-def chat_rows(db: Session) -> list[LibraryChatMessage]:
-    return list(db.scalars(select(LibraryChatMessage).order_by(LibraryChatMessage.id)))
+def conversation_title(question: str) -> str:
+    """The first question on one line, cut to `TITLE_LENGTH` characters."""
+    title = " ".join(question.split()) or "Discussion"
+    if len(title) > TITLE_LENGTH:
+        title = title[: TITLE_LENGTH - 1].rstrip() + "…"
+    return title
 
 
-def chat_history(db: Session) -> list[dict[str, str]]:
-    """The conversation as the model reads it: role and text of each message."""
-    return [{"role": row.role, "content": row.content} for row in chat_rows(db)]
+def get_conversation(db: Session, conversation_id: int) -> LibraryChatConversation:
+    conversation = db.get(LibraryChatConversation, conversation_id)
+    if conversation is None:
+        raise ConversationNotFoundError()
+    return conversation
 
 
-def chat_messages(db: Session) -> list[dict]:
-    """The conversation as the page shows it, each answer with the channels and fiches it cites."""
-    rows = chat_rows(db)
+def start_conversation(db: Session, question: str) -> LibraryChatConversation:
+    """A new discussion named after its first question; the caller commits."""
+    conversation = LibraryChatConversation(title=conversation_title(question))
+    db.add(conversation)
+    db.flush()
+    return conversation
+
+
+def _has_messages():
+    return exists().where(LibraryChatMessage.conversation_id == LibraryChatConversation.id)
+
+
+def list_conversations(db: Session) -> list[LibraryChatConversation]:
+    """The latest discussions, most recently answered first. A discussion whose first
+    question never got an answer has no message and is not listed."""
+    return list(
+        db.scalars(
+            select(LibraryChatConversation)
+            .where(_has_messages())
+            .order_by(LibraryChatConversation.updated_at.desc(), LibraryChatConversation.id.desc())
+            .limit(LISTED_CONVERSATIONS)
+        )
+    )
+
+
+def latest_conversation(db: Session) -> LibraryChatConversation | None:
+    conversations = list_conversations(db)
+    return conversations[0] if conversations else None
+
+
+def chat_rows(db: Session, conversation_id: int | None) -> list[LibraryChatMessage]:
+    if conversation_id is None:
+        return []
+    return list(
+        db.scalars(
+            select(LibraryChatMessage)
+            .where(LibraryChatMessage.conversation_id == conversation_id)
+            .order_by(LibraryChatMessage.id)
+        )
+    )
+
+
+def chat_history(db: Session, conversation_id: int | None) -> list[dict[str, str]]:
+    """The discussion as the model reads it: role and text of each message."""
+    return [{"role": row.role, "content": row.content} for row in chat_rows(db, conversation_id)]
+
+
+def chat_messages(db: Session, conversation_id: int | None) -> list[dict]:
+    """The discussion as the page shows it, each answer with the channels and fiches it cites."""
+    rows = chat_rows(db, conversation_id)
     video_ids = {video_id for row in rows for video_id in parse_source_ids(row.sources)}
     channel_ids = {
         channel_id for row in rows for channel_id in parse_source_ids(row.channel_sources)
@@ -65,20 +130,27 @@ def total_video_count(db: Session) -> int:
 
 
 def add_chat_exchange(
-    db: Session, question: str, answer: str, video_ids: list[int], channel_ids: list[int]
+    db: Session,
+    conversation: LibraryChatConversation,
+    question: str,
+    answer: str,
+    video_ids: list[int],
+    channel_ids: list[int],
 ) -> None:
-    """Append a question and its answer; the caller commits."""
-    db.add(LibraryChatMessage(role="user", content=question))
+    """Append a question and its answer to the discussion; the caller commits."""
+    db.add(LibraryChatMessage(conversation_id=conversation.id, role="user", content=question))
     db.add(
         LibraryChatMessage(
+            conversation_id=conversation.id,
             role="assistant",
             content=answer,
             sources=_join_source_ids(video_ids),
             channel_sources=_join_source_ids(channel_ids),
         )
     )
+    conversation.updated_at = datetime.now(UTC)
 
 
-def clear_chat(db: Session) -> None:
-    db.query(LibraryChatMessage).delete()
+def delete_conversation(db: Session, conversation_id: int) -> None:
+    db.delete(get_conversation(db, conversation_id))
     db.commit()

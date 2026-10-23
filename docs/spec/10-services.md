@@ -29,7 +29,7 @@ que des paquets situés plus haut dans ce tableau.
 | `videos/` | Les fiches : filtres, Vu/Écartée, lecture, statistiques, modifications, documents, données des pages bibliothèque et fiche | `common`, `media`, `youtube` |
 | `raton/` | La mascotte de l'accueil : scénarios, choix de la réplique, visites | `common`, `videos` |
 | `rag/` | Notes structurées et recherche sémantique, page `/rag` | `common`, `llm`, `videos` |
-| `library_chat/` | Chat bibliothèque : outils du modèle et conversation enregistrée | `channels`, `common`, `rag`, `videos`, `youtube` |
+| `library_chat/` | Chat bibliothèque : outils du modèle et discussions enregistrées | `channels`, `common`, `rag`, `videos`, `youtube` |
 | `jobs/` | Orchestration : tâches de fond et planificateur | `channels`, `common`, `ingest`, `library_chat`, `llm`, `media`, `playlists`, `rag`, `videos`, `youtube` |
 
 ## Règles
@@ -173,7 +173,7 @@ Voir [19 Indexation et recherche dans les notes](19-indexation-et-recherche-note
 |---|---|
 | `schema` | Outils que le modèle peut appeler (noms, descriptions, schémas d'entrée) et leurs bornes |
 | `tools` | Exécution de ces outils (recherche de chaînes, de vidéos, de notes ; ajout d'une chaîne) et références citées par la réponse |
-| `history` | Conversation enregistrée dans `library_chat_messages` |
+| `history` | Discussions (`library_chat_conversations`) et leurs messages (`library_chat_messages`) : ouverture, liste, lecture, ajout d'un échange, suppression |
 
 Voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md).
 

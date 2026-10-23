@@ -20,6 +20,10 @@ def library_chat_scope_config(chat: dict) -> dict:
         )
     return {
         "chatUrl": "/api/chat",
+        # Where the widget opens or deletes a discussion: `{conversationsUrl}/{id}`.
+        "conversationsUrl": "/api/chat/conversations",
+        "conversationId": chat["conversation_id"],
+        "conversations": chat["conversations"],
         "placeholder": "Demander…",
         "suggestions": LIBRARY_CHAT_SUGGESTIONS,
         "messages": chat["messages"],

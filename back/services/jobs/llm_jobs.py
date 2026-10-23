@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from back.core.logging import logged_job
 from back.db.session import SessionLocal
+from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.llm_job import LlmJob
 from back.models.video import Video
 from back.services.common.job_log import log_job
@@ -62,7 +63,9 @@ def run_llm_job(job_id: int) -> None:
                     job.tool_calls = json.dumps(steps)
                     db.commit()
 
-                toolbox = LibraryChatToolbox(db, on_progress=save_tool_calls)
+                toolbox = LibraryChatToolbox(
+                    db, on_progress=save_tool_calls, conversation_id=job.conversation_id
+                )
                 added_channel_ids = toolbox.added_channel_ids
                 completion = provider_instance.complete_with_tools(
                     prompt.messages,
@@ -134,11 +137,13 @@ def enqueue_llm_job(
     video_id: int | None,
     prompt: str,
     question: str | None = None,
+    conversation_id: int | None = None,
 ) -> LlmJob:
     job = LlmJob(
         kind=kind,
         provider=provider,
         video_id=video_id,
+        conversation_id=conversation_id,
         prompt=prompt,
         question=question,
         status="queued",
@@ -182,9 +187,15 @@ def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None
 def apply_library_chat_result(db: Session, job: LlmJob) -> None:
     if job.status != "done":
         return
+    conversation = (
+        db.get(LibraryChatConversation, job.conversation_id) if job.conversation_id else None
+    )
+    if conversation is None:
+        raise ValueError("Discussion supprimée")
     sources = json.loads(job.sources) if job.sources else {}
     add_chat_exchange(
         db,
+        conversation,
         job.question or "",
         job.result or "",
         sources.get("video_ids", []),

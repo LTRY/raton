@@ -1,8 +1,9 @@
 """Bodies and replies of the `/api` LLM requests: notes, discussion of a fiche, library chat."""
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from back.schemas.video import ChatMessageRead, VideoDocumentsRead
 
@@ -11,14 +12,26 @@ class QuestionCreate(BaseModel):
     question: str
 
 
+class LibraryQuestionCreate(QuestionCreate):
+    # The discussion the question follows; none starts a new one.
+    conversation_id: int | None = None
+
+
 class LlmJobQueuedRead(BaseModel):
     job_id: int
     status: str
     status_url: str
+    # `library_chat` only: the discussion of the question, new or not.
+    conversation_id: int | None = None
 
     @classmethod
     def from_job(cls, job) -> LlmJobQueuedRead:
-        return cls(job_id=job.id, status=job.status, status_url=f"/api/llm-jobs/{job.id}")
+        return cls(
+            job_id=job.id,
+            status=job.status,
+            status_url=f"/api/llm-jobs/{job.id}",
+            conversation_id=job.conversation_id,
+        )
 
 
 class LibraryChatChannelRead(BaseModel):
@@ -39,8 +52,21 @@ class LibraryChatMessageRead(BaseModel):
     citations: list[LibraryChatCitationRead]
 
 
+class LibraryChatConversationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    updated_at: datetime
+
+
 class LibraryChatRead(BaseModel):
+    # The discussion shown; null (and no messages) when there is none yet.
+    conversation_id: int | None
+    title: str | None
     messages: list[LibraryChatMessageRead]
+    # The latest discussions, most recent first, to switch to another one.
+    conversations: list[LibraryChatConversationRead]
     # Fiches whose notes the chat can search, out of the library's.
     indexed_video_count: int
     total_video_count: int
@@ -63,7 +89,7 @@ class LlmJobStatusRead(BaseModel):
     documents: VideoDocumentsRead | None = None
     # `chat` done: the fiche's discussion, with the new answer.
     chat_messages: list[ChatMessageRead] | None = None
-    # `library_chat` done: the conversation, with the new answer.
+    # `library_chat` done: its discussion, with the new answer.
     library_chat: LibraryChatRead | None = None
 
 
