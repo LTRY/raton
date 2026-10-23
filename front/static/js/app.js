@@ -353,8 +353,7 @@ function resolveResumePosition(storageKey, serverPosition, serverAt) {
 // element starts playing claims the session: its metadata and buttons replace
 // the previous owner's. `meta()` is read on every play, so a player that swaps
 // tracks on the same element stays current. `actions.previous`/`next` turn the
-// ±seek buttons into previous/next track (iOS shows one pair or the other);
-// `actions.play` replaces the default Play.
+// ±seek buttons into previous/next track (iOS shows one pair or the other).
 const MEDIA_SESSION_SKIP_SECONDS = 30;
 // On window: this closure runs again on every Turbo visit, while the permanent
 // mini-player keeps the handlers of the first run. All runs share one owner.
@@ -399,7 +398,7 @@ function claimMediaSession(media, meta, actions = {}) {
       album: "Raton",
       artwork: info.artwork ? [{ src: new URL(info.artwork, window.location.href).href }] : [],
     });
-    setAction("play", actions.play || (() => media.play().catch(() => {})));
+    setAction("play", () => media.play().catch(() => {}));
     setAction("pause", () => media.pause());
     setAction("seekto", (details) => seekTo(details.seekTime));
     const skip = (details, sign) => seekTo(media.currentTime + sign * (details.seekOffset || MEDIA_SESSION_SKIP_SECONDS));
@@ -422,36 +421,6 @@ function claimMediaSession(media, meta, actions = {}) {
 }
 window.ratonClaimMediaSession = claimMediaSession;
 
-// iOS mutes a <video> that starts playing while the page is hidden (screen
-// locked, other app in front): the progress moves on in silence. From there the
-// sound goes through the mini-player's <audio>, which may play in the
-// background, at the same position. The lock screen's Play is a user gesture
-// for WebKit, so the mini-player is allowed to start.
-function playVideoOrHandOff(video) {
-  const miniPlayer = window.ratonMiniPlayer;
-  if (!document.hidden || !miniPlayer || !video.dataset.backgroundSrc) {
-    video.play().catch(() => {});
-    return;
-  }
-  const id = video.dataset.videoId;
-  const resumeKey = `raton:media-position:${id}:audio`;
-  const position = video.currentTime;
-  if (Number.isFinite(position)) {
-    writeStoredResume(resumeKey, position);
-    miniPlayer.seekTo(id, position);
-  }
-  miniPlayer.load({
-    id,
-    title: video.dataset.mediaTitle,
-    channel: video.dataset.mediaArtist,
-    src: video.dataset.backgroundSrc,
-    thumb: video.getAttribute("poster") || "",
-    resumeKey,
-    activityUrl: video.dataset.activityUrl,
-    detailUrl: `/videos/${id}`,
-  });
-}
-
 // Clears the lock screen when the owning player is closed, not merely paused.
 function releaseMediaSession(media) {
   if (!("mediaSession" in navigator) || mediaSessionState.owner !== media) return;
@@ -469,15 +438,11 @@ function bindResumableMedia(media) {
   const endBufferSeconds = RESUME_END_BUFFER_SECONDS;
   let lastSavedAt = 0;
   let watchedSeconds = 0;
-  claimMediaSession(
-    media,
-    () => ({
-      title: media.dataset.mediaTitle,
-      artist: media.dataset.mediaArtist,
-      artwork: media.getAttribute("poster") || media.dataset.mediaArtwork,
-    }),
-    media.dataset.backgroundSrc ? { play: () => playVideoOrHandOff(media) } : {}
-  );
+  claimMediaSession(media, () => ({
+    title: media.dataset.mediaTitle,
+    artist: media.dataset.mediaArtist,
+    artwork: media.getAttribute("poster") || media.dataset.mediaArtwork,
+  }));
   let lastTrackedTime = null;
   // Position de reprise tant qu'elle n'est pas confirmée par une lecture
   // effective : Safari iOS peut ignorer un `currentTime` posé avant que le média

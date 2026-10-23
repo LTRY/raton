@@ -56,15 +56,3 @@ def test_players_claim_the_media_session():
     assert "releaseMediaSession(audio)" in APP_JS
     assert "ratonClaimMediaSession" in PLAYLIST_JS
     assert "{ previous: goPrevious, next: goNext }" in PLAYLIST_JS
-
-
-def test_fiche_video_hands_off_to_the_mini_player_when_hidden():
-    # iOS mutes a <video> started while the page is hidden: the lock screen's
-    # Play goes through the mini-player's <audio> instead.
-    template = (ROOT / "front/templates/video_detail.html").read_text(encoding="utf-8")
-    assert (
-        'data-background-src="{{ video.media_urls.audio or video.media_urls.video }}"' in template
-    )
-    assert "function playVideoOrHandOff(video)" in APP_JS
-    assert "if (!document.hidden || !miniPlayer || !video.dataset.backgroundSrc)" in APP_JS
-    assert "{ play: () => playVideoOrHandOff(media) }" in APP_JS

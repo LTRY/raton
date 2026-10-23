@@ -465,16 +465,6 @@ celui qui l'avait.
 - Lecteurs de `/videos/{id}` (`<video>`, `<audio>` inline) : titre et chaine
   lus dans `data-media-title`/`data-media-artist`, vignette dans `poster` ou
   `data-media-artwork` ; sauts de ±30 s.
-- Lecture depuis l'ecran verrouille sur la video d'une fiche : iOS coupe le
-  son d'un `<video>` qui demarre pendant que la page est cachee (la barre
-  avance en silence). Si la page est cachee, le bouton Lecture
-  (`playVideoOrHandOff`) passe donc la main au mini-lecteur, dont l'`<audio>`
-  a le droit de jouer en arriere-plan : il charge le fichier audio de la fiche
-  (a defaut, le fichier video, dont il ne lit que le son, `data-background-src`)
-  a la position de la video, ecrite d'abord dans la reprise audio
-  (`raton:media-position:<id>:audio`). La video reste en pause ; au retour
-  dans l'app, l'ecoute continue dans le mini-lecteur. Page visible, Lecture
-  relance simplement la video.
 - Lecteur de playlist : piste precedente/suivante (memes regles que ses
   boutons) a la place des sauts.
 
@@ -484,6 +474,13 @@ Le `<video>` de `/videos/{id}` et celui du lecteur de playlist portent
 `playsinline` : sur iPhone la lecture reste dans la page (le carrousel, les
 sauts et la reprise restent visibles) ; le bouton plein ecran natif reste
 disponible.
+
+Limite connue d'iOS, pas de Raton : ouvert depuis l'icone de l'ecran
+d'accueil (web app), un audio mis en pause depuis l'ecran verrouille reprend
+sans son quand on appuie sur Lecture (la position avance, rien ne sort). iOS
+endort la web app en arriere-plan et ne lui rend pas la sortie audio ; un
+onglet Safari n'a pas ce probleme. Pour ecouter avec des pauses ecran
+verrouille, passer par Safari.
 
 Les lecteurs natifs exigent le support HTTP Range pour :
 
