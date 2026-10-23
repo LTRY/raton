@@ -45,17 +45,22 @@ Services :
 - `app` : le front (`front/`) — les pages, image `raton:local` (etape
   `front`). Ni DB, ni media, ni secret : il appelle l'API du conteneur `api`
   (`RATON_API_URL=http://api:8001`) et relaie vers lui les appels `/api/*`
-  du navigateur.
+  du navigateur ;
+- `mcp` : le serveur MCP (`mcp_server/`, voir [21 Serveur MCP](21-serveur-mcp.md)),
+  image `raton-mcp:local` (etape `mcp`). Ni DB, ni media, ni secret : il appelle
+  directement l'API du conteneur `api` (`RATON_API_URL=http://api:8001`), sans
+  passer par le front.
 
 Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app`,
-`raton-api` pour `api` et `raton-db` pour `db`, au lieu de `raton-app-1`...
+`raton-api` pour `api`, `raton-mcp` pour `mcp` et `raton-db` pour `db`, au lieu de `raton-app-1`...
 Une seule instance de la pile peut donc tourner par machine.
 
-Port publie : `8000` (`app`, le front), sur `127.0.0.1` par defaut ;
-`APP_BIND=0.0.0.0` l'ouvre au LAN. Ni `api` ni `db` ne publient de port : le
-navigateur, un raccourci iOS ou un client MCP passent par le front, dont le
-relais `/api/*` atteint le back sur le reseau interne de Compose. Seul `api`
-joint PostgreSQL.
+Ports publies : `8000` (`app`, le front) et `8002` (`mcp`, le serveur MCP), sur
+`127.0.0.1` par defaut ; `APP_BIND=0.0.0.0` et `MCP_BIND=0.0.0.0` les ouvrent
+au LAN. Ni `api` ni `db` ne publient de port : le navigateur et un raccourci
+iOS passent par le front, dont le relais `/api/*` atteint le back sur le
+reseau interne de Compose, et un client MCP passe par le serveur MCP, qui
+appelle le back sur ce meme reseau. Seul `api` joint PostgreSQL.
 
 Volumes :
 

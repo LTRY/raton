@@ -51,4 +51,5 @@ incomplete, sauf si elle est explicitement marquee comme cible future.
 - [17 Roadmap et limites connues](17-roadmap-et-limites.md)
 - [18 Raton : scénarios et répliques](18-raton-scenarios.md)
 - [19 Indexation et recherche dans les notes](19-indexation-et-recherche-notes.md)
+- [21 Serveur MCP](21-serveur-mcp.md)
 - [20 Glossaire](20-glossaire.md) : vocabulaire commun (cloche, fiche, Nouveautes, Lu, purge...), a lire avant de nommer quoi que ce soit

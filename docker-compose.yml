@@ -60,5 +60,21 @@ services:
       RATON_API_URL: http://api:8001
       APP_TRUSTED_ORIGINS: ${APP_TRUSTED_ORIGINS:-}
 
+  # The MCP server (`mcp_server/`): another client of the API, like the front; read-only tools.
+  mcp:
+    container_name: raton-mcp
+    image: ${RATON_MCP_IMAGE:-raton-mcp:local}
+    build:
+      context: .
+      target: mcp
+    depends_on:
+      - api
+    ports:
+      # Loopback only: the MCP server has no authentication. Set MCP_BIND=0.0.0.0 to open it to a trusted LAN.
+      - "${MCP_BIND:-127.0.0.1}:8002:8002"
+    environment:
+      RATON_API_URL: http://api:8001
+      MCP_TRANSPORT: streamable-http
+
 volumes:
   postgres_data:

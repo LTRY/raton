@@ -41,6 +41,11 @@ verifiee sur chaque formulaire, confirmation, un seul deploiement a la fois, et
   (redirections comprises). Un nom qui ne se resout pas est laisse a l'outil
   qui l'appelle ; le DNS rebinding n'est pas couvert.
 
+- **Serveur MCP** : le port `8002` (`mcp`, voir
+  [21 Serveur MCP](21-serveur-mcp.md)) n'est pas authentifie non plus ; il est
+  publie sur `127.0.0.1` par defaut (`MCP_BIND=0.0.0.0` l'ouvre au LAN) et ses
+  outils sont en lecture seule.
+
 Si exposition Internet :
 
 - ajouter authentification ;

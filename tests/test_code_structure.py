@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "back"
 FRONT = ROOT / "front"
+MCP = ROOT / "mcp_server"
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "api_route"}
 
 
@@ -56,6 +57,16 @@ def test_back_never_imports_the_front():
 def test_front_speaks_http_only_through_its_api_client_and_relay():
     talkers = {path.split(":")[0] for path in imports_of(FRONT, "httpx")}
     assert talkers <= {"front/api.py", "front/proxy.py"}, talkers
+
+
+def test_mcp_server_is_a_client_of_the_api_like_the_front():
+    # The MCP server reaches the data only through the back's /api, over HTTP (docs/spec/21-serveur-mcp.md).
+    assert not imports_of(MCP, "back"), imports_of(MCP, "back")
+    assert not imports_of(MCP, "front"), imports_of(MCP, "front")
+    assert not imports_of(APP, "mcp_server"), imports_of(APP, "mcp_server")
+    assert not imports_of(FRONT, "mcp_server"), imports_of(FRONT, "mcp_server")
+    talkers = {path.split(":")[0] for path in imports_of(MCP, "httpx")}
+    assert talkers <= {"mcp_server/api.py"}, talkers
 
 
 # Package -> packages it may import, inside back/services/. Every service module lives in one of these

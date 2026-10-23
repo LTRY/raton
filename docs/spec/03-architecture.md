@@ -31,10 +31,13 @@ peuvent tourner dans deux conteneurs (voir
   formulaires. Le front n'importe **jamais** le back : il lit et ecrit tout
   par l'API, en HTTP (`front/api.py`, adresse `RATON_API_URL`), comme le ferait
   un autre front (une SPA, une app native) ou un serveur MCP.
+- **`mcp_server/`** : le serveur MCP, autre client de l'API `/api` en HTTP
+  (`mcp_server/api.py`), sans règle métier (voir
+  [21 Serveur MCP](21-serveur-mcp.md)).
 
 `tests/test_code_structure.py` verifie la frontiere : `front/` n'importe
-rien de `back/`, `back/` rien de `front/`, et seuls `front/api.py` et
-`front/proxy.py` parlent HTTP.
+rien de `back/`, `back/` rien de `front/`, `mcp_server/` ni l'un ni l'autre, et
+seuls `front/api.py`, `front/proxy.py` et `mcp_server/api.py` parlent HTTP.
 
 Ce qui decide d'un comportement (un filtre, un etat Vu/Ecartee deduit de la
 lecture, la categorie « sans barre de progression », la pagination, un tri)

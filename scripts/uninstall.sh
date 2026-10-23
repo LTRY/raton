@@ -39,7 +39,7 @@ media_root="$(media_host_root 2>/dev/null || true)"
 log_dir="${LOG_HOST_DIR:-./.local/logs}"
 
 echo "This will remove:"
-echo "  - the docker compose stack (containers, network) and the raton:local and raton-api:local images"
+echo "  - the docker compose stack (containers, network) and the raton:local, raton-api:local and raton-mcp:local images"
 echo "  - .venv and .local/bin"
 [ "$purge" = 1 ] && echo "  - the PostgreSQL volume, $log_dir and .local/raton.db (ALL DATABASE DATA)"
 [ "$purge_media" = 1 ] && echo "  - the media library: ${media_root:-<not found>} (ALL DOWNLOADED FILES)"

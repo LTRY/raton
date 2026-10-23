@@ -14,12 +14,12 @@ test:
 	uv run --python 3.14 --extra dev pytest
 
 lint:
-	uv run --python 3.14 --extra dev ruff check back front tests alembic
-	uv run --python 3.14 --extra dev ruff format --check back front tests alembic
+	uv run --python 3.14 --extra dev ruff check back front mcp_server tests alembic
+	uv run --python 3.14 --extra dev ruff format --check back front mcp_server tests alembic
 
 format:
-	uv run --python 3.14 --extra dev ruff check --fix back front tests alembic
-	uv run --python 3.14 --extra dev ruff format back front tests alembic
+	uv run --python 3.14 --extra dev ruff check --fix back front mcp_server tests alembic
+	uv run --python 3.14 --extra dev ruff format back front mcp_server tests alembic
 
 compose-config:
 	docker compose config
