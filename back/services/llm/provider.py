@@ -133,6 +133,7 @@ class LLMProvider(Protocol):
         messages: str | list[dict],
         on_text: Callable[[str], None] | None = None,
         system: str | None = None,
+        json_schema: dict | None = None,
     ) -> CompletionResult: ...
 
     def complete_with_tools(
@@ -176,8 +177,13 @@ class AnthropicProvider:
         messages: str | list[dict],
         on_text: Callable[[str], None] | None = None,
         system: str | None = None,
+        json_schema: dict | None = None,
     ) -> CompletionResult:
-        """One completion of `messages` (a bare string is a single user message) under `system`."""
+        """One completion of `messages` (a bare string is a single user message) under `system`.
+
+        With `json_schema`, the answer is JSON that the API guarantees matches it (structured
+        outputs), instead of a format the prompt can only ask for.
+        """
         import anthropic
 
         if isinstance(messages, str):
@@ -193,6 +199,11 @@ class AnthropicProvider:
             max_tokens=max_output_tokens(self.model),
             messages=messages,
             **({"system": system} if system else {}),
+            **(
+                {"output_config": {"format": {"type": "json_schema", "schema": json_schema}}}
+                if json_schema
+                else {}
+            ),
         ) as stream:
             _forward_text(stream, on_text)
             response = stream.get_final_message()

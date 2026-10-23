@@ -93,6 +93,13 @@ Resume court (3 lignes) genere avec les notes. Il n'existe pas de resume complet
 - **Code** : `transcript.summary_short.txt`
 - **A ne pas confondre avec** : Les notes structurees.
 
+### Quiz
+
+Questions a choix multiple generees par le LLM a partir du transcript d'une fiche, pour verifier ce qu'on a retenu de la video. Onglet `Quiz` de la fiche ; un nouveau quiz remplace le precedent.
+
+- **Code** : `transcript.quiz.json`, job LLM `kind="quiz"`, `/api/videos/{id}/quiz/generate`
+- **A ne pas confondre avec** : Les questions suggerees du resume, qui sont des pistes pour le chat de la fiche, sans reponse attendue.
+
 ### Playlist
 
 Liste ordonnee **locale** de fiches. Un import est un instantane, sans re-synchronisation.

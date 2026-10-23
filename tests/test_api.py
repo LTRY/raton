@@ -238,6 +238,7 @@ def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
         "short_summary": None,
         "suggested_questions": [],
         "chat_messages": [{"role": "user", "content": "Salut"}],
+        "quiz": [],
     }
     assert payload["sponsor_segments"] == [
         {"category": "sponsor", "start_seconds": 10.0, "end_seconds": 40.0}

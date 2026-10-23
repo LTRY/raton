@@ -49,6 +49,7 @@ def video_detail_context(video, raw: dict, settings, playlists, back_path: str) 
         "notes_transcript": documents.notes,
         "short_summary": documents.short_summary,
         "suggested_questions": documents.suggested_questions,
+        "quiz": raw["documents"]["quiz"],
         "display_transcript": documents.transcript,
         "video": video,
         "category_options": styles,

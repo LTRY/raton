@@ -63,6 +63,7 @@ Un dossier video peut contenir :
 - transcript : `transcript.txt` ;
 - notes structurees : `transcript.notes.txt` ;
 - resume court (3 lignes) : `transcript.summary_short.txt` ;
+- quiz : `transcript.quiz.json` ;
 - historique chat : `transcript.chat.json`.
 
 ## Staging

@@ -1,4 +1,5 @@
-"""`/api` LLM requests: notes of a fiche, its discussion, the library chat, and their jobs.
+"""`/api` LLM requests: notes and quiz of a fiche, its discussion, the library chat, and their
+jobs.
 
 The discussion and the documents of a fiche are also in `GET /api/videos/{id}`.
 """
@@ -26,6 +27,7 @@ from back.services.jobs.llm_requests import (
     find_llm_job,
     queue_library_question,
     queue_notes_generation,
+    queue_quiz_generation,
     queue_video_question,
     resolve_llm_job,
 )
@@ -58,6 +60,25 @@ def generate_notes(
     video = fiche(db, video_id)
     try:
         job = queue_notes_generation(db, video)
+    except LlmRequestError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    background_tasks.add_task(run_llm_job, job.id)
+    return LlmJobQueuedRead.from_job(job)
+
+
+@router.post(
+    "/videos/{video_id}/quiz/generate",
+    response_model=LlmJobQueuedRead,
+    status_code=202,
+    responses=error_responses(400, 404, 422),
+)
+def generate_quiz(
+    video_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
+) -> LlmJobQueuedRead:
+    """A new quiz on the fiche's transcript, replacing the previous one; poll `status_url`."""
+    video = fiche(db, video_id)
+    try:
+        job = queue_quiz_generation(db, video)
     except LlmRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     background_tasks.add_task(run_llm_job, job.id)
@@ -148,6 +169,8 @@ def get_llm_job(
         return LlmJobStatusRead(
             **fields, status="done", documents=VideoDocumentsRead.from_documents(documents)
         )
+    if job.kind == "quiz":
+        return LlmJobStatusRead(**fields, status="done", quiz=documents["quiz"])
     return LlmJobStatusRead(**fields, status="done", chat_messages=documents["chat_messages"])
 
 

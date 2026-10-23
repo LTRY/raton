@@ -1,5 +1,5 @@
 """The files written next to a fiche: `metadata.json`, and next to its transcript the notes,
-summaries, questions and chat.
+summaries, questions, quiz and chat.
 
 The transcript files' names are fixed relative to `transcript.txt`; this module is the only one
 that knows them.
@@ -15,6 +15,7 @@ NOTES_FILE = "transcript.notes.txt"
 SHORT_SUMMARY_FILE = "transcript.summary_short.txt"
 QUESTIONS_FILE = "transcript.questions.txt"
 CHAT_FILE = "transcript.chat.json"
+QUIZ_FILE = "transcript.quiz.json"
 
 
 def read_video_metadata(video: Video) -> dict:
@@ -68,6 +69,17 @@ def save_chat(path: Path, messages: list[dict[str, str]]) -> None:
     path.write_text(json.dumps(messages, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def load_quiz(path: Path) -> list[dict]:
+    """The questions of a quiz file; [] when missing or unreadable."""
+    if not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError, OSError:
+        return []
+    return data if isinstance(data, list) else []
+
+
 def read_transcript_documents(video: Video) -> dict:
     """Every document of the fiche that exists on disk; None (or empty) for the others."""
     transcript = None
@@ -75,6 +87,7 @@ def read_transcript_documents(video: Video) -> dict:
     short_summary = None
     suggested_questions: list[str] = []
     chat_messages = []
+    quiz = []
     if video.transcript_path:
         path = local_media_path(video.transcript_path)
         if path.is_file():
@@ -95,6 +108,7 @@ def read_transcript_documents(video: Video) -> dict:
                     if line.strip()
                 ]
             chat_messages = load_chat(path.with_name(CHAT_FILE))
+            quiz = load_quiz(path.with_name(QUIZ_FILE))
     return {
         "transcript": transcript,
         "notes_transcript": notes_transcript,
@@ -102,6 +116,7 @@ def read_transcript_documents(video: Video) -> dict:
         "suggested_questions": suggested_questions,
         "display_transcript": transcript,
         "chat_messages": chat_messages,
+        "quiz": quiz,
     }
 
 
@@ -114,6 +129,14 @@ def write_generated_documents(video: Video, generated: dict) -> None:
     )
     transcript_path.with_name(QUESTIONS_FILE).write_text(
         "\n".join(generated["summary_questions"]), encoding="utf-8"
+    )
+
+
+def write_quiz(video: Video, questions: list[dict]) -> None:
+    """Replace the fiche's quiz: a new one is a new set of questions, not more of them."""
+    transcript_path, _, _ = get_transcript_paths(video)
+    transcript_path.with_name(QUIZ_FILE).write_text(
+        json.dumps(questions, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
 

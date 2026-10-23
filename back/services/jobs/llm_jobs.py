@@ -18,9 +18,14 @@ from back.services.library_chat.schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
 from back.services.library_chat.tools import LibraryChatToolbox
 from back.services.llm.prompts import Prompt, split_generation_result
 from back.services.llm.provider import CompletionFailed, get_llm_provider
+from back.services.llm.quiz import QUIZ_SCHEMA, parse_quiz_result
 from back.services.llm.usage import compute_job_cost_usd
 from back.services.rag.indexing import index_video_notes
-from back.services.videos.documents import append_transcript_chat, write_generated_documents
+from back.services.videos.documents import (
+    append_transcript_chat,
+    write_generated_documents,
+    write_quiz,
+)
 
 # How often a streaming `generate` job saves its text so far: short enough that
 # the page polling it shows the résumé as it is written, long enough not to
@@ -76,6 +81,10 @@ def run_llm_job(job_id: int) -> None:
             elif job.kind == "generate":
                 completion = provider_instance.complete(
                     prompt.messages, on_text=save_partial_result, system=prompt.system
+                )
+            elif job.kind == "quiz":
+                completion = provider_instance.complete(
+                    prompt.messages, system=prompt.system, json_schema=QUIZ_SCHEMA
                 )
             else:
                 completion = provider_instance.complete(prompt.messages, system=prompt.system)
@@ -162,6 +171,14 @@ def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | No
     job.status = "applied"
     db.commit()
     return generated
+
+
+def apply_quiz_result(db: Session, video: Video, job: LlmJob) -> None:
+    if job.status != "done":
+        return
+    write_quiz(video, parse_quiz_result(job.result or ""))
+    job.status = "applied"
+    db.commit()
 
 
 def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None:

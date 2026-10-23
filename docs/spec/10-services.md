@@ -82,8 +82,9 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `provider` | Interface `LLMProvider` et `AnthropicProvider` (API Anthropic directe), dont la boucle d'appels d'outils du chat bibliothèque |
+| `provider` | Interface `LLMProvider` et `AnthropicProvider` (API Anthropic directe), dont la boucle d'appels d'outils du chat bibliothèque et la réponse JSON imposée par un schéma (quiz) |
 | `prompts` | Construction des prompts (notes, résumé, analyse vidéo, question sur un transcript, chat bibliothèque) et découpage des réponses |
+| `quiz` | Prompt et schéma JSON du quiz d'une fiche, lecture et mélange des questions reçues |
 | `usage` | Coût réel d'un job LLM d'après les jetons comptés par le fournisseur, totaux et dépense par mois |
 
 ### `media/`
@@ -139,7 +140,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture ; catégories sans barre de progression (`card_list_states`) |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
-| `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
+| `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, quiz, discussion par vidéo |
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
@@ -188,7 +189,7 @@ web ; chacune ouvre sa propre session DB.
 | `download_requests` | Côté requête de ces tâches, partagé par les formulaires et `/api` : validation et mise en file depuis la page d'import (`queue_manual_download`), une fiche (`queue_media_download`, `queue_transcript_retry`), une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) ou les formats manquants d'une playlist (`queue_playlist_downloads`) ; import synchrone du partage iOS (`import_shared_video`) ; état (`job_status`) et arrêt (`cancel_job`) d'un job |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
-| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
+| `llm_requests` | Une demande au LLM (notes d'une fiche, quiz d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
 | `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques ; scan lancé à la main depuis `/settings` |
 

@@ -5726,6 +5726,139 @@ turbo-frame {
   display: none;
 }
 
+/* Quiz tab of a fiche: one question card at a time. */
+.quiz-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.quiz-header h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.quiz-intro {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.quiz-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.quiz-progress {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.quiz-question {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.quiz-choices {
+  display: grid;
+  gap: 8px;
+}
+
+button.quiz-choice {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-10);
+  color: var(--color-text);
+  font-weight: 600;
+  line-height: 1.4;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+button.quiz-choice:hover:not(:disabled) {
+  background: var(--color-tint);
+  border-color: var(--color-tint-border);
+}
+
+/* Answered: the choices stay readable, only the right and the picked one stand out. */
+button.quiz-choice:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+button.quiz-choice:disabled:not(.is-right, .is-wrong) {
+  color: var(--color-text-muted);
+}
+
+button.quiz-choice.is-right {
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  border-color: var(--color-success);
+}
+
+button.quiz-choice.is-wrong {
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+  border-color: var(--color-danger);
+}
+
+.quiz-feedback {
+  display: grid;
+  gap: 8px;
+}
+
+.quiz-feedback[hidden] {
+  display: none;
+}
+
+.quiz-verdict {
+  font-weight: 800;
+  margin: 0;
+}
+
+.quiz-verdict.is-right {
+  color: var(--color-success);
+}
+
+.quiz-verdict.is-wrong {
+  color: var(--color-danger);
+}
+
+.quiz-explanation {
+  color: var(--color-text-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.quiz-feedback button,
+.quiz-result button {
+  justify-self: start;
+}
+
+.quiz-score {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .quiz-feedback button,
+  .quiz-result button {
+    justify-self: stretch;
+  }
+}
+
 .video-player-panel {
   background: #111827;
   border: 1px solid var(--color-border-strong);

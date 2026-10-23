@@ -59,6 +59,9 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
 - `.vtt` (`data-tab="vtt"`) : onglet masque si aucun sous-titre `.vtt` lisible
   n'existe pour la video (`video.subtitle_path`) ; panneau HTML independant
   affichant le contenu brut du fichier `.vtt` dans un `pre.transcript-content` ;
+- `Quiz` (`data-tab="quiz"`, `id="quiz"`) : onglet masque, et panneau absent
+  du DOM, si aucun `transcript.txt` n'existe ; voir la section « Quiz »
+  ci-dessous ;
 - `Commentaire` (`data-tab="personal-notes"`, `id="personal-notes"`) :
   toujours present ; le formulaire renvoie vers `/videos/{id}#personal-notes`
   pour rouvrir l'onglet apres enregistrement ;
@@ -83,6 +86,7 @@ ouvre l'onglet correspondant cote client au chargement :
 | `#transcript` | `Transcript` (aucun si pas de transcript) |
 | `#personal-notes` | `Commentaire` |
 | `#segments-sponsors` | `Segments` |
+| `#quiz` | `Quiz` |
 
 Affichage additionnel dans le panneau `text` :
 
@@ -255,6 +259,53 @@ recherchable depuis le chat cross-video que lorsqu'elle a au moins un chunk
 ici — regénérer des notes déjà au format libre (anciennes notes) ne les
 indexe pas rétroactivement, il faut recliquer sur "Générer notes, résumé". Voir [05 Modèle de données](05-modele-de-donnees.md).
 
+## Quiz
+
+L'onglet `Quiz` de `/videos/{id}` verifie ce qu'on a retenu de la video :
+des questions a choix multiple tirees du transcript, posees une a une.
+
+`POST /api/videos/{id}/quiz/generate` :
+
+- source : `transcript.txt` (`400 Génération impossible : …` sans transcript) ;
+- cree un job (`llm_jobs`, `kind="quiz"`) et repond `202 {job_id, status,
+  status_url}`, meme mecanique asynchrone que la generation des notes ;
+- prompt : `back/services/llm/quiz.py:build_quiz_prompt`, consignes dans
+  `QUIZ_SYSTEM`, transcript balise en `user` comme les autres prompts.
+  Exactement 5 questions de 4 propositions, une seule juste ; elles portent
+  sur les idees importantes (these, arguments, faits et chiffres marquants,
+  liens de cause a effet), pas sur des details anodins, et suivent l'ordre de
+  la video ; chaque question a une explication d'une ou deux phrases ;
+- la reponse est du JSON impose par l'API (*structured outputs* :
+  `complete(..., json_schema=QUIZ_SCHEMA)`, parametre `output_config.format`) :
+  le modele ecrit la bonne reponse a part des mauvaises ;
+- au premier poll apres la fin, `parse_quiz_result` ecarte les questions
+  inexploitables (sans texte, moins de 3 mauvaises reponses, bonne reponse
+  repetee parmi les mauvaises), garde les 5 premieres et **melange** les
+  propositions, pour que la bonne ne soit pas toujours a la meme place ; puis
+  ecrit `transcript.quiz.json` (liste de `{question, choices, answer,
+  explanation}`, `answer` = indice de la bonne dans `choices`), qui
+  **remplace** le quiz precedent. Une reponse sans aucune question
+  exploitable fait echouer le poll (`Application du résultat impossible : …`).
+
+`GET /api/videos/{id}` porte le dernier quiz dans `documents.quiz` (`[]`
+avant le premier) ; le poll d'un job `quiz` termine repond `quiz`.
+
+Panneau `#quiz` (rendu par le script de la page a partir du JSON
+`[data-quiz-questions]` ; pas de repli sans JavaScript, comme la discussion) :
+
+- en-tete : titre `Quiz` et bouton `Générer un quiz` (`Nouveau quiz` des
+  qu'un quiz existe) ; sans quiz, une phrase d'introduction ;
+- une question a la fois (`.quiz-card`) : « Question n sur N », l'enonce,
+  puis les propositions en boutons pleine largeur (44 px de haut au moins) ;
+- un choix fige la question : la bonne proposition passe en vert, le choix
+  faux en rouge, puis s'affichent le verdict (`Bonne réponse` / `Raté`),
+  l'explication et le bouton `Question suivante` (`Voir le résultat` a la
+  derniere) ;
+- a la fin, le score (`3 / 5`), une phrase selon le score et le bouton
+  `Recommencer`. Le score n'est pas enregistre ;
+- pendant la generation, le bouton est desactive et le statut du panneau
+  affiche `Génération du quiz…` ; une erreur s'y affiche aussi.
+
 ## Jobs LLM asynchrones
 
 `GET /api/llm-jobs/{job_id}` (voir [12 API et routes](12-api-et-routes.md))
@@ -280,12 +331,13 @@ poll) sont dans `back/services/jobs/llm_requests.py`.
 - des que le job est termine (`done`), applique le resultat une seule fois
   (ecrit `transcript.notes.txt`/`transcript.summary_short.txt`/
   `transcript.questions.txt` pour
-  `generate` ; ajoute question/reponse a `transcript.chat.json` pour `chat` —
+  `generate` ; ecrit `transcript.quiz.json` pour `quiz` ; ajoute
+  question/reponse a `transcript.chat.json` pour `chat` —
   voir sections Génération/Discussion ci-dessus), passe le job a
   `applied`, puis repond `status: "done"` avec `documents` (`generate` :
   transcript, notes, résumé court, questions et discussion, pour que la page
-  resynchronise ses onglets et le résumé sous le titre en une fois) ou
-  `chat_messages` (`chat`). Un nouveau poll sur un job deja `applied`
+  resynchronise ses onglets et le résumé sous le titre en une fois), `quiz`
+  (`quiz`) ou `chat_messages` (`chat`). Un nouveau poll sur un job deja `applied`
   renvoie l'etat courant sans ré-appliquer (idempotent).
 
 ## Cout reel des jobs LLM

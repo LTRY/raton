@@ -743,7 +743,7 @@ def test_video_detail_page_tab_order_starts_with_info_segments_raw(tmp_path):
     assert response.status_code == 200
     tab_order = re.findall(r'class="transcript-tab[^"]*" data-tab="([a-z-]+)"', rendered)
     assert tab_order[:3] == ["info", "segments", "raw"]
-    assert tab_order[3:] == ["notes", "vtt", "personal-notes"]
+    assert tab_order[3:] == ["notes", "vtt", "quiz", "personal-notes"]
 
 
 def test_video_detail_page_has_personal_notes_tab_and_no_analysis_tab(tmp_path):
@@ -4996,3 +4996,48 @@ def test_share_import_reports_a_failed_import_and_rejects_other_hosts(monkeypatc
     assert failed.status_code == 502
     assert failed.json()["message"] == "Vidéo indisponible"
     assert rejected.status_code == 400
+
+
+def test_fiche_page_offers_a_quiz_tab_with_the_last_quiz(tmp_path):
+    db = make_session()
+    folder = tmp_path / "video"
+    folder.mkdir()
+    transcript = folder / "transcript.txt"
+    transcript.write_text("Bonjour depuis le transcript.", encoding="utf-8")
+    video = add_video(db)
+    video.folder_path = str(folder)
+    video.transcript_path = str(transcript)
+    video.transcript_status = TranscriptStatus.downloaded
+    db.commit()
+
+    before = site(db).get(f"/videos/{video.id}").text
+    (folder / "transcript.quiz.json").write_text(
+        json.dumps(
+            [
+                {
+                    "question": "De quoi parle-t-on ?",
+                    "choices": ["A", "B", "C", "D"],
+                    "answer": 2,
+                    "explanation": "C'est dit.",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    after = site(db).get(f"/videos/{video.id}").text
+
+    assert 'data-tab="quiz"' in before
+    assert "Générer un quiz" in before
+    assert "Nouveau quiz" in after
+    questions = after.split("data-quiz-questions>", 1)[1].split("</script>", 1)[0]
+    assert json.loads(questions)[0]["question"] == "De quoi parle-t-on ?"
+
+
+def test_fiche_page_without_transcript_has_no_quiz(tmp_path):
+    db = make_session()
+    video = add_video(db)
+
+    rendered = site(db).get(f"/videos/{video.id}").text
+
+    assert 'data-tab="quiz"' in rendered  # the tab bar is always the same, the tab is hidden
+    assert 'id="quiz"' not in rendered
