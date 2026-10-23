@@ -101,9 +101,13 @@ class LibraryChatToolbox:
     """
 
     def __init__(
-        self, db: Session, on_progress: Callable[[list[dict]], None] | None = None
+        self,
+        db: Session,
+        on_progress: Callable[[list[dict]], None] | None = None,
+        conversation_id: int | None = None,
     ) -> None:
         self.db = db
+        self.conversation_id = conversation_id
         self.on_progress = on_progress
         self.steps: list[dict] = []
         self._summary: str | None = None
@@ -395,9 +399,13 @@ class LibraryChatToolbox:
         return " — ".join(parts)
 
     def _cited_in_history(self) -> dict[str, set[int]]:
-        """Ids earlier answers already cited: they were validated back then, and
-        the model sees their `[[...]]` in the history it is given."""
-        rows = self.db.query(LibraryChatMessage.sources, LibraryChatMessage.channel_sources).all()
+        """Ids earlier answers of the discussion already cited: they were validated
+        back then, and the model sees their `[[...]]` in the history it is given."""
+        rows = (
+            self.db.query(LibraryChatMessage.sources, LibraryChatMessage.channel_sources)
+            .filter(LibraryChatMessage.conversation_id == self.conversation_id)
+            .all()
+        )
         return {
             "chaine": {item for _, channels in rows for item in parse_source_ids(channels)},
             "video": {item for videos, _ in rows for item in parse_source_ids(videos)},
@@ -407,7 +415,7 @@ class LibraryChatToolbox:
         """Validate the references of an answer and return the ones that are backed.
 
         An id is backed when a tool returned it during this job or an earlier
-        answer already cited it. `[[kind:id|name]]` stays in the text when
+        answer of the discussion already cited it. `[[kind:id|name]]` stays in the text when
         backed (the interface turns it into a link) and falls back to its
         plain name otherwise; a bare `[kind:id]` is removed. Ids are listed in
         order of first mention. A reference to anything else can only be a

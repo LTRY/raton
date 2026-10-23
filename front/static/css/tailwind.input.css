@@ -498,6 +498,19 @@ h2 {
   display: none;
 }
 
+/* On Raton's screen the discussions menu sits at the top left of the page,
+   not above the composer at the bottom. */
+.dashboard-home {
+  position: relative;
+}
+
+.dashboard-home .chat-bar[data-chat-empty="true"] .discussion-header {
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
 .dashboard-home .chat-bar {
   margin: 0 auto;
   max-width: 720px;
@@ -7002,9 +7015,9 @@ turbo-frame {
   justify-content: space-between;
 }
 
-/* With no discussion yet the bar is only its composer (no header: it would
-   hold nothing but a hidden button). */
-.chat-bar[data-chat-empty="true"] .discussion-header,
+/* With no discussion on screen the bar is only its composer (no header: it
+   would hold nothing but hidden buttons), unless it has the discussions menu. */
+.chat-bar[data-chat-empty="true"]:not([data-chat-navigable="true"]) .discussion-header,
 .chat-bar .chat-hint {
   display: none;
 }
@@ -7120,10 +7133,249 @@ turbo-frame {
   width: 14px;
 }
 
-.chat-coverage-note {
-  color: var(--color-text-muted);
-  font-size: 13px;
+/* Discussions of the library chat, laid out like a chat app: a row with the
+   menu button, the open discussion's title and "new discussion", and a side
+   drawer listing the discussions. */
+.chat-nav {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chat-nav[hidden],
+.chat-nav [hidden] {
+  display: none;
+}
+
+.chat-nav-button {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--chat-line);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  flex: none;
+  height: 44px;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s ease;
+  width: 44px;
+}
+
+.chat-nav-button:hover:not(:disabled) {
+  background: var(--color-tint);
+}
+
+.chat-nav-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.chat-nav-button svg {
+  height: 20px;
+  width: 20px;
+}
+
+.chat-nav-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The new-discussion button keeps the title centred when it is hidden. */
+.chat-nav-button[data-chat-new][hidden] {
+  display: flex;
+  visibility: hidden;
+}
+
+.chat-drawer-backdrop {
+  background: rgba(43, 32, 24, 0.45);
+  inset: 0;
+  position: fixed;
+  z-index: 1000;
+}
+
+.chat-drawer {
+  animation: chat-drawer-in 0.24s ease-out;
+  background: var(--color-surface);
+  bottom: 0;
+  box-shadow: 18px 0 48px rgba(43, 32, 24, 0.22);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  left: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  position: fixed;
+  top: 0;
+  width: min(320px, 86vw);
+  z-index: 1001;
+}
+
+.chat-drawer-backdrop[hidden],
+.chat-drawer[hidden] {
+  display: none;
+}
+
+@keyframes chat-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-drawer {
+    animation: none;
+  }
+}
+
+.chat-drawer-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-left: 8px;
+}
+
+.chat-drawer-brand {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.chat-drawer-item,
+.chat-drawer-open {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 16px;
+  gap: 14px;
+  min-height: 48px;
+  min-width: 0;
+  padding: 0 12px;
+  text-align: left;
+}
+
+.chat-drawer-item {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.chat-drawer-item svg {
+  flex: none;
+  height: 22px;
+  width: 22px;
+}
+
+.chat-drawer-item:hover,
+.chat-drawer-open:hover,
+.chat-drawer-item:focus-visible,
+.chat-drawer-open:focus-visible {
+  background: var(--color-surface-muted);
+}
+
+.chat-drawer-label {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 12px 4px;
+}
+
+.chat-drawer-list {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-drawer-conversation {
+  align-items: center;
+  display: flex;
+  min-width: 0;
+}
+
+.chat-drawer-open {
+  display: block;
+  flex: 1;
+  line-height: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-drawer-open[aria-current="true"] {
+  background: var(--color-tint);
+  font-weight: 700;
+}
+
+.chat-drawer-delete {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  flex: none;
+  height: 44px;
+  justify-content: center;
+  opacity: 0.6;
+  padding: 0;
+  width: 44px;
+}
+
+.chat-drawer-delete:hover,
+.chat-drawer-delete:focus-visible {
+  color: var(--color-danger);
+  opacity: 1;
+}
+
+.chat-drawer-delete svg {
+  height: 18px;
+  width: 18px;
+}
+
+/* Pinned to the bottom of the drawer, like the "new session" pill of a chat app. */
+.chat-drawer-new {
+  align-items: center;
+  align-self: center;
+  background: var(--color-text);
+  border: 0;
+  border-radius: var(--radius-pill);
+  bottom: 0;
+  box-shadow: 0 10px 30px rgba(43, 32, 24, 0.25);
+  color: var(--color-white);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  gap: 10px;
+  margin-top: auto;
+  min-height: 52px;
+  padding: 0 24px;
+  position: sticky;
+}
+
+.chat-drawer-new svg {
+  height: 20px;
+  width: 20px;
 }
 
 .chat-messages {
@@ -11733,6 +11985,24 @@ body::before {
   }
 }
 
+/* Phone (no top bar): the row with the discussions menu stays at the top
+   while a long discussion scrolls. Lifted above the tab bar while the drawer
+   is open, since the sticky row is the drawer's stacking context. */
+@media (max-width: 800px) {
+  .dashboard-home .chat-bar[data-chat-empty="false"] .discussion-header {
+    background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+    margin-inline: -16px;
+    padding: max(8px, env(safe-area-inset-top)) 16px 8px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  .dashboard-home .chat-bar .discussion-header:has([data-chat-drawer]:not([hidden])) {
+    z-index: 1001;
+  }
+}
+
 /* Touch targets (docs/spec/11-interface-html.md, "Cibles tactiles"). On a
    touch screen the small controls grow to a finger's size; where growing would
    push the layout (stars, row menus, small round buttons), an invisible
@@ -11779,3 +12049,4 @@ body::before {
     inset: -11px;
   }
 }
+

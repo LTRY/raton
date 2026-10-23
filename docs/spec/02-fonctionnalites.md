@@ -250,7 +250,8 @@ Fonctionnalites :
   n'en ont pas (lot Anthropic, 100 par nuit, reglable dans `/settings`, hors
   shorts et hors categories exclues) : c'est ce qui rend les videos
   cherchables par le chat bibliotheque sans cliquer sur le robot ;
-- effacer l'historique de discussion.
+- effacer la discussion d'une video ; pour le chat bibliotheque, ouvrir une
+  nouvelle discussion, rouvrir ou supprimer une des precedentes.
 
 Les fichiers associes :
 

@@ -15,7 +15,8 @@ class LlmJob(Base):
     docs/spec/09-transcript-et-discussion-llm.md).
 
     `video_id` is null for `kind="library_chat"`: the cross-video chat has no
-    single video to scope the job to.
+    single video to scope the job to; `conversation_id` names its discussion
+    instead (null once that discussion is deleted, and on every other kind).
 
     While a `generate` job is `running`, `result` holds the text streamed so
     far (the status route shows the résumé from it as it is written); it is
@@ -34,6 +35,11 @@ class LlmJob(Base):
     provider: Mapped[str] = mapped_column(String(30), nullable=False)
     video_id: Mapped[int | None] = mapped_column(
         ForeignKey("videos.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("library_chat_conversations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     question: Mapped[str | None] = mapped_column(Text, nullable=True)

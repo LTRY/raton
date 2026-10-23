@@ -591,7 +591,9 @@ dans l'espace libre et la barre de chat reste collee au bas (au-dessus de la
 barre d'onglets sur telephone).
 
 Des qu'une discussion est affichee (`data-chat-empty="false"`), Raton est
-masque : il ne reste que la conversation. Ni metriques, ni
+masque : il ne reste que la conversation. On revient a Raton par le menu des
+discussions (☰ → « Raton »), le crayon « Nouvelle discussion » ou le bouton
+retour du navigateur (voir « Widget de chat »). Ni metriques, ni
 Historique complet, ni temps de lecture : ils sont dans Bibliotheque et
 Parametres.
 
@@ -741,7 +743,7 @@ attribut `data-chat-config` :
   "llmProviderLabel": "...",
   "scopes": {
     "video": {"chatUrl": "/api/videos/{id}/chat", "messages": [...]},
-    "library": {"chatUrl": "/api/chat", "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
+    "library": {"chatUrl": "/api/chat", "conversationsUrl": "/api/chat/conversations", "conversationId": 3, "conversations": [{"id": 3, "title": "...", "updated_at": "..."}], "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...]}
   }
 }
 ```
@@ -752,7 +754,8 @@ attribut `data-chat-config` :
   l'utilise aujourd'hui, le support reste dans la macro).
 - Mise en page : en-tete (icone, titre, `llmProviderLabel` en sous-titre,
   bascule de portee, bouton "Effacer" affiche seulement quand la portee
-  courante a des messages), conversation, ligne de statut, puis le composeur.
+  courante a des messages et ne garde pas de discussions — voir ci-dessous),
+  conversation, ligne de statut, puis le composeur.
   La conversation **coule dans la page** (aucun cadre a defilement interne :
   il piege le balayage sur iPhone) ; `initChatWidget` la suit vers le bas
   pendant qu'une reponse s'ecrit (`scrollIntoView`, debut du dernier message :
@@ -814,8 +817,43 @@ attribut `data-chat-config` :
   (`"true"`/`"false"`, rendu cote serveur puis tenu a jour par
   `initChatWidget`). Sur le dashboard et `/videos/{id}` (`.chat-bar`), la barre vide
   se reduit au seul champ de saisie : ni carte, ni en-tete, ni aide clavier ;
-  la carte, le bouton "Effacer" et `coverageNote` n'apparaissent qu'une fois
-  la discussion entamee.
+  la carte et le bouton "Effacer" n'apparaissent qu'une fois
+  la discussion entamee. Seule exception : une portee qui a des discussions
+  (`conversationsUrl`, attribut `data-chat-navigable="true"`) garde son
+  en-tete, reduit au bouton menu ; sur l'accueil il est pose en haut a gauche
+  de la page (`position: absolute` dans `.dashboard-home`), pas au-dessus du
+  champ.
+- Discussions (portee avec `conversationsUrl`, donc `library`), sur le modele
+  du menu lateral d'une app de chat : l'en-tete est une ligne (`.chat-nav`)
+  avec le bouton menu (☰) a gauche, le titre de la discussion ouverte au
+  centre (tronque sur une ligne) et, a droite, « Nouvelle discussion »
+  (crayon, visible quand la discussion a des messages). « Effacer » n'existe
+  pas pour cette portee. Sur telephone, cette ligne reste collee en haut de
+  l'ecran pendant qu'une discussion defile.
+  - ☰ ouvre un tiroir a gauche (`.chat-drawer`, 320px au plus, 86 % de la
+    largeur sur telephone, glisse depuis la gauche sauf
+    `prefers-reduced-motion`) sur un voile sombre ; ✕, Echap ou le voile le
+    referment. Il contient, de haut en bas : le titre « Discussions »,
+    l'entree « Raton » (retour a l'ecran de Raton), « Récents » puis une
+    ligne par discussion (titre tronque, corbeille discrete ; celle ouverte
+    est surlignee, `aria-current`), et le bouton pilule « Nouvelle
+    discussion » colle en bas du tiroir, qui place aussi le curseur dans le
+    champ.
+  - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
+    Raton : rien d'affiche, `conversationId` a `null`, et la question
+    suivante ouvre une discussion (voir
+    [09](09-transcript-et-discussion-llm.md)), dont le `conversation_id`
+    renvoye par `POST /api/chat` est garde pour la question suivante.
+  - Choisir une discussion la charge (`GET {conversationsUrl}/{id}`) sans
+    recharger la page. La corbeille demande confirmation puis la supprime
+    (`DELETE`) ; si c'etait celle affichee, le widget revient a Raton.
+  - La discussion ouverte est dans l'adresse : `/?discussion={id}`
+    (`history.pushState`, aussi des la premiere reponse d'une nouvelle
+    discussion). Recharger la page la rouvre, et le bouton retour du
+    navigateur revient a la precedente ou a Raton (`popstate`). Un id inconnu
+    affiche Raton. Sans `?discussion=`, l'accueil s'ouvre sur Raton.
+  - Pendant l'attente d'une reponse, ☰ et le crayon sont desactives : la
+    discussion ne change pas sous la reponse.
 - `placeholder` (optionnel) remplace le texte d'invite du champ pour la
   portee courante ("Demander…" pour `library`).
 - `suggestions` (optionnel) : liste des demandes que l'assistant sait
@@ -852,14 +890,11 @@ attribut `data-chat-config` :
   (reponses enregistrees avant ce format) est rendu en une rangee de puces
   defilante sous le message (`.chat-citations`, jamais la page) : les chaines
   d'abord, en puces pleines (`.chat-channel-chip`), puis les videos.
-- `coverageNote` (scope `library` uniquement) affiche combien de videos sont
-  actuellement indexees pour la recherche dans les notes (`"12/773 videos indexees..."`),
-  calcule cote serveur (`library_chat_scope_config`, `front/library_chat.py`) a partir
-  de `indexed_video_count`/`total_video_count` (voir
-  [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)).
+- Le widget n'affiche pas combien de videos sont indexees pour la recherche
+  dans les notes : cette couverture est sur la page `/rag`.
 - Les messages initiaux sont pre-rendus dans la config au chargement de la
   page (pas de fetch initial) ; changer de portee ne fait donc pas d'appel
-  reseau, seulement un nouveau rendu local.
+  reseau, seulement un nouveau rendu local (changer de discussion, si).
 - `initChatWidget` remplace l'ancienne implementation JS locale a
   `video_detail.html` (dupliquee entre elle et `app.js`
   avant cette unification) — l'autre implementation de polling

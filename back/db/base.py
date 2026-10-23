@@ -1,5 +1,6 @@
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.library_chat_message import LibraryChatMessage
 from back.models.llm_job import LlmJob
 from back.models.playlist import Playlist, PlaylistItem
@@ -12,6 +13,7 @@ __all__ = [
     "AppSetting",
     "Channel",
     "DownloadJob",
+    "LibraryChatConversation",
     "LibraryChatMessage",
     "LlmJob",
     "Playlist",

@@ -69,8 +69,37 @@
 {% macro chat_widget(widget_id, title, config, extra_class="") %}
 {% set has_multiple_scopes = config.scopes.keys() | list | length > 1 %}
 {# data-chat-empty is kept in sync by initChatWidget; rendering it here avoids a layout jump before the script runs. #}
-<section class="chat-widget {{ extra_class }}" id="{{ widget_id }}" data-chat-widget data-chat-empty="{{ 'false' if config.scopes[config.defaultScope].messages else 'true' }}" data-chat-config='{{ config | tojson }}'{% if not title %} aria-label="Assistant"{% endif %}>
+<section class="chat-widget {{ extra_class }}" id="{{ widget_id }}" data-chat-widget data-chat-empty="{{ 'false' if config.scopes[config.defaultScope].messages else 'true' }}" data-chat-navigable="{{ 'true' if config.scopes[config.defaultScope].conversationsUrl else 'false' }}" data-chat-config='{{ config | tojson }}'{% if not title %} aria-label="Assistant"{% endif %}>
   <div class="discussion-header">
+    {# Discussions of the library scope (`conversationsUrl` in its config), shown by initChatWidget: the drawer lists them, like the side menu of a chat app. #}
+    <div class="chat-nav" data-chat-nav hidden>
+      <button type="button" class="chat-nav-button" data-chat-drawer-toggle aria-expanded="false" aria-controls="{{ widget_id }}-drawer" aria-label="Discussions" title="Discussions">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h16"/></svg>
+      </button>
+      <p class="chat-nav-title" data-chat-nav-title></p>
+      <button type="button" class="chat-nav-button" data-chat-new aria-label="Nouvelle discussion" title="Nouvelle discussion" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+      <div class="chat-drawer-backdrop" data-chat-drawer-backdrop hidden></div>
+      <nav class="chat-drawer" id="{{ widget_id }}-drawer" data-chat-drawer aria-label="Discussions" hidden>
+        <div class="chat-drawer-head">
+          <span class="chat-drawer-brand">Discussions</span>
+          <button type="button" class="chat-nav-button" data-chat-drawer-close aria-label="Fermer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <button type="button" class="chat-drawer-item" data-chat-home>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5M5.5 9v11h13V9"/></svg>
+          <span>Raton</span>
+        </button>
+        <p class="chat-drawer-label" data-chat-recent-label>Récents</p>
+        <ul class="chat-drawer-list" data-chat-conversations-list></ul>
+        <button type="button" class="chat-drawer-new" data-chat-drawer-new>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Nouvelle discussion</span>
+        </button>
+      </nav>
+    </div>
     {% if title %}
     <div class="chat-title">
       <span class="chat-title-icon" aria-hidden="true">
@@ -100,7 +129,6 @@
       </form>
     </div>
   </div>
-  <p class="chat-coverage-note" data-chat-coverage hidden></p>
   <div class="chat-messages" data-chat-messages role="log" aria-live="polite"></div>
   <p class="async-form-status" data-chat-status aria-live="polite" hidden></p>
   <form class="chat-form" data-chat-form data-turbo="false">

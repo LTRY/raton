@@ -15,6 +15,8 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.library_chat_conversation import LibraryChatConversation
+from back.models.library_chat_message import LibraryChatMessage
 from back.models.video import Video
 from back.services.common.settings import get_setting, set_setting
 from back.services.raton.picker import (
@@ -304,6 +306,39 @@ def test_home_page_is_only_raton_and_the_chat(db):
     assert 'id="dashboard-chat"' in response.text
     assert "Une vidéo suivie" not in response.text
     assert "home-row" not in response.text
+
+
+def chat_config(html):
+    raw = html.split("data-chat-config='", 1)[1].split("'", 1)[0]
+    return json.loads(raw.replace("&#39;", "'").replace("&amp;", "&"))["scopes"]["library"]
+
+
+def test_home_opens_on_raton_and_a_discussion_from_its_address(db):
+    older = LibraryChatConversation(title="Ancienne", updated_at=datetime(2026, 10, 1, tzinfo=UTC))
+    latest = LibraryChatConversation(title="Récente", updated_at=datetime(2026, 10, 20, tzinfo=UTC))
+    db.add_all([older, latest])
+    db.flush()
+    for conversation in (older, latest):
+        db.add(LibraryChatMessage(conversation_id=conversation.id, role="user", content="Q ?"))
+    db.commit()
+    client = site_client()
+
+    home = client.get("/").text
+    opened = client.get(f"/?discussion={older.id}").text
+    unknown = client.get("/?discussion=999")
+
+    assert 'data-chat-empty="true"' in home
+    assert 'data-chat-navigable="true"' in home
+    assert "data-chat-drawer-toggle" in home
+    assert chat_config(home)["conversationId"] is None
+    assert [item["title"] for item in chat_config(home)["conversations"]] == [
+        "Récente",
+        "Ancienne",
+    ]
+    assert chat_config(opened)["conversationId"] == older.id
+    assert 'data-chat-empty="false"' in opened
+    assert unknown.status_code == 200
+    assert chat_config(unknown.text)["conversationId"] is None
 
 
 def test_home_announces_new_videos_with_its_button(db):

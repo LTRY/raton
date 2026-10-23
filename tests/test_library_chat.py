@@ -11,12 +11,17 @@ from back.db.base import *  # noqa: F403
 from back.db.session import Base
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.library_chat_message import LibraryChatMessage
 from back.models.llm_job import LlmJob
 from back.models.video import TranscriptStatus, Video
-from back.schemas.llm import QuestionCreate
+from back.schemas.llm import LibraryQuestionCreate
 from back.services.jobs import backfills, llm_jobs
-from back.services.library_chat.history import chat_messages
+from back.services.library_chat.history import (
+    chat_messages,
+    conversation_title,
+    list_conversations,
+)
 from back.services.library_chat.tools import LibraryChatToolbox
 from back.services.llm.provider import CompletionResult
 from back.services.rag import retrieval as rag_retrieval
@@ -63,12 +68,16 @@ def fake_provider(answer, tool_calls=()):
     return FakeProvider()
 
 
-def ask(db, monkeypatch, provider, question="Une question ?"):
+def ask(db, monkeypatch, provider, question="Une question ?", conversation_id=None):
     # The post-chat profile backfill would reach YouTube and the real media root.
     monkeypatch.setattr(backfills, "run_channel_profile_backfill_job", lambda: None)
     monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: provider)
     monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    job_id = llm_api.ask_library(QuestionCreate(question=question), BackgroundTasks(), db).job_id
+    job_id = llm_api.ask_library(
+        LibraryQuestionCreate(question=question, conversation_id=conversation_id),
+        BackgroundTasks(),
+        db,
+    ).job_id
     llm_jobs.run_llm_job(job_id)
     return llm_api.get_llm_job(job_id, BackgroundTasks(), db).library_chat.model_dump()
 
@@ -109,7 +118,7 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     )
 
     queued = llm_api.ask_library(
-        QuestionCreate(question="Qu'est-ce que le stoïcisme ?"), background_tasks, db
+        LibraryQuestionCreate(question="Qu'est-ce que le stoïcisme ?"), background_tasks, db
     )
 
     assert queued.status_url == f"/api/llm-jobs/{queued.job_id}"
@@ -248,8 +257,12 @@ def test_inline_reference_without_label_is_kept_when_backed_and_dropped_otherwis
 def test_reference_already_cited_in_the_history_stays_a_link():
     db = make_session()
     video = add_video(db, "Vidéo déjà citée")
+    conversation = LibraryChatConversation(title="Avant")
+    db.add(conversation)
+    db.flush()
     db.add(
         LibraryChatMessage(
+            conversation_id=conversation.id,
             role="assistant",
             content="Voir.",
             sources=str(video.id),
@@ -257,7 +270,7 @@ def test_reference_already_cited_in_the_history_stays_a_link():
         )
     )
     db.commit()
-    toolbox = LibraryChatToolbox(db)
+    toolbox = LibraryChatToolbox(db, conversation_id=conversation.id)
 
     text, sources = toolbox.extract_sources(
         f"Reprenons [[video:{video.id}|Vidéo déjà citée]] de [[chaine:{video.channel.id}|Chaîne test]]."
@@ -312,7 +325,7 @@ def test_tool_failure_is_reported_to_the_model_instead_of_failing_the_job(monkey
 def test_chat_about_library_rejects_empty_question(monkeypatch):
     db = make_session()
     with pytest.raises(HTTPException) as refused:
-        llm_api.ask_library(QuestionCreate(question="   "), BackgroundTasks(), db)
+        llm_api.ask_library(LibraryQuestionCreate(question="   "), BackgroundTasks(), db)
 
     assert refused.value.status_code == 400
 
@@ -331,18 +344,116 @@ def test_library_chat_payload_drops_chips_for_deleted_videos_and_channels(monkey
     db.delete(channel)  # cascades to its videos
     db.commit()
 
-    message = chat_messages(db)[1]
+    message = chat_messages(db, answered["conversation_id"])[1]
     assert message["channels"] == []
     assert message["citations"] == []
 
 
-def test_clear_library_chat_deletes_all_messages(monkeypatch):
+def test_deleting_a_discussion_deletes_its_messages_only(monkeypatch):
     db = make_session()
-    ask(db, monkeypatch, fake_provider("Réponse."))
-    assert len(chat_messages(db)) == 2
+    kept = ask(db, monkeypatch, fake_provider("Gardée."))
+    deleted = ask(db, monkeypatch, fake_provider("Supprimée."))
 
-    llm_api.clear_library_chat(db)
-    assert chat_messages(db) == []
+    llm_api.delete_library_conversation(deleted["conversation_id"], db)
+
+    assert chat_messages(db, deleted["conversation_id"]) == []
+    assert len(chat_messages(db, kept["conversation_id"])) == 2
+    assert [item.id for item in list_conversations(db)] == [kept["conversation_id"]]
+    with pytest.raises(HTTPException) as missing:
+        llm_api.delete_library_conversation(deleted["conversation_id"], db)
+    assert missing.value.status_code == 404
+
+
+def test_a_question_follows_its_discussion_and_without_one_starts_another(monkeypatch):
+    db = make_session()
+    first = ask(db, monkeypatch, fake_provider("Première réponse."), question="Première ?")
+    provider = fake_provider("Suite.")
+    followed = ask(
+        db, monkeypatch, provider, question="Et ensuite ?", conversation_id=first["conversation_id"]
+    )
+    other = ask(db, monkeypatch, fake_provider("Autre sujet."), question="Autre ?")
+
+    assert followed["conversation_id"] == first["conversation_id"]
+    assert [message["content"] for message in followed["messages"]] == [
+        "Première ?",
+        "Première réponse.",
+        "Et ensuite ?",
+        "Suite.",
+    ]
+    # The model reads the discussion so far, never another one.
+    sent, _ = provider.calls[0]
+    assert [turn["content"] for turn in sent] == ["Première ?", "Première réponse.", "Et ensuite ?"]
+    assert other["conversation_id"] != first["conversation_id"]
+    assert [message["content"] for message in other["messages"]] == ["Autre ?", "Autre sujet."]
+    # Latest answered first.
+    assert [item["id"] for item in other["conversations"]] == [
+        other["conversation_id"],
+        first["conversation_id"],
+    ]
+    assert other["conversations"][1]["title"] == "Première ?"
+    # The home page opens on Raton: no discussion until one is picked.
+    home = llm_api.get_library_chat(db)
+    assert home.conversation_id is None and home.messages == []
+    assert len(home.conversations) == 2
+
+
+def test_a_question_to_an_unknown_discussion_is_refused():
+    db = make_session()
+    with pytest.raises(HTTPException) as refused:
+        llm_api.ask_library(
+            LibraryQuestionCreate(question="Suite ?", conversation_id=999), BackgroundTasks(), db
+        )
+
+    assert refused.value.status_code == 404
+    assert db.query(LlmJob).count() == 0
+
+
+def test_a_reference_cited_in_another_discussion_is_not_backed():
+    db = make_session()
+    video = add_video(db, "Citée ailleurs")
+    elsewhere = LibraryChatConversation(title="Ailleurs")
+    here = LibraryChatConversation(title="Ici")
+    db.add_all([elsewhere, here])
+    db.flush()
+    db.add(
+        LibraryChatMessage(
+            conversation_id=elsewhere.id, role="assistant", content="Voir.", sources=str(video.id)
+        )
+    )
+    db.commit()
+
+    text, sources = LibraryChatToolbox(db, conversation_id=here.id).extract_sources(
+        f"Voir [[video:{video.id}|Citée ailleurs]]."
+    )
+
+    assert text == "Voir Citée ailleurs."
+    assert sources["video_ids"] == []
+
+
+def test_an_answer_whose_discussion_was_deleted_fails_instead_of_landing_elsewhere(monkeypatch):
+    db = make_session()
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: fake_provider("Trop tard."))
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    queued = llm_api.ask_library(LibraryQuestionCreate(question="Q ?"), BackgroundTasks(), db)
+    llm_jobs.run_llm_job(queued.job_id)
+    llm_api.delete_library_conversation(queued.conversation_id, db)
+    db.get(LlmJob, queued.job_id).conversation_id = None  # ON DELETE SET NULL, as on PostgreSQL
+    db.commit()
+
+    status = llm_api.get_llm_job(queued.job_id, BackgroundTasks(), db)
+
+    assert status.status == "failed"
+    assert "Discussion supprimée" in status.message
+    assert db.query(LibraryChatMessage).count() == 0
+
+
+def test_a_discussion_is_named_after_its_first_question_on_one_line():
+    assert conversation_title("  Quelles chaînes\n parlent de cuisine ?  ") == (
+        "Quelles chaînes parlent de cuisine ?"
+    )
+    long_title = conversation_title("mot " * 40)
+    assert len(long_title) == 80
+    assert long_title.endswith("…")
 
 
 def test_notes_search_keeps_at_most_two_chunks_per_video():

@@ -245,6 +245,13 @@ Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page det
 - **Code** : `/api/videos/{id}/chat`, `/api/chat`
 - **A ne pas confondre avec** : Un job LLM, qui est la tache de fond derriere chaque reponse.
 
+### Discussion
+
+Un fil de questions-reponses du chat, que le modele relit a chaque question. Le chat d'une fiche en a une seule (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰), rangees sous « Récents ».
+
+- **Code** : `transcript.chat.json` (fiche), `library_chat_conversations` / `conversation_id` (bibliotheque)
+- **A ne pas confondre avec** : Le chat lui-meme (l'outil), ni l'onglet `Commentaire` d'une fiche.
+
 ### Chunk
 
 Morceau de notes ou de resume indexe avec son embedding pour la recherche semantique.

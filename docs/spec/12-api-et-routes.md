@@ -104,7 +104,8 @@ Playlists :
 
 Videos :
 
-- `GET /` : accueil (barre de chat de la bibliotheque seule).
+- `GET /` : accueil (barre de chat de la bibliotheque seule) ;
+  `?discussion={id}` ouvre cette discussion du chat au lieu de Raton.
 - `GET /dashboard/nouveautes?page=N` : page complete, une pile de videos recentes par chaine suivie (cloche videos ou shorts active, chaque cloche ne listant que son type), paginee par chaine (10 chaines/page, `page`=chaines et non videos).
 - `GET /dashboard/historique?page=N` : page complete paginee (50/page) de l'activite "Historique".
 - `GET /dashboard/reprises?page=N` : ancienne URL de la page ci-dessus, conservee en redirection 302 (temporaire, pour ne pas figer un 301 dans le cache des navigateurs) vers `/dashboard/historique`, `page` preservee.
@@ -444,11 +445,18 @@ arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
   la fiche, a la suite de sa discussion ; `400 La question est vide.`.
   `DELETE /api/videos/{id}/chat` efface la discussion (`204`). La discussion
   elle-meme se lit dans `GET /api/videos/{id}` (`documents.chat_messages`).
-- `GET /api/chat` : la conversation du chat bibliotheque (`messages`, chaque
-  reponse avec les `channels` et `citations` qu'elle cite) et
-  `indexed_video_count`/`total_video_count`. `POST /api/chat` `{question}` :
-  pose une question (`202`) ; `DELETE /api/chat` efface la conversation
-  (`204`).
+- `GET /api/chat` : le chat bibliotheque sans discussion ouverte
+  (`conversation_id` et `title` `null`, `messages` vide), la liste
+  `conversations` (`[{id, title, updated_at}]`, les 50 plus recentes) et
+  `indexed_video_count`/`total_video_count`.
+  `GET /api/chat/conversations/{id}` : meme reponse avec cette discussion
+  ouverte (`messages`, chaque reponse avec les `channels` et `citations`
+  qu'elle cite) ; `DELETE /api/chat/conversations/{id}` la supprime (`204`) ;
+  `404 Discussion introuvable.`. `POST /api/chat` `{question,
+  conversation_id}` : pose une question a la suite de cette discussion, ou en
+  ouvre une nouvelle sans `conversation_id` (`202`, la reponse porte le
+  `conversation_id`) ; `400 La question est vide.`, `404 Discussion
+  introuvable.`.
 - `GET /api/llm-jobs/{id}` : `{id, kind, video_id, status}` avec `status`
   `pending`, `done` ou `failed`. En attente : `partial_short_summary` (job
   `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).

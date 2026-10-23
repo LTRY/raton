@@ -236,6 +236,10 @@ Champs :
 - `video_id` : FK `videos.id`, cascade delete, **nullable** — null uniquement
   pour `kind="library_chat"` (le chat cross-video n'est rattache a aucune
   video precise, voir `library_chat_messages` ci-dessous) ;
+- `conversation_id` : FK `library_chat_conversations.id`, `ON DELETE SET
+  NULL`, nullable — la discussion d'un job `library_chat`, ou sa reponse est
+  ajoutee ; `null` pour les autres types, et une fois la discussion supprimee
+  (la reponse n'est alors ecrite nulle part : le poll repond `failed`) ;
 - `prompt` : le `Prompt` envoye au fournisseur, en JSON `{"system": ..., "messages": [...]}` (`back/services/llm/prompts.py:Prompt`) ; un job cree avant ce format porte une simple chaine, lue comme un message `user` sans `system` ;
 - `question` : question brute (pour `kind="chat"`/`"library_chat"`), reutilisee
   pour reconstituer l'historique une fois la reponse obtenue ;
@@ -294,19 +298,36 @@ l'echelle d'une bibliotheque personnelle, un tri par distance cosinus
 (`embedding <=> :query`) sans index specialise est suffisant ; a
 reconsiderer si la table grossit significativement.
 
-### `library_chat_messages`
+### `library_chat_conversations`
 
-Le fil unique et continu du chat cross-video ("toute la bibliotheque"),
-distinct du chat par-video (fichier `transcript.chat.json`, voir
+Les discussions du chat cross-video ("toute la bibliotheque"), distinctes du
+chat par-video (fichier `transcript.chat.json`, voir
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) : pas
 de fichier naturel ou stocker un historique qui n'est rattache a aucune video
-precise, d'ou une table. Un seul fil global, pas de notion de conversations
-multiples ni de multi-utilisateur (coherent avec le reste de l'app, usage LAN
-personnel).
+precise, d'ou une table. Plusieurs discussions, mais pas de multi-utilisateur
+(coherent avec le reste de l'app, usage LAN personnel). La migration `0003`
+a range les messages de l'ancien fil unique dans une premiere discussion.
 
 Champs :
 
 - `id` ;
+- `title` : la premiere question, sur une ligne, coupee a 80 caracteres
+  (`back/services/library_chat/history.py:conversation_title`) ;
+- `created_at` ;
+- `updated_at` (indexe) : date de la derniere reponse ; la liste des
+  discussions est triee dessus, la plus recente d'abord.
+
+Supprimer une discussion supprime ses messages (cascade).
+
+### `library_chat_messages`
+
+Un message d'une discussion du chat cross-video.
+
+Champs :
+
+- `id` ;
+- `conversation_id` : FK `library_chat_conversations.id`, `ON DELETE
+  CASCADE`, non nul, indexe ;
 - `role` : `user` ou `assistant` ;
 - `content` : texte du message ;
 - `sources` : liste d'ids video separes par des virgules, uniquement sur les
