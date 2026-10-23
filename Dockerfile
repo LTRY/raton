@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Two images from one file: `back` (the API, the scheduler, ffmpeg) and `front` (the pages).
+# Three images from one file: `back` (the API, the scheduler, ffmpeg), `front` (the pages) and `mcp` (the MCP server).
 # docker-compose.yml builds each with its `target`.
 
 # Compiles front/static/css/app.css with the Tailwind standalone CLI (no
@@ -80,3 +80,11 @@ USER raton
 
 EXPOSE 8000
 CMD ["uvicorn", "front.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM base AS mcp
+
+COPY --chown=raton:raton mcp_server ./mcp_server
+USER raton
+
+EXPOSE 8002
+CMD ["python", "-m", "mcp_server"]
