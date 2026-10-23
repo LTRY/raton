@@ -349,6 +349,84 @@ function resolveResumePosition(storageKey, serverPosition, serverAt) {
   return local ? local.position : null;
 }
 
+// Lock screen / Control Center controls (iOS, Android, media keys). Whichever
+// element starts playing claims the session: its metadata and buttons replace
+// the previous owner's. `meta()` is read on every play, so a player that swaps
+// tracks on the same element stays current. `actions.previous`/`next` turn the
+// ±seek buttons into previous/next track (iOS shows one pair or the other).
+const MEDIA_SESSION_SKIP_SECONDS = 30;
+let mediaSessionOwner = null;
+
+function claimMediaSession(media, meta, actions = {}) {
+  if (!("mediaSession" in navigator) || !media || media.dataset.mediaSessionBound) return;
+  media.dataset.mediaSessionBound = "1";
+  const session = navigator.mediaSession;
+  const setAction = (action, handler) => {
+    try {
+      session.setActionHandler(action, handler);
+    } catch {
+      // Action unknown to this browser: its button just does not appear.
+    }
+  };
+  const updatePosition = () => {
+    if (mediaSessionOwner !== media || !session.setPositionState) return;
+    if (!Number.isFinite(media.duration) || media.duration <= 0) return;
+    try {
+      session.setPositionState({
+        duration: media.duration,
+        playbackRate: media.playbackRate || 1,
+        position: Math.min(Math.max(media.currentTime, 0), media.duration),
+      });
+    } catch {
+      // Inconsistent state while the source changes: the next event fixes it.
+    }
+  };
+  const seekTo = (seconds) => {
+    const upperBound = Number.isFinite(media.duration) ? media.duration : Infinity;
+    media.currentTime = Math.min(Math.max(seconds, 0), upperBound);
+    media.dispatchEvent(new CustomEvent("raton:user-seek"));
+    updatePosition();
+  };
+  const claim = () => {
+    const info = meta() || {};
+    mediaSessionOwner = media;
+    session.metadata = new MediaMetadata({
+      title: info.title || "Raton",
+      artist: info.artist || "",
+      album: "Raton",
+      artwork: info.artwork ? [{ src: new URL(info.artwork, window.location.href).href }] : [],
+    });
+    setAction("play", () => media.play().catch(() => {}));
+    setAction("pause", () => media.pause());
+    setAction("seekto", (details) => seekTo(details.seekTime));
+    const skip = (details, sign) => seekTo(media.currentTime + sign * (details.seekOffset || MEDIA_SESSION_SKIP_SECONDS));
+    setAction("seekbackward", actions.previous ? null : (details) => skip(details, -1));
+    setAction("seekforward", actions.next ? null : (details) => skip(details, 1));
+    setAction("previoustrack", actions.previous || null);
+    setAction("nexttrack", actions.next || null);
+    updatePosition();
+  };
+  media.addEventListener("play", () => {
+    claim();
+    session.playbackState = "playing";
+  });
+  media.addEventListener("pause", () => {
+    if (mediaSessionOwner !== media) return;
+    session.playbackState = "paused";
+    updatePosition();
+  });
+  ["loadedmetadata", "seeked", "ratechange"].forEach((type) => media.addEventListener(type, updatePosition));
+}
+window.ratonClaimMediaSession = claimMediaSession;
+
+// Clears the lock screen when the owning player is closed, not merely paused.
+function releaseMediaSession(media) {
+  if (!("mediaSession" in navigator) || mediaSessionOwner !== media) return;
+  mediaSessionOwner = null;
+  navigator.mediaSession.metadata = null;
+  navigator.mediaSession.playbackState = "none";
+}
+
 function bindResumableMedia(media) {
   const storageKey = media.dataset.resumeKey;
   if (!storageKey) return;
@@ -358,6 +436,11 @@ function bindResumableMedia(media) {
   const endBufferSeconds = RESUME_END_BUFFER_SECONDS;
   let lastSavedAt = 0;
   let watchedSeconds = 0;
+  claimMediaSession(media, () => ({
+    title: media.dataset.mediaTitle,
+    artist: media.dataset.mediaArtist,
+    artwork: media.getAttribute("poster") || media.dataset.mediaArtwork,
+  }));
   let lastTrackedTime = null;
   // Position de reprise tant qu'elle n'est pas confirmée par une lecture
   // effective : Safari iOS peut ignorer un `currentTime` posé avant que le média
@@ -2513,6 +2596,11 @@ function initMiniPlayer() {
   const closeButton = bar.querySelector("[data-mini-player-close]");
   if (!audio || !playPauseButton || !seek) return;
 
+  let currentTrack = null;
+  claimMediaSession(audio, () =>
+    currentTrack && { title: currentTrack.title, artist: currentTrack.channel, artwork: currentTrack.thumb }
+  );
+
   const saveIntervalSeconds = 5;
   const minimumResumeSeconds = RESUME_MINIMUM_SECONDS;
   const endBufferSeconds = RESUME_END_BUFFER_SECONDS;
@@ -2704,6 +2792,8 @@ function initMiniPlayer() {
     // commençant à 0 et laisser un seek interne en attente indéfiniment.
     audio.sponsorSkipController?.setSegments([]);
     delete audio.dataset.trackId;
+    currentTrack = null;
+    releaseMediaSession(audio);
     bar.hidden = true;
     document.body.classList.remove("has-mini-player");
   });
@@ -2726,6 +2816,7 @@ function initMiniPlayer() {
         logActivity();
       }
       audio.dataset.trackId = track.id;
+      currentTrack = track;
       audio.dataset.resumeKey = track.resumeKey || "";
       audio.dataset.resumeServerPosition = track.resumeServerPosition || "";
       audio.dataset.resumeServerAt = track.resumeServerAt || "";

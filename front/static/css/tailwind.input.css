@@ -120,6 +120,11 @@ body {
 
 body {
   margin: 0;
+  /* viewport-fit=cover (base.html) lets the page run under the notch of an
+     iPhone held sideways: keep the content beside it. Fixed elements add the
+     insets themselves. */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
 }
 
 a {
@@ -230,7 +235,7 @@ main {
 }
 
 body.has-mini-player main {
-  padding-bottom: 100px;
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
 
 section {
@@ -1197,6 +1202,37 @@ button.secondary {
 
 .filters-toolbar {
   margin-bottom: 18px;
+}
+
+/* Exploration filters fold (videos.html): the summary only shows on a phone,
+   where the inline script in the template closes the fold. */
+.filters-fold-summary {
+  display: none;
+}
+
+@media (max-width: 800px) {
+  .filters-fold-summary {
+    align-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    color: var(--color-text);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 15px;
+    font-weight: 700;
+    gap: 8px;
+    list-style: none;
+    min-height: 44px;
+    padding: 0 16px;
+  }
+
+  .filters-fold-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .filters-fold[open] > .filters-fold-summary {
+    margin-bottom: 10px;
+  }
 }
 
 .filters-form {
@@ -2346,6 +2382,16 @@ button.secondary {
   line-height: 1;
   min-width: 28px;
   padding: 3px 8px;
+}
+
+/* At either end of the stack: a flat outline, not a faded copy of the active
+   arrow that still reads as tappable. */
+.video-stack-controls button:disabled {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-faint);
+  cursor: default;
+  opacity: 1;
 }
 
 .video-stack-carousel {
@@ -5790,7 +5836,7 @@ turbo-frame {
   display: flex;
   gap: 14px;
   left: 0;
-  padding: 10px 20px;
+  padding: 10px max(20px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
   position: fixed;
   right: 0;
   z-index: 60;
@@ -6572,7 +6618,7 @@ turbo-frame {
   max-width: min(420px, calc(100vw - 32px));
   pointer-events: none;
   position: fixed;
-  right: 16px;
+  right: calc(16px + env(safe-area-inset-right, 0px));
   top: calc(76px + env(safe-area-inset-top, 0px));
   z-index: 70;
 }
@@ -7649,6 +7695,7 @@ turbo-frame {
   max-height: 70dvh;
   max-width: 560px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 10px 14px 18px;
   position: fixed;
   right: 8px;
@@ -8934,6 +8981,7 @@ summary.channel-menu-item::-webkit-details-marker {
 .channel-filters-panel {
   max-height: min(78vh, 640px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px 20px 16px;
   right: -70px;
   transform-origin: top right;
@@ -9041,10 +9089,10 @@ summary.channel-menu-item::-webkit-details-marker {
 /* Raton keeping the channel exploration company: fixed at the bottom, above the phone tab bar. */
 .explorer-raton {
   align-items: flex-end;
-  bottom: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   display: flex;
   gap: 8px;
-  left: 16px;
+  left: calc(16px + env(safe-area-inset-left, 0px));
   max-width: calc(100vw - 32px);
   pointer-events: none;
   position: fixed;
@@ -9127,7 +9175,7 @@ html.explore-running {
 }
 
 body.has-mini-player .explorer-raton {
-  bottom: 86px;
+  bottom: calc(86px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (max-width: 800px) {
@@ -9884,9 +9932,10 @@ a.channel-explore-btn {
     border-radius: 22px 22px 0 0;
     bottom: 0;
     left: 0;
-    max-height: 88vh;
+    max-height: 88dvh;
     overflow-y: auto;
-    padding-bottom: 28px;
+    overscroll-behavior: contain;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     position: fixed;
     right: 0;
     top: auto;
@@ -11574,5 +11623,52 @@ body::before {
   .import-fab.is-closing > .import-sheet,
   .import-fab.is-closing > .import-backdrop {
     animation: none;
+  }
+}
+
+/* Touch targets (docs/spec/11-interface-html.md, "Cibles tactiles"). On a
+   touch screen the small controls grow to a finger's size; where growing would
+   push the layout (stars, row menus, small round buttons), an invisible
+   `::after` widens the tappable area instead, vertically more than sideways so
+   that neighbours in a row do not steal each other's taps. Last in the file:
+   the page rules above have the same specificity. */
+@media (pointer: coarse) {
+  .chip3,
+  button.category-label,
+  .asset-filter-chip .asset-label,
+  .asset-filter-chip .category-label {
+    align-items: center;
+    display: inline-flex;
+    font-size: 12px;
+    min-height: 32px;
+    padding: 4px 11px;
+  }
+
+  .video-stack-controls {
+    gap: 8px;
+  }
+
+  .video-stack-controls button {
+    font-size: 18px;
+    min-height: 36px;
+    min-width: 40px;
+  }
+
+  .rating-star,
+  .video-row-more-button,
+  .settings-category-remove {
+    position: relative;
+  }
+
+  .rating-star::after,
+  .video-row-more-button::after,
+  .settings-category-remove::after {
+    content: "";
+    inset: -11px -2px;
+    position: absolute;
+  }
+
+  .settings-category-remove::after {
+    inset: -11px;
   }
 }

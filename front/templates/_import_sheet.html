@@ -23,7 +23,7 @@
   <form class="download-form import-form" action="/videos/download" data-api-action="/api/videos/import" data-api-body="manualDownload" method="post" data-async-download data-download-format-form data-turbo="false" data-pending-message="Import en file d'attente...">
     <label>
       URL YouTube
-      <input name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." required>
+      <input name="url" type="url" autocorrect="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." required>
     </label>
     <fieldset class="import-formats">
       <legend>Fichiers à garder</legend>
@@ -84,7 +84,7 @@
 
     <form class="pl-add-card" action="/playlists/import-url" data-api-action="/api/playlists/import-url" data-api-body="playlistUrl" method="post" data-async-job data-turbo="false" data-pending-message="Import de la playlist en file d'attente...">
       <label class="pl-facet" for="playlist-url">Depuis une URL YouTube</label>
-      <input id="playlist-url" name="url" type="text" placeholder="https://www.youtube.com/playlist?list=..." required>
+      <input id="playlist-url" name="url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://www.youtube.com/playlist?list=..." required>
       <input name="title" type="text" placeholder="Titre (optionnel, sinon celui de YouTube)" aria-label="Titre (optionnel)">
       <span class="pl-hint">Seules les métadonnées sont importées ; le téléchargement reste une étape séparée.</span>
       <button class="pl-btn-secondary" type="button" data-playlist-preview-button>Prévisualiser</button>
@@ -120,7 +120,7 @@
     <div class="import-pane import-pane-playlist">
     <form class="pl-add-card channel-create-form" action="/channels" method="post">
       <label class="pl-facet" for="channel-new-url">Une chaîne YouTube</label>
-      <input id="channel-new-url" name="url" type="text" placeholder="Nom, URL ou @handle de la chaîne" required>
+      <input id="channel-new-url" name="url" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Nom, URL ou @handle de la chaîne" required>
       <turbo-frame id="import-categories" src="/import/categories" loading="lazy">
         <p class="import-formats-hint">Chargement des catégories…</p>
       </turbo-frame>

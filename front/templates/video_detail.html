@@ -218,7 +218,7 @@
           </div>
           {% if video.media_urls.video %}
           <section class="video-player-panel" aria-label="Lecteur vidéo">
-            <video controls preload="metadata" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.media_urls.thumbnail %}poster="{{ video.media_urls.thumbnail }}"{% endif %}>
+            <video controls playsinline preload="metadata" data-media-title="{{ video.title }}" data-media-artist="{{ video.channel.name if video.channel else '' }}" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.media_urls.thumbnail %}poster="{{ video.media_urls.thumbnail }}"{% endif %}>
               <source src="{{ video.media_urls.video }}">
               {% if video.media_urls.subtitles %}
               {# Pas d'attribut `default` : il réactiverait la piste à chaque chargement,
@@ -273,7 +273,7 @@
           </section>
           {% elif video.media_urls.audio %}
           <section class="audio-player-panel" aria-label="Lecteur audio">
-            <audio controls preload="metadata" src="{{ video.media_urls.audio }}" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
+            <audio controls preload="metadata" src="{{ video.media_urls.audio }}" data-media-title="{{ video.title }}" data-media-artist="{{ video.channel.name if video.channel else '' }}" {% if video.media_urls.thumbnail %}data-media-artwork="{{ video.media_urls.thumbnail }}" {% endif %}data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:audio" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="audio"{% if resume_positions.audio %} data-resume-server-position="{{ resume_positions.audio.position_seconds }}" data-resume-server-at="{{ resume_positions.audio.at_ms }}"{% endif %}></audio>
           </section>
           {% endif %}
 

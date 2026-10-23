@@ -53,7 +53,7 @@ copies reduites y sont floues sur telephone).
 Sur `/videos/{id}`, si `video_path` existe :
 
 ```html
-<video controls preload="metadata" poster="/api/videos/{id}/thumbnail">
+<video controls playsinline preload="metadata" poster="/api/videos/{id}/thumbnail">
   <source src="/api/videos/{id}/video">
   <track kind="subtitles" src="/api/videos/{id}/subtitles" label="Sous-titres">
 </video>
@@ -451,7 +451,29 @@ barre de progression**, ce qui supposerait un lecteur custom.
   `max-width: 1180px`.
 - Le player audio occupe toute la largeur disponible.
 
+## Ecran verrouille (Media Session)
+
+Chaque lecteur declare sa piste a `navigator.mediaSession`
+(`claimMediaSession` dans `app.js`) : l'ecran verrouille, le Centre de
+controle d'iOS et les touches media affichent le titre de la fiche, la chaine,
+la vignette et une barre de position, avec lecture/pause et deplacement dans
+la piste. L'element qui demarre la lecture prend la session (titre, boutons) a
+celui qui l'avait.
+
+- Mini-lecteur persistant : la piste chargee ; sauts de ±30 s. Fermer le
+  mini-lecteur vide la session.
+- Lecteurs de `/videos/{id}` (`<video>`, `<audio>` inline) : titre et chaine
+  lus dans `data-media-title`/`data-media-artist`, vignette dans `poster` ou
+  `data-media-artwork` ; sauts de ±30 s.
+- Lecteur de playlist : piste precedente/suivante (memes regles que ses
+  boutons) a la place des sauts.
+
 ## Compatibilite Safari/iPhone
+
+Le `<video>` de `/videos/{id}` et celui du lecteur de playlist portent
+`playsinline` : sur iPhone la lecture reste dans la page (le carrousel, les
+sauts et la reprise restent visibles) ; le bouton plein ecran natif reste
+disponible.
 
 Les lecteurs natifs exigent le support HTTP Range pour :
 
