@@ -49,13 +49,24 @@ Services :
 - `mcp` : le serveur MCP (`mcp_server/`, voir [21 Serveur MCP](21-serveur-mcp.md)),
   image `raton-mcp:local` (etape `mcp`). Ni DB, ni media, ni secret : il appelle
   directement l'API du conteneur `api` (`RATON_API_URL=http://api:8001`), sans
-  passer par le front.
+  passer par le front ;
+- `ops` : le conteneur d'operations `raton-ops` (image `raton-ops:local`, etape
+  `ops` du `Dockerfile`), lance par `make previews` et non par `make up` (il est
+  dans le profil Compose `ops`, pour qu'un deploiement lance depuis sa propre
+  page ne le recree pas en cours de route). Il sert la page des previews (voir
+  « Previews des PR ») et execute la revue quotidienne des journaux (voir
+  [13 Jobs, logs et planification](13-jobs-logs-planification.md), « Revue
+  quotidienne des journaux »). Il tourne en **root** avec le socket Docker de
+  l'hote monte : il pilote le Docker de l'hote (previews, `make up`). Aucune
+  dependance Raton dans l'image : Docker, git, `gh`, `make`, `jq` et le CLI
+  Claude Code.
 
 Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app`,
-`raton-api` pour `api`, `raton-mcp` pour `mcp` et `raton-db` pour `db`, au lieu de `raton-app-1`...
+`raton-api` pour `api`, `raton-mcp` pour `mcp`, `raton-ops` pour `ops` et `raton-db` pour `db`, au lieu de `raton-app-1`...
 Une seule instance de la pile peut donc tourner par machine.
 
-Ports publies : `8000` (`app`, le front) et `8002` (`mcp`, le serveur MCP), sur
+Ports publies : `8000` (`app`, le front), `8002` (`mcp`, le serveur MCP) et
+`8999` (`ops`, la page des previews, sur l'interface d'`APP_BIND`), sur
 `127.0.0.1` par defaut ; `APP_BIND=0.0.0.0` et `MCP_BIND=0.0.0.0` les ouvrent
 au LAN. Ni `api` ni `db` ne publient de port : le navigateur et un raccourci
 iOS passent par le front, dont le relais `/api/*` atteint le back sur le
@@ -66,6 +77,11 @@ Volumes :
 
 - `postgres_data` pour PostgreSQL ;
 - `${MEDIA_HOST_ROOT:-./.local/media/YouTube}:/media/youtube` ;
+- `/var/run/docker.sock` et le depot lui-meme (`.:${RATON_REPO}`) pour `ops`. Le
+  depot est monte **au meme chemin que sur l'hote** (`RATON_REPO`, positionne
+  par le Makefile) : les montages des fichiers compose qu'`ops` lance sont
+  resolus par le Docker de l'hote, les deux cotes doivent donc s'accorder sur
+  le chemin. Le journal y est monte en lecture seule ;
 - `${LOG_HOST_DIR:-./.local/logs}:/var/log/raton` : le journal
   applicatif, qui doit survivre a la recreation du conteneur a chaque deploiement
   (voir [13 Jobs, logs et planification](13-jobs-logs-planification.md), section
@@ -274,9 +290,12 @@ partir d'une PR ouverte, pour l'essayer avant le merge sans toucher a la pile
 reelle. Elle se deploie a la main, depuis une page web ou en ligne de commande ;
 le merge ne deploie rien.
 
-- **Page des previews** : `make previews` (`scripts/previews.py`, bibliotheque
-  standard Python seulement) sert une page sur le port `8999` (`PREVIEWS_PORT`),
-  sur l'interface d'`APP_BIND` du `.env` (`PREVIEWS_BIND` la remplace). Elle
+- **Page des previews** : `make previews` construit et lance le conteneur
+  `raton-ops` (voir « Docker Compose »), qui sert `scripts/previews.py`
+  (bibliotheque standard Python seulement) sur le port `8999` (`PREVIEWS_PORT`),
+  sur l'interface d'`APP_BIND` du `.env`. `gh` y est authentifie par `GH_TOKEN`
+  (`.env`), qui sert aussi a git en HTTPS (`git fetch origin main`) : le remote
+  `origin` doit donc etre en HTTPS, avec un jeton qui lit le depot. Elle
   liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
@@ -286,7 +305,8 @@ le merge ne deploie rien.
   previews dont la PR est fermee restent listees pour etre retirees, et
   **Retirer les previews des PR fermees** les supprime toutes. La sortie de
   chaque action est dans `.local/previews/logs/pr-<N>.log` (lien **Journal**).
-  La page n'a pas d'authentification (comme Raton, reseau local de confiance)
+  Un script de preview ou de deploiement tourne dans le conteneur, qui
+  reconstruit les images via le Docker de l'hote. La page n'a pas d'authentification (comme Raton, reseau local de confiance)
   et refuse un formulaire poste depuis une autre origine.
 - **Script** : `scripts/preview.sh up <N>` recupere la tete de la PR
   (`refs/pull/<N>/head`) dans un worktree git `.local/previews/pr-<N>`, puis

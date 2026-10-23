@@ -7,6 +7,9 @@ MEDIA_HOST_ROOT := $(CURDIR)/.local/media/YouTube
 endif
 export MEDIA_HOST_ROOT
 
+# The ops container mounts the repository at this very path (see the `ops` service).
+export RATON_REPO := $(CURDIR)
+
 install:
 	uv sync --python 3.14 --extra dev
 
@@ -62,10 +65,11 @@ demo: css
 	mkdir -p .local "$(MEDIA_HOST_ROOT)"
 	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
 
-# The page that deploys the PR previews (scripts/previews.py), on the interface of APP_BIND in .env.
+# The raton-ops container (docker-compose.yml, profile `ops`): the page that deploys the PR previews
+# and main (scripts/previews.py, port 8999 on the interface of APP_BIND) and the daily log review.
 previews:
-	PREVIEWS_BIND="$${PREVIEWS_BIND:-$$(sed -n 's/^APP_BIND=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")}" \
-	  uv run --python 3.14 python scripts/previews.py
+	docker compose --profile ops up --build -d ops
+	-docker image prune -f
 
 uninstall:
 	./scripts/uninstall.sh $(ARGS)

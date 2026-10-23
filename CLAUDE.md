@@ -76,7 +76,7 @@ make ci             # css + lint + test + compose-config (run before opening a P
 make format         # ruff fix + format (also run on every edited .py by the PostToolUse hook)
 make demo           # back (API, :8001) + front (pages, :8000) with --reload on a local sqlite db (no Postgres needed)
 make upgrade-ytdlp  # yt-dlp only moves when uv.lock does: the Docker image installs from the lock
-make previews       # page (:8999): deploys a PR's preview on port 9000 + its number (scripts/preview.sh), and main to the real stack (scripts/deploy.sh)
+make previews       # starts the raton-ops container (root, Docker socket): page (:8999) that deploys a PR's preview on port 9000 + its number (scripts/preview.sh) and main to the real stack (scripts/deploy.sh), plus the daily 8:00 log review
 ```
 
 Other targets (`install`, `test`, `lint`, `css`, `migrate`, `docs-dev`, `docs-build`, `up`...) are in the Makefile; `make up` is the deploy and is not part of the task workflow.

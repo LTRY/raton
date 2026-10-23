@@ -76,5 +76,37 @@ services:
       RATON_API_URL: http://api:8001
       MCP_TRANSPORT: streamable-http
 
+  # The operations container (`make previews`): the previews page, the deploy of main and the daily
+  # log review. Root with the Docker socket on purpose: it drives the host's Docker. Behind a
+  # profile so that `make up` (and so a deploy it runs itself) never recreates it mid-job.
+  ops:
+    container_name: raton-ops
+    profiles: [ops]
+    image: ${RATON_OPS_IMAGE:-raton-ops:local}
+    build:
+      context: .
+      target: ops
+    restart: unless-stopped
+    ports:
+      # Same interface as the app (APP_BIND): the page has no authentication.
+      - "${APP_BIND:-127.0.0.1}:${PREVIEWS_PORT:-8999}:8999"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The repository at its host path: the bind mounts of the compose files it runs are
+      # resolved by the host's Docker, so both sides must agree on the path (RATON_REPO is set by the Makefile).
+      - .:${RATON_REPO:-/raton}
+      - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton:ro
+    environment:
+      RATON_REPO: ${RATON_REPO:-}
+      LOG_DIR: /var/log/raton
+      TZ: ${TZ:-Europe/Paris}
+      # gh and git over HTTPS (previews, fetch of origin/main).
+      GH_TOKEN: ${GH_TOKEN:-}
+      # The daily log review: Claude Code on the Anthropic API, billed per token.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPS_REVIEW_HOUR: ${OPS_REVIEW_HOUR:-8}
+      OPS_REVIEW_MODEL: ${OPS_REVIEW_MODEL:-sonnet}
+      OPS_REVIEW_MAX_USD: ${OPS_REVIEW_MAX_USD:-1}
+
 volumes:
   postgres_data:
