@@ -281,6 +281,20 @@
     timeTotal.textContent = formatTime(media.duration);
   });
   media.addEventListener("progress", paintSeek);
+  // On a full page load app.js (the helper) runs after this script.
+  const bindMediaSession = () =>
+    window.ratonClaimMediaSession(
+      media,
+      () =>
+        current && {
+          title: current.dataset.title,
+          artist: current.dataset.channel,
+          artwork: current.dataset.thumb === "1" ? `/api/videos/${current.dataset.videoId}/thumbnail` : "",
+        },
+      { previous: goPrevious, next: goNext }
+    );
+  if (window.ratonClaimMediaSession) bindMediaSession();
+  else document.addEventListener("DOMContentLoaded", bindMediaSession, { once: true });
   media.addEventListener("play", () => { lastTick = Date.now(); updatePlayIcon(); });
   media.addEventListener("pause", () => { lastTick = null; postActivity(); updatePlayIcon(); });
   media.addEventListener("ended", () => { postActivity(); goNext(); });

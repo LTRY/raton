@@ -1998,6 +1998,17 @@ def test_videos_page_filters_by_rated_videos(monkeypatch):
     )
 
 
+def test_videos_page_filters_fold_counts_active_filters():
+    db = make_session()
+    add_video(db)
+
+    rendered = site(db).get("/videos?asset_filters=1&asset=video&rated=1").text
+
+    assert '<details class="filters-toolbar filters-fold" open data-filters-fold>' in rendered
+    # One per active filter pill: Vidéo and ★ Notées.
+    assert '<span class="adv-filters-count">2</span>' in rendered
+
+
 def test_videos_page_renders_default_rated_sub_library(monkeypatch):
     db = make_session()
     rated = add_video(db)
@@ -4802,7 +4813,7 @@ def test_css_hides_topbar_on_phone():
         for block in phone_blocks
     )
     assert any(
-        "100dvh - 90px - var(--home-mini-reserve, 0px) - env(safe-area-inset-bottom)" in block
+        "100dvh - 90px - var(--home-mini-reserve, 0px) - var(--tabbar-safe-bottom)" in block
         for block in phone_blocks
     )
 

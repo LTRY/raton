@@ -23,6 +23,32 @@ dans `<head>`, et `favicon.png` (64 x 64) par `<link rel="icon">`. Sans
 elle, « Ajouter a l'ecran d'accueil » affiche la simple lettre « P ». Le nom
 sous l'icone vient de `apple-mobile-web-app-title` (« Raton »).
 
+Application ecran d'accueil (iPhone) : `<link rel="manifest">` declare
+`front/static/manifest.webmanifest` (`display: standalone`, `start_url` et
+`scope` `/`, fond et `theme_color` creme `--color-bg`, icone
+`apple-touch-icon.png`) : ajoutee a l'ecran d'accueil, Raton s'ouvre en plein
+ecran, sans la barre d'adresse de Safari.
+`apple-mobile-web-app-status-bar-style` vaut `default` : la barre d'etat
+(heure, batterie) garde sa propre bande et la page commence dessous.
+
+Zones sures : la balise viewport porte `viewport-fit=cover`, sans quoi Safari
+renvoie 0 pour toutes les `env(safe-area-inset-*)` et les marges prevues pour
+la barre d'accueil et l'encoche ne s'appliquent pas. Avec elle, chaque element
+fixe colle a un bord ajoute la zone sure de ce bord (barre d'onglets,
+mini-lecteur, feuilles basses, notifications, Raton explorateur) et `body`
+porte `padding-left/right: env(safe-area-inset-left/right)` pour qu'en
+paysage le contenu ne passe pas sous l'encoche.
+
+Exception, la barre d'onglets du telephone : un iPhone sans bouton
+d'accueil annonce 34 px de zone sure en bas, et les ajouter en entier
+souleverait la barre bien au-dessus de la barre d'accueil, ce que ne fait
+aucune app native. Elle n'en garde que la part au-dela de 20 px
+(`--tabbar-safe-bottom: max(0px, zone sure du bas - 20px)`, soit 14 px) : son
+bas est a 6 px + `--tabbar-safe-bottom` de l'ecran (20 px sur ces iPhone,
+6 px dans Safari ou la barre d'outils couvre deja le bas). Tout ce qui se cale
+sur elle suit la meme variable : reserve du bas des pages, composeur du chat,
+accueil, mini-lecteur, Raton explorateur, boutons des Parametres.
+
 Navigation pilotee par Turbo Drive (`front/static/js/vendor/turbo.min.js`,
 vendored, charge dans `<head>` avec `data-turbo-track="reload"`) : les clics
 sur les liens et la plupart des soumissions de formulaire deviennent des
@@ -106,6 +132,32 @@ droite.
   qui deborde doit etre contraint.
 - Verification : a 390px de large, `document.documentElement.scrollWidth`
   vaut `clientWidth`.
+
+### Cibles tactiles
+
+Sur ecran tactile (`@media (pointer: coarse)`, bloc en fin de
+`tailwind.input.css`), un controle se touche du doigt sans viser : 32 px de
+haut au minimum, vers 44 px quand la place le permet.
+
+- Les pastilles de filtre (`.chip3`, « ★ Notees », « Masquer les ecartees »,
+  « Sans categorie ») et les boutons pastilles (« + Categories »,
+  « + Playlists », `button.category-label`) passent a 32 px de haut, texte 12 px.
+- Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
+- Les etoiles de notation, le menu ⋮ des cartes et le ✕ d'une categorie dans
+  les Parametres gardent leur dessin : un `::after` invisible agrandit leur
+  zone de toucher, surtout en hauteur (11 px de chaque cote) et a peine en
+  largeur, pour que deux etoiles voisines ne se volent pas les appuis.
+
+Clavier : les champs de recherche portent `enterkeyhint="search"` (touche
+« Rechercher » du clavier iOS) ; les champs d'URL et de chaine de la feuille
+d'import desactivent majuscule automatique et correction
+(`autocapitalize="off"`, `autocorrect="off"`, `spellcheck="false"`), et le
+champ d'URL de playlist demande le clavier URL (`inputmode="url"`).
+
+Les panneaux qui defilent au-dessus de la page (feuille d'import, feuille
+basse d'une chaine, panneau de filtres d'une chaine, menu de suggestions du
+chat) portent `overscroll-behavior: contain` : arrive au bout, le geste ne
+fait pas defiler la page dessous.
 
 ### Temps de chargement des pages
 
@@ -335,7 +387,7 @@ blanche), leger flou (8 px) et forte saturation de ce qui passe dessous
 (`backdrop-filter`, pour que les couleurs des vignettes restent visibles),
 liseré clair et reflet interne en haut. Sans
 `backdrop-filter`, elle garde un fond blanc quasi opaque. Elle reste dans la
-bande de 72 px + zone sure que les pages reservent en bas.
+bande de 72 px + `--tabbar-safe-bottom` que les pages reservent en bas.
 
 Quand un champ texte a le focus (clavier a l'ecran ouvert), la barre est
 masquee (`body:has(textarea:focus, [contenteditable]:focus, input…:focus)`, doublee
@@ -583,7 +635,8 @@ videos importees via playlist (chaine auto-creee sans cloche — voir
 pile montre jusqu'a `NOUVEAUTES_STACK_SIZE` (10) videos triees par date de
 sortie, navigables une a la fois via des fleches precedent/suivant
 (`.video-stack-carousel`, scroll-snap), sans compteur de position ("1 / 10")
-entre les fleches ; chaque video reutilise la meme carte
+entre les fleches ; une fleche desactivee (debut ou fin de la pile) n'est
+qu'un contour clair, sans fond, pour ne pas se lire comme un bouton actif ; chaque video reutilise la meme carte
 (macro `video_card`, même vignette pleine hauteur, même note, sans
 labels) que la page `/videos`. Les piles sont
 paginees par chaine (`NOUVEAUTES_CHANNEL_PAGE_SIZE` = 10 chaines par
@@ -705,12 +758,12 @@ attribut `data-chat-config` :
   pendant qu'une reponse s'ecrit (`scrollIntoView`, debut du dernier message :
   une reponse longue se lit depuis sa premiere ligne), pas au chargement. Le
   composeur est `position: sticky` en bas de l'ecran (au-dessus de la tab bar
-  sous 800px, `72px + env(safe-area-inset-bottom)`, soit 6px d'ecart avec la
+  sous 800px, `72px + var(--tabbar-safe-bottom)`, soit 6px d'ecart avec la
   barre : le composeur colle a la barre, comme l'accueil vide) tant qu'une discussion est
   affichee ; vide, il reste a sa place dans la page. Sur telephone, l'accueil
   remplit l'ecran (`100dvh` moins la reserve de la tab bar) et le composeur vide
   se pose donc aussi a 6px de la barre. Des que le clavier est ouvert
-  (`html.keyboard-open`), la reserve de la tab bar (72px + safe-area) est retiree
+  (`html.keyboard-open`), la reserve de la tab bar (72px + `--tabbar-safe-bottom`) est retiree
   de cette hauteur : sinon elle laisse entre le composeur et le clavier un vide
   de la meme taille. Avec le mini lecteur affiche,
   le `padding-bottom` de `main` est conserve (le composeur reste au-dessus du
@@ -1055,6 +1108,14 @@ meme (`videos_page`) ; elle choisit le template selon la chaine.
 Contenu :
 
 - barre de recherche (voir [Recherche](#recherche-videos-et-chaines)) ;
+- sur `/videos`, le formulaire de filtres est dans un `details.filters-fold` :
+  ouvert sur ordinateur (son resume est masque), il est **replie sur
+  telephone** (<= 800 px) derriere une pilule « Filtres » (44 px de haut) qui
+  porte le nombre de filtres actifs (celui des pastilles de filtres actifs),
+  pour que les fiches commencent dans le premier ecran. Un script
+  en ligne juste apres le `details` le replie avant le premier affichage ;
+  chaque filtre recharge la page, donc l'etat ouvert choisi sur telephone est
+  garde pour la session (`sessionStorage`, `raton:library-filters-open`) ;
 - filtre chaine ;
 - tri (import recent / publication recente / les plus vues / les mieux notees : note
   decroissante, puis date de publication) ;

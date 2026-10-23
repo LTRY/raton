@@ -53,7 +53,7 @@ copies reduites y sont floues sur telephone).
 Sur `/videos/{id}`, si `video_path` existe :
 
 ```html
-<video controls preload="metadata" poster="/api/videos/{id}/thumbnail">
+<video controls playsinline preload="metadata" poster="/api/videos/{id}/thumbnail">
   <source src="/api/videos/{id}/video">
   <track kind="subtitles" src="/api/videos/{id}/subtitles" label="Sous-titres">
 </video>
@@ -451,7 +451,47 @@ barre de progression**, ce qui supposerait un lecteur custom.
   `max-width: 1180px`.
 - Le player audio occupe toute la largeur disponible.
 
+## Ecran verrouille (Media Session)
+
+Chaque lecteur declare sa piste a `navigator.mediaSession`
+(`claimMediaSession` dans `app.js`) : l'ecran verrouille, le Centre de
+controle d'iOS et les touches media affichent le titre de la fiche, la chaine,
+la vignette et une barre de position, avec lecture/pause et deplacement dans
+la piste. L'element qui demarre la lecture prend la session (titre, boutons) a
+celui qui l'avait.
+
+- Mini-lecteur persistant : la piste chargee ; sauts de ±30 s. Fermer le
+  mini-lecteur vide la session.
+- Lecteurs de `/videos/{id}` (`<video>`, `<audio>` inline) : titre et chaine
+  lus dans `data-media-title`/`data-media-artist`, vignette dans `poster` ou
+  `data-media-artwork` ; sauts de ±30 s.
+- Lecteur de playlist : piste precedente/suivante (memes regles que ses
+  boutons) a la place des sauts.
+
 ## Compatibilite Safari/iPhone
+
+Le `<video>` de `/videos/{id}` et celui du lecteur de playlist portent
+`playsinline` : sur iPhone la lecture reste dans la page (le carrousel, les
+sauts et la reprise restent visibles) ; le bouton plein ecran natif reste
+disponible.
+
+Limite connue d'iOS, pas de Raton : ouvert depuis l'icone de l'ecran
+d'accueil (web app), un audio mis en pause depuis l'ecran verrouille reprend
+sans son quand on appuie sur Lecture (la position avance, rien ne sort). iOS
+retire la sortie audio a la web app en pause en arriere-plan ; un onglet
+Safari n'a pas ce probleme.
+
+Contournement (`claimMediaSession`, « pause douce », verifie sur iPhone) : une Pause
+recue de l'ecran verrouille ou du Centre de controle pendant que la page est
+cachee ne met pas le lecteur en pause, elle passe sa vitesse a 0
+(`playbackRate`). Pour iOS l'element joue toujours et garde la sortie audio ;
+rien ne s'entend et la position ne bouge pas. Lecture remet la vitesse
+d'avant. La pause douce devient une vraie pause au retour dans l'app (les
+boutons du lecteur affichent alors Lecture), au changement de piste (piste
+precedente/suivante, nouvelle source) et au bout de 15 minutes
+(`SOFT_PAUSE_MAX_MS`), pour ne pas garder la session audio indefiniment ;
+apres ces 15 minutes la limite ci-dessus revient. Page visible, Pause est une
+vraie pause.
 
 Les lecteurs natifs exigent le support HTTP Range pour :
 

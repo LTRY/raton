@@ -8,7 +8,7 @@
        /channels and /playlists, but still submits and live-searches with the filters. #}
     <label class="page-search">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input name="q" type="search" value="{{ search_query|default('') }}" form="library-filters" placeholder="Rechercher une fiche" aria-label="Rechercher une fiche" autocomplete="off">
+      <input name="q" type="search" value="{{ search_query|default('') }}" form="library-filters" placeholder="Rechercher une fiche" aria-label="Rechercher une fiche" enterkeyhint="search" autocomplete="off">
     </label>
   </div>
   {{ macros.library_subnav("exploration") }}
@@ -21,7 +21,14 @@
   </nav>
   {% endif %}
 
-  <div class="filters-toolbar">
+  {# Folded on a phone so the fiches start on the first screen; the summary only
+     shows there (docs/spec/11-interface-html.md, "Bibliotheque > Exploration"). #}
+  <details class="filters-toolbar filters-fold" open data-filters-fold>
+    <summary class="filters-fold-summary lg">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 17h16"/><circle cx="15" cy="7" r="2.5" fill="var(--color-white)"/><circle cx="9" cy="17" r="2.5" fill="var(--color-white)"/></svg>
+      <span>Filtres</span>
+      {% if active_filter_pills %}<span class="adv-filters-count">{{ active_filter_pills|length }}</span>{% endif %}
+    </summary>
     <form class="filters-form" id="library-filters" action="/videos" method="get" data-auto-submit-filter data-live-search="library-results">
       <input type="hidden" name="asset_filters" value="1">
       <div class="filters-main-row">
@@ -95,7 +102,26 @@
       </details>
       <button class="visually-hidden" type="submit">Filtrer</button>
     </form>
-  </div>
+  </details>
+  {# Inline so the fold closes before the first paint. Each filter change reloads
+     the page: the choice is kept for the session so an open panel stays open. #}
+  <script>
+    (function () {
+      const fold = document.currentScript.previousElementSibling;
+      const key = "raton:library-filters-open";
+      let stored = null;
+      try {
+        stored = window.sessionStorage.getItem(key);
+      } catch {}
+      fold.open = !window.matchMedia("(max-width: 800px)").matches || stored === "1";
+      fold.addEventListener("toggle", () => {
+        if (!window.matchMedia("(max-width: 800px)").matches) return;
+        try {
+          window.sessionStorage.setItem(key, fold.open ? "1" : "0");
+        } catch {}
+      });
+    })();
+  </script>
 
   {# Everything that depends on `q` lives in this frame: live search swaps it
      alone, so the search field keeps focus while typing. #}
