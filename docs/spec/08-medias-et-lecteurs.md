@@ -478,9 +478,20 @@ disponible.
 Limite connue d'iOS, pas de Raton : ouvert depuis l'icone de l'ecran
 d'accueil (web app), un audio mis en pause depuis l'ecran verrouille reprend
 sans son quand on appuie sur Lecture (la position avance, rien ne sort). iOS
-endort la web app en arriere-plan et ne lui rend pas la sortie audio ; un
-onglet Safari n'a pas ce probleme. Pour ecouter avec des pauses ecran
-verrouille, passer par Safari.
+retire la sortie audio a la web app en pause en arriere-plan ; un onglet
+Safari n'a pas ce probleme.
+
+Contournement experimental (`claimMediaSession`, « pause douce ») : une Pause
+recue de l'ecran verrouille ou du Centre de controle pendant que la page est
+cachee ne met pas le lecteur en pause, elle passe sa vitesse a 0
+(`playbackRate`). Pour iOS l'element joue toujours et garde la sortie audio ;
+rien ne s'entend et la position ne bouge pas. Lecture remet la vitesse
+d'avant. La pause douce devient une vraie pause au retour dans l'app (les
+boutons du lecteur affichent alors Lecture), au changement de piste (piste
+precedente/suivante, nouvelle source) et au bout de 15 minutes
+(`SOFT_PAUSE_MAX_MS`), pour ne pas garder la session audio indefiniment ;
+apres ces 15 minutes la limite ci-dessus revient. Page visible, Pause est une
+vraie pause.
 
 Les lecteurs natifs exigent le support HTTP Range pour :
 

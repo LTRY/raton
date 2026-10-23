@@ -56,3 +56,13 @@ def test_players_claim_the_media_session():
     assert "releaseMediaSession(audio)" in APP_JS
     assert "ratonClaimMediaSession" in PLAYLIST_JS
     assert "{ previous: goPrevious, next: goNext }" in PLAYLIST_JS
+
+
+def test_lock_screen_pause_is_a_soft_pause_while_hidden():
+    # Experimental: iOS takes the audio output away from a paused home-screen
+    # web app, so a Pause from the lock screen only sets the rate to 0.
+    assert 'setAction("pause", pauseFromSession);' in APP_JS
+    assert 'setAction("play", playFromSession);' in APP_JS
+    assert "if (!document.hidden || media.paused)" in APP_JS
+    assert "media.playbackRate = 0;" in APP_JS
+    assert "const SOFT_PAUSE_MAX_MS = 15 * 60 * 1000;" in APP_JS
