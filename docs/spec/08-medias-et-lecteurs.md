@@ -249,6 +249,24 @@ lecture-pause (56 px) et fermer (44 px). La barre de temps et les sauts ±30 s
 y sont masques — le curseur du volet Audio les remplace. Au-dela de 800 px la
 barre de progression et les sauts ±30 s restent affiches.
 
+### Barre espace : lecture / pause
+
+Sur toutes les pages, la barre espace met en pause ou reprend la lecture
+(`initSpaceToggle`, `front/static/js/app.js`, lie une seule fois au document) :
+
+- si un media (`<audio>`/`<video>` avec une source) joue, il est mis en pause ;
+- sinon, le dernier media lance reprend s'il est encore sur la page, puis a
+  defaut la piste du mini-lecteur, puis le media de la page s'il est le seul.
+
+La touche garde son role natif (et la page ne bouge pas) quand le focus est
+dans un champ de saisie, un `select`, un element editable, sur un bouton, un
+lien, un `summary`, un controle a role ARIA activable ou sur un lecteur natif
+(`<video controls>`, qui bascule lui-meme). Le curseur de progression
+(`input type="range"`, `role="slider"`) laisse la touche au raccourci. Sans
+media a piloter, l'espace fait defiler la page comme d'habitude. Les
+combinaisons avec Alt, Ctrl, Cmd ou Maj et la repetition de touche sont
+ignorees.
+
 ### Barre de progression commune
 
 Les trois barres (volet Audio de `/videos/{id}`, mini-lecteur, lecteur de
