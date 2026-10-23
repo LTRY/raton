@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = "==3.14.*"
 resolution-markers = [
     "sys_platform == 'linux'",
@@ -40,21 +40,21 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.117.0"
+version = "1.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "distro" },
     { name = "docstring-parser" },
-    { name = "httpx" },
+    { name = "httpx2" },
     { name = "jiter" },
+    { name = "opentelemetry-api" },
     { name = "pydantic" },
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/41/0d/8f71d535edb0d438f023bd825fb65f67c14fa88a2bd6b75f292a58a63de4/anthropic-0.117.0.tar.gz", hash = "sha256:98107f2b76439641e0ae2a1754087534b8f178dbab99d6eb1bc4b7bc8c744496", size = 989933, upload-time = "2026-07-16T19:36:13.07Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/10/37/5a2a4316df8babd28f096477a707cd75f240b4264c97fb128c32375105d6/anthropic-1.15.0.tar.gz", hash = "sha256:90caa9df83e2fc8bddb4ddeb83b7191bce255f635c03eae055deec521741df08", size = 1726101, upload-time = "2026-10-15T19:45:34.635Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/4c/917d21d6619a4475cdafc6d13a69fdb3b901ddac57e76caca5a25c117b6d/anthropic-0.117.0-py3-none-any.whl", hash = "sha256:451a0a6905f11dff7663d13e4ee5dbf909eb8942b1d049803c7b937a13ac47ec", size = 998327, upload-time = "2026-07-16T19:36:11.225Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/65/54437e7edea49a3be9ef56f6b5965999bfdc52b9dadc9b448124ca51a594/anthropic-1.15.0-py3-none-any.whl", hash = "sha256:10189a7993c5c71a0a2d4bb80020ca6a2fd27679f51e627405da37251d15ff49", size = 2047755, upload-time = "2026-10-15T19:45:32.951Z" },
 ]
 
 [[package]]
@@ -216,15 +216,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/10/bf/8d6ebc7dded797bd0f0160d52188021211f011a2b164ef0ae1dac4587465/cryptography-50.0.2-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:7a8701d6b584d76e909e3d305b7d126b41439876a5aaf76cddc67fc230eafa2e", size = 4897738, upload-time = "2026-09-30T15:29:43.106Z" },
     { url = "https://files.pythonhosted.org/packages/d4/aa/f3f6e0de7e6253b8baa8b2d8fb9d50924fa75cee3d4624bd4bc1208ee923/cryptography-50.0.2-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:ce47f66801c20ec6c6632453bb5960fe38939e9306970b48b3a5a26de7745d94", size = 5058280, upload-time = "2026-09-30T15:29:44.827Z" },
     { url = "https://files.pythonhosted.org/packages/f6/b6/a1faf3a27ae9405fb34b1713cc73b2d8a26b04d5c561578fa2e6ef3e5bb9/cryptography-50.0.2-cp39-abi3-win_amd64.whl", hash = "sha256:4e81d95e5bafc2d6e34e4bed780e53e4d5b9a2f928573428aa4d35fbec1eb0de", size = 3854095, upload-time = "2026-09-30T15:29:46.782Z" },
-]
-
-[[package]]
-name = "distro"
-version = "1.9.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fc/f8/98eea607f65de6527f8a2e8885fc8015d3e6f5775df186e443e0964a11c3/distro-1.9.0.tar.gz", hash = "sha256:2fa77c6fd8940f116ee1d6b94a2f90b13b5ea8d019b98bc8bafdcabcdd9bdbed", size = 60722, upload-time = "2023-12-24T09:54:32.31Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/b3/231ffd4ab1fc9d679809f356cebee130ac7daa00d6d6f3206dd4fd137e9e/distro-1.9.0-py3-none-any.whl", hash = "sha256:7bffd925d65168f85027d8da9af6bddab658135b840670a223589bc0c8ef02b2", size = 20277, upload-time = "2023-12-24T09:54:30.421Z" },
 ]
 
 [[package]]
