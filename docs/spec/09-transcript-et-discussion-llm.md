@@ -560,8 +560,9 @@ cites dans `llm_jobs.sources`.
   video n'est indexee que si ses notes ont ete (re)generees au format a
   sections, voir la section Notes structurees ci-dessus).
 
-`GET /api/chat` : la discussion la plus recente (celle qu'ouvre l'accueil),
-meme reponse. `GET /api/chat/conversations/{id}` : une discussion donnee.
+`GET /api/chat` : aucune discussion ouverte (`conversation_id` `null`, pas de
+message : l'ecran de Raton de l'accueil), meme reponse avec la liste des
+discussions. `GET /api/chat/conversations/{id}` : une discussion donnee.
 `DELETE /api/chat/conversations/{id}` : supprime la discussion et ses
 messages (`204`). Pas de portee par utilisateur.
 

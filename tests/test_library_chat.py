@@ -385,13 +385,16 @@ def test_a_question_follows_its_discussion_and_without_one_starts_another(monkey
     assert [turn["content"] for turn in sent] == ["Première ?", "Première réponse.", "Et ensuite ?"]
     assert other["conversation_id"] != first["conversation_id"]
     assert [message["content"] for message in other["messages"]] == ["Autre ?", "Autre sujet."]
-    # Latest answered first; the home page opens on it.
+    # Latest answered first.
     assert [item["id"] for item in other["conversations"]] == [
         other["conversation_id"],
         first["conversation_id"],
     ]
     assert other["conversations"][1]["title"] == "Première ?"
-    assert llm_api.get_library_chat(db).conversation_id == other["conversation_id"]
+    # The home page opens on Raton: no discussion until one is picked.
+    home = llm_api.get_library_chat(db)
+    assert home.conversation_id is None and home.messages == []
+    assert len(home.conversations) == 2
 
 
 def test_a_question_to_an_unknown_discussion_is_refused():

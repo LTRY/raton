@@ -1879,12 +1879,13 @@ function initChatWidget(root) {
   const suggestList = root.querySelector("[data-chat-suggest-list]");
   const suggestClose = root.querySelector("[data-chat-suggest-close]");
   const suggestBackdrop = root.querySelector("[data-chat-suggest-backdrop]");
-  const conversationsEl = root.querySelector("[data-chat-conversations]");
-  const conversationsToggle = root.querySelector("[data-chat-conversations-toggle]");
-  const conversationsMenu = root.querySelector("[data-chat-conversations-menu]");
+  const navEl = root.querySelector("[data-chat-nav]");
+  const navTitle = root.querySelector("[data-chat-nav-title]");
+  const drawerToggle = root.querySelector("[data-chat-drawer-toggle]");
+  const drawer = root.querySelector("[data-chat-drawer]");
+  const drawerBackdrop = root.querySelector("[data-chat-drawer-backdrop]");
+  const recentLabel = root.querySelector("[data-chat-recent-label]");
   const conversationsList = root.querySelector("[data-chat-conversations-list]");
-  const conversationsClose = root.querySelector("[data-chat-conversations-close]");
-  const conversationsBackdrop = root.querySelector("[data-chat-conversations-backdrop]");
   const newButton = root.querySelector("[data-chat-new]");
   let currentScope = config.scopes[config.defaultScope] ? config.defaultScope : Object.keys(config.scopes)[0];
   let statusTimer;
@@ -1998,59 +1999,72 @@ function initChatWidget(root) {
     messagesEl?.lastElementChild?.scrollIntoView({ block: "start", behavior: "smooth" });
   }
 
-  // A scope with `conversationsUrl` (library) keeps several discussions: the
-  // header lists them and starts a new one instead of erasing the only one.
+  // A scope with `conversationsUrl` (library) keeps several discussions: a
+  // side drawer lists them, and the open one is in the URL (`?discussion=ID`),
+  // so a reload keeps it and the browser's back button returns to Raton.
   const hasConversations = () => Boolean(scopeConfig().conversationsUrl);
-  const dayFormat = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short" });
-  const timeFormat = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-  function conversationDate(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toDateString() === new Date().toDateString() ? timeFormat.format(date) : dayFormat.format(date);
+  function discussionUrl(conversationId) {
+    const url = new URL(window.location.href);
+    if (conversationId) url.searchParams.set("discussion", conversationId);
+    else url.searchParams.delete("discussion");
+    return url;
   }
 
-  function closeConversations() {
-    if (!conversationsMenu || conversationsMenu.hidden) return;
-    conversationsMenu.hidden = true;
-    conversationsToggle.setAttribute("aria-expanded", "false");
+  function syncUrl(conversationId, { replace = false } = {}) {
+    if (!hasConversations()) return;
+    const url = discussionUrl(conversationId);
+    if (url.href === window.location.href) return;
+    window.history[replace ? "replaceState" : "pushState"]({ discussion: conversationId || null }, "", url);
+  }
+
+  function closeDrawer({ restoreFocus = false } = {}) {
+    if (!drawer || drawer.hidden) return;
+    drawer.hidden = true;
+    drawerBackdrop.hidden = true;
+    drawerToggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus) drawerToggle.focus({ preventScroll: true });
+  }
+
+  function openDrawer() {
+    if (input) input.blur();
+    drawer.hidden = false;
+    drawerBackdrop.hidden = false;
+    drawerToggle.setAttribute("aria-expanded", "true");
+    const target = conversationsList.querySelector("[aria-current='true']") || drawer.querySelector("[data-chat-home]");
+    target?.focus({ preventScroll: true });
   }
 
   function renderConversations() {
-    if (!conversationsEl) return;
+    if (!navEl) return;
     const scope = scopeConfig();
     if (!hasConversations()) {
-      conversationsEl.hidden = true;
-      root.dataset.chatHasConversations = "false";
+      navEl.hidden = true;
+      root.dataset.chatNavigable = "false";
       return;
     }
     const conversations = scope.conversations || [];
-    conversationsEl.hidden = false;
-    root.dataset.chatHasConversations = conversations.length ? "true" : "false";
-    conversationsToggle.hidden = !conversations.length;
-    conversationsToggle.disabled = busy;
+    const current = conversations.find((item) => item.id === scope.conversationId);
+    navEl.hidden = false;
+    root.dataset.chatNavigable = "true";
+    navTitle.textContent = (scope.messages || []).length ? current?.title || "" : "";
+    drawerToggle.disabled = busy;
     newButton.hidden = !(scope.messages || []).length;
     newButton.disabled = busy;
-    if (!conversations.length) closeConversations();
+    recentLabel.hidden = !conversations.length;
     conversationsList.replaceChildren(
       ...conversations.map((conversation) => {
         const item = document.createElement("li");
-        item.className = "chat-conversation";
+        item.className = "chat-drawer-conversation";
         const open = document.createElement("button");
         open.type = "button";
-        open.className = "chat-conversation-open";
+        open.className = "chat-drawer-open";
+        open.textContent = conversation.title;
         if (conversation.id === scope.conversationId) open.setAttribute("aria-current", "true");
-        const title = document.createElement("span");
-        title.className = "chat-conversation-title";
-        title.textContent = conversation.title;
-        const date = document.createElement("span");
-        date.className = "chat-conversation-date";
-        date.textContent = conversationDate(conversation.updated_at);
-        open.append(title, date);
         open.addEventListener("click", () => openConversation(conversation.id));
         const remove = document.createElement("button");
         remove.type = "button";
-        remove.className = "chat-conversation-delete";
+        remove.className = "chat-drawer-delete";
         remove.setAttribute("aria-label", `Supprimer la discussion « ${conversation.title} »`);
         remove.title = "Supprimer la discussion";
         remove.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7m3 0-.7 12a2 2 0 0 1-2 1.9H8.2a2 2 0 0 1-2-1.9L5.5 7"/></svg>';
@@ -2068,22 +2082,27 @@ function initChatWidget(root) {
     scope.conversations = chat.conversations;
   }
 
-  function startConversation() {
+  // Back to Raton: nothing on screen, the next question opens a new discussion.
+  function startConversation({ push = true } = {}) {
+    if (busy) return;
     const scope = scopeConfig();
     scope.conversationId = null;
     scope.messages = [];
-    closeConversations();
+    closeDrawer();
     renderMessages();
-    focusInputAtEnd();
+    if (push) syncUrl(null);
+    window.scrollTo({ top: 0 });
   }
 
-  async function openConversation(conversationId) {
-    closeConversations();
+  async function openConversation(conversationId, { push = true } = {}) {
+    closeDrawer();
     if (busy || conversationId === scopeConfig().conversationId) return;
     try {
       const scope = scopeConfig();
       applyLibraryChat(scope, await apiRequest("GET", `${scope.conversationsUrl}/${conversationId}`));
       renderMessages();
+      if (push) syncUrl(conversationId);
+      window.scrollTo({ top: 0 });
     } catch (error) {
       setStatus(error.message, "error");
     }
@@ -2105,35 +2124,32 @@ function initChatWidget(root) {
     if (conversation.id === scope.conversationId) {
       scope.conversationId = null;
       scope.messages = [];
+      syncUrl(null, { replace: true });
     }
     renderMessages();
     setStatus("Discussion supprimée.", "success");
   }
 
-  if (conversationsToggle && conversationsMenu) {
-    conversationsToggle.addEventListener("click", () => {
-      if (!conversationsMenu.hidden) {
-        closeConversations();
-        return;
-      }
-      if (input) input.blur();
-      conversationsMenu.hidden = false;
-      conversationsToggle.setAttribute("aria-expanded", "true");
-      const current = conversationsList.querySelector("[aria-current='true']") || conversationsList.querySelector("button");
-      if (current) current.focus({ preventScroll: true });
+  if (drawer && drawerToggle) {
+    drawerToggle.addEventListener("click", () => (drawer.hidden ? openDrawer() : closeDrawer()));
+    drawerBackdrop.addEventListener("click", () => closeDrawer());
+    root.querySelector("[data-chat-drawer-close]")?.addEventListener("click", () => closeDrawer({ restoreFocus: true }));
+    root.querySelector("[data-chat-home]")?.addEventListener("click", () => startConversation());
+    root.querySelector("[data-chat-drawer-new]")?.addEventListener("click", () => {
+      startConversation();
+      focusInputAtEnd();
     });
-    conversationsBackdrop?.addEventListener("click", closeConversations);
-    conversationsClose?.addEventListener("click", () => {
-      closeConversations();
-      conversationsToggle.focus({ preventScroll: true });
+    drawer.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDrawer({ restoreFocus: true });
     });
-    conversationsEl.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape" || conversationsMenu.hidden) return;
-      closeConversations();
-      conversationsToggle.focus();
+    window.addEventListener("popstate", () => {
+      if (!hasConversations()) return;
+      const id = Number(new URL(window.location.href).searchParams.get("discussion")) || null;
+      if (id) openConversation(id, { push: false });
+      else startConversation({ push: false });
     });
   }
-  newButton?.addEventListener("click", startConversation);
+  newButton?.addEventListener("click", () => startConversation());
 
   function renderMessages() {
     if (!messagesEl) return;
@@ -2333,7 +2349,7 @@ function initChatWidget(root) {
       button.disabled = true;
       busy = true;
       renderConversations();
-      closeConversations();
+      closeDrawer();
       if (input) input.contentEditable = "false";
       // Show the question and a typing bubble right away; both are replaced by
       // the server's own message list once the answer lands (or dropped again
@@ -2357,6 +2373,8 @@ function initChatWidget(root) {
         const answered = await waitForAnswer(job.status_url, renderToolSteps);
         if (answered.library_chat) {
           applyLibraryChat(scope, answered.library_chat);
+          // A new discussion gets its address once answered: back returns to Raton.
+          syncUrl(scope.conversationId);
         } else {
           scope.messages = answered.chat_messages;
         }

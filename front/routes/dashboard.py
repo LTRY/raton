@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from front.api import Api, get_api
+from front.api import Api, ApiError, get_api
 from front.cards import card_views, history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
 from front.library_chat import library_chat_widget_config
@@ -13,16 +13,24 @@ router = APIRouter()
 
 
 @router.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, api: Api = Depends(get_api)):
-    """Home: Raton's line of this visit and the library chat bar, nothing else."""
+def dashboard(request: Request, discussion: int | None = None, api: Api = Depends(get_api)):
+    """Home: Raton's line of this visit and the library chat bar, nothing else. `?discussion=`
+    opens that discussion of the chat instead of Raton (an unknown one falls back to Raton)."""
     settings = api.get("/settings")
+    chat = None
+    if discussion is not None:
+        try:
+            chat = api.get(f"/chat/conversations/{discussion}")
+        except ApiError as exc:
+            if exc.status != 404:
+                raise
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
             "raton": {"scenario": record(api.post("/raton/visit"))},
             "chat_widget_config": library_chat_widget_config(
-                api.get("/chat"), settings["llm_provider_label"]
+                chat or api.get("/chat"), settings["llm_provider_label"]
             ),
         },
     )

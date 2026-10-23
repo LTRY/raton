@@ -591,7 +591,9 @@ dans l'espace libre et la barre de chat reste collee au bas (au-dessus de la
 barre d'onglets sur telephone).
 
 Des qu'une discussion est affichee (`data-chat-empty="false"`), Raton est
-masque : il ne reste que la conversation. Ni metriques, ni
+masque : il ne reste que la conversation. On revient a Raton par le menu des
+discussions (☰ → « Raton »), le crayon « Nouvelle discussion » ou le bouton
+retour du navigateur (voir « Widget de chat »). Ni metriques, ni
 Historique complet, ni temps de lecture : ils sont dans Bibliotheque et
 Parametres.
 
@@ -817,27 +819,41 @@ attribut `data-chat-config` :
   se reduit au seul champ de saisie : ni carte, ni en-tete, ni aide clavier ;
   la carte, le bouton "Effacer" et `coverageNote` n'apparaissent qu'une fois
   la discussion entamee. Seule exception : une portee qui a des discussions
-  precedentes (`data-chat-has-conversations="true"`) garde son en-tete, avec
-  le seul bouton « Discussions », au-dessus du champ.
-- Discussions (portee avec `conversationsUrl`, donc `library`) : au lieu
-  d'« Effacer », l'en-tete porte « Discussions » (affiche des qu'une
-  discussion existe) et « Nouvelle » (affiche quand la discussion courante a
-  des messages). « Nouvelle » vide l'affichage et remet `conversationId` a
-  `null` : la question suivante ouvre une discussion (voir
-  [09](09-transcript-et-discussion-llm.md)), dont le `conversation_id`
-  renvoye par `POST /api/chat` est garde pour la question suivante.
-  « Discussions » ouvre la meme feuille collee au bas de l'ecran que « Idees
-  de Raton » (poignee, ✕, titre « Discussions », voile ; ✕, Echap ou le voile
-  la referment), une ligne par discussion : son titre (tronque sur une
-  ligne), la date de sa derniere reponse (l'heure si c'est aujourd'hui, sinon
-  « 21 oct. ») et une corbeille. La discussion affichee est entouree
-  (`aria-current`). Choisir une ligne charge la discussion
-  (`GET {conversationsUrl}/{id}`) sans recharger la page ; la corbeille
-  demande confirmation puis la supprime (`DELETE`), et si c'etait celle
-  affichee, le widget revient a une nouvelle discussion. Pendant l'attente
-  d'une reponse, les deux boutons sont desactives : la discussion ne change
-  pas sous la reponse. L'accueil ouvre la discussion la plus recente
-  (`GET /api/chat`).
+  (`conversationsUrl`, attribut `data-chat-navigable="true"`) garde son
+  en-tete, reduit au bouton menu ; sur l'accueil il est pose en haut a gauche
+  de la page (`position: absolute` dans `.dashboard-home`), pas au-dessus du
+  champ.
+- Discussions (portee avec `conversationsUrl`, donc `library`), sur le modele
+  du menu lateral d'une app de chat : l'en-tete est une ligne (`.chat-nav`)
+  avec le bouton menu (☰) a gauche, le titre de la discussion ouverte au
+  centre (tronque sur une ligne) et, a droite, « Nouvelle discussion »
+  (crayon, visible quand la discussion a des messages). « Effacer » n'existe
+  pas pour cette portee. Sur telephone, cette ligne reste collee en haut de
+  l'ecran pendant qu'une discussion defile.
+  - ☰ ouvre un tiroir a gauche (`.chat-drawer`, 320px au plus, 86 % de la
+    largeur sur telephone, glisse depuis la gauche sauf
+    `prefers-reduced-motion`) sur un voile sombre ; ✕, Echap ou le voile le
+    referment. Il contient, de haut en bas : le titre « Discussions »,
+    l'entree « Raton » (retour a l'ecran de Raton), « Récents » puis une
+    ligne par discussion (titre tronque, corbeille discrete ; celle ouverte
+    est surlignee, `aria-current`), et le bouton pilule « Nouvelle
+    discussion » colle en bas du tiroir, qui place aussi le curseur dans le
+    champ.
+  - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
+    Raton : rien d'affiche, `conversationId` a `null`, et la question
+    suivante ouvre une discussion (voir
+    [09](09-transcript-et-discussion-llm.md)), dont le `conversation_id`
+    renvoye par `POST /api/chat` est garde pour la question suivante.
+  - Choisir une discussion la charge (`GET {conversationsUrl}/{id}`) sans
+    recharger la page. La corbeille demande confirmation puis la supprime
+    (`DELETE`) ; si c'etait celle affichee, le widget revient a Raton.
+  - La discussion ouverte est dans l'adresse : `/?discussion={id}`
+    (`history.pushState`, aussi des la premiere reponse d'une nouvelle
+    discussion). Recharger la page la rouvre, et le bouton retour du
+    navigateur revient a la precedente ou a Raton (`popstate`). Un id inconnu
+    affiche Raton. Sans `?discussion=`, l'accueil s'ouvre sur Raton.
+  - Pendant l'attente d'une reponse, ☰ et le crayon sont desactives : la
+    discussion ne change pas sous la reponse.
 - `placeholder` (optionnel) remplace le texte d'invite du champ pour la
   portee courante ("Demander…" pour `library`).
 - `suggestions` (optionnel) : liste des demandes que l'assistant sait

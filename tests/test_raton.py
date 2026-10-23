@@ -308,7 +308,12 @@ def test_home_page_is_only_raton_and_the_chat(db):
     assert "home-row" not in response.text
 
 
-def test_home_opens_the_latest_discussion_and_offers_the_others(db):
+def chat_config(html):
+    raw = html.split("data-chat-config='", 1)[1].split("'", 1)[0]
+    return json.loads(raw.replace("&#39;", "'").replace("&amp;", "&"))["scopes"]["library"]
+
+
+def test_home_opens_on_raton_and_a_discussion_from_its_address(db):
     older = LibraryChatConversation(title="Ancienne", updated_at=datetime(2026, 10, 1, tzinfo=UTC))
     latest = LibraryChatConversation(title="Récente", updated_at=datetime(2026, 10, 20, tzinfo=UTC))
     db.add_all([older, latest])
@@ -316,17 +321,24 @@ def test_home_opens_the_latest_discussion_and_offers_the_others(db):
     for conversation in (older, latest):
         db.add(LibraryChatMessage(conversation_id=conversation.id, role="user", content="Q ?"))
     db.commit()
+    client = site_client()
 
-    response = site_client().get("/")
+    home = client.get("/").text
+    opened = client.get(f"/?discussion={older.id}").text
+    unknown = client.get("/?discussion=999")
 
-    assert 'data-chat-has-conversations="true"' in response.text
-    assert "data-chat-conversations-toggle" in response.text
-    config = json.loads(
-        response.text.split("data-chat-config='", 1)[1].split("'", 1)[0].replace("&#39;", "'")
-    )
-    library = config["scopes"]["library"]
-    assert library["conversationId"] == latest.id
-    assert [item["title"] for item in library["conversations"]] == ["Récente", "Ancienne"]
+    assert 'data-chat-empty="true"' in home
+    assert 'data-chat-navigable="true"' in home
+    assert "data-chat-drawer-toggle" in home
+    assert chat_config(home)["conversationId"] is None
+    assert [item["title"] for item in chat_config(home)["conversations"]] == [
+        "Récente",
+        "Ancienne",
+    ]
+    assert chat_config(opened)["conversationId"] == older.id
+    assert 'data-chat-empty="false"' in opened
+    assert unknown.status_code == 200
+    assert chat_config(unknown.text)["conversationId"] is None
 
 
 def test_home_announces_new_videos_with_its_button(db):

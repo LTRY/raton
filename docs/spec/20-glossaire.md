@@ -247,7 +247,7 @@ Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page det
 
 ### Discussion
 
-Un fil de questions-reponses du chat, que le modele relit a chaque question. Le chat d'une fiche en a une seule (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans la liste « Discussions ».
+Un fil de questions-reponses du chat, que le modele relit a chaque question. Le chat d'une fiche en a une seule (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰), rangees sous « Récents ».
 
 - **Code** : `transcript.chat.json` (fiche), `library_chat_conversations` / `conversation_id` (bibliotheque)
 - **A ne pas confondre avec** : Le chat lui-meme (l'outil), ni l'onglet `Commentaire` d'une fiche.

@@ -65,11 +65,6 @@ def list_conversations(db: Session) -> list[LibraryChatConversation]:
     )
 
 
-def latest_conversation(db: Session) -> LibraryChatConversation | None:
-    conversations = list_conversations(db)
-    return conversations[0] if conversations else None
-
-
 def chat_rows(db: Session, conversation_id: int | None) -> list[LibraryChatMessage]:
     if conversation_id is None:
         return []

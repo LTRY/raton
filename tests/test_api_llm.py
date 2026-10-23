@@ -159,16 +159,15 @@ def test_the_library_chat_shows_its_tools_then_its_answer(client, db, video, tas
     answer = done["library_chat"]["messages"][1]
     assert answer["content"] == "Celle-ci."
     assert answer["citations"] == [{"video_id": video.id, "title": "Fiche"}]
-    assert chat["messages"] == done["library_chat"]["messages"]
     assert chat["total_video_count"] == 1
-    assert chat["conversation_id"] == queued.json()["conversation_id"]
-    assert chat["title"] == "Quelles vidéos ?"
+    assert chat["conversation_id"] is None and chat["messages"] == []
     assert [item["title"] for item in chat["conversations"]] == ["Quelles vidéos ?"]
-    assert opened == chat
+    assert opened["conversation_id"] == queued.json()["conversation_id"]
+    assert opened["title"] == "Quelles vidéos ?"
+    assert opened["messages"] == done["library_chat"]["messages"]
     assert deleted.status_code == 204
     assert client.get(conversation_url).status_code == 404
-    assert client.get("/api/chat").json()["messages"] == []
-    assert client.get("/api/chat").json()["conversation_id"] is None
+    assert client.get("/api/chat").json()["conversations"] == []
 
 
 def test_a_failed_job_is_reported_with_its_reason(client, db, video, tasks):

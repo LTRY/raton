@@ -36,7 +36,6 @@ from back.services.library_chat.history import (
     chat_messages,
     delete_conversation,
     get_conversation,
-    latest_conversation,
     list_conversations,
     total_video_count,
 )
@@ -105,8 +104,9 @@ def clear_video_chat(video_id: int, db: Session = Depends(get_db)) -> None:
 
 @router.get("/chat", response_model=LibraryChatRead)
 def get_library_chat(db: Session = Depends(get_db)) -> LibraryChatRead:
-    """The latest discussion of the library chat, and the list of the others."""
-    return library_chat_read(db, latest_conversation(db))
+    """The library chat with no discussion open (a new one starts with the next question), and
+    the list of the discussions to reopen."""
+    return library_chat_read(db, None)
 
 
 @router.post(
