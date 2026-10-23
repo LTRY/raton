@@ -1057,6 +1057,37 @@ def test_scan_channel_section_caps_imports_and_keeps_the_backlog_for_the_next_sc
     assert imported_ids == ["vid4", "vid3", "vid2", "vid1", "vid0"]
 
 
+def test_scan_channel_section_skip_known_imports_past_a_known_video(monkeypatch):
+    db = make_session()
+    channel = Channel(url="https://example.test/channel", name="Auto channel")
+    known = Video(
+        yt_video_id="vid0",
+        title="Known",
+        url="https://example.test/watch/vid0",
+        media_type="metadata",
+        folder_path="/tmp/vid0",
+        transcript_status=TranscriptStatus.missing,
+        channel=channel,
+    )
+    db.add_all([channel, known])
+    db.commit()
+    # The newest video of the page is already known (explore from a channel with 1 fiche).
+    monkeypatch.setattr(
+        scanner,
+        "list_channel_entries",
+        lambda channel, page=1, page_size=25, section="videos": _entries(3),
+    )
+    imported_ids = []
+    monkeypatch.setattr(scanner, "import_video_metadata", _fake_import(imported_ids))
+
+    stopping = scanner.scan_channel_section(db, channel, max_pages=1)
+    skipping = scanner.scan_channel_section(db, channel, max_pages=1, skip_known=True)
+
+    assert stopping == 0
+    assert skipping == 2
+    assert imported_ids == ["vid1", "vid2"]
+
+
 def test_scan_channel_section_stops_between_two_imports_when_asked(monkeypatch):
     db = make_session()
     channel = Channel(url="https://example.test/channel", name="Auto channel")

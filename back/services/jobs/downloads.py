@@ -162,6 +162,9 @@ def run_channel_metadata_import_job(
             "page_size": CHANNEL_VIDEO_PAGE_SIZE,
             "max_pages": 1,
             "section": section,
+            # The page asked for may start with fiches already imported (the bell's first sync, a
+            # video added by URL): stopping at the first one would import nothing.
+            "skip_known": True,
         }
         if mark_new:
             scan_options["mark_new"] = True

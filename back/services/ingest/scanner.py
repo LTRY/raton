@@ -60,6 +60,7 @@ def scan_channel_section(
     mark_new: bool = False,
     max_imports: int | None = None,
     should_stop: Callable[[], bool] | None = None,
+    skip_known: bool = False,
 ) -> int:
     """Import the metadata of the channel's new videos and return how many were imported.
 
@@ -67,6 +68,9 @@ def scan_channel_section(
     the entries to import are collected first, then imported oldest first. The leftovers are then
     the newest ones, still ahead of the first known video, so the next scan finds them again.
     Importing newest first would strand them behind a known video.
+
+    `skip_known` keeps going past a video already in the DB instead of stopping there: the explore
+    button asks for a page of the listing that may start with videos imported earlier.
 
     Raises RateLimitedError (after logging it) when YouTube answers 429; what was imported before
     stays imported.
@@ -108,6 +112,8 @@ def scan_channel_section(
                         existing.url = canonical_video_url(existing.url, yt_video_id, "shorts")
                         db.add(existing)
                         db.commit()
+                    continue
+                if skip_known:
                     continue
                 reached_known = True
                 break
