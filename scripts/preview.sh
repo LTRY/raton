@@ -3,17 +3,21 @@
 # 9000 + its number. Driven by hand or by the previews page (scripts/previews.py).
 #
 #   preview.sh up <pr>     build the PR's current head and (re)start its preview
-#   preview.sh down <pr>   remove the PR's preview: containers, images, worktree
-#   preview.sh list        one line per preview: <pr> <port> <commit> <container state>
+#   preview.sh down <pr>   remove the PR's preview: containers, images, worktree, DB copy
+#   preview.sh list        one line per preview: <pr> <port> <commit> <container state> <db>
 #   preview.sh sweep       remove the previews of the PRs that are no longer open
 #
 # Each preview is its own compose project (raton-pr-<pr>, docker-compose.preview.yml), built
 # from a git worktree of the PR's head in .local/previews/pr-<pr>. Same-repository PRs only:
 # the host builds and runs the PR's code, so a fork's PR never gets one.
+# Its DB is the real stack's (raton-db) when the PR has no migration to run on it, else a copy
+# (database raton_pr_<pr> on the same server) that the preview migrates: scripts/preview_db.py
+# decides.
 # Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 set -euo pipefail
 
 BASE_PORT=9000
+DB_CONTAINER=raton-db
 
 cd "$(dirname "$0")/.."
 REPO="$PWD"
@@ -25,16 +29,19 @@ require_pr() {
   [[ "${1:-}" =~ ^[0-9]+$ ]] || { echo "preview.sh: numéro de PR attendu, reçu '${1:-}'" >&2; exit 2; }
 }
 
+db_psql() { docker exec -i "$DB_CONTAINER" "$@"; }
+
 # Always with the preview file: a bare `docker compose` here would load the real stack's file.
 compose() {
   local pr="$1"; shift
   PREVIEW_PR="$pr" PREVIEW_PORT="$(port_for "$pr")" PREVIEW_SRC="$(worktree_for "$pr")" \
+    PREVIEW_DB_NAME="${PREVIEW_DB_NAME:-raton}" PREVIEW_DB_NETWORK="${PREVIEW_DB_NETWORK:-none}" \
     docker compose -p "raton-pr-$pr" -f "$REPO/docker-compose.preview.yml" "$@"
 }
 
 cmd_up() {
   require_pr "${1:-}"
-  local pr="$1" info state cross sha src address
+  local pr="$1" info state cross sha src address db_revision mode copy
   info="$(gh pr view "$pr" --json state,isCrossRepository --jq '.state + " " + (.isCrossRepository | tostring)')"
   state="${info%% *}"
   cross="${info#* }"
@@ -54,6 +61,28 @@ cmd_up() {
     mkdir -p "$(dirname "$src")"
     git worktree add -q --detach "$src" "$sha"
   fi
+
+  if [ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null)" != "true" ]; then
+    echo "preview.sh: $DB_CONTAINER ne tourne pas : lancez la pile réelle (make up)" >&2; exit 1
+  fi
+  db_revision="$(db_psql psql -U raton -d raton -tAc 'SELECT version_num FROM alembic_version')"
+  mode="$(python3 "$REPO/scripts/preview_db.py" "$src/alembic/versions" "$db_revision")"
+  copy="raton_pr_$pr"
+  # The previous deploy's api holds connections to the copy: stop it before dropping the copy.
+  compose "$pr" stop api >/dev/null 2>&1 || true
+  db_psql dropdb -U raton --if-exists --force "$copy"
+  if [ "$mode" = copy ]; then
+    echo "preview $pr : la PR a des migrations à jouer, copie de la DB dans $copy..."
+    db_psql createdb -U raton "$copy"
+    db_psql bash -c "set -o pipefail; pg_dump -U raton raton | psql -q -v ON_ERROR_STOP=1 -U raton $copy" >/dev/null
+    export PREVIEW_DB_NAME="$copy" PREVIEW_MIGRATE=1
+  else
+    echo "preview $pr : aucune migration à jouer, branchée sur la DB réelle"
+    export PREVIEW_DB_NAME=raton PREVIEW_MIGRATE=0
+  fi
+  export PREVIEW_DB_MODE="$mode"
+  PREVIEW_DB_NETWORK="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$DB_CONTAINER" | cut -d' ' -f1)"
+  export PREVIEW_DB_NETWORK
   echo "preview $pr : commit ${sha:0:7}, construction..."
 
   export PREVIEW_SHA="$sha"
@@ -81,6 +110,9 @@ cmd_down() {
   local pr="$1" src
   src="$(worktree_for "$pr")"
   compose "$pr" down -v --remove-orphans --rmi all >/dev/null 2>&1 || true
+  if [ "$(docker inspect -f '{{.State.Running}}' "$DB_CONTAINER" 2>/dev/null)" = "true" ]; then
+    db_psql dropdb -U raton --if-exists --force "raton_pr_$pr"
+  fi
   if [ -d "$src" ]; then git worktree remove --force "$src"; fi
   git worktree prune
   git update-ref -d "refs/previews/pr-$pr" 2>/dev/null || true
@@ -88,11 +120,12 @@ cmd_down() {
 }
 
 cmd_list() {
-  local pr sha state
+  local pr sha state db
+  # A preview built before the DB label has none: "-" keeps the columns aligned.
   docker ps -a --filter label=raton.preview.pr \
-    --format '{{.Label "raton.preview.pr"}} {{.Label "raton.preview.sha"}} {{.State}}' |
-    while read -r pr sha state; do
-      echo "$pr $(port_for "$pr") ${sha:--} $state"
+    --format '{{.Label "raton.preview.pr"}}|{{.Label "raton.preview.sha"}}|{{.State}}|{{.Label "raton.preview.db"}}' |
+    while IFS='|' read -r pr sha state db; do
+      echo "$pr $(port_for "$pr") ${sha:--} $state ${db:--}"
     done
 }
 

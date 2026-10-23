@@ -286,8 +286,8 @@ puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make
 ## Previews des PR
 
 Une preview est une instance jetable de Raton (back et front) construite a
-partir d'une PR ouverte, pour l'essayer avant le merge sans toucher a la pile
-reelle. Elle se deploie a la main, depuis une page web ou en ligne de commande ;
+partir d'une PR ouverte, pour l'essayer avant le merge sur les vraies donnees,
+sans jamais migrer la DB reelle. Elle se deploie a la main, depuis une page web ou en ligne de commande ;
 le merge ne deploie rien.
 
 - **Page des previews** : `make previews` construit et lance le conteneur
@@ -311,22 +311,37 @@ le merge ne deploie rien.
 - **Script** : `scripts/preview.sh up <N>` recupere la tete de la PR
   (`refs/pull/<N>/head`) dans un worktree git `.local/previews/pr-<N>`, puis
   construit et lance le projet compose `raton-pr-<N>`
-  (`docker-compose.preview.yml`) ; `down <N>` supprime conteneurs, images et
-  worktree ; `list` liste les previews ; `sweep` retire celles des PR fermees.
+  (`docker-compose.preview.yml`) ; `down <N>` supprime conteneurs, images,
+  worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees.
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
-- **Isolement** : DB SQLite dans le conteneur `api`, remplie par les donnees de
-  demo (`scripts/demo_seed.py`, `APP_AUTO_CREATE_TABLES=true`), recreee a chaque
-  deploiement ; pas de dossier media (seuls quelques transcripts de demo,
-  `scripts/demo_transcripts.py`, ecrits dans le conteneur), scheduler coupe
-  (`APP_SCHEDULER_ENABLED=false`).
+- **DB** : la preview tourne sur le serveur Postgres de la pile reelle
+  (`raton-db`, qui doit tourner : sinon `up` refuse), sur son reseau Docker.
+  `scripts/preview_db.py` compare la revision Alembic de la DB reelle aux
+  migrations de la PR :
+  - la tete de migration de la PR est la revision de la DB reelle (la PR ne
+    touche a aucune migration, et la prod est a jour de `main`) : la preview est
+    **branchee sur la DB reelle** (`raton`), sans lancer Alembic ; ses ecritures
+    (Vu, suppression d'une fiche...) sont de vraies ecritures ;
+  - la DB reelle est a une revision plus ancienne de la chaine de la PR (la PR
+    ajoute une migration, ou `main` en a une que la prod n'a pas encore) : `up`
+    **copie la DB** (`pg_dump` vers la base `raton_pr_<N>` du meme serveur) et
+    la preview joue `alembic upgrade head` sur la copie ;
+  - sinon (la DB reelle est en avance sur la PR, ou la PR a plusieurs tetes de
+    migration) : `up` refuse, il faut mettre la PR a jour avec `main`.
+  La copie est refaite a chaque deploiement et supprimee par `down`. La page
+  affiche « DB reelle » ou « copie de la DB » a cote du port.
+- **Isolement** : le dossier media de la pile reelle est monte en lecture
+  seule (les lecteurs jouent, une suppression de fichier echoue) ; scheduler
+  coupe (`APP_SCHEDULER_ENABLED=false`) : une preview ne lance ni les
+  verifications ni les telechargements de la pile reelle.
 - **Cle LLM** : une preview recoit `LLM_PROVIDER`, `ANTHROPIC_API_KEY` et
   `ANTHROPIC_MODEL` du `.env` de la pile reelle, pour essayer les fonctions LLM
   (notes, quiz, discussion) sur les fiches de demo qui ont un transcript ; leurs
-  appels sont factures sur la meme cle. Aucun autre secret (`VOYAGE_API_KEY`,
-  mot de passe Postgres) : la recherche dans les notes reste vide. Le code d'une
-  PR non mergee tourne donc avec la vraie cle Anthropic : c'est pour cela que
-  seules les PR du depot ont une preview (ci-dessous). Les
-  migrations Alembic ne tournent pas : le schema vient des modeles de la PR.
+  appels sont factures sur la meme cle. Elle recoit aussi `POSTGRES_PASSWORD`
+  (la DB ci-dessus), mais pas `VOYAGE_API_KEY` : la recherche dans les notes
+  reste vide. Le code d'une PR non mergee tourne donc avec la vraie cle
+  Anthropic et un acces complet a la DB reelle : c'est pour cela que seules les
+  PR du depot ont une preview (ci-dessous).
 - **PR de fork refusees** : la machine construit et execute le code de la PR,
   donc seules les PR du depot lui-meme ont une preview.
 
