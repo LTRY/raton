@@ -743,7 +743,7 @@ attribut `data-chat-config` :
   "llmProviderLabel": "...",
   "scopes": {
     "video": {"chatUrl": "/api/videos/{id}/chat", "messages": [...]},
-    "library": {"chatUrl": "/api/chat", "conversationsUrl": "/api/chat/conversations", "conversationId": 3, "conversations": [{"id": 3, "title": "...", "updated_at": "..."}], "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...], "coverageNote": "..."}
+    "library": {"chatUrl": "/api/chat", "conversationsUrl": "/api/chat/conversations", "conversationId": 3, "conversations": [{"id": 3, "title": "...", "updated_at": "..."}], "placeholder": "...", "suggestions": [{"label": "...", "prompt": "..."}], "messages": [...]}
   }
 }
 ```
@@ -817,7 +817,7 @@ attribut `data-chat-config` :
   (`"true"`/`"false"`, rendu cote serveur puis tenu a jour par
   `initChatWidget`). Sur le dashboard et `/videos/{id}` (`.chat-bar`), la barre vide
   se reduit au seul champ de saisie : ni carte, ni en-tete, ni aide clavier ;
-  la carte, le bouton "Effacer" et `coverageNote` n'apparaissent qu'une fois
+  la carte et le bouton "Effacer" n'apparaissent qu'une fois
   la discussion entamee. Seule exception : une portee qui a des discussions
   (`conversationsUrl`, attribut `data-chat-navigable="true"`) garde son
   en-tete, reduit au bouton menu ; sur l'accueil il est pose en haut a gauche
@@ -890,11 +890,8 @@ attribut `data-chat-config` :
   (reponses enregistrees avant ce format) est rendu en une rangee de puces
   defilante sous le message (`.chat-citations`, jamais la page) : les chaines
   d'abord, en puces pleines (`.chat-channel-chip`), puis les videos.
-- `coverageNote` (scope `library` uniquement) affiche combien de videos sont
-  actuellement indexees pour la recherche dans les notes (`"12/773 videos indexees..."`),
-  calcule cote serveur (`library_chat_scope_config`, `front/library_chat.py`) a partir
-  de `indexed_video_count`/`total_video_count` (voir
-  [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)).
+- Le widget n'affiche pas combien de videos sont indexees pour la recherche
+  dans les notes : cette couverture est sur la page `/rag`.
 - Les messages initiaux sont pre-rendus dans la config au chargement de la
   page (pas de fetch initial) ; changer de portee ne fait donc pas d'appel
   reseau, seulement un nouveau rendu local (changer de discussion, si).

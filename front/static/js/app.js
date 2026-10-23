@@ -1842,7 +1842,6 @@ function initChatWidget(root) {
 
   const messagesEl = root.querySelector("[data-chat-messages]");
   const statusEl = root.querySelector("[data-chat-status]");
-  const coverageEl = root.querySelector("[data-chat-coverage]");
   const form = root.querySelector("[data-chat-form]");
   const clearForm = root.querySelector("[data-chat-clear]");
   const scopeButtons = root.querySelectorAll("[data-chat-scope]");
@@ -2162,10 +2161,6 @@ function initChatWidget(root) {
     root.dataset.chatEmpty = messages.length ? "false" : "true";
     if (clearForm) clearForm.hidden = !messages.length || hasConversations();
     renderConversations();
-    if (coverageEl) {
-      coverageEl.hidden = !scope.coverageNote || !messages.length;
-      coverageEl.textContent = scope.coverageNote || "";
-    }
   }
 
   // The tool calls the model makes while it works (search a channel, search

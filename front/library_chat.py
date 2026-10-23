@@ -10,14 +10,6 @@ LIBRARY_CHAT_SUGGESTIONS = [
 
 
 def library_chat_scope_config(chat: dict) -> dict:
-    indexed = chat["indexed_video_count"]
-    total = chat["total_video_count"]
-    coverage_note = None
-    if total:
-        coverage_note = (
-            f"{indexed} vidéo{'s' if indexed > 1 else ''} indexée{'s' if indexed > 1 else ''} sur {total} "
-            "pour la recherche dans les notes (une vidéo devient indexée quand ses notes structurées sont générées)."
-        )
     return {
         "chatUrl": "/api/chat",
         # Where the widget opens or deletes a discussion: `{conversationsUrl}/{id}`.
@@ -27,7 +19,6 @@ def library_chat_scope_config(chat: dict) -> dict:
         "placeholder": "Demander…",
         "suggestions": LIBRARY_CHAT_SUGGESTIONS,
         "messages": chat["messages"],
-        "coverageNote": coverage_note,
     }
 
 

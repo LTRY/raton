@@ -7312,12 +7312,6 @@ turbo-frame {
   width: 20px;
 }
 
-.chat-coverage-note {
-  color: var(--color-text-muted);
-  font-size: 13px;
-  margin: 0;
-}
-
 .chat-messages {
   display: flex;
   flex-direction: column;

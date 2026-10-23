@@ -555,8 +555,8 @@ cites dans `llm_jobs.sources`.
   ...], conversations: [{id, title, updated_at}], indexed_video_count,
   total_video_count}`, comme `GET /api/chat`. Les chaines et videos
   supprimees depuis la reponse sont retirees de `channels`/`citations`.
-  `indexed_video_count`/`total_video_count` alimentent la note de couverture
-  du widget : combien de videos la recherche dans les notes peut voir (une
+  `indexed_video_count`/`total_video_count` disent combien de videos la
+  recherche dans les notes peut voir (le widget ne les affiche pas) (une
   video n'est indexee que si ses notes ont ete (re)generees au format a
   sections, voir la section Notes structurees ci-dessus).
 
