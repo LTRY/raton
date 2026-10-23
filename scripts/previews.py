@@ -2,7 +2,9 @@
 
 It also deploys main to the real stack (scripts/deploy.sh, button at the top of the page).
 
-Usage: python3 scripts/previews.py [--host 127.0.0.1] [--port 8999]   (or `make previews`)
+Usage: python3 -m scripts.previews [--host 127.0.0.1] [--port 8999] [--scheduler]
+`make previews` starts it as the `raton-ops` container (docker-compose.yml), with --scheduler:
+the daily log review (scripts/ops_review.py).
 
 A small standard-library server, outside Raton (no import of back/ or front/): it reads the
 open PRs with `gh` and runs scripts/preview.sh or scripts/deploy.sh, which do the work. Each
@@ -25,6 +27,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
+
+from scripts import ops_review
 
 REPO = Path(__file__).resolve().parent.parent
 PREVIEW_SH = REPO / "scripts" / "preview.sh"
@@ -54,6 +58,9 @@ class Job:
 jobs: dict[int, Job] = {}
 prod_job: Job | None = None
 jobs_lock = threading.Lock()
+
+# Whether this process runs the daily log review (--scheduler); set by main().
+SCHEDULER_ON = False
 
 
 def parse_previews(text: str) -> dict[int, Preview]:
@@ -226,6 +233,7 @@ button, .open, .refresh { font: inherit; font-size: 14px; border-radius: 8px; pa
 button.primary, .open { background: var(--accent); border-color: var(--accent); color: #fff; }
 button:disabled { opacity: .5; cursor: default; }
 .log { font-size: 13px; color: var(--muted); }
+.reviews { margin: 6px 0 0; padding-left: 18px; }
 footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   color: var(--muted); font-size: 13px; }
 """
@@ -298,6 +306,8 @@ def render_page(
     job_by_pr: dict[int, Job],
     error: str | None,
     prod_job: Job | None = None,
+    reviews: list[ops_review.Review] | None = None,
+    review_busy: bool = False,
 ) -> str:
     rows = [
         render_row(host, pr["number"], pr, previews.get(pr["number"]), job_by_pr.get(pr["number"]))
@@ -310,9 +320,12 @@ def render_page(
         for number, preview in sorted(previews.items(), reverse=True)
         if number not in open_numbers
     ]
-    busy = any(job.returncode is None for job in job_by_pr.values()) or (
-        prod_job is not None and prod_job.returncode is None
+    busy = (
+        any(job.returncode is None for job in job_by_pr.values())
+        or (prod_job is not None and prod_job.returncode is None)
+        or review_busy
     )
+    review_card = "" if reviews is None else ops_review.render_reviews(reviews, review_busy)
     refresh = '<meta http-equiv="refresh" content="4">' if busy else ""
     banner = f'<div class="banner">{html.escape(error)}</div>' if error else ""
     empty = '<p class="lead">Aucune PR ouverte.</p>' if not rows else ""
@@ -325,6 +338,7 @@ def render_page(
 <p class="lead">Une instance jetable de Raton par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/" class="refresh">Rafraîchir</a></div>
 {render_prod(prod_job)}
+{review_card}
 {banner}{"".join(rows)}{empty}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
 </footer>
@@ -355,13 +369,26 @@ class Handler(BaseHTTPRequestHandler):
                 job_by_pr = dict(jobs)
                 prod = prod_job
             page = render_page(
-                self.headers.get("Host"), prs, list_previews(), job_by_pr, error, prod
+                self.headers.get("Host"),
+                prs,
+                list_previews(),
+                job_by_pr,
+                error,
+                prod,
+                ops_review.list_reviews(limit=60) if SCHEDULER_ON else None,
+                ops_review.running_since is not None,
             )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
             path = log_path(int(parts[1]))
             text = path.read_text(errors="replace") if path.exists() else "Aucun journal."
             self.send_text(HTTPStatus.OK, text, "text/plain")
+        elif len(parts) == 2 and parts[0] == "reviews":
+            review = ops_review.read_review(parts[1])
+            if review is None:
+                self.send_text(HTTPStatus.NOT_FOUND, "Revue introuvable.", "text/plain")
+            else:
+                self.send_text(HTTPStatus.OK, review.text, "text/plain")
         elif parts == ["prod", "log"]:
             text = PROD_LOG.read_text(errors="replace") if PROD_LOG.exists() else "Aucun journal."
             self.send_text(HTTPStatus.OK, text, "text/plain")
@@ -384,6 +411,9 @@ class Handler(BaseHTTPRequestHandler):
         elif parts == ["prod", "deploy"]:
             start_prod_deploy()
             self.redirect_home()
+        elif parts == ["reviews", "run"] and SCHEDULER_ON:
+            ops_review.start_review(ops_review.DEFAULT_HOURS, "manual")
+            self.redirect_home()
         elif parts == ["sweep"]:
             start_sweep()
             self.redirect_home()
@@ -395,7 +425,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--host", default=os.environ.get("PREVIEWS_BIND") or "127.0.0.1")
     parser.add_argument("--port", type=int, default=int(os.environ.get("PREVIEWS_PORT") or 8999))
+    parser.add_argument(
+        "--scheduler",
+        action="store_true",
+        help="run the daily log review (scripts/ops_review.py) and show it on the page",
+    )
     args = parser.parse_args()
+    if args.scheduler:
+        global SCHEDULER_ON
+        SCHEDULER_ON = True
+        ops_review.start_scheduler()
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"Page des previews sur http://{args.host}:{args.port}/ (Ctrl-C pour arrêter)")
     try:

@@ -11,13 +11,20 @@ Les pages principales ne sont pas authentifiees dans cet etat cible actuel.
 Cette absence d'authentification n'est pas un bug tant que l'app n'est pas
 exposee hors LAN.
 
-La page des previews (`make previews`, port `8999`) n'est pas authentifiee non
+La page des previews (conteneur `raton-ops`, `make previews`, port `8999`) n'est pas authentifiee non
 plus, alors que son bouton **Deployer main en production** reconstruit la vraie
 instance : sur ce LAN, n'importe qui peut la redeployer. Garde-fous : origine
 verifiee sur chaque formulaire, confirmation, un seul deploiement a la fois, et
 `scripts/deploy.sh` ne deploie que `origin/main` (voir
 [04 Configuration et deploiement](04-configuration-et-deploiement.md),
 « Deploiement de main »).
+
+Ce conteneur tourne en **root** avec le socket Docker de l'hote monte : qui
+atteint la page ou le conteneur controle le Docker de l'hote. Il recoit aussi
+`GH_TOKEN` et `ANTHROPIC_API_KEY` (la revue quotidienne des journaux, voir
+[13](13-jobs-logs-planification.md)). C'est le prix de l'automatisation des
+previews et du deploiement ; la page reste donc sur l'interface d'`APP_BIND`
+(loopback par defaut).
 
 Une preview tourne avec la cle Anthropic du `.env` (voir « Previews des PR »
 dans [04](04-configuration-et-deploiement.md)) : le code d'une PR non mergee

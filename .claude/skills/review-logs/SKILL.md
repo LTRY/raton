@@ -11,7 +11,9 @@ Argument optionnel : un nombre d'heures (`/review-logs 48`), 24 par défaut.
 
 ## 1. Trouver le journal
 
-Le journal de l'instance qui tourne est dans le checkout principal, pas dans un worktree :
+Si la variable `LOG_DIR` est définie (c'est le cas dans le conteneur `raton-ops`, qui lance ce skill chaque matin), c'est le dossier du journal : `ls -la "$LOG_DIR"` et passe à l'étape 2.
+
+Sinon, le journal de l'instance qui tourne est dans le checkout principal, pas dans un worktree :
 
 ```bash
 MAIN="$(cd "$(git rev-parse --git-common-dir)/.." && pwd)"
@@ -25,8 +27,10 @@ Si le dossier n'existe pas ou `app.jsonl` est vide : dis-le, c'est déjà un con
 ## 2. Lire le digest
 
 ```bash
-uv run --python 3.14 python -m back.core.logs_digest --dir "$LOG_DIR" --hours 24
+python -m back.core.logs_digest --dir "$LOG_DIR" --hours 24
 ```
+
+(Hors du conteneur `raton-ops`, préfixe par `uv run --python 3.14` si `python` n'est pas celui du projet.)
 
 Il résume : niveaux, redémarrages, signaux automatiques, erreurs et avertissements groupés, réponses 5xx, requêtes lentes, jobs, appels externes.
 
