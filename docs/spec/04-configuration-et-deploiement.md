@@ -296,8 +296,16 @@ le merge ne deploie rien.
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
 - **Isolement** : DB SQLite dans le conteneur `api`, remplie par les donnees de
   demo (`scripts/demo_seed.py`, `APP_AUTO_CREATE_TABLES=true`), recreee a chaque
-  deploiement ; pas de dossier media, pas de secret (`ANTHROPIC_API_KEY`,
-  `VOYAGE_API_KEY`), scheduler coupe (`APP_SCHEDULER_ENABLED=false`). Les
+  deploiement ; pas de dossier media (seuls quelques transcripts de demo,
+  `scripts/demo_transcripts.py`, ecrits dans le conteneur), scheduler coupe
+  (`APP_SCHEDULER_ENABLED=false`).
+- **Cle LLM** : une preview recoit `LLM_PROVIDER`, `ANTHROPIC_API_KEY` et
+  `ANTHROPIC_MODEL` du `.env` de la pile reelle, pour essayer les fonctions LLM
+  (notes, quiz, discussion) sur les fiches de demo qui ont un transcript ; leurs
+  appels sont factures sur la meme cle. Aucun autre secret (`VOYAGE_API_KEY`,
+  mot de passe Postgres) : la recherche dans les notes reste vide. Le code d'une
+  PR non mergee tourne donc avec la vraie cle Anthropic : c'est pour cela que
+  seules les PR du depot ont une preview (ci-dessous). Les
   migrations Alembic ne tournent pas : le schema vient des modeles de la PR.
 - **PR de fork refusees** : la machine construit et execute le code de la PR,
   donc seules les PR du depot lui-meme ont une preview.
