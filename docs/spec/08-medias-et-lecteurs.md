@@ -477,3 +477,22 @@ En mode Video, un bouton « Plein ecran » (`[data-fullscreen]`, coin bas droit
 de la scene) ouvre la video dans le lecteur natif de Safari
 (`webkitEnterFullscreen()`, seule voie sur iPhone) avec repli sur
 `requestFullscreen()`. Il est masque en mode Audio.
+
+## Lecteur plein ecran des shorts
+
+Sur la page d'une chaine, section Shorts, la tuile d'un short dont la video
+est telechargee (`data-short-play` sur le lien de la vignette) ouvre le short
+en plein ecran au lieu de sa page detail (`openShortPlayer`,
+`front/static/js/app.js`) :
+
+- un calque noir (`.short-player`) couvre la fenetre avec un `<video controls>`
+  sur `/api/videos/{id}/video` et un bouton « Fermer » ; la lecture demarre et
+  le calque demande le plein ecran dans le meme clic (geste utilisateur) ;
+- sur iPhone, qui n'a pas de plein ecran d'element, la video n'a pas
+  `playsinline` : sa lecture l'ouvre dans le lecteur natif de Safari ; ailleurs,
+  un refus du plein ecran laisse le calque couvrir la fenetre ;
+- le calque disparait quand on sort du plein ecran (ou du lecteur natif), a la
+  fin du short, sur « Fermer » ou Echap ;
+- la video est un media reprenable (`data-resumable-media`) : position de
+  reprise et activite (`POST /api/videos/{id}/activity`) comme sur la page
+  detail ; le mini-lecteur est mis en pause a l'ouverture.
