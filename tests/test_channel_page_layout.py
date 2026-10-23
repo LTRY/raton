@@ -49,13 +49,10 @@ def add_video(db, channel, key, *, rating=0, is_new=False, short=False, age_days
         yt_video_id=key,
         title=f"Titre {key}",
         url=f"https://www.youtube.com/{'shorts/' if short else 'watch?v='}{key}",
-        folder_path="/x",
-        video_path="/x/video.mp4",
-        media_type="video",
         rating=rating,
         is_new=is_new,
         published_at=NOW - timedelta(days=age_days),
-        **extra,
+        **({"folder_path": "/x", "video_path": "/x/video.mp4", "media_type": "video"} | extra),
     )
     db.add(video)
     db.commit()
@@ -379,3 +376,24 @@ def test_cards_carry_their_video_id_for_the_exploration_dedup():
     video = add_video(db, channel, "one")
 
     assert f'data-video-id="{video.id}"' in get_channel_page(client, channel)
+
+
+def test_a_downloaded_short_tile_plays_fullscreen_and_an_audio_only_one_opens_its_fiche():
+    client, db, channel = make_client()
+    played = add_video(db, channel, "vid", short=True, age_days=1)
+    audio = add_video(
+        db,
+        channel,
+        "aud",
+        short=True,
+        age_days=2,
+        video_path=None,
+        audio_path="/x/audio.m4a",
+        media_type="audio",
+    )
+
+    html = get_channel_page(client, channel, "&section=shorts")
+
+    assert f'data-short-play="/api/videos/{played.id}/video"' in html
+    assert f'data-short-play="/api/videos/{audio.id}/video"' not in html
+    assert html.count("data-short-play=") == 1

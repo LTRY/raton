@@ -3987,6 +3987,83 @@ if (!window.__formatPopoverScrollBound) {
   window.__formatPopoverScrollBound = true;
   window.addEventListener("scroll", closeFormatPopovers, { passive: true });
 }
+
+// A downloaded short tile (`data-short-play`) plays the short fullscreen instead
+// of opening its fiche. Everything runs inside the click so the browser counts
+// it as a user gesture: iPhone has no element fullscreen, but a <video> without
+// `playsinline` that starts playing opens in Safari's native fullscreen player.
+// Elsewhere the overlay asks for fullscreen; if that is refused it still
+// covers the viewport. Leaving fullscreen, the end of the short or the close
+// button tears the overlay down.
+function openShortPlayer(link) {
+  document.querySelector("[data-mini-player-audio]")?.pause();
+  const videoId = link.dataset.shortVideoId;
+  const overlay = document.createElement("div");
+  overlay.className = "short-player";
+  overlay.dataset.shortPlayer = "";
+  const video = document.createElement("video");
+  video.controls = true;
+  video.src = link.dataset.shortPlay;
+  video.dataset.resumableMedia = "";
+  video.dataset.resumeKey = `raton:media-position:${videoId}:video`;
+  video.dataset.activityUrl = `/api/videos/${videoId}/activity`;
+  video.dataset.mediaKind = "video";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "short-player-close";
+  close.setAttribute("aria-label", "Fermer");
+  close.title = "Fermer";
+  close.textContent = "✕";
+  overlay.append(video, close);
+  document.body.append(overlay);
+  bindResumableMedia(video);
+
+  let closed = false;
+  function teardown() {
+    if (closed) return;
+    closed = true;
+    // `pause` saves the position and reports the activity (bindResumableMedia).
+    video.pause();
+    const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fullscreenElement === overlay) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
+    }
+    document.removeEventListener("fullscreenchange", onFullscreenChange);
+    document.removeEventListener("webkitfullscreenchange", onFullscreenChange);
+    document.removeEventListener("keydown", onKeydown);
+    document.removeEventListener("turbo:before-cache", teardown);
+    overlay.remove();
+  }
+  function onFullscreenChange() {
+    if (!(document.fullscreenElement || document.webkitFullscreenElement)) teardown();
+  }
+  function onKeydown(event) {
+    if (event.key === "Escape") teardown();
+  }
+  close.addEventListener("click", teardown);
+  video.addEventListener("ended", teardown);
+  // iPhone's native player leaves through its own "done" button.
+  video.addEventListener("webkitendfullscreen", teardown);
+  document.addEventListener("keydown", onKeydown);
+  document.addEventListener("turbo:before-cache", teardown);
+
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
+
+  video.play().catch(() => {});
+  const requestFullscreen = overlay.requestFullscreen || overlay.webkitRequestFullscreen;
+  requestFullscreen?.call(overlay)?.catch?.(() => {});
+}
+
+if (!window.__shortPlayerBound) {
+  window.__shortPlayerBound = true;
+  document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest("a[data-short-play]") : null;
+    if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    openShortPlayer(link);
+  });
+}
 })();
 
 // Popovers are <details data-pop>: only one stays open, an outside click or

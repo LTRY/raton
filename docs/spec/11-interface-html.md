@@ -1249,8 +1249,12 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   meilleure qualite en dessous), sans ouvrir la page detail : la tuile est un
   formulaire `data-async-job` vers `POST /videos/{id}/media/video/download`
   (`video_quality=1080`, `next` = la page courante), son etat de progression
-  recouvre la vignette. Un short deja telecharge garde le lien vers la page
-  detail sur toute la tuile ;
+  recouvre la vignette. **Cliquer sur la tuile d'un short dont la video est
+  telechargee le lit en plein ecran** (voir
+  [08 Medias et lecteurs](08-medias-et-lecteurs.md), section "Lecteur plein
+  ecran des shorts") ; le lien vers la page detail reste sur la tuile pour un
+  clic avec modificateur (nouvel onglet) ou sans JavaScript, et un short qui
+  n'a que l'audio l'ouvre toujours ;
 - les cartes arrivent en cascade (`--i` : indice de la carte, delai plafonne) ;
 - sous la grille : pagination numerotee (macro `numbered_pagination` :
   « ‹ 1 2 3 … N ›, page courante en orange), puis le bouton **Explorer la

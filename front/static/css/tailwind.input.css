@@ -9766,6 +9766,39 @@ a.channel-explore-btn {
   -webkit-text-stroke: 0.7px rgba(255, 255, 255, 0.95);
 }
 
+/* Fullscreen player of a downloaded short (static/js/app.js, openShortPlayer). Fixed over the whole
+   viewport, so it still covers the page when the browser refuses fullscreen. */
+.short-player {
+  background: var(--color-black);
+  inset: 0;
+  position: fixed;
+  z-index: 1001;
+}
+
+.short-player video {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.short-player-close {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-white);
+  cursor: pointer;
+  display: flex;
+  font-size: 18px;
+  height: 40px;
+  justify-content: center;
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right));
+  top: calc(12px + env(safe-area-inset-top));
+  width: 40px;
+}
+
 /* ---- Phone ---- */
 @media (max-width: 640px) {
   .channel-banner {

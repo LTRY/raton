@@ -219,6 +219,8 @@
 {% set is_audio_only_card = card.has_audio and not card.has_video %}
 {# A short tile without a local file downloads on click (1080p or the best below) instead of opening the detail page. #}
 {% set short_download = short_tile and not (card.has_video or card.has_audio) %}
+{# A downloaded short tile plays the video fullscreen on click (static/js/app.js, openShortPlayer); its href stays the no-JS fallback. #}
+{% set short_play = short_tile and card.has_video %}
 <article class="video-row{{ ' video-row-watched' if list_state == 'watched' else '' }}{{ ' video-row-hidden' if list_state == 'hidden' else '' }}{{ ' video-row-channel' if channel_mode else '' }}{{ ' video-row-feature' if feature else '' }}" data-video-id="{{ card.id }}"{% if channel_mode %} style="--i: {{ index }}"{% endif %}>
   <span class="video-row-thumb-wrap">
     {% if short_download %}
@@ -227,7 +229,7 @@
       <input type="hidden" name="next" value="{{ next_path }}">
       <button class="video-row-thumb" type="submit" aria-label="Télécharger {{ card.title }} en 1080p" title="Télécharger en 1080p">
     {% else %}
-    <a class="video-row-thumb" href="/videos/{{ card.id }}?next={{ next_path | urlencode }}" tabindex="-1" aria-hidden="true">
+    <a class="video-row-thumb" href="/videos/{{ card.id }}?next={{ next_path | urlencode }}" tabindex="-1" aria-hidden="true"{% if short_play %} data-short-play="/api/videos/{{ card.id }}/video" data-short-video-id="{{ card.id }}"{% endif %}>
     {% endif %}
       {% if card.has_thumbnail %}
       {% if short_tile %}
