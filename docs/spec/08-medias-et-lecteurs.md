@@ -465,6 +465,16 @@ celui qui l'avait.
 - Lecteurs de `/videos/{id}` (`<video>`, `<audio>` inline) : titre et chaine
   lus dans `data-media-title`/`data-media-artist`, vignette dans `poster` ou
   `data-media-artwork` ; sauts de ±30 s.
+- Lecture depuis l'ecran verrouille sur la video d'une fiche : iOS coupe le
+  son d'un `<video>` qui demarre pendant que la page est cachee (la barre
+  avance en silence). Si la page est cachee, le bouton Lecture
+  (`playVideoOrHandOff`) passe donc la main au mini-lecteur, dont l'`<audio>`
+  a le droit de jouer en arriere-plan : il charge le fichier audio de la fiche
+  (a defaut, le fichier video, dont il ne lit que le son, `data-background-src`)
+  a la position de la video, ecrite d'abord dans la reprise audio
+  (`raton:media-position:<id>:audio`). La video reste en pause ; au retour
+  dans l'app, l'ecoute continue dans le mini-lecteur. Page visible, Lecture
+  relance simplement la video.
 - Lecteur de playlist : piste precedente/suivante (memes regles que ses
   boutons) a la place des sauts.
 

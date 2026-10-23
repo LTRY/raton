@@ -218,7 +218,7 @@
           </div>
           {% if video.media_urls.video %}
           <section class="video-player-panel" aria-label="Lecteur vidéo">
-            <video controls playsinline preload="metadata" data-media-title="{{ video.title }}" data-media-artist="{{ video.channel.name if video.channel else '' }}" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.media_urls.thumbnail %}poster="{{ video.media_urls.thumbnail }}"{% endif %}>
+            <video controls playsinline preload="metadata" data-video-id="{{ video.id }}" data-background-src="{{ video.media_urls.audio or video.media_urls.video }}" data-media-title="{{ video.title }}" data-media-artist="{{ video.channel.name if video.channel else '' }}" data-resumable-media data-resume-key="raton:media-position:{{ video.id }}:video" data-activity-url="/api/videos/{{ video.id }}/activity" data-media-kind="video" {% if resume_positions.video %}data-resume-server-position="{{ resume_positions.video.position_seconds }}" data-resume-server-at="{{ resume_positions.video.at_ms }}" {% endif %}{% if video.media_urls.thumbnail %}poster="{{ video.media_urls.thumbnail }}"{% endif %}>
               <source src="{{ video.media_urls.video }}">
               {% if video.media_urls.subtitles %}
               {# Pas d'attribut `default` : il réactiverait la piste à chaque chargement,
