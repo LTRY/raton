@@ -31,8 +31,8 @@ def search_library(
 def get_video(video_id: int) -> Any:
     """One fiche: metadata, notes, transcript state, playlists. Read only: does not mark it Vu."""
     detail = api.get(f"/videos/{video_id}")
-    # The raw WebVTT of the subtitles only bloats the answer.
-    detail.pop("subtitles_vtt", None)
+    # The timed lines repeat the transcript, which only bloats the answer.
+    detail.pop("transcript_lines", None)
     return detail
 
 

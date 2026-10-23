@@ -721,7 +721,7 @@ def test_video_detail_page_opens_with_no_active_tab(tmp_path):
     assert "transcript-tab active" not in rendered
     assert not re.search(r'class="transcript-tab"[^>]*aria-selected="true"', rendered)
     assert '<div data-tab-panel="text" hidden>' in rendered
-    for panel in ("vtt", "personal-notes", "info", "segments"):
+    for panel in ("personal-notes", "info", "segments"):
         assert re.search(rf'data-tab-panel="{panel}" hidden>', rendered), panel
 
 
@@ -743,7 +743,72 @@ def test_video_detail_page_tab_order_starts_with_info_segments_raw(tmp_path):
     assert response.status_code == 200
     tab_order = re.findall(r'class="transcript-tab[^"]*" data-tab="([a-z-]+)"', rendered)
     assert tab_order[:3] == ["info", "segments", "raw"]
-    assert tab_order[3:] == ["notes", "vtt", "personal-notes"]
+    assert tab_order[3:] == ["notes", "personal-notes"]
+
+
+def timed_transcript_video(db, tmp_path, *, with_media: bool):
+    folder = tmp_path / "video"
+    folder.mkdir()
+    subtitle = folder / "video.fr.vtt"
+    subtitle.write_text(
+        "WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nBonjour\n\n"
+        "00:01:05.500 --> 00:01:07.000\nBonjour\nle monde\n",
+        encoding="utf-8",
+    )
+    transcript = folder / "transcript.txt"
+    transcript.write_text("Bonjour\nle monde", encoding="utf-8")
+    video = add_video(db)
+    video.folder_path = str(folder)
+    video.subtitle_path = str(subtitle)
+    video.transcript_path = str(transcript)
+    video.transcript_status = TranscriptStatus.downloaded
+    if not with_media:
+        video.video_path = None
+    db.commit()
+    return video
+
+
+def test_video_detail_page_shows_the_transcript_line_by_line_with_resume_buttons(tmp_path):
+    db = make_session()
+    video = timed_transcript_video(db, tmp_path, with_media=True)
+
+    rendered = site(db).get(f"/videos/{video.id}").text
+
+    assert 'data-tab="vtt"' not in rendered
+    assert 'id="transcript-lines"' in rendered
+    assert re.findall(r'class="transcript-line-text">([^<]*)<', rendered) == [
+        "Bonjour",
+        "le monde",
+    ]
+    assert 'data-seek-time="1.0"' in rendered
+    assert 'data-seek-time="65.5"' in rendered
+    assert "Reprendre la lecture à 1:05" in rendered
+    # The copy button copies the transcript text, which the page still carries whole.
+    assert '<pre id="transcript-content" class="transcript-content">Bonjour\nle monde</pre>' in (
+        rendered
+    )
+
+
+def test_video_detail_page_keeps_the_plain_transcript_without_a_player(tmp_path):
+    db = make_session()
+    video = timed_transcript_video(db, tmp_path, with_media=False)
+
+    rendered = site(db).get(f"/videos/{video.id}").text
+
+    assert 'id="transcript-content"' in rendered
+    assert 'id="transcript-lines"' not in rendered
+
+
+def test_video_api_returns_the_timed_transcript_lines(tmp_path):
+    db = make_session()
+    video = timed_transcript_video(db, tmp_path, with_media=False)
+
+    detail = api_videos.get_video(video.id, db)
+
+    assert [line.model_dump() for line in detail.transcript_lines] == [
+        {"start_seconds": 1.0, "text": "Bonjour"},
+        {"start_seconds": 65.5, "text": "le monde"},
+    ]
 
 
 def test_video_detail_page_has_personal_notes_tab_and_no_analysis_tab(tmp_path):

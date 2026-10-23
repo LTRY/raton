@@ -31,7 +31,7 @@ téléchargement ni d'appel au LLM.
 | Outil | Appel `/api` |
 |---|---|
 | `search_library` | `GET /library` (`q`, `channel_id`, `section`, `sort`, `page`) |
-| `get_video` | `GET /videos/{id}` (sans `subtitles_vtt`) ; ne marque pas la fiche Vu |
+| `get_video` | `GET /videos/{id}` (sans `transcript_lines`) ; ne marque pas la fiche Vu |
 | `list_channels` | `GET /channels` |
 | `get_channel` | `GET /channels/{id}` |
 | `list_playlists` | `GET /playlists` |

@@ -18,6 +18,7 @@ from back.services.videos.documents import read_transcript_documents, read_video
 from back.services.videos.editing import mark_video_opened
 from back.services.videos.playback import latest_playback_positions
 from back.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
+from back.services.youtube.subtitles import TranscriptLine, read_transcript_lines
 
 
 class VideoNotFoundError(ValueError):
@@ -30,7 +31,8 @@ class VideoDetail:
     video: Video
     # `read_transcript_documents`: transcript, notes, summaries, questions, chat of the fiche.
     documents: dict
-    subtitles_vtt: str | None
+    # The transcript line by line with the time each one starts, empty without a `.vtt` file.
+    transcript_lines: list[TranscriptLine]
     # The fields of metadata.json the page shows, as yt-dlp wrote them.
     metadata: dict
     sponsor_segments: list[VideoSponsorSegment]
@@ -42,13 +44,17 @@ class VideoDetail:
     category_label_styles: list[dict[str, str]]
 
 
-def read_subtitles(video: Video) -> str | None:
-    if not video.subtitle_path:
-        return None
+def read_timed_transcript(video: Video) -> list[TranscriptLine]:
+    if not video.subtitle_path or not video.subtitle_path.lower().endswith(".vtt"):
+        return []
     subtitle_file = local_media_path(video.subtitle_path)
     if not subtitle_file.is_file():
-        return None
-    return subtitle_file.read_text(encoding="utf-8", errors="replace")
+        return []
+    try:
+        return read_transcript_lines(subtitle_file)
+    except Exception:
+        # A broken file must not break the page: the transcript then shows as plain text.
+        return []
 
 
 def detail_metadata(raw: dict) -> dict:
@@ -81,7 +87,7 @@ def video_detail(db: Session, video: Video) -> VideoDetail:
     return VideoDetail(
         video=video,
         documents=read_transcript_documents(video),
-        subtitles_vtt=read_subtitles(video),
+        transcript_lines=read_timed_transcript(video),
         metadata=detail_metadata(read_video_metadata(video)),
         sponsor_segments=segments,
         sponsor_skip_enabled=get_sponsor_skip_enabled(db),

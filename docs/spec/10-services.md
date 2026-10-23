@@ -74,6 +74,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `channel_info` | Ce que yt-dlp dit d'une chaîne : résolution d'une URL ou d'un handle, profil, liste des vidéos |
 | `downloads` | Téléchargement du média, des sous-titres et de la miniature, fichiers écrits à côté (`metadata.json`, transcript) |
 | `sponsorblock` | Appel à l'API SponsorBlock |
+| `subtitles` | Lecture d'un fichier `.vtt` en lignes de transcript horodatées (`read_transcript_lines`), partagée par l'écriture de `transcript.txt` et la page de la fiche |
 | `sponsor_segments` | Segments sponsors d'une fiche : récupération, enregistrement, segments actifs ; recherche à la demande avec son message d'échec (`refresh_sponsor_segments`) |
 | `url_guard` | Refus des URL qui visent la machine locale ou un réseau privé (SSRF) |
 | `view_counts` | Nombre de vues et durée d'une fiche, lus depuis `metadata.json` |
@@ -140,7 +141,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
-| `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, sous-titres, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
+| `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, transcript horodaté, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
