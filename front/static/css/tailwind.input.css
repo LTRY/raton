@@ -8438,6 +8438,10 @@ turbo-frame {
   line-height: 1.15;
   margin: 0 0 6px;
   min-width: 0;
+  /* Top-anchored just below the banner edge (the row's 44px overlap + 8px), so
+     a name that wraps grows downward instead of climbing onto the banner. */
+  align-self: flex-start;
+  padding-top: 52px;
 }
 
 /* The channel name is the link to YouTube; the arrow only brightens on hover. */
@@ -9788,6 +9792,7 @@ a.channel-explore-btn {
   .channel-name {
     flex: 1;
     font-size: 23px;
+    padding-top: 40px;
   }
 
   .channel-actions {
