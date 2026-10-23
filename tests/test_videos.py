@@ -4813,7 +4813,7 @@ def test_css_hides_topbar_on_phone():
         for block in phone_blocks
     )
     assert any(
-        "100dvh - 90px - var(--home-mini-reserve, 0px) - env(safe-area-inset-bottom)" in block
+        "100dvh - 90px - var(--home-mini-reserve, 0px) - var(--tabbar-safe-bottom)" in block
         for block in phone_blocks
     )
 

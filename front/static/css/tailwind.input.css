@@ -7915,9 +7915,17 @@ turbo-frame {
   color: var(--status-error-fg);
 }
 
+/* Bottom offset of the phone tab bar, followed by everything that sits on
+   it (page padding, composer, mini player, explorer raton). A home-indicator
+   iPhone reports a 34px bottom safe area (viewport-fit=cover): adding all of
+   it lifts the bar far above the indicator, which only needs about 14px. */
+:root {
+  --tabbar-safe-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - 20px));
+}
+
 @media (max-width: 800px) {
   body {
-    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    padding-bottom: calc(72px + var(--tabbar-safe-bottom));
   }
 
   .csv-import-row {
@@ -7944,8 +7952,8 @@ turbo-frame {
 
   /* The home fills the screen so its composer sits right above the tab bar
      (6px gap, the same as the docked composer of a discussion): the page is
-     the 18px top padding, this block, then the 72px + safe-area the body
-     reserves for the bar. Main's bottom padding goes, otherwise it would be
+     the 18px top padding, this block, then the 72px + --tabbar-safe-bottom
+     the body reserves for the bar. Main's bottom padding goes, otherwise it would be
      a second gap between the composer and the bar. With the mini player up,
      `body.has-mini-player main` keeps its padding (the composer must stay
      above the player) and --home-mini-reserve takes it off the min-height. */
@@ -7959,18 +7967,18 @@ turbo-frame {
 
   .dashboard-home,
   .dashboard-home .chat-bar[data-chat-empty="false"] {
-    min-height: calc(100dvh - 90px - var(--home-mini-reserve, 0px) - env(safe-area-inset-bottom));
+    min-height: calc(100dvh - 90px - var(--home-mini-reserve, 0px) - var(--tabbar-safe-bottom));
   }
 
   /* A floating pill detached from the edges. It stays inside the 72px +
-     safe-area band the pages reserve at the bottom (padding, sticky composer,
+     --tabbar-safe-bottom band the pages reserve at the bottom (padding, sticky composer,
      mini player). Without `backdrop-filter` it keeps a near-opaque white fill;
      see the @supports block below for the glass variant. */
   .mobile-tabbar {
     background: rgba(255, 255, 255, 0.94);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-xl);
-    bottom: calc(6px + env(safe-area-inset-bottom));
+    bottom: calc(6px + var(--tabbar-safe-bottom));
     box-shadow: 0 12px 32px rgba(43, 32, 24, 0.16);
     display: grid;
     gap: 4px;
@@ -8058,7 +8066,7 @@ turbo-frame {
      page holds the seek slider and the skip buttons. */
   /* Sits just above the floating tab bar (6px offset + 60px tall). */
   .mini-player {
-    bottom: calc(66px + env(safe-area-inset-bottom));
+    bottom: calc(66px + var(--tabbar-safe-bottom));
     gap: 12px;
     padding: 10px 14px;
     z-index: 55;
@@ -8417,7 +8425,7 @@ turbo-frame {
      6px + 60px, so 72px leaves a 6px gap and the composer reads as attached
      to the menu. */
   .chat-form {
-    bottom: calc(72px + env(safe-area-inset-bottom));
+    bottom: calc(72px + var(--tabbar-safe-bottom));
   }
 }
 
@@ -9161,7 +9169,7 @@ html.explore-running {
 
 @media (max-width: 800px) {
   .explorer-raton {
-    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(66px + var(--tabbar-safe-bottom));
   }
 
   .explorer-raton-art {
@@ -9180,7 +9188,7 @@ body.has-mini-player .explorer-raton {
 
 @media (max-width: 800px) {
   body.has-mini-player .explorer-raton {
-    bottom: calc(152px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(152px + var(--tabbar-safe-bottom));
   }
 }
 
@@ -10224,7 +10232,7 @@ a.log-title:hover { color: var(--color-primary); }
 
 @media (max-width: 800px) {
   .settings-nav { margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
-  .settings-actions { bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .settings-actions { bottom: calc(72px + var(--tabbar-safe-bottom)); }
   .settings-actions span { display: none; }
   .settings-actions button { flex: 1; min-height: 44px; }
   .settings-card { padding: 16px; }

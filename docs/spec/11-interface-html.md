@@ -39,6 +39,16 @@ mini-lecteur, feuilles basses, notifications, Raton explorateur) et `body`
 porte `padding-left/right: env(safe-area-inset-left/right)` pour qu'en
 paysage le contenu ne passe pas sous l'encoche.
 
+Exception, la barre d'onglets du telephone : un iPhone sans bouton
+d'accueil annonce 34 px de zone sure en bas, et les ajouter en entier
+souleverait la barre bien au-dessus de la barre d'accueil, ce que ne fait
+aucune app native. Elle n'en garde que la part au-dela de 20 px
+(`--tabbar-safe-bottom: max(0px, zone sure du bas - 20px)`, soit 14 px) : son
+bas est a 6 px + `--tabbar-safe-bottom` de l'ecran (20 px sur ces iPhone,
+6 px dans Safari ou la barre d'outils couvre deja le bas). Tout ce qui se cale
+sur elle suit la meme variable : reserve du bas des pages, composeur du chat,
+accueil, mini-lecteur, Raton explorateur, boutons des Parametres.
+
 Navigation pilotee par Turbo Drive (`front/static/js/vendor/turbo.min.js`,
 vendored, charge dans `<head>` avec `data-turbo-track="reload"`) : les clics
 sur les liens et la plupart des soumissions de formulaire deviennent des
@@ -377,7 +387,7 @@ blanche), leger flou (8 px) et forte saturation de ce qui passe dessous
 (`backdrop-filter`, pour que les couleurs des vignettes restent visibles),
 liseré clair et reflet interne en haut. Sans
 `backdrop-filter`, elle garde un fond blanc quasi opaque. Elle reste dans la
-bande de 72 px + zone sure que les pages reservent en bas.
+bande de 72 px + `--tabbar-safe-bottom` que les pages reservent en bas.
 
 Quand un champ texte a le focus (clavier a l'ecran ouvert), la barre est
 masquee (`body:has(textarea:focus, [contenteditable]:focus, input…:focus)`, doublee
@@ -748,12 +758,12 @@ attribut `data-chat-config` :
   pendant qu'une reponse s'ecrit (`scrollIntoView`, debut du dernier message :
   une reponse longue se lit depuis sa premiere ligne), pas au chargement. Le
   composeur est `position: sticky` en bas de l'ecran (au-dessus de la tab bar
-  sous 800px, `72px + env(safe-area-inset-bottom)`, soit 6px d'ecart avec la
+  sous 800px, `72px + var(--tabbar-safe-bottom)`, soit 6px d'ecart avec la
   barre : le composeur colle a la barre, comme l'accueil vide) tant qu'une discussion est
   affichee ; vide, il reste a sa place dans la page. Sur telephone, l'accueil
   remplit l'ecran (`100dvh` moins la reserve de la tab bar) et le composeur vide
   se pose donc aussi a 6px de la barre. Des que le clavier est ouvert
-  (`html.keyboard-open`), la reserve de la tab bar (72px + safe-area) est retiree
+  (`html.keyboard-open`), la reserve de la tab bar (72px + `--tabbar-safe-bottom`) est retiree
   de cette hauteur : sinon elle laisse entre le composeur et le clavier un vide
   de la meme taille. Avec le mini lecteur affiche,
   le `padding-bottom` de `main` est conserve (le composeur reste au-dessus du

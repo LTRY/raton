@@ -18,6 +18,14 @@ def test_viewport_covers_the_screen_so_safe_area_insets_apply():
     assert "env(safe-area-inset-bottom" in CSS
 
 
+def test_tab_bar_keeps_only_part_of_the_bottom_safe_area():
+    # The full 34px inset lifts the bar far above the home indicator.
+    assert "--tabbar-safe-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - 20px));" in CSS
+    start = CSS.index("  .mobile-tabbar {\n    background")
+    block = CSS[start : CSS.index("}", start)]
+    assert "bottom: calc(6px + var(--tabbar-safe-bottom));" in block
+
+
 def test_home_screen_manifest_opens_standalone():
     assert '<link rel="manifest" href="/static/manifest.webmanifest">' in BASE
     assert '<meta name="apple-mobile-web-app-status-bar-style" content="default">' in BASE
