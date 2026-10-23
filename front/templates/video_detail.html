@@ -237,7 +237,7 @@
           {% endif %}
 
           <div class="media-panel media-panel-video">
-            <p class="media-panel-label"><span class="mp-when-idle">Télécharger la vidéo</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Vidéo téléchargée</span></p>
+            <p class="media-panel-label"><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Vidéo téléchargée</span></p>
             <div class="media-panel-actions">
               <button type="button" class="media-disc media-disc-download mp-when-idle" data-media-download aria-label="Télécharger la vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg></button>
               <span class="media-disc media-disc-busy mp-when-busy" role="status" aria-label="Téléchargement en cours"><svg class="media-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".25"/><path d="M12 3a9 9 0 0 1 9 9"/></svg></span>
@@ -289,7 +289,7 @@
             data-track-activity-url="/api/videos/{{ video.id }}/activity"
             data-track-detail-url="/videos/{{ video.id }}">
             <div class="media-panel-top">
-              <p class="media-panel-label"><span class="mp-when-idle">Télécharger l'audio</span><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
+              <p class="media-panel-label"><span class="mp-when-busy">Téléchargement…</span><span class="mp-when-ok">Audio téléchargé</span></p>
             </div>
             <div class="media-panel-actions">
               <button type="button" class="media-skip media-skip-back mp-when-ready" data-audio-skip="-15" aria-label="Reculer de 15 secondes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>

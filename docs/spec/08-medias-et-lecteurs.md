@@ -129,14 +129,16 @@ bouton (`format-toggle-loading`, `-active`, `-error`).
 
 - **Volet video** : pas de bouton play ni de saut ±15 s, le lecteur reste le
   `<video controls>` natif. Sans fichier, la vignette occupe tout le volet
-  (`object-fit: cover`) et le bouton « Telecharger la video » est pose par-dessus,
+  (`object-fit: cover`) et le bouton de telechargement (icone seule, sans
+  libelle ; « Telecharger la video » en `aria-label`) est pose par-dessus,
   en bas, sur un degrade sombre ; un clic ouvre le choix de qualite (memes valeurs
   que le popover de la barre d'actions). Une fois le telechargement termine, la
   coche s'affiche 1,4 s puis la page est rechargee (visite Turbo `replace`) pour
   faire apparaitre le lecteur.
   Le rechargement attend la fin d'un telechargement en cours sur l'autre volet
   et rouvre le carrousel sur le volet que le lecteur regardait.
-- **Volet audio** : sans fichier, un bouton « Telecharger l'audio » (copie de la piste du fichier video quand il existe et que la piste n'est pas degradee, sinon yt-dlp : voir `07-youtube-et-telechargements.md`). Une fois
+- **Volet audio** : sans fichier, un bouton de telechargement (icone seule,
+  sans libelle ; « Telecharger l'audio » en `aria-label`) (copie de la piste du fichier video quand il existe et que la piste n'est pas degradee, sinon yt-dlp : voir `07-youtube-et-telechargements.md`). Une fois
   l'audio present (au chargement ou apres telechargement), les commandes
   reculer 15 s / lecture-pause / avancer 15 s s'affichent. La barre commune
   sous les volets (`.media-seek`, `role="slider"`) suit le design commun des barres
