@@ -137,6 +137,11 @@ demarrage `backfill_original_transcripts`) : les videos `missing` dont
 requete pour les autres). Il s'arrete apres 5 echecs consecutifs et n'est
 marque fait (`original_transcript_backfill_done`) que s'il est alle au bout.
 
+L'import d'une page (« Explorer la suite », premiere synchro de la cloche) ne
+s'arrete pas non plus a la premiere video connue (`skip_known`) : la page
+demandee peut commencer par des fiches deja importees (cloche, import par URL),
+et s'y arreter n'importerait rien.
+
 Les shorts ne s'arretent pas a la premiere video connue (leur URL `/watch` est
 reparee en `/shorts/`) : le listing s'arrete des qu'une page ne contient aucun
 short inconnu, au lieu de relire les 3 pages chaque nuit.

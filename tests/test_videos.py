@@ -2289,6 +2289,7 @@ def test_channel_metadata_import_job_imports_one_page(monkeypatch):
             "page_size": downloads.CHANNEL_VIDEO_PAGE_SIZE,
             "max_pages": 1,
             "section": "videos",
+            "skip_known": True,
         }
     ]
     assert job.status == "metadata"
