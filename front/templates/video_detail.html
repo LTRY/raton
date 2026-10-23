@@ -331,7 +331,6 @@
         <button type="button" class="transcript-tab" data-tab="segments" role="tab" aria-selected="false">Segments{% if sponsor_segments %} ({{ sponsor_segments | length }}){% endif %}</button>
         <button type="button" class="transcript-tab" data-tab="raw" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Transcript</button>
         <button type="button" class="transcript-tab" data-tab="notes" role="tab" aria-selected="false" {% if not notes_transcript %}hidden{% endif %}>Notes structurées</button>
-        <button type="button" class="transcript-tab" data-tab="vtt" role="tab" aria-selected="false" {% if not vtt_content %}hidden{% endif %}>.vtt</button>
         <button type="button" class="transcript-tab" data-tab="personal-notes" role="tab" aria-selected="false">Commentaire</button>
       </div>
 
@@ -358,17 +357,18 @@
             </svg>
           </button>
           <pre id="transcript-content" class="transcript-content">{{ display_transcript }}</pre>
+          {# The transcript line by line, each one able to resume the player at its start; only with
+             a player to resume. The script shows it instead of the <pre> on the Transcript tab. #}
+          {% if transcript_lines and (video.media_urls.video or video.media_urls.audio) %}
+          <div id="transcript-lines" class="transcript-content transcript-lines" hidden>
+            {%- for line in transcript_lines -%}
+            <p class="transcript-line"><span class="transcript-line-text">{{ line.text }}</span> <button type="button" class="transcript-line-seek" data-seek-time="{{ line.start_seconds }}" aria-label="Reprendre la lecture à {{ line.start_label }}" title="Reprendre la lecture à {{ line.start_label }}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z"/></svg>{{ line.start_label }}</button></p>
+            {%- endfor -%}
+          </div>
+          {% endif %}
         </div>
       </div>
       {% endif %}
-
-      <div class="transcript-panel vtt-panel" data-tab-panel="vtt" {% if default_tab != 'vtt' %}hidden{% endif %}>
-        {% if vtt_content %}
-        <pre class="transcript-content">{{ vtt_content }}</pre>
-        {% else %}
-        <p class="notice error">Aucun fichier .vtt disponible pour cette vidéo.</p>
-        {% endif %}
-      </div>
 
       <div class="transcript-panel personal-notes-panel" id="personal-notes" data-tab-panel="personal-notes" {% if default_tab != 'personal-notes' %}hidden{% endif %}>
         <div class="personal-notes-header">
@@ -589,6 +589,7 @@
   const llmProviderLabel = {{ (llm_provider_label or "") | tojson }};
   const copyButton = document.getElementById("copy-transcript");
   const transcriptContent = document.getElementById("transcript-content");
+  const transcriptLines = document.getElementById("transcript-lines");
   const transcriptVersion = document.getElementById("transcript-version");
   const transcriptStatus = document.getElementById("transcript-action-status");
   const transcriptProgress = document.getElementById("transcript-progress");
@@ -696,6 +697,9 @@
     if (TEXT_TABS.has(activeTab)) {
       const doc = documents[activeTab];
       transcriptContent.textContent = doc.content;
+      const showLines = Boolean(transcriptLines) && activeTab === "raw";
+      transcriptContent.hidden = showLines;
+      if (transcriptLines) transcriptLines.hidden = !showLines;
       transcriptVersion.textContent = `${doc.length} caractères · ${doc.label}`;
       if (textPanel) textPanel.hidden = false;
       otherPanels.forEach((panel) => {
@@ -963,21 +967,36 @@
     });
   }
 
+  // Without hover (touch screens), tapping a line of the transcript reveals its resume button.
+  if (transcriptLines) {
+    transcriptLines.addEventListener("click", (event) => {
+      const line = event.target.closest(".transcript-line");
+      if (!line || event.target.closest(".transcript-line-seek")) return;
+      transcriptLines.querySelector(".transcript-line.is-picked")?.classList.remove("is-picked");
+      line.classList.add("is-picked");
+    });
+  }
+
   if (copyButton) {
     const copyIcon = copyButton.querySelector(".transcript-copy-icon:not(.transcript-copy-icon--check)");
     const checkIcon = copyButton.querySelector(".transcript-copy-icon--check");
     copyButton.addEventListener("click", async () => {
-      const text = transcriptContent.textContent;
+      // The text of the shown document, never the timed lines (their resume buttons are not text).
+      const text = documents[activeTab]?.content ?? transcriptContent.textContent;
       try {
         await navigator.clipboard.writeText(text);
       } catch {
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(transcriptContent);
-        selection.removeAllRanges();
-        selection.addRange(range);
+        // Without the clipboard API (plain http on the LAN), copy from a throwaway field: the
+        // shown text may sit in a hidden element, which cannot be selected.
+        const field = document.createElement("textarea");
+        field.value = text;
+        field.setAttribute("readonly", "");
+        field.style.position = "fixed";
+        field.style.opacity = "0";
+        document.body.append(field);
+        field.select();
         document.execCommand("copy");
-        selection.removeAllRanges();
+        field.remove();
       }
       copyButton.classList.add("is-copied");
       // .hidden (propriété IDL) n'est pas reflétée sur l'attribut par les

@@ -251,8 +251,10 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   `playlists` (`{playlist_id, title, item_id}`), `channel` (`{id, name}`),
   `badges` (ce que contient la fiche, dans l'ordre des badges : `new`,
   `audio`, `video`, `metadata`, `transcript`, `notes`, `imported`),
-  `has_transcript` (un transcript est enregistre) et `subtitles_vtt` (le
-  fichier `.vtt`, `null` sans sous-titres). Lecture seule :
+  `has_transcript` (un transcript est enregistre) et `transcript_lines` (le
+  transcript ligne par ligne avec l'heure de debut de chacune,
+  `{start_seconds, text}`, lu dans les sous-titres `.vtt` ; liste vide sans
+  `.vtt` lisible). Lecture seule :
   contrairement a la page, ne sort pas la fiche des Nouveautes. `404` si la
   fiche n'existe pas.
 - `GET /api/library` : la liste de la bibliotheque (ou la page d'une chaine)

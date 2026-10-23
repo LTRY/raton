@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import webvtt
 from yt_dlp import YoutubeDL
 
 from back.models.video import TranscriptStatus
 from back.services.common.files import sanitize_filename
+from back.services.youtube.subtitles import read_transcript_lines
 from back.services.youtube.yt import extract_video_info, ytdlp_call
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".webm", ".mov", ".avi"}
@@ -215,17 +215,6 @@ def write_metadata(folder: Path, info: dict[str, Any]) -> Path:
     return metadata_path
 
 
-def dedupe_consecutive_lines(lines: list[str]) -> list[str]:
-    deduped: list[str] = []
-    previous = ""
-    for line in lines:
-        normalized = " ".join(line.split()).casefold()
-        if normalized and normalized != previous:
-            deduped.append(line)
-        previous = normalized
-    return deduped
-
-
 def write_transcript(
     folder: Path, subtitle_path: Path | None
 ) -> tuple[Path | None, TranscriptStatus]:
@@ -234,11 +223,8 @@ def write_transcript(
     transcript_path = folder / "transcript.txt"
     try:
         if subtitle_path.suffix.lower() == ".vtt":
-            lines = []
-            for caption in webvtt.read(str(subtitle_path)):
-                lines.extend(line.strip() for line in caption.text.splitlines() if line.strip())
-            lines = dedupe_consecutive_lines(lines)
-            transcript_path.write_text("\n".join(lines), encoding="utf-8")
+            lines = read_transcript_lines(subtitle_path)
+            transcript_path.write_text("\n".join(line.text for line in lines), encoding="utf-8")
         else:
             transcript_path.write_text(
                 subtitle_path.read_text(encoding="utf-8", errors="ignore"), encoding="utf-8"

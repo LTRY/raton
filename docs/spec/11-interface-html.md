@@ -257,7 +257,7 @@ page :
   rechargement ne reaffiche pas la notification ; `data-turbo-temporary`
   l'exclut du cache Turbo ;
 - les messages d'etat propres a un bloc restent en place dans la page
-  (`.notice`, `.async-form-status`) : absence de fichier `.vtt`, statut du
+  (`.notice`, `.async-form-status`) : statut du
   dernier scan dans les parametres, erreur du panneau de recherche YouTube,
   erreur de recuperation des fiches d'une chaine, progression d'un
   traitement en file d'attente.

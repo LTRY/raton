@@ -132,7 +132,7 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
         else None,
         badges=video_badges(video),
         has_transcript=video.transcript_path is not None,
-        subtitles_vtt=detail.subtitles_vtt,
+        transcript_lines=detail.transcript_lines,
     )
 
 

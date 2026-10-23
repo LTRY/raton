@@ -53,12 +53,11 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
   [08 Medias et lecteurs](08-medias-et-lecteurs.md), section "Segments
   sponsorisés" ;
 - `Transcript` (`data-tab="raw"`, anciennement libelle `Brut`) : onglet masque
-  (`hidden`) si aucun `transcript.txt` n'existe ;
+  (`hidden`) si aucun `transcript.txt` n'existe ; il n'y a plus d'onglet `.vtt`
+  montrant le fichier de sous-titres brut : ses horodatages servent au
+  transcript ligne par ligne (voir plus bas) ;
 - `Notes structurees` (`data-tab="notes"`) : onglet masque tant que
   `transcript.notes.txt` n'existe pas ;
-- `.vtt` (`data-tab="vtt"`) : onglet masque si aucun sous-titre `.vtt` lisible
-  n'existe pour la video (`video.subtitle_path`) ; panneau HTML independant
-  affichant le contenu brut du fichier `.vtt` dans un `pre.transcript-content` ;
 - `Commentaire` (`data-tab="personal-notes"`, `id="personal-notes"`) :
   toujours present ; le formulaire renvoie vers `/videos/{id}#personal-notes`
   pour rouvrir l'onglet apres enregistrement ;
@@ -89,7 +88,34 @@ Affichage additionnel dans le panneau `text` :
 - longueur en caracteres du document affiche + son libelle (`Transcript` /
   `Notes structurees`) ;
 - icone de copie discrete en haut a droite de la zone de texte (copie le
-  document actuellement affiche ; passe brievement en coche pour confirmer).
+  texte du document actuellement affiche — pour l'onglet `Transcript`, le
+  contenu de `transcript.txt`, jamais le fichier `.vtt` ni les horodatages ;
+  passe brievement en coche pour confirmer).
+
+#### Transcript ligne par ligne
+
+Quand les sous-titres de la fiche sont un fichier `.vtt` lisible
+(`video.subtitle_path`) et que la fiche a un lecteur (fichier video ou
+audio), l'onglet `Transcript` montre, a la place du `pre#transcript-content`,
+un `div#transcript-lines` : une ligne `p.transcript-line` par ligne de
+`transcript.txt`, chacune avec son heure de debut.
+
+- Les lignes viennent de `GET /api/videos/{id}` (`transcript_lines`,
+  `{start_seconds, text}`), lues dans le `.vtt` par le meme decoupage que
+  celui qui ecrit `transcript.txt` (`read_transcript_lines`,
+  `back/services/youtube/subtitles.py`) : memes lignes, memes doublons
+  consecutifs retires ; une ligne repetee par les sous-titres automatiques
+  garde l'heure du premier cue ou elle apparait.
+- Au survol d'une ligne (souris), elle se surligne et propose un bouton
+  `.transcript-line-seek` « ▶ m:ss » en fin de ligne ; sur ecran tactile
+  (pas de survol), c'est un appui sur la ligne qui le fait apparaitre. Le
+  bouton garde sa place masque (`visibility: hidden`) : le texte ne bouge pas
+  quand il apparait.
+- Le bouton porte `data-seek-time` : comme un timestamp de segment, il
+  reprend la lecture du lecteur de la fiche a ce moment (voir
+  [08 Medias et lecteurs](08-medias-et-lecteurs.md)).
+- Sans `.vtt` (sous-titres d'un autre format, import manuel), sans lecteur ou
+  si le fichier est illisible, le transcript reste le texte brut du `pre`.
 
 ### Bouton robot (generation IA)
 

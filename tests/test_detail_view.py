@@ -83,7 +83,7 @@ def test_open_video_detail_returns_raw_values_and_takes_the_fiche_out_of_nouveau
     assert detail.skip_segments == [{"start": 10.0, "end": 40.0}]
     assert detail.sponsor_skip_enabled is True
     assert [playlist.title for playlist in detail.all_playlists] == ["A", "B"]
-    assert detail.subtitles_vtt is None
+    assert detail.transcript_lines == []
     assert detail.documents["transcript"] is None
 
 

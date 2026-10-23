@@ -118,6 +118,13 @@ class SponsorSegmentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TranscriptLineRead(BaseModel):
+    start_seconds: float
+    text: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class SkipSegmentRead(BaseModel):
     start: float
     end: float
@@ -170,5 +177,6 @@ class VideoDetailRead(VideoRead):
     badges: list[str]
     # A transcript is recorded (its file may still be missing: `documents.transcript` is null).
     has_transcript: bool
-    # The subtitles file as the page shows it, null without subtitles.
-    subtitles_vtt: str | None
+    # The transcript line by line with the time each one starts (from the `.vtt` subtitles),
+    # empty without them.
+    transcript_lines: list[TranscriptLineRead]

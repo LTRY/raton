@@ -55,7 +55,14 @@ def video_detail_context(video, raw: dict, settings, playlists, back_path: str) 
         "category_option_labels": [style.label for style in styles],
         "category_style_map": {style.label: style for style in styles},
         "extended_metadata": extended_metadata_context(video.metadata),
-        "vtt_content": video.subtitles_vtt,
+        "transcript_lines": [
+            {
+                "start_seconds": line.start_seconds,
+                "start_label": format_duration(line.start_seconds) or "0:00",
+                "text": line.text,
+            }
+            for line in video.transcript_lines
+        ],
         "sponsor_segments": [
             {
                 "category_label": sponsor_labels.get(segment.category, segment.category),

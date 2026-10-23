@@ -3,6 +3,7 @@ from back.models.video import TranscriptStatus
 from back.services.common.files import sanitize_filename
 from back.services.youtube import channel_info, downloads
 from back.services.youtube.downloads import discover_downloaded_files, write_transcript
+from back.services.youtube.subtitles import TranscriptLine, read_transcript_lines
 
 
 def test_sanitize_filename_removes_invalid_characters():
@@ -263,3 +264,24 @@ def test_download_subtitles_requests_nothing_when_the_video_has_no_original_trac
         tmp_path,
         info={"automatic_captions": {"fr": [], "en": []}, "subtitles": {}},
     )
+
+
+def test_read_transcript_lines_matches_the_transcript_with_start_times(tmp_path):
+    subtitle = tmp_path / "subtitle.vtt"
+    subtitle.write_text(
+        "WEBVTT\n\n"
+        "00:00:00.000 --> 00:00:01.000\némission\n\n"
+        "00:00:01.000 --> 00:00:02.000\némission\nmerci\n\n"
+        "01:00:02.250 --> 01:00:03.000\nmerci\nau revoir\n\n",
+        encoding="utf-8",
+    )
+
+    lines = read_transcript_lines(subtitle)
+    transcript_path, _ = write_transcript(tmp_path, subtitle)
+
+    assert lines == [
+        TranscriptLine(0.0, "émission"),
+        TranscriptLine(1.0, "merci"),
+        TranscriptLine(3602.25, "au revoir"),
+    ]
+    assert transcript_path.read_text(encoding="utf-8") == "\n".join(line.text for line in lines)

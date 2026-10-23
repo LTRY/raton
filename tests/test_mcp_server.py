@@ -69,7 +69,7 @@ def test_tools_forward_to_the_api(db):
     assert server.list_playlists() == []
     detail = server.get_video(video.id)
     assert detail["title"] == "Une fiche"
-    assert "subtitles_vtt" not in detail
+    assert "transcript_lines" not in detail
     assert server.search_library(q="fiche")["total"] == 1
     assert "stacks" in server.get_nouveautes()
 
