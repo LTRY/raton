@@ -115,6 +115,61 @@ def test_generate_notes_without_a_transcript_is_refused(client, db, video, tasks
     assert tasks == []
 
 
+QUIZ_RESULT_TEXT = json.dumps(
+    {
+        "questions": [
+            {
+                "question": "De quoi parle la vidéo ?",
+                "bonne_reponse": "Du transcript.",
+                "mauvaises_reponses": ["De cuisine.", "De sport.", "De musique."],
+                "explication": "Elle le dit dès le début.",
+            }
+        ]
+    }
+)
+
+
+def test_a_quiz_is_generated_then_shown_with_the_fiche(client, db, video, tasks):
+    before = client.get(f"/api/videos/{video.id}").json()["documents"]["quiz"]
+    queued = client.post(f"/api/videos/{video.id}/quiz/generate")
+    job_id = queued.json()["job_id"]
+    pending = client.get(queued.json()["status_url"]).json()
+    finish(db, job_id, status="done", result=QUIZ_RESULT_TEXT)
+    done = client.get(queued.json()["status_url"]).json()
+
+    assert before == []
+    assert queued.status_code == 202
+    assert db.get(LlmJob, job_id).kind == "quiz"
+    assert pending["status"] == "pending"
+    assert done["status"] == "done"
+    [question] = done["quiz"]
+    assert question["question"] == "De quoi parle la vidéo ?"
+    assert question["choices"][question["answer"]] == "Du transcript."
+    assert question["explanation"] == "Elle le dit dès le début."
+    assert client.get(f"/api/videos/{video.id}").json()["documents"]["quiz"] == done["quiz"]
+
+
+def test_a_quiz_that_cannot_be_read_fails_with_its_reason(client, db, video, tasks):
+    queued = client.post(f"/api/videos/{video.id}/quiz/generate")
+    finish(db, queued.json()["job_id"], status="done", result="pas du json")
+
+    failed = client.get(queued.json()["status_url"]).json()
+
+    assert failed["status"] == "failed"
+    assert "JSON" in failed["message"]
+
+
+def test_a_quiz_needs_a_transcript(client, db, video, tasks):
+    video.transcript_path = None
+    db.commit()
+
+    response = client.post(f"/api/videos/{video.id}/quiz/generate")
+
+    assert response.status_code == 400
+    assert response.json()["detail"].startswith("Génération impossible : ")
+    assert tasks == []
+
+
 def test_a_question_on_a_fiche_is_answered_into_its_discussion(client, db, video, tasks):
     empty = client.post(f"/api/videos/{video.id}/chat", json={"question": "   "})
     queued = client.post(

@@ -91,12 +91,22 @@ class ChatMessageRead(BaseModel):
     content: str
 
 
+class QuizQuestionRead(BaseModel):
+    question: str
+    choices: list[str]
+    # Index of the right one in `choices`.
+    answer: int
+    explanation: str
+
+
 class VideoDocumentsRead(BaseModel):
     transcript: str | None
     notes: str | None
     short_summary: str | None
     suggested_questions: list[str]
     chat_messages: list[ChatMessageRead]
+    # The last quiz generated on the fiche; [] before the first.
+    quiz: list[QuizQuestionRead]
 
     @classmethod
     def from_documents(cls, documents: dict) -> VideoDocumentsRead:
@@ -107,6 +117,7 @@ class VideoDocumentsRead(BaseModel):
             short_summary=documents["short_summary"],
             suggested_questions=documents["suggested_questions"],
             chat_messages=documents["chat_messages"],
+            quiz=documents["quiz"],
         )
 
 

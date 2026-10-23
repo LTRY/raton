@@ -18,6 +18,7 @@ from back.services.llm.prompts import (
     split_summary_result,
 )
 from back.services.llm.provider import AnthropicProvider, CompletionFailed, get_llm_provider
+from back.services.llm.quiz import QUIZ_SCHEMA, build_quiz_prompt
 from back.services.videos.documents import load_chat, save_chat
 
 
@@ -259,6 +260,7 @@ def test_every_prompt_wraps_the_transcript_in_xml_tags():
         build_generation_prompt("T."),
         build_auto_notes_prompt("T."),
         build_chat_prompt("T.", [], "Question ?"),
+        build_quiz_prompt("T."),
     )
     for prompt in prompts:
         assert prompt.messages[0]["content"].startswith("<transcript>\nT.\n</transcript>")
@@ -437,6 +439,24 @@ def test_complete_uses_the_model_output_ceiling(monkeypatch):
     assert holder["client"].messages.stream_kwargs["max_tokens"] == 64_000
     AnthropicProvider(api_key="sk-ant-test", model="claude-haiku-5-5").complete("p")
     assert holder["client"].messages.stream_kwargs["max_tokens"] == 128_000
+
+
+def test_complete_asks_for_json_only_when_given_a_schema(monkeypatch):
+    holder = {}
+
+    def make_client(**kwargs):
+        holder["client"] = _FakeAnthropicClient(_FakeAnthropicResponse('{"questions": []}'))
+        return holder["client"]
+
+    monkeypatch.setattr(anthropic, "Anthropic", make_client)
+    provider = AnthropicProvider(api_key="sk-ant-test", model="claude-sonnet-5")
+
+    provider.complete("p")
+    assert "output_config" not in holder["client"].messages.stream_kwargs
+    provider.complete("p", json_schema=QUIZ_SCHEMA)
+    assert holder["client"].messages.stream_kwargs["output_config"] == {
+        "format": {"type": "json_schema", "schema": QUIZ_SCHEMA}
+    }
 
 
 def test_truncated_response_keeps_its_billed_usage(monkeypatch):

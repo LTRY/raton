@@ -148,9 +148,10 @@ Videos :
   `POST /api/videos/{id}/notes/generate` (notes structurees, resume court et
   questions suggerees en un seul appel LLM, a partir de `transcript.txt` —
   voir [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
-  redirige vers l'onglet transcript de la fiche. La discussion d'une fiche et
-  le chat de la bibliotheque n'ont pas de route HTML : leurs widgets appellent
-  `/api/videos/{id}/chat`, `/api/chat` et `/api/llm-jobs/{id}`.
+  redirige vers l'onglet transcript de la fiche. La discussion et le quiz
+  d'une fiche et le chat de la bibliotheque n'ont pas de route HTML : leurs
+  scripts appellent `/api/videos/{id}/chat`, `/api/videos/{id}/quiz/generate`,
+  `/api/chat` et `/api/llm-jobs/{id}`.
 - `POST /videos/{id}/sponsors/fetch` : rechercher les segments sponsorises via l'API publique SponsorBlock — **seule source** — pour les categories activees (`/settings`) ; remplace uniquement les lignes `source="sponsorblock"` de la video. Redirige vers `/videos/{id}?message=...#segments-sponsors` (l'ancre ouvre l'onglet Segments ; `level=error` en cas d'echec) — voir [08 Medias et lecteurs](08-medias-et-lecteurs.md). Meme recherche : `POST /api/videos/{id}/sponsor-segments/fetch`.
 - `GET /videos/import` : renvoie (303) vers `/videos?import=video`, qui ouvre la feuille d'import de la Bibliotheque ; garde `message`/`level`. `GET /import/categories` : fragment `turbo-frame` des pastilles de categories de la feuille.
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
@@ -438,6 +439,10 @@ arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
 - `POST /api/videos/{id}/notes/generate` : notes structurees, resume court et
   questions suggerees depuis le transcript, en un appel ; `400` si la fiche
   n'a pas de transcript (`Génération impossible : …`).
+- `POST /api/videos/{id}/quiz/generate` : un nouveau quiz (questions a choix
+  multiple) depuis le transcript, qui remplace le precedent ; `400` si la
+  fiche n'a pas de transcript. Le dernier quiz se lit dans
+  `GET /api/videos/{id}` (`documents.quiz`).
 - `POST /api/videos/{id}/chat` `{question}` : question sur le transcript de
   la fiche, a la suite de sa discussion ; `400 La question est vide.`.
   `DELETE /api/videos/{id}/chat` efface la discussion (`204`). La discussion
@@ -452,7 +457,8 @@ arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
   `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).
   Le premier poll apres la fin ecrit le resultat (une seule fois, comme le
   poll de la page) et repond `documents` (`generate`, avec les nouvelles
-  notes), `chat_messages` (`chat`) ou `library_chat` (`library_chat`) ;
+  notes), `quiz` (`quiz`), `chat_messages` (`chat`) ou `library_chat`
+  (`library_chat`) ;
   apres une generation, l'indexation des notes part en arriere-plan. Un job
   echoue repond `200` avec `status: failed` et `message` (`Génération
   impossible : …`, `Réponse impossible : …`). `404 Tâche introuvable`.

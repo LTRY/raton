@@ -16,6 +16,7 @@ from back.services.common.settings import get_llm_provider_name
 from back.services.jobs.llm_jobs import (
     apply_generation_result,
     apply_library_chat_result,
+    apply_quiz_result,
     apply_transcript_chat_result,
     enqueue_llm_job,
 )
@@ -26,6 +27,7 @@ from back.services.llm.prompts import (
     build_library_chat_prompt,
     partial_generation_summary,
 )
+from back.services.llm.quiz import build_quiz_prompt
 from back.services.videos.documents import get_transcript_paths, load_chat
 
 
@@ -72,6 +74,22 @@ def queue_notes_generation(db: Session, video: Video) -> LlmJob:
         return enqueue_llm_job(
             db,
             kind="generate",
+            provider=get_llm_provider_name(),
+            video_id=video.id,
+            prompt=prompt.to_json(),
+        )
+    except Exception as exc:
+        raise LlmRequestError(f"Génération impossible : {exc}") from exc
+
+
+def queue_quiz_generation(db: Session, video: Video) -> LlmJob:
+    """A new quiz on the fiche's transcript (`build_quiz_prompt`), replacing the previous one."""
+    try:
+        transcript_path, _, _ = get_transcript_paths(video)
+        prompt = build_quiz_prompt(transcript_path.read_text(encoding="utf-8", errors="replace"))
+        return enqueue_llm_job(
+            db,
+            kind="quiz",
             provider=get_llm_provider_name(),
             video_id=video.id,
             prompt=prompt.to_json(),
@@ -137,7 +155,7 @@ def resolve_llm_job(db: Session, job: LlmJob) -> LlmJobOutcome:
             outcome.tool_calls = json.loads(job.tool_calls) if job.tool_calls else []
         return outcome
     if job.status == "failed":
-        verb = "Génération" if job.kind == "generate" else "Réponse"
+        verb = "Génération" if job.kind in ("generate", "quiz") else "Réponse"
         raise LlmJobFailedError(f"{verb} impossible : {job.error}")
     # "done" (first poll after completion) or "applied" (already written, replayed idempotently).
     outcome = LlmJobOutcome(job=job, pending=False)
@@ -156,6 +174,8 @@ def resolve_llm_job(db: Session, job: LlmJob) -> LlmJobOutcome:
                     generated["notes_text"],
                     generated["summary_short"],
                 )
+        elif job.kind == "quiz":
+            apply_quiz_result(db, video, job)
         else:
             apply_transcript_chat_result(db, video, job)
     except Exception as exc:

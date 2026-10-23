@@ -332,6 +332,7 @@
         <button type="button" class="transcript-tab" data-tab="raw" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Transcript</button>
         <button type="button" class="transcript-tab" data-tab="notes" role="tab" aria-selected="false" {% if not notes_transcript %}hidden{% endif %}>Notes structurées</button>
         <button type="button" class="transcript-tab" data-tab="vtt" role="tab" aria-selected="false" {% if not vtt_content %}hidden{% endif %}>.vtt</button>
+        <button type="button" class="transcript-tab" data-tab="quiz" role="tab" aria-selected="false" {% if not transcript %}hidden{% endif %}>Quiz</button>
         <button type="button" class="transcript-tab" data-tab="personal-notes" role="tab" aria-selected="false">Commentaire</button>
       </div>
 
@@ -369,6 +370,21 @@
         <p class="notice error">Aucun fichier .vtt disponible pour cette vidéo.</p>
         {% endif %}
       </div>
+
+      {% if transcript %}
+      {# Rendered by the page script from the JSON below; the quiz has no fallback without
+         JavaScript, like the discussion. #}
+      <div class="transcript-panel quiz-panel" id="quiz" data-tab-panel="quiz" hidden>
+        <div class="quiz-header">
+          <h2>Quiz</h2>
+          <button type="button" class="secondary" data-quiz-generate>{{ "Nouveau quiz" if quiz else "Générer un quiz" }}</button>
+        </div>
+        <p class="quiz-intro" data-quiz-intro {% if quiz %}hidden{% endif %}>Quelques questions pour vérifier ce que vous avez retenu de la vidéo.</p>
+        <p class="async-form-status" data-quiz-status aria-live="polite" hidden></p>
+        <div class="quiz-body" data-quiz-body aria-live="polite"></div>
+        <script type="application/json" data-quiz-questions>{{ quiz | tojson }}</script>
+      </div>
+      {% endif %}
 
       <div class="transcript-panel personal-notes-panel" id="personal-notes" data-tab-panel="personal-notes" {% if default_tab != 'personal-notes' %}hidden{% endif %}>
         <div class="personal-notes-header">
@@ -678,6 +694,7 @@
     "#transcript": textDefaultTab,
     "#personal-notes": "personal-notes",
     "#segments-sponsors": "segments",
+    "#quiz": "quiz",
   };
   let activeTab = "";
   let hashTab = HASH_TABS[window.location.hash];
@@ -922,6 +939,117 @@
         button.classList.remove("ai-generate-loading");
       }
     });
+  }
+
+  // The quiz: one question at a time, a choice reveals the right answer and why, then the score.
+  // The questions come from the page (the last quiz) or from a quiz job just finished.
+  const quizPanel = document.getElementById("quiz");
+  if (quizPanel) {
+    const quizBody = quizPanel.querySelector("[data-quiz-body]");
+    const quizIntro = quizPanel.querySelector("[data-quiz-intro]");
+    const quizStatus = quizPanel.querySelector("[data-quiz-status]");
+    const quizGenerate = quizPanel.querySelector("[data-quiz-generate]");
+    let questions = JSON.parse(quizPanel.querySelector("[data-quiz-questions]").textContent);
+    let current = 0;
+    let score = 0;
+
+    const element = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+
+    function setQuizStatus(message, level) {
+      quizStatus.hidden = !message;
+      quizStatus.textContent = message || "";
+      quizStatus.dataset.level = level || "";
+    }
+
+    function renderQuestion() {
+      const item = questions[current];
+      const card = element("div", "quiz-card");
+      card.append(element("p", "quiz-progress", `Question ${current + 1} sur ${questions.length}`));
+      card.append(element("p", "quiz-question", item.question));
+      const choices = element("div", "quiz-choices");
+      const feedback = element("div", "quiz-feedback");
+      feedback.hidden = true;
+      item.choices.forEach((choice, index) => {
+        const button = element("button", "quiz-choice", choice);
+        button.type = "button";
+        button.addEventListener("click", () => {
+          const right = index === item.answer;
+          if (right) score += 1;
+          choices.querySelectorAll(".quiz-choice").forEach((other, otherIndex) => {
+            other.disabled = true;
+            if (otherIndex === item.answer) other.classList.add("is-right");
+          });
+          if (!right) button.classList.add("is-wrong");
+          feedback.replaceChildren(
+            element("p", `quiz-verdict ${right ? "is-right" : "is-wrong"}`, right ? "Bonne réponse" : "Raté"),
+          );
+          if (item.explanation) feedback.append(element("p", "quiz-explanation", item.explanation));
+          const last = current === questions.length - 1;
+          const next = element("button", "quiz-next", last ? "Voir le résultat" : "Question suivante");
+          next.type = "button";
+          next.addEventListener("click", () => {
+            current += 1;
+            render();
+          });
+          feedback.append(next);
+          feedback.hidden = false;
+          next.focus();
+        });
+        choices.append(button);
+      });
+      card.append(choices, feedback);
+      quizBody.replaceChildren(card);
+    }
+
+    function renderScore() {
+      const card = element("div", "quiz-card quiz-result");
+      card.append(element("p", "quiz-score", `${score} / ${questions.length}`));
+      const ratio = score / questions.length;
+      const verdict = ratio === 1 ? "Tout est retenu." : ratio >= 0.6 ? "L'essentiel est retenu." : "Quelques points méritent un second passage.";
+      card.append(element("p", "quiz-explanation", verdict));
+      const again = element("button", "secondary", "Recommencer");
+      again.type = "button";
+      again.addEventListener("click", start);
+      card.append(again);
+      quizBody.replaceChildren(card);
+    }
+
+    function render() {
+      quizIntro.hidden = questions.length > 0;
+      quizGenerate.textContent = questions.length ? "Nouveau quiz" : "Générer un quiz";
+      if (!questions.length) quizBody.replaceChildren();
+      else if (current < questions.length) renderQuestion();
+      else renderScore();
+    }
+
+    function start() {
+      current = 0;
+      score = 0;
+      render();
+    }
+
+    quizGenerate.addEventListener("click", async () => {
+      quizGenerate.disabled = true;
+      setQuizStatus("Génération du quiz…", "loading");
+      try {
+        const queued = await window.ratonApi("POST", `/api/videos/${videoId}/quiz/generate`);
+        const job = await pollLlmJob(queued.status_url);
+        questions = job.quiz;
+        setQuizStatus("");
+        start();
+      } catch (error) {
+        setQuizStatus(error.message, "error");
+      } finally {
+        quizGenerate.disabled = false;
+      }
+    });
+
+    start();
   }
 
   const transcriptRetryButton = document.getElementById("transcript-retry-button");

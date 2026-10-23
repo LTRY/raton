@@ -1,10 +1,11 @@
-"""Bodies and replies of the `/api` LLM requests: notes, discussion of a fiche, library chat."""
+"""Bodies and replies of the `/api` LLM requests: notes, quiz and discussion of a fiche, library
+chat."""
 
 from typing import Literal
 
 from pydantic import BaseModel
 
-from back.schemas.video import ChatMessageRead, VideoDocumentsRead
+from back.schemas.video import ChatMessageRead, QuizQuestionRead, VideoDocumentsRead
 
 
 class QuestionCreate(BaseModel):
@@ -61,6 +62,8 @@ class LlmJobStatusRead(BaseModel):
     tool_calls: list[dict] = []
     # `generate` done: the fiche's documents, with the new notes and résumé.
     documents: VideoDocumentsRead | None = None
+    # `quiz` done: the fiche's new quiz.
+    quiz: list[QuizQuestionRead] | None = None
     # `chat` done: the fiche's discussion, with the new answer.
     chat_messages: list[ChatMessageRead] | None = None
     # `library_chat` done: the conversation, with the new answer.

@@ -222,7 +222,8 @@ Champs :
 - `kind` : `generate` (notes + resume en un
   seul appel), `auto_notes` (notes + resume court d'une video, en lot
   nocturne : voir [13 Jobs, logs et planification](13-jobs-logs-planification.md),
-  jamais interroge par le navigateur, son prompt n'est pas stocke), `chat` ou
+  jamais interroge par le navigateur, son prompt n'est pas stocke), `quiz`
+  (quiz d'une fiche, voir [09](09-transcript-et-discussion-llm.md)), `chat` ou
   `library_chat`. La valeur historique
   `detect_sponsors` (detection IA des segments sponsorises) n'est **plus
   produite** depuis le retrait de cette detection, mais les lignes deja en

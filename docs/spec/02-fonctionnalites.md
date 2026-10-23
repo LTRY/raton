@@ -258,4 +258,5 @@ Les fichiers associes :
 - `transcript.notes.txt` : notes structurees ;
 - `transcript.summary_short.txt` : resume court (3 lignes) ;
 - `transcript.questions.txt` : questions suggerees par l'IA (une par ligne) ;
+- `transcript.quiz.json` : dernier quiz genere (questions a choix multiple) ;
 - `transcript.chat.json` : historique de discussion.
