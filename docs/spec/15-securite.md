@@ -19,6 +19,11 @@ verifiee sur chaque formulaire, confirmation, un seul deploiement a la fois, et
 [04 Configuration et deploiement](04-configuration-et-deploiement.md),
 « Deploiement de main »).
 
+Une preview tourne avec la cle Anthropic du `.env` (voir « Previews des PR »
+dans [04](04-configuration-et-deploiement.md)) : le code d'une PR non mergee
+peut donc l'utiliser ou la lire. D'ou le refus des PR de fork, et le
+deploiement d'une preview reste un geste manuel.
+
 ## Garde-fous sans authentification
 
 - **Separation front/back** : seul le back (conteneur `api`, sans port

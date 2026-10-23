@@ -1,7 +1,8 @@
 # One PR preview, driven by scripts/preview.sh (compose project raton-pr-<PR>): the PR's back and
 # front, built from its git worktree (PREVIEW_SRC), on port PREVIEW_PORT. Throwaway on purpose:
-# a sqlite DB inside the `api` container filled with the demo data, no media, no secret, no
-# scheduler — a preview never touches the real stack, its DB or its media.
+# a sqlite DB inside the `api` container filled with the demo data, no media, no scheduler — a
+# preview never touches the real stack, its DB or its media. Its only secret is the Anthropic key
+# of the real stack's .env (read by compose from the repo root), so the LLM features can be tried.
 # See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 services:
   api:
@@ -17,6 +18,9 @@ services:
       MEDIA_ROOT: /tmp/media
       APP_AUTO_CREATE_TABLES: "true"
       APP_SCHEDULER_ENABLED: "false"
+      LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
     command:
       - sh
       - -c

@@ -3,19 +3,24 @@
 Run as `python -m scripts.demo_seed` against an empty sqlite database: it
 creates the tables and a handful of channels and videos, then does nothing on
 the following runs. No media files exist behind these rows, so players have
-nothing to play, but every list and detail page has something to show.
+nothing to play, but every list and detail page has something to show. A few fiches get a
+transcript (`DEMO_TRANSCRIPTS`), so the LLM features (notes, quiz, discussion) have something
+to work on when the preview has an API key.
 """
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from back.core.config import get_settings
 from back.db.base import *  # noqa: F403  (registers every model on Base.metadata)
 from back.db.session import Base, SessionLocal, engine
 from back.models.channel import Channel
-from back.models.video import Video
+from back.models.video import TranscriptStatus, Video
 from back.services.videos.playback import record_playback_activity
+from scripts.demo_transcripts import DEMO_TRANSCRIPTS
 
 # One long name, so the channel page header is shown wrapping onto two lines.
 DEMO_CHANNELS = [
@@ -52,8 +57,9 @@ DEMO_VIDEOS = [
 ]
 
 
-def seed_demo(db: Session) -> bool:
-    """Insert the demo rows; return False when the database already has channels."""
+def seed_demo(db: Session, media_root: Path) -> bool:
+    """Insert the demo rows, and the transcripts under `media_root`; return False when the
+    database already has channels."""
     if db.scalar(select(Channel.id).limit(1)) is not None:
         return False
     now = datetime.now(UTC)
@@ -78,7 +84,7 @@ def seed_demo(db: Session) -> bool:
             yt_video_id=yt_video_id,
             title=title,
             url=f"https://www.youtube.com/watch?v={yt_video_id}",
-            folder_path=f"/tmp/media/{channel.name}/{yt_video_id}",
+            folder_path=str(media_root / channel.name / yt_video_id),
             published_at=now - timedelta(days=index * 3 + 1),
             downloaded_at=now - timedelta(days=index),
             duration_seconds=300 + index * 217,
@@ -87,6 +93,13 @@ def seed_demo(db: Session) -> bool:
             rating=rating,
             list_state=list_state,
         )
+        transcript = DEMO_TRANSCRIPTS.get(title)
+        if transcript:
+            path = Path(video.folder_path) / "transcript.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(transcript, encoding="utf-8")
+            video.transcript_path = str(path)
+            video.transcript_status = TranscriptStatus.downloaded
         db.add(video)
         if played_share is not None:
             played.append((video, played_share))
@@ -104,7 +117,7 @@ def main() -> None:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        seed_demo(db)
+        seed_demo(db, get_settings().media_root)
     finally:
         db.close()
 
