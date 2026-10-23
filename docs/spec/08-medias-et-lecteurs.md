@@ -481,7 +481,7 @@ sans son quand on appuie sur Lecture (la position avance, rien ne sort). iOS
 retire la sortie audio a la web app en pause en arriere-plan ; un onglet
 Safari n'a pas ce probleme.
 
-Contournement experimental (`claimMediaSession`, « pause douce ») : une Pause
+Contournement (`claimMediaSession`, « pause douce », verifie sur iPhone) : une Pause
 recue de l'ecran verrouille ou du Centre de controle pendant que la page est
 cachee ne met pas le lecteur en pause, elle passe sa vitesse a 0
 (`playbackRate`). Pour iOS l'element joue toujours et garde la sortie audio ;

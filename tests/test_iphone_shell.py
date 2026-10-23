@@ -59,7 +59,7 @@ def test_players_claim_the_media_session():
 
 
 def test_lock_screen_pause_is_a_soft_pause_while_hidden():
-    # Experimental: iOS takes the audio output away from a paused home-screen
+    # iOS takes the audio output away from a paused home-screen
     # web app, so a Pause from the lock screen only sets the rate to 0.
     assert 'setAction("pause", pauseFromSession);' in APP_JS
     assert 'setAction("play", playFromSession);' in APP_JS

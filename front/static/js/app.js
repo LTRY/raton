@@ -355,7 +355,7 @@ function resolveResumePosition(storageKey, serverPosition, serverAt) {
 // tracks on the same element stays current. `actions.previous`/`next` turn the
 // ±seek buttons into previous/next track (iOS shows one pair or the other).
 const MEDIA_SESSION_SKIP_SECONDS = 30;
-// Experimental, for the iOS home-screen web app: audio paused while the screen
+// For the iOS home-screen web app (checked on an iPhone): audio paused while the screen
 // is locked resumes without sound, because iOS takes the paused, backgrounded
 // app's audio output away. A Pause from the lock screen therefore only sets the
 // playback rate to 0 (a "soft pause"): the element keeps playing for iOS, which
