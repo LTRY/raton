@@ -1375,24 +1375,35 @@ Template : `video_detail.html`
 
 Contenu ordonne :
 
-1. lien de retour vers la page d'origine (`next`, sinon `/videos`), libelle
-   selon cette page : "Retour a la playlist" (detail d'une playlist),
-   "Retour a la chaine" (bibliotheque filtree sur une chaine), sinon
-   "Retour a la bibliotheque" ; sous 800 px, ce lien partage sa ligne avec un
-   bouton « ⋮ » en verre (`details.video-more[data-pop]`) qui ouvre un menu
+1. bouton icone de retour (`a.video-back.lg`, fleche ←, rond en verre de
+   44 px, meme dessin que le bouton « ⋮ ») : il revient a la page
+   precedemment visitee (`history.back()`, `data-history-back`) quand elle
+   est une page de Raton (visite Turbo, ou chargement complet dont le
+   referent est Raton) ; sinon il suit son `href`, la page d'origine (`next`,
+   sinon `/videos`). Son `aria-label`/`title` nomme cette page : "Retour a la
+   playlist" (detail d'une playlist), "Retour a la chaine" (bibliotheque
+   filtree sur une chaine), sinon "Retour a la bibliotheque". Sous 800 px, il
+   partage sa ligne avec le selecteur video/audio (`.media-pager-dots`, au
+   centre, voir le point 7) et un bouton « ⋮ » en verre
+   (`details.video-more[data-pop]`) qui ouvre un menu
    (`.video-more-panel`, 300 px) : groupes separes par un filet, chacun sous
    un petit libelle gris en capitales, et des lignes pleine largeur avec une
    icone (`.video-more-item`, 44 px de haut, sous-titre gris eventuel). Groupes :
-   « Segments sponsors » (liste des segments, puis « Rechercher » — sous-titre
+   « IA » (« Generer avec l'IA », sous-titre « Notes structurees et resume »,
+   rendu seulement si `transcript.txt` existe, qui relaie son clic vers le
+   bouton robot `#generate-form .ai-generate-button` par `data-click-proxy` ;
+   le resultat ou l'erreur s'annonce par un toast), « Segments sponsors » (liste des segments, puis « Rechercher » — sous-titre
    « Aucun segment detecte pour l'instant » — ou « Rechercher a nouveau »
    quand il y en a), « Fichiers » (« Supprimer la video » / « Supprimer
    l'audio » en rouge, voir « Carrousel video / audio » dans
    [08 Medias et lecteurs](08-medias-et-lecteurs.md)) et « Transcription »
    (« Recuperer la transcription » quand `video.transcript_path` est vide, qui
    relaie son clic vers `#transcript-retry-button` par `data-click-proxy`) ;
-   sous 800 px, l'onglet « Segments » et le bouton de recuperation de la barre
-   d'actions sont masques par CSS (leurs panneaux et leurs ids restent), le
-   panneau « ⋮ » prend leur place ; la description reste dans l'onglet « Plus
+   sous 800 px, l'onglet « Segments » et toute la barre d'actions
+   (`.video-detail-action-bar` : actions formats, bouton robot, bouton de
+   recuperation) sont masques par CSS (leurs panneaux, boutons et ids
+   restent pour les relais), le carrousel et le panneau « ⋮ » prennent leur
+   place ; la description reste dans l'onglet « Plus
    d'informations », visible sur telephone a cote des autres onglets
    (Transcript, Notes structurees, Commentaire...) ; une ancre
    `#segments-sponsors` ouvre alors ce panneau, un clic sur un segment le
@@ -1428,7 +1439,8 @@ Contenu ordonne :
    (Video, Audio), place en tete de la page sous le lien de retour, pleine
    largeur de l'ecran en 16:9 et sans le cadre blanc de la fiche
    (`.video-detail-card` sans fond ni bordure), avec un bouton de
-   telechargement par volet, un selecteur a deux icones juste dessous et sans
+   telechargement par volet, un selecteur a deux icones sur la ligne du
+   bouton de retour (point 1) et sans
    les boutons Audio/Video de la barre d'actions (voir « Carrousel video / audio » dans
    [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;
 8. faits ;

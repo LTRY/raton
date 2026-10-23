@@ -310,6 +310,8 @@ def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_pat
     assert 'class="ai-generate-button"' in rendered
     assert 'aria-label="Générer notes, résumé"' in rendered
     assert 'id="ai-generate-tooltip"' in rendered
+    # On a phone the "⋮" menu carries it, as a proxy to the same button.
+    assert 'data-click-proxy="#generate-form .ai-generate-button"' in rendered
     assert "Analyse de pertinence" not in rendered
     assert 'name="include_image"' not in rendered
     assert f'href="/videos/{video.id}/transcript"' not in rendered
@@ -1327,7 +1329,8 @@ def test_video_detail_back_link_returns_to_channel_page(monkeypatch):
 
     assert response.status_code == 200
     assert f'href="/videos?channel_id={video.channel_id}&amp;page=2"' in rendered
-    assert "← Retour à la chaîne" in rendered
+    assert 'aria-label="Retour à la chaîne"' in rendered
+    assert "data-history-back" in rendered
 
 
 def test_video_detail_back_link_returns_to_playlist_page(monkeypatch):
@@ -1339,7 +1342,7 @@ def test_video_detail_back_link_returns_to_playlist_page(monkeypatch):
 
     assert response.status_code == 200
     assert 'href="/playlists/7"' in rendered
-    assert "← Retour à la playlist" in rendered
+    assert 'aria-label="Retour à la playlist"' in rendered
 
 
 async def collect_streaming_body(response):

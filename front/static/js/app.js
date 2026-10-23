@@ -2818,7 +2818,7 @@ function bindMediaPager(pager) {
   const videoId = pager.dataset.videoId;
   const track = pager.querySelector("[data-media-pager-track]");
   const slides = [...pager.querySelectorAll("[data-media-slide]")];
-  const dots = [...pager.querySelectorAll("[data-media-dot]")];
+  const dots = [...(pager.closest(".video-detail") || pager).querySelectorAll("[data-media-dot]")];
   const actions = pager.closest(".video-detail-card")?.querySelector("[data-video-format-actions]");
   const allowDelete = actions?.dataset.allowDelete === "true";
   if (!track || slides.length === 0) return;
@@ -3025,7 +3025,7 @@ function bindPagerSeek(pager) {
   const currentEl = bar.querySelector("[data-media-time-current]");
   const durationEl = bar.querySelector("[data-media-time-duration]");
   const track = pager.querySelector("[data-media-pager-track]");
-  const dots = [...pager.querySelectorAll("[data-media-dot]")];
+  const dots = [...(pager.closest(".video-detail") || pager).querySelectorAll("[data-media-dot]")];
   const video = pager.querySelector("[data-media-slide='video'] video");
   const player = window.ratonMiniPlayer;
   const audio = player?.audioElement();
@@ -4060,6 +4060,29 @@ if (!window.__channelPopsBound) {
     return;
   }
 })();
+
+// `data-history-back`: a back link that returns to the page the user actually
+// came from when it is one of Raton's (a Turbo visit, or a full load whose
+// referrer is this origin), and otherwise follows its `href`, so a page opened
+// from a bookmark or a notification still has somewhere to go.
+if (!window.__historyBackBound) {
+  window.__historyBackBound = true;
+  document.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest("a[data-history-back]") : null;
+    if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    let sameOriginReferrer = false;
+    try {
+      sameOriginReferrer = new URL(document.referrer).origin === window.location.origin;
+    } catch {
+      // No referrer: nothing to go back to.
+    }
+    const turboIndex = window.history.state?.turbo?.restorationIndex || 0;
+    if (turboIndex > 0 || (sameOriginReferrer && window.history.length > 1)) {
+      event.preventDefault();
+      window.history.back();
+    }
+  });
+}
 
 // `data-click-proxy="<selector>"`: a button that only forwards its click to the
 // element the selector names (a control that must keep a single id, shown

@@ -97,15 +97,17 @@ volets (`.media-pager`, CSS `scroll-snap`, glissement natif) : **Video** a
 gauche, **Audio** a droite. Une video audio seule s'ouvre sur le volet Audio, de
 meme qu'une URL en `#audio` (lien du mini-lecteur), qui l'emporte sur le volet
 memorise (le rechargement apres telechargement retire le `#`).
-Sous le carrousel, un petit selecteur a deux icones (camera a gauche, ondes
-a droite, `.media-pager-dots`) indique le volet actif et sert aussi de
-boutons ; ses boutons restent `data-media-dot`. Chaque volet fait la meme
+Un petit selecteur a deux icones (camera a gauche, ondes a droite,
+`.media-pager-dots`) indique le volet actif et sert aussi de boutons ; il
+est place au-dessus du carrousel, au centre de la ligne du bouton de retour
+et du bouton « ⋮ » (`.video-topbar`), hors de `.media-pager` : les scripts
+du carrousel cherchent ses boutons (`data-media-dot`) dans `.video-detail`. Chaque volet fait la meme
 hauteur (16:9 sur toute la largeur de l'ecran, sans cadre ni ombre) : passer de
 la video a l'audio ne deplace donc rien dans le reste de la page. Le volet
 Audio y loge une pochette carree (168 px) centree dans le volet, le bouton
 lecture (ou telechargement) au milieu de la pochette, en verre liquide
 transparent (fond blanc translucide, flou, liseré clair), et les boutons
-±15 s de part et d'autre de la pochette. Entre les volets et le selecteur, une **barre de progression unique**
+±15 s de part et d'autre de la pochette. Sous les volets, une **barre de progression unique**
 (`.media-pager-seek`, `bindPagerSeek`) suit le volet affiche : sur le volet
 Video elle suit et deplace le `<video>` (qui garde ses controles natifs, donc
 aussi sa propre barre), sur le volet Audio le mini-lecteur ; le temps courant
@@ -127,14 +129,16 @@ bouton (`format-toggle-loading`, `-active`, `-error`).
 
 - **Volet video** : pas de bouton play ni de saut ±15 s, le lecteur reste le
   `<video controls>` natif. Sans fichier, la vignette occupe tout le volet
-  (`object-fit: cover`) et le bouton « Telecharger la video » est pose par-dessus,
+  (`object-fit: cover`) et le bouton de telechargement (icone seule, sans
+  libelle ; « Telecharger la video » en `aria-label`) est pose par-dessus,
   en bas, sur un degrade sombre ; un clic ouvre le choix de qualite (memes valeurs
   que le popover de la barre d'actions). Une fois le telechargement termine, la
   coche s'affiche 1,4 s puis la page est rechargee (visite Turbo `replace`) pour
   faire apparaitre le lecteur.
   Le rechargement attend la fin d'un telechargement en cours sur l'autre volet
   et rouvre le carrousel sur le volet que le lecteur regardait.
-- **Volet audio** : sans fichier, un bouton « Telecharger l'audio » (copie de la piste du fichier video quand il existe et que la piste n'est pas degradee, sinon yt-dlp : voir `07-youtube-et-telechargements.md`). Une fois
+- **Volet audio** : sans fichier, un bouton de telechargement (icone seule,
+  sans libelle ; « Telecharger l'audio » en `aria-label`) (copie de la piste du fichier video quand il existe et que la piste n'est pas degradee, sinon yt-dlp : voir `07-youtube-et-telechargements.md`). Une fois
   l'audio present (au chargement ou apres telechargement), les commandes
   reculer 15 s / lecture-pause / avancer 15 s s'affichent. La barre commune
   sous les volets (`.media-seek`, `role="slider"`) suit le design commun des barres
