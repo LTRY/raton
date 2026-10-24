@@ -250,7 +250,8 @@ lance `scripts/deploy.sh` en tache de fond. Ce script :
   ce travail non commite) ;
 - met `main` a jour sur `origin/main` en avance rapide seulement (refus si
   `main` a diverge) ;
-- lance `make up`.
+- lance `make up`, qui retire d'abord les previews branchees sur la DB reelle
+  que ce deploiement va migrer (voir « Previews des PR », « DB »).
 
 Le bouton demande une confirmation, est desactive pendant un deploiement, et la
 sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
@@ -316,7 +317,8 @@ le merge ne deploie rien.
   (`docker-compose.preview.yml`), puis attend qu'elle reponde (depuis `raton-ops`,
   la boucle locale est le conteneur lui-meme : le script joint l'hote par
   `host.docker.internal`) ; `down <N>` supprime conteneurs, images,
-  worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees.
+  worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
+  `retire-stale` retire celles qu'un deploiement rendrait perimees (voir « DB » ci-dessous).
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
 - **DB** : la preview tourne sur le serveur Postgres de la pile reelle
   (`raton-db`, qui doit tourner : sinon `up` refuse), sur son reseau Docker.
@@ -334,6 +336,13 @@ le merge ne deploie rien.
     migration) : `up` refuse, il faut mettre la PR a jour avec `main`.
   La copie est refaite a chaque deploiement et supprimee par `down`. La page
   affiche « DB reelle » ou « copie de la DB » a cote du port.
+  Une preview branchee sur la DB reelle y fait tourner le code de sa PR : si un
+  deploiement de `main` migre ensuite cette DB, l'ancien code y ecrirait des
+  lignes que le nouveau schema refuse. `make up` lance donc
+  `scripts/preview.sh retire-stale` avant de reconstruire la pile : il retire
+  (`down`) chaque preview branchee sur la DB reelle dont la tete de migration
+  n'est pas celle du depot deploye (`preview_db.py head`). Pour la relancer, la
+  PR doit d'abord etre mise a jour avec `main`.
 - **Isolement** : le dossier media de la pile reelle est monte en lecture
   seule (les lecteurs jouent, une suppression de fichier echoue) ; scheduler
   coupe (`APP_SCHEDULER_ENABLED=false`) : une preview ne lance ni les

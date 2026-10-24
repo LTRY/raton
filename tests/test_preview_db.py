@@ -2,7 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from scripts.preview_db import COPY, SHARED, PreviewDbError, choose_db, read_revisions
+from scripts.preview_db import (
+    COPY,
+    SHARED,
+    PreviewDbError,
+    choose_db,
+    main,
+    migration_head,
+    read_revisions,
+)
 
 CHAIN = {
     "0001_initial": None,
@@ -34,3 +42,14 @@ def test_read_revisions_reads_the_repo_migrations():
 
     assert revisions["0001_initial"] is None
     assert revisions["0002_drop_ai_analysis"] == "0001_initial"
+
+
+def test_migration_head_is_the_revision_nothing_follows():
+    assert migration_head(CHAIN) == "0003_new"
+
+
+def test_head_command_prints_the_repo_migration_head(capsys):
+    versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
+
+    assert main(["head", str(versions)]) == 0
+    assert capsys.readouterr().out.strip() == migration_head(read_revisions(versions))

@@ -1,11 +1,13 @@
 """Which DB a PR preview runs on, from the PR's Alembic revisions and the real DB's revision.
 
     python3 scripts/preview_db.py <alembic/versions of the PR> <revision of the real DB>
+    python3 scripts/preview_db.py head <alembic/versions>
 
-prints `shared` when the PR's migration head is the revision the real DB is at (no migration
+The first form prints `shared` when the PR's migration head is the revision the real DB is at (no migration
 to run: the preview uses the real DB), `copy` when the real DB is at an older revision of the
 PR's chain (the preview migrates a copy). Exits 1 with the French reason otherwise: the real
 DB is ahead of the PR, which no copy can fix since the PR lacks the migrations to go back.
+`head` prints the migration head: `preview.sh retire-stale` compares a preview's to main's.
 Standard library only: it runs in the raton-ops container, without the app's virtualenv.
 Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 """
@@ -38,11 +40,16 @@ def read_revisions(versions_dir: Path) -> dict[str, str | None]:
     return revisions
 
 
-def choose_db(revisions: dict[str, str | None], db_revision: str) -> str:
+def migration_head(revisions: dict[str, str | None]) -> str:
     heads = set(revisions) - set(revisions.values())
     if len(heads) != 1:
         raise PreviewDbError(f"la PR a {len(heads)} têtes de migration au lieu d'une")
     (head,) = heads
+    return head
+
+
+def choose_db(revisions: dict[str, str | None], db_revision: str) -> str:
+    head = migration_head(revisions)
     if db_revision == head:
         return SHARED
     revision: str | None = head
@@ -58,10 +65,16 @@ def choose_db(revisions: dict[str, str | None], db_revision: str) -> str:
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
-        print("usage: preview_db.py <alembic/versions> <révision de la DB>", file=sys.stderr)
+        print(
+            "usage: preview_db.py <alembic/versions> <révision de la DB> | head <alembic/versions>",
+            file=sys.stderr,
+        )
         return 2
     try:
-        print(choose_db(read_revisions(Path(argv[0])), argv[1].strip()))
+        if argv[0] == "head":
+            print(migration_head(read_revisions(Path(argv[1]))))
+        else:
+            print(choose_db(read_revisions(Path(argv[0])), argv[1].strip()))
     except PreviewDbError as error:
         print(f"preview_db.py: {error}", file=sys.stderr)
         return 1
