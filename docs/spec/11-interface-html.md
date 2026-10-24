@@ -602,6 +602,18 @@ Parametres.
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
 
+**Menu de la Bibliotheque** (macro `library_menu` de `_macros.html`, branche par
+`initLibraryMenu` dans `static/js/app.js`) : un bouton ☰ rond, a gauche du titre
+`Bibliotheque` des trois vues, ouvre un tiroir a gauche, le meme que celui des
+discussions du chat bibliotheque (`.chat-drawer`, voir « Widget de chat ») : 320px
+au plus, 86 % de la largeur sur telephone, voile sombre ; ✕, Echap ou le voile le
+referment, et il est referme avant que Turbo ne garde la page en cache (le bouton
+retour ne le rouvre pas). Il contient le titre « Bibliothèque » puis un lien par
+section, avec son icone : **Nouveautés**, **Historique**, **Exploration** et
+**Podcasts** (`/videos?category=podcast`, l'Exploration filtree sur la categorie
+`podcast`). La section affichee est surlignee (`aria-current="page"`) ;
+Podcasts l'est quand le seul filtre de categorie de `/videos` est `podcast`.
+
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
 tuiles a cocher **Video** (MP4) et **Audio** (M4A), qualite video (segment

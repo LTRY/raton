@@ -2603,6 +2603,29 @@ def test_library_pages_share_the_nouveautes_historique_exploration_subnav():
     assert 'aria-label="Recherche"' not in rendered
 
 
+def test_library_pages_open_the_library_menu_from_the_title_row():
+    db = make_session()
+    client = site(db)
+
+    for path, current in (
+        ("/dashboard/nouveautes", "/dashboard/nouveautes"),
+        ("/dashboard/historique", "/dashboard/historique"),
+        ("/videos", "/videos"),
+        ("/videos?category=podcast", "/videos?category=podcast"),
+    ):
+        rendered = client.get(path).text
+        head = rendered[rendered.index('<div class="page-head">') : rendered.index("<h1>")]
+        assert "data-library-menu-toggle" in head, path
+        for href in (
+            "/dashboard/nouveautes",
+            "/dashboard/historique",
+            "/videos",
+            "/videos?category=podcast",
+        ):
+            marker = f'<a class="chat-drawer-item" href="{href}" aria-current="page">'
+            assert (marker in rendered) == (href == current), (path, href)
+
+
 def make_new_video(db, channel, index, is_new=True):
     video = Video(
         channel=channel,

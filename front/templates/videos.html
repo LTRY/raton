@@ -3,6 +3,7 @@
 {% block content %}
 <section>
   <div class="page-head">
+    {{ macros.library_menu("podcasts" if selected_category_filters|list == ['podcast'] else "exploration") }}
     <h1>Bibliothèque</h1>
     {# Tied to the filters form below by `form=`: the field sits on the title row like on
        /channels and /playlists, but still submits and live-searches with the filters. #}

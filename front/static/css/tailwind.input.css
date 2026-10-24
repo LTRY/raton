@@ -7378,6 +7378,21 @@ turbo-frame {
   width: 20px;
 }
 
+/* Side menu of the Bibliothèque (macro `library_menu`): the discussions drawer, holding links. */
+.library-menu {
+  --chat-line: var(--color-border);
+  flex: none;
+}
+
+.library-menu .chat-drawer-item {
+  text-decoration: none;
+}
+
+.library-menu .chat-drawer-item[aria-current="page"] {
+  background: var(--color-tint);
+  font-weight: 700;
+}
+
 .chat-messages {
   display: flex;
   flex-direction: column;
