@@ -4147,8 +4147,64 @@ if (!window.__importFabBound) {
   });
 }
 
+// Space bar plays or pauses the media in use from anywhere on the page, like a
+// music app. Bound once: this file re-runs on every Turbo visit, and a second
+// listener would undo the first one's toggle.
+function initSpaceToggle() {
+  if (window.__spaceToggleBound) return;
+  window.__spaceToggleBound = true;
+
+  // `play` does not bubble: listen in the capture phase.
+  let lastPlayed = null;
+  document.addEventListener("play", (event) => {
+    if (event.target instanceof HTMLMediaElement) lastPlayed = event.target;
+  }, true);
+
+  // The closed mini player keeps its <audio> but drops its `src`; `currentSrc`
+  // would still name the old track.
+  const hasSource = (media) => media.hasAttribute("src") || Boolean(media.querySelector("source[src]"));
+
+  // Elements whose own Space action must win: typing, activating a control,
+  // and the native media controls (which toggle by themselves).
+  function ownsSpace(element) {
+    if (!(element instanceof Element)) return false;
+    if (element.isContentEditable) return true;
+    if (element.matches("input")) return element.type !== "range";
+    return Boolean(element.closest(
+      "textarea, select, button, a[href], summary, audio, video, [role='button'], [role='checkbox'], [role='switch'], [role='menuitem'], [role='option'], [role='tab']"
+    ));
+  }
+
+  // Playing media to pause, or else the one to resume: the last one played,
+  // then the mini player's track, then the page's only media.
+  function targets() {
+    const media = [...document.querySelectorAll("audio, video")].filter(hasSource);
+    const playing = media.filter((element) => !element.paused);
+    if (playing.length) return playing;
+    if (lastPlayed?.isConnected && hasSource(lastPlayed)) return [lastPlayed];
+    const mini = document.querySelector("[data-mini-player-audio]");
+    if (mini && hasSource(mini)) return [mini];
+    return media.length === 1 ? media : [];
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== " " || event.repeat || event.defaultPrevented) return;
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (ownsSpace(event.target)) return;
+    const media = targets();
+    // Nothing to play: Space keeps scrolling the page.
+    if (!media.length) return;
+    event.preventDefault();
+    media.forEach((element) => {
+      if (element.paused) element.play().catch(() => {});
+      else element.pause();
+    });
+  });
+}
+
 initToasts();
 initMiniPlayer();
+initSpaceToggle();
 bindPlayTrackButtons();
 document.querySelectorAll("[data-media-pager]").forEach(bindMediaPager);
 
