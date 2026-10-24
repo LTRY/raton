@@ -67,11 +67,11 @@ def library_query(request: Request, channel_id: int | None, page: int) -> dict:
         "asset_filter_mode": selected_video_filter_mode(request, "asset_filter_mode"),
         "category_filter_mode": selected_video_filter_mode(request, "category_filter_mode"),
         "q": params.get("q"),
+        "hide": params.get("hide"),
         "page": max(page, 1),
     }
     for flag, name in (
         ("rated", "rated"),
-        ("hide_hidden", "hide_hidden"),
         ("uncategorized", "uncategorized"),
     ):
         if params.get(flag) == "1":
@@ -91,7 +91,8 @@ def query_without(request: Request, remove: list[tuple[str, str | None]]) -> str
 
 
 def video_filters_clear_href(request: Request) -> str:
-    keep_keys = {"channel_id", "section", "sort", "q"}
+    # `hide` is how the list is shown, not a filter: "Tout effacer" keeps it.
+    keep_keys = {"channel_id", "section", "sort", "q", "hide"}
     pairs = [(key, value) for key, value in request.query_params.multi_items() if key in keep_keys]
     pairs.append(("asset_filters", "1"))
     return f"{request.url.path}?{urlencode(pairs)}"
@@ -109,14 +110,6 @@ def video_active_filter_pills(request: Request, filters) -> list[dict]:
                 "label": "★ Notées",
                 "kind": "include",
                 "href": query_without(request, [("rated", None)]),
-            }
-        )
-    if filters.hide_hidden:
-        pills.append(
-            {
-                "label": "Écartées masquées",
-                "kind": "exclude",
-                "href": query_without(request, [("hide_hidden", None)]),
             }
         )
     for option in VIDEO_ASSET_FILTER_OPTIONS:

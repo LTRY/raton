@@ -139,7 +139,7 @@ Sur ecran tactile (`@media (pointer: coarse)`, bloc en fin de
 `tailwind.input.css`), un controle se touche du doigt sans viser : 32 px de
 haut au minimum, vers 44 px quand la place le permet.
 
-- Les pastilles de filtre (`.chip3`, « ★ Notees », « Masquer les ecartees »,
+- Les pastilles de filtre (`.chip3`, « ★ Notees »,
   « Sans categorie ») et les boutons pastilles (« + Categories »,
   `button.category-label`) passent a 32 px de haut, texte 12 px.
 - Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
@@ -601,6 +601,10 @@ Parametres.
 
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
+
+Les trois vues, et la page d'une chaine, portent le **selecteur d'affichage**
+(voir [Videos](#videos) plus bas) au bout de `library_subnav` (dans la barre
+d'outils sur une chaine).
 
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
@@ -1281,7 +1285,7 @@ formulaire, le bouton `↻`.
 - **Filtres** (popover, feuille basse sur telephone) : types de fichier et
   categories en pastilles a trois etats (inclure / exclure / neutre, macro
   `filter_chip3`) avec leurs modes « Au moins un / Tous », « ★ Notées »,
-  « Masquer les écartées » et « Sans catégorie » (voir plus bas), le nombre de
+  et « Sans catégorie » (voir plus bas), le nombre de
   fiches correspondantes et un bouton
   « Fermer ». Chaque changement recharge la page ; `app.js` memorise dans
   `sessionStorage` que le panneau etait ouvert et le rouvre. Le bouton affiche
@@ -1407,9 +1411,7 @@ enregistre aucun. Les deux paliers de grisage n'y portent pas les memes noms de
 classe que sur une carte de liste (`dashboard-media-row-completed` et
 `dashboard-media-row-hidden`) : la macro les passe en
 `data-row-watched-class`/`data-row-hidden-class` sur le conteneur, ce qui
-permet au JS de repeindre la ligne sans rien savoir du template. "Historique"
-n'a pas de filtre "Masquer les ecartees" — une video ecartee y reste visible,
-simplement grisee au palier fort. Les deux paliers y sont obtenus en teintant
+permet au JS de repeindre la ligne sans rien savoir du template. Les deux paliers y sont obtenus en teintant
 le texte, alors qu'une carte de liste baisse son `opacity` : la ligne
 d'historique est posee sur le fond deja creme d'un bloc de journee, ou un
 voile d'opacite rendait le titre illisible. Ce sont des pastilles
@@ -1449,10 +1451,46 @@ la macro expose cet etat automatique dans `data-list-state-auto` pour que le
 client sache quoi repeindre sans recharger. Cliquer **Vu** sur une video
 ecartee la fait redescendre au palier "vu".
 
-Le nuage de chips de `/videos` porte une case **Masquer les ecartees**
-(`hide_hidden=1`), a cote de **★ Notées** : elle exclut de la liste les seules
-videos dont `list_state` vaut `hidden`, jamais celles grisees uniquement par
-leur progression de lecture.
+#### Selecteur d'affichage : tout, sans les vus, sans les vus ni les ecartees
+
+`/videos`, la page d'une chaine, Nouveautes et Historique portent un
+**selecteur d'affichage** a trois icones (macro `list_hide_selector`,
+`.list-hide-selector`, meme piste et meme pastille relevee que le segment
+Vidéos/Shorts d'une chaine) qui choisit ce que la liste retire, cote serveur
+(parametre `hide`) :
+
+| Icone | `hide` | Libelle (`title`/`aria-label`) | La liste retire |
+| --- | --- | --- | --- |
+| liste | `none` | Tout afficher | rien |
+| œil (celui de **Vu**) | `watched` | Masquer les vus | les fiches vues |
+| œil barre (celui d'**Écartée**) | `watched_hidden` | Masquer les vus et les écartées | les fiches vues et les ecartees |
+
+Par defaut (`hide` absent ou inconnu), la Bibliotheque, une chaine et les
+Nouveautes sont sur `watched_hidden` ; l'Historique est sur `none`, car il
+n'aligne presque que des lectures terminees. Le defaut est decide par l'API,
+qui renvoie le niveau applique (`filters.hide`, `hide`). Chaque icone est un
+lien vers la meme page avec `hide` choisi, revenu a la premiere page (le nombre
+de lignes change) ; les formulaires de filtres de `/videos` et d'une chaine
+portent `hide` en champ cache pour le garder, et « Tout effacer » le garde
+aussi (c'est une facon d'afficher, pas un filtre).
+
+« Vu » suit le glossaire : `list_state = "watched"`, ou `watched_at` pose par la
+regle des 90 % quand `list_state` est vide, hors categorie « sans barre de
+progression ». Une fiche ecartee n'est pas « vue » : sur `watched`, elle reste
+affichee, grisee au palier fort. Ce Vu-la peut differer du grisage automatique
+d'une carte, qui suit la derniere lecture (terminee a 95 %) : une fiche
+relancee apres avoir ete vue n'est plus grisee mais reste retiree par
+`watched`. Sur Historique, la ligne d'une fiche supprimee n'a plus d'etat et
+reste toujours.
+
+Le conteneur de la liste nomme dans `data-drop-states` les etats qu'il retire
+(la `turbo-frame` des resultats sur `/videos` et une chaine,
+`.video-stack-list` sur Nouveautes, `.history-day-lists` sur Historique) :
+une carte marquee **Vu** ou **Écartée** qui prend l'un de ces etats est
+retiree aussitot de la page au lieu d'etre grisee, avec un toast qui rappelle
+l'affichage « Tout » ; une pile de Nouveautes ou une journee d'Historique videe
+disparait avec elle. Les compteurs (nombre de fiches, de medias d'une journee)
+ne se mettent a jour qu'au prochain rendu.
 
 Le facet **Categories** (sur `/videos` comme sur la page d'une chaine) porte
 aussi une case **Sans categorie** (`uncategorized=1`) : elle ne garde que les

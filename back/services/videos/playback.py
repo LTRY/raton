@@ -5,9 +5,10 @@ import math
 import re
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, selectinload
 
+from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.video import Video
 from back.services.common.durations import (
@@ -16,7 +17,7 @@ from back.services.common.durations import (
     parse_duration_label,
 )
 from back.services.common.job_log import log_job
-from back.services.videos.filters import video_category_labels
+from back.services.videos.filters import video_category_labels, video_list_hide_condition
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}
 WATCHED_RATIO = 0.9
@@ -318,12 +319,30 @@ def playback_seconds_by_day(
     return seconds_by_day
 
 
-def dashboard_media_activity_logs(db: Session, limit: int | None = None) -> list[DownloadJob]:
+def dashboard_media_activity_logs(
+    db: Session,
+    limit: int | None = None,
+    hide: str = "none",
+    no_progress_labels: frozenset[str] = frozenset(),
+) -> list[DownloadJob]:
+    """Latest activity job of each media, newest first; `hide` leaves out the Vu and/or Écartée
+    fiches (`LIST_HIDES`). A job whose fiche was deleted has no state left and always stays."""
     query = (
         select(DownloadJob)
         .where(DownloadJob.status.in_(DASHBOARD_ACTIVITY_STATUSES))
         .order_by(desc(DownloadJob.created_at))
     )
+    if hide != "none":
+        query = (
+            query.outerjoin(Video, Video.id == DownloadJob.video_id)
+            .outerjoin(Channel, Channel.id == Video.channel_id)
+            .where(
+                or_(
+                    DownloadJob.video_id.is_(None),
+                    video_list_hide_condition(hide, no_progress_labels),
+                )
+            )
+        )
     if limit is not None:
         query = query.limit(limit)
     media_activity_logs = []

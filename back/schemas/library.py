@@ -47,7 +47,8 @@ class LibraryFiltersRead(BaseModel):
     excluded_assets: list[str]
     excluded_categories: list[str]
     rated: bool
-    hide_hidden: bool
+    # "none", "watched" or "watched_hidden": what the list leaves out (Vu, Écartée).
+    hide: str
     uncategorized: bool
     asset_filter_mode: str
     category_filter_mode: str

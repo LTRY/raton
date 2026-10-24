@@ -65,8 +65,11 @@ Champs :
 - `list_state` : etat de grisage force manuellement depuis les listes video,
   nullable. `null` = aucun forcage, la carte suit la detection automatique
   (derniere lecture terminee) ; `watched` = marquee vue a la main ; `unwatched`
-  = forcee non-vue, ce qui annule la detection automatique ; `hidden` = ecartee,
-  soit un grisage renforce plus le filtre "Masquer les ecartees" de `/videos`.
+  = forcee non-vue, ce qui annule la detection automatique ; `hidden` = ecartee :
+  un grisage renforce, et la fiche est retiree des listes (Bibliotheque, page
+  d'une chaine, Nouveautes, Historique) quand leur selecteur d'affichage est sur
+  « sans les vus ni les ecartees » (`hide=watched_hidden`, voir
+  [11 Interface HTML](11-interface-html.md)).
   Un `watched` pose a la main est respecte meme sur une categorie replay, alors
   que la detection automatique y reste neutralisee ;
 - `category_labels` : categories associees a la video ;

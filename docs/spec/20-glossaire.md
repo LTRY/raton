@@ -193,7 +193,7 @@ Une fiche est vue quand la lecture a atteint 90 % de la duree (`watched_at`, rem
 
 ### Ecartee
 
-Fiche que la personne ne veut plus voir dans ses listes : grisee en plus, et masquable par le filtre « Masquer les ecartees ».
+Fiche que la personne ne veut plus voir dans ses listes : grisee au palier fort, et retiree des listes par le selecteur d'affichage sur « sans les vus ni les ecartees » (le defaut, sauf sur l'Historique). Sa page `/videos/{id}` reste ouverte.
 
 - **Code** : `list_state = "hidden"`
 - **A ne pas confondre avec** : Une fiche supprimee ou purgee. Le mot « cachee » n'est pas employe.
@@ -298,6 +298,13 @@ Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.
 
 - **Code** : reglage `video_library_views` (`back/services/common/library_views.py`)
 - **A ne pas confondre avec** : Une playlist.
+
+### Selecteur d'affichage
+
+Les trois icones d'une liste (Bibliotheque, page d'une chaine, Nouveautes, Historique) qui choisissent ce qu'elle retire : rien (« Tout afficher »), les fiches vues, ou les vues et les ecartees.
+
+- **Code** : parametre `hide` (`none`, `watched`, `watched_hidden`), `LIST_HIDES` (`back/services/videos/filters.py`), macro `list_hide_selector`
+- **A ne pas confondre avec** : Un filtre de `/videos` : « Tout effacer » ne le remet pas a zero, et il n'entre pas dans une vue enregistree.
 
 ### Carte
 

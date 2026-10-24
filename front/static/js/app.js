@@ -1310,7 +1310,8 @@ document.querySelectorAll("[data-screen-time-carousel]").forEach((carousel) => {
 });
 
 document.querySelectorAll("[data-video-stack-carousel]").forEach((carousel) => {
-  const slides = Array.from(carousel.querySelectorAll(".video-stack-slide"));
+  // Counted live: a slide is removed when its fiche leaves the list (dropListedCard).
+  const slideCount = () => carousel.querySelectorAll(".video-stack-slide").length;
   const container = carousel.closest(".video-stack");
   const previous = container?.querySelector("[data-video-stack-previous]");
   const next = container?.querySelector("[data-video-stack-next]");
@@ -1318,11 +1319,11 @@ document.querySelectorAll("[data-video-stack-carousel]").forEach((carousel) => {
 
   function updateControls() {
     if (previous) previous.disabled = activeIndex === 0;
-    if (next) next.disabled = activeIndex === slides.length - 1;
+    if (next) next.disabled = activeIndex === slideCount() - 1;
   }
 
   function goTo(index) {
-    activeIndex = Math.max(0, Math.min(index, slides.length - 1));
+    activeIndex = Math.max(0, Math.min(index, slideCount() - 1));
     carousel.scrollTo({ left: activeIndex * carousel.clientWidth, behavior: "smooth" });
     updateControls();
   }
@@ -1331,7 +1332,7 @@ document.querySelectorAll("[data-video-stack-carousel]").forEach((carousel) => {
   next?.addEventListener("click", () => goTo(activeIndex + 1));
   carousel.addEventListener("scroll", () => {
     if (!carousel.clientWidth) return;
-    activeIndex = Math.max(0, Math.min(Math.round(carousel.scrollLeft / carousel.clientWidth), slides.length - 1));
+    activeIndex = Math.max(0, Math.min(Math.round(carousel.scrollLeft / carousel.clientWidth), slideCount() - 1));
     updateControls();
   }, { passive: true });
   updateControls();
@@ -2592,6 +2593,23 @@ function paintListState(container, state) {
   });
 }
 
+// A list that leaves out the Vu and/or Écartée fiches (the 3-icon selector) names those states
+// in `data-drop-states`: a card that takes one goes away at once, as it would on the next load;
+// an emptied carousel of the Nouveautés or day of the Historique goes with it.
+function dropListedCard(container, state) {
+  const card = container.closest(".video-stack-slide") || container.closest("article");
+  if (!card) return;
+  const stack = card.closest("[data-video-stack]");
+  const day = card.closest(".dashboard-day-group");
+  card.remove();
+  // Lets the carousel recount its slides and repaint its arrows.
+  stack?.querySelector("[data-video-stack-carousel]")?.dispatchEvent(new Event("scroll"));
+  if (stack && !stack.querySelector(".video-stack-slide")) stack.remove();
+  if (day && !day.querySelector(".dashboard-media-row")) day.remove();
+  const done = state === "hidden" ? "Fiche écartée" : "Fiche marquée vue";
+  window.showToast?.(`${done} : l'affichage « Tout » la remontre.`);
+}
+
 async function submitListState(container, requested) {
   const buttons = [...container.querySelectorAll("[data-list-state-target]")];
   buttons.forEach((button) => {
@@ -2607,6 +2625,8 @@ async function submitListState(container, requested) {
     if (painted === "unwatched") painted = "normal";
     if (!painted) painted = container.dataset.listStateAuto || "normal";
     paintListState(container, painted);
+    const dropStates = container.closest("[data-drop-states]")?.dataset.dropStates.split(" ") || [];
+    if (dropStates.includes(painted)) dropListedCard(container, painted);
   } catch (error) {
     paintListState(container, container.dataset.listState);
   } finally {

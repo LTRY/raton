@@ -5,8 +5,8 @@
   <div class="page-head">
     <h1>Bibliothèque</h1>
   </div>
-  {{ macros.library_subnav("nouveautes") }}
-  <div class="video-stack-list">
+  {{ macros.library_subnav("nouveautes", hide_selector) }}
+  <div class="video-stack-list" data-drop-states="{{ hide_selector.drop_states }}">
     {{ macros.video_stack_list(video_stacks, current_new_videos_path, category_style_map) }}
   </div>
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}

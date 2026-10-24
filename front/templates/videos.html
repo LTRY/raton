@@ -11,7 +11,7 @@
       <input name="q" type="search" value="{{ search_query|default('') }}" form="library-filters" placeholder="Rechercher une fiche" aria-label="Rechercher une fiche" enterkeyhint="search" autocomplete="off">
     </label>
   </div>
-  {{ macros.library_subnav("exploration") }}
+  {{ macros.library_subnav("exploration", hide_selector) }}
 
   {% if library_views %}
   <nav class="library-subnav" aria-label="Sous-bibliothèques">
@@ -31,6 +31,7 @@
     </summary>
     <form class="filters-form" id="library-filters" action="/videos" method="get" data-auto-submit-filter data-live-search="library-results">
       <input type="hidden" name="asset_filters" value="1">
+      <input type="hidden" name="hide" value="{{ hide_selector.current }}">
       <div class="filters-main-row">
         <select name="channel_id">
           <option value="">Toutes les chaînes</option>
@@ -66,10 +67,6 @@
           <label class="asset-filter-chip">
             <input name="rated" type="checkbox" value="1" {% if selected_rated_only %}checked{% endif %}>
             <span class="asset-label asset-label-rating">★ Notées</span>
-          </label>
-          <label class="asset-filter-chip">
-            <input name="hide_hidden" type="checkbox" value="1" {% if selected_hide_hidden %}checked{% endif %}>
-            <span class="asset-label asset-label-hidden">Masquer les écartées</span>
           </label>
         </div>
       </div>
@@ -125,7 +122,7 @@
 
   {# Everything that depends on `q` lives in this frame: live search swaps it
      alone, so the search field keeps focus while typing. #}
-  <turbo-frame id="library-results" class="live-results" target="_top">
+  <turbo-frame id="library-results" class="live-results" target="_top" data-drop-states="{{ hide_selector.drop_states }}">
   {% if active_filter_pills %}
   <div class="active-filters-row">
     {% for pill in active_filter_pills %}

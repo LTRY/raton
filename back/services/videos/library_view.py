@@ -16,8 +16,15 @@ from back.services.common.categories import normalize_video_category_label
 from back.services.common.durations import format_duration
 from back.services.common.library_views import VIDEO_ASSET_KINDS
 from back.services.common.search import normalized_search_query
-from back.services.common.settings import get_video_library_views
-from back.services.videos.filters import video_filters_condition, video_section_condition
+from back.services.common.settings import (
+    get_no_progress_category_labels,
+    get_video_library_views,
+)
+from back.services.videos.filters import (
+    list_hide,
+    video_filters_condition,
+    video_section_condition,
+)
 from back.services.videos.library_query import (
     library_page,
     library_section_counts,
@@ -29,6 +36,7 @@ from back.services.youtube.channel_info import normalized_channel_section
 LIBRARY_PAGE_SIZE = 50
 LIBRARY_SORTS = ("imported", "published", "views", "rated")
 FILTER_MODES = ("and", "or", "not")
+LIBRARY_DEFAULT_HIDE = "watched_hidden"
 
 
 @dataclass(frozen=True)
@@ -42,7 +50,8 @@ class LibraryFilters:
     excluded_assets: frozenset[str] = field(default_factory=frozenset)
     excluded_categories: frozenset[str] = field(default_factory=frozenset)
     rated_only: bool = False
-    hide_hidden: bool = False
+    # What the list leaves out (`LIST_HIDES`): by default the Vu and the Écartée fiches.
+    hide: str = LIBRARY_DEFAULT_HIDE
     uncategorized_only: bool = False
     asset_filter_mode: str = "or"
     category_filter_mode: str = "or"
@@ -75,7 +84,7 @@ def library_filters(
     excluded_assets=(),
     excluded_categories=(),
     rated_only: bool = False,
-    hide_hidden: bool = False,
+    hide: str | None = None,
     uncategorized_only: bool = False,
     asset_filter_mode: str | None = None,
     category_filter_mode: str | None = None,
@@ -93,7 +102,7 @@ def library_filters(
         excluded_assets=frozenset(excluded_assets) & VIDEO_ASSET_KINDS,
         excluded_categories=_labels(excluded_categories),
         rated_only=rated_only,
-        hide_hidden=hide_hidden,
+        hide=list_hide(hide, LIBRARY_DEFAULT_HIDE),
         uncategorized_only=uncategorized_only,
         asset_filter_mode=asset_filter_mode if asset_filter_mode in FILTER_MODES else "or",
         category_filter_mode=category_filter_mode if category_filter_mode in FILTER_MODES else "or",
@@ -141,8 +150,9 @@ def library_listing(db: Session, filters: LibraryFilters) -> LibraryListing:
         filters.rated_only,
         filters.asset_filter_mode,
         filters.category_filter_mode,
-        filters.hide_hidden,
+        filters.hide,
         filters.uncategorized_only,
+        frozenset(get_no_progress_category_labels(db)),
     )
     videos, page, total_pages, count = library_page(
         db,
