@@ -72,9 +72,6 @@ def test_glass_light_hook_is_wired():
 def test_topbar_and_everyday_controls_use_the_glass_class():
     root = Path(__file__).resolve().parents[1] / "front" / "templates"
     assert '<header class="topbar lg">' in (root / "base.html").read_text()
-    macros = (root / "_macros.html").read_text()
-    start = macros.index("{% macro library_subnav")
-    assert macros[start : macros.index("{% endmacro %}", start)].count('class="lg"') == 3
     for name in ("stats.html", "rag_dashboard.html", "settings.html", "_macros.html"):
         text = (root / name).read_text()
         assert 'class="button-link secondary"' not in text, name

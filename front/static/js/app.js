@@ -2421,12 +2421,14 @@ function initChatWidget(root) {
 
 document.querySelectorAll("[data-chat-widget]").forEach(initChatWidget);
 
-// Side menu of the Bibliothèque (macro `library_menu`): opens and closes like the discussions
-// drawer of the library chat; its entries are plain links.
+// Navigation of the Bibliothèque (macros `library_menu`, `library_title`): on a phone, the ☰
+// button opens and closes it like the discussions drawer of the library chat. On a wider screen
+// the CSS shows it as a column and hides the button. Its entries are plain links.
 function initLibraryMenu(root) {
-  const toggle = root.querySelector("[data-library-menu-toggle]");
+  const toggle = document.querySelector("[data-library-menu-toggle]");
   const drawer = root.querySelector("[data-library-menu-drawer]");
   const backdrop = root.querySelector("[data-library-menu-backdrop]");
+  if (!toggle) return;
 
   function open() {
     drawer.hidden = false;

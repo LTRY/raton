@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
 {% block content %}
-<section>
+<div class="library-layout">
+{{ macros.library_menu("historique", library_views) }}
+<section class="library-main">
   <div class="page-head">
-    {{ macros.library_menu("historique", library_views) }}
-    <h1>Bibliothèque</h1>
+    {{ macros.library_title("Historique") }}
   </div>
-  {{ macros.library_subnav("historique") }}
   <section class="history-reading-time" aria-label="Temps de lecture">
     <h2>Temps de lecture</h2>
     {{ macros.playback_time_cards(playback_time_stats) }}
@@ -14,4 +14,5 @@
   {{ macros.history_day_list(history_days, category_style_map, history_days|length) }}
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
 </section>
+</div>
 {% endblock %}

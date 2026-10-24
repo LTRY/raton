@@ -446,8 +446,6 @@ par `.chat-composer`.
     Tant que le menu Bibliotheque est ouvert, la barre perd son flou
     (`:has(.nav-library-menu[open])`) : le menu a son propre verre, et un flou
     imbrique ne verrait que le fond de la barre ;
-  - les pastilles de sous-navigation de la bibliotheque (`library_subnav`) ;
-    l'etat courant (`aria-current`) garde sa teinte chaude, plus de bleu plein ;
   - les liens-boutons `.button-link` (Retour, Precedent/Suivant, Cout LLM…) :
     texte `--color-primary` sur verre, plus de bleu ni d'ardoise.
 - **Barre d'enregistrement des parametres** (`.settings-actions`, collante en
@@ -477,10 +475,10 @@ par `.chat-composer`.
   des graphiques, lecteur).
 - Test : `tests/test_glass_css.py`.
 
-Bibliotheque = trois vues reliees par une barre de sous-navigation commune
-(macro `library_subnav` de `_macros.html`, `.library-subnav`) :
-**Nouveautes** `/dashboard/nouveautes`, **Historique** `/dashboard/historique`,
-**Exploration** `/videos`.
+Bibliotheque = trois vues reliees par le menu de la Bibliotheque (macro
+`library_menu` de `_macros.html`, voir « Bibliotheque : Nouveautes, Historique,
+Exploration ») : **Nouveautes** `/dashboard/nouveautes`, **Historique**
+`/dashboard/historique`, **Exploration** `/videos`.
 - Toute date affichee dans l'interface utilise le format francais long
   `Lun. 20 juil. 2026` (jour abrege + point, jour, mois abrege + point,
   annee), et `Lun. 20 juil. 2026 14:32` quand une heure est jointe. Fonctions
@@ -598,24 +596,34 @@ Parametres.
 
 ## Bibliotheque : Nouveautes, Historique, Exploration
 
-Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
-`library_subnav`.
+Les trois vues partagent le titre `Bibliotheque` et le menu de la Bibliotheque.
+Il n'y a pas de pastilles de sections ni de vues sous le titre.
+
+**Titre** (macro `library_title`) : le nom de ce qui est affiche (Nouveautés,
+Historique, Exploration, ou le nom de la vue enregistree dont les filtres sont
+ceux de `/videos`). Sur bureau, `Bibliothèque` suivi de ce nom dans une pastille
+teintee (`.library-current`) ; sur telephone, le nom seul en titre, sur la ligne
+du bouton ☰.
 
 **Menu de la Bibliotheque** (macro `library_menu` de `_macros.html`, branche par
-`initLibraryMenu` dans `static/js/app.js`) : un bouton ☰ rond, a gauche du titre
-`Bibliotheque` des trois vues, ouvre un tiroir a gauche, le meme que celui des
-discussions du chat bibliotheque (`.chat-drawer`, voir « Widget de chat ») : 320px
-au plus, 86 % de la largeur sur telephone, voile sombre ; ✕, Echap ou le voile le
-referment, et il est referme avant que Turbo ne garde la page en cache (le bouton
-retour ne le rouvre pas). Il contient le titre « Bibliothèque », un lien par
-section avec son icone (**Nouveautés**, **Historique**, **Exploration**), puis,
-sous « Sous-bibliothèques », un lien par vue enregistree (reglees dans
-`/settings`) qui ouvre `/videos` avec ses filtres. Les vues viennent de
-`saved_views` de `GET /api/library` sur `/videos` et de `GET /api/library/views`
-sur Nouveautes et Historique. L'entree affichee est surlignee
-(`aria-current="page"`) : la vue enregistree dont les filtres sont ceux de
-`/videos`, sinon Exploration. Il n'y a plus de barre de pastilles des vues sur
-`/videos` : elles sont dans ce menu.
+`initLibraryMenu` dans `static/js/app.js`). Il contient un lien par section avec
+son icone (**Nouveautés**, **Historique**, **Exploration**), puis, sous
+« Sous-bibliothèques », un lien par vue enregistree (reglees dans `/settings`)
+qui ouvre `/videos` avec ses filtres. Les vues viennent de `saved_views` de
+`GET /api/library` sur `/videos` et de `GET /api/library/views` sur Nouveautes
+et Historique. L'entree affichee est surlignee (`aria-current="page"`) : la vue
+enregistree dont les filtres sont ceux de `/videos`, sinon Exploration.
+
+- Telephone (800px et moins) : un bouton ☰ rond, a gauche du titre, ouvre le
+  menu en tiroir a gauche, le meme que celui des discussions du chat
+  bibliotheque (`.chat-drawer`, voir « Widget de chat ») : 320px au plus, 86 %
+  de la largeur, voile sombre, titre « Bibliothèque » en tete ; ✕, Echap ou le
+  voile le referment, et il est referme avant que Turbo ne garde la page en
+  cache (le bouton retour ne le rouvre pas).
+- Bureau (plus de 800px) : pas de bouton ni de tiroir. La page est une grille
+  (`.library-layout`) : le menu est une colonne de 220px a gauche, toujours
+  visible et collee sous la barre du haut quand la page defile (sans fond, sans
+  titre), le contenu (`.library-main`) prend le reste.
 
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
