@@ -397,6 +397,29 @@ def test_add_video_to_playlist_existing_and_new_branches(front_client):
     assert {item.playlist_id for item in items} == {playlist.id, new_playlist.id}
 
 
+def test_video_detail_playlist_form_lives_in_more_menu(front_client):
+    db = make_session()
+    video = add_video(db)
+    member = Playlist(title="Member playlist", source="manual")
+    other = Playlist(title="Other playlist", source="manual")
+    db.add_all([member, other])
+    db.flush()
+    item = PlaylistItem(playlist_id=member.id, video_id=video.id, position=0)
+    db.add(item)
+    db.commit()
+
+    rendered = front_client(db).get(f"/videos/{video.id}").text
+
+    menu_start = rendered.index('class="video-more-panel')
+    menu = rendered[menu_start : rendered.index("</details>", menu_start)]
+    assert f'action="/videos/{video.id}/playlists"' in menu
+    assert f'action="/playlists/{member.id}/items/{item.id}/remove"' in menu
+    assert f'<option value="{other.id}">Other playlist</option>' in menu
+    # The add form is not repeated outside the menu, and the old toggle is gone.
+    assert rendered.count(f'action="/videos/{video.id}/playlists"') == 1
+    assert "playlist-widget" not in rendered
+
+
 # --- routes: import-url / import-csv (synchronous half only) ---------------
 
 
