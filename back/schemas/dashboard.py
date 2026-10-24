@@ -52,20 +52,28 @@ class HistoryVideoRead(BaseModel):
 
 
 class HistoryRowRead(BaseModel):
+    """One media on one local day."""
+
+    # The day's latest playback report of the media.
     job_id: int
     created_at: datetime
     # The local day it sits under.
     day: date
     video: HistoryVideoRead | None
     channel: LibraryChannelRead | None
+    # The latest report: its position is where the media was left that day.
     playback: PlaybackRead
+    # Seconds watched that day, every playback of the media added up (a replay counts again).
+    watched_seconds: float
+    # The fiche was already Vu before that day.
+    rewatch: bool
     shown_state: Literal["normal", "watched", "hidden"]
     auto_state: Literal["normal", "watched"]
     replay_category: bool
 
 
 class HistoriqueRead(BaseModel):
-    """The latest playback of each media, newest first, 50 per page."""
+    """One row per media and per local day, newest first, 50 per page."""
 
     rows: list[HistoryRowRead]
     page: int

@@ -148,7 +148,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
 | `nouveautes` | Les Nouveautés (`GET /api/nouveautes`) : une pile des fiches les plus récentes par chaîne suivie, paginée par chaîne |
-| `history` | L'Historique (`GET /api/historique`) : la dernière lecture de chaque média, jour local par jour local, et le temps de lecture de chaque jour de la page |
+| `history` | L'Historique (`GET /api/historique`) : une ligne par média et par jour local (temps regardé additionné, Revu), et le temps de lecture de chaque jour de la page |
 
 ### `raton/`
 

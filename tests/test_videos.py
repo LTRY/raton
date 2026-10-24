@@ -43,6 +43,7 @@ from back.services.jobs import backfills, download_requests, downloads, llm_jobs
 from back.services.jobs.scheduler import record_scan_result
 from back.services.llm.provider import CompletionFailed, CompletionResult, UsageTally
 from back.services.videos import editing as videos_editing
+from back.services.videos import history as videos_history
 from back.services.videos import list_state as videos_list_state
 from back.services.videos import playback as videos_playback
 from back.services.videos.filters import video_badges
@@ -2977,6 +2978,74 @@ def history_playback_jobs(db) -> None:
     db.commit()
 
 
+def replay_history_jobs(db) -> datetime:
+    """A 20-minute video played to the end over two reports on July 1st (Vu that day), then
+    replayed from the start and paused at 0:30 on July 2nd. Returns the next noon."""
+    video = add_video(db)
+    set_video_state(db, video, watched_at=datetime(2026, 7, 1, 9, 30))
+
+    def played(created_at: datetime, position: int, watched: int) -> DownloadJob:
+        return DownloadJob(
+            status="played",
+            user_id=user_id(db),
+            message=json.dumps(
+                {
+                    "type": "playback",
+                    "action": "Lecture",
+                    "media_label": "vidéo",
+                    "position_seconds": position,
+                    "duration_seconds": 1200,
+                    "watched_seconds": watched,
+                }
+            ),
+            video=video,
+            channel=video.channel,
+            created_at=created_at,
+        )
+
+    db.add_all(
+        [
+            played(datetime(2026, 7, 1, 9, 10), 600, 600),
+            played(datetime(2026, 7, 1, 9, 30), 1200, 600),
+            played(datetime(2026, 7, 2, 20, 0), 30, 30),
+        ]
+    )
+    db.commit()
+    return datetime(2026, 7, 3, 12, 0).astimezone()
+
+
+def test_history_page_has_one_row_per_media_and_day_adding_every_playback():
+    db = make_session()
+    now = replay_history_jobs(db)
+
+    history = videos_history.history_page(db, user_id(db), now=now)
+
+    assert [(row.day.isoformat(), row.watched_seconds) for row in history.rows] == [
+        ("2026-07-02", 30.0),
+        ("2026-07-01", 1200.0),
+    ]
+    # The replay stopped at 0:30 does not take the Vu back.
+    assert [row.shown_state for row in history.rows] == ["watched", "watched"]
+    assert [row.rewatch for row in history.rows] == [True, False]
+    assert history.rows[0].playback["position_seconds"] == 30
+    assert {day.isoformat(): s for day, s in history.seconds_by_day.items()} == {
+        "2026-07-02": 30.0,
+        "2026-07-01": 1200.0,
+    }
+
+
+def test_dashboard_history_row_shows_time_watched_and_replay():
+    db = make_session()
+    replay_history_jobs(db)
+
+    rendered = site(db).get("/dashboard/historique").text
+
+    assert rendered.count('<article class="dashboard-media-row') == 2
+    assert '<span class="history-row-time">20:00 regardé</span>' in rendered
+    assert '<span class="history-row-time">0:30 regardé</span>' in rendered
+    assert rendered.count('<span class="history-row-rewatch">Revu</span>') == 1
+
+
 def test_dashboard_history_renders_one_collapsible_block_per_day():
     db = make_session()
     history_playback_jobs(db)
@@ -4717,6 +4786,17 @@ def test_video_list_state_follows_playback_when_unset():
     assert videos_list_state.video_list_state(state, {"is_completed": True}, False) == "watched"
     assert videos_list_state.video_list_state(state, {"is_completed": False}, False) == "normal"
     assert videos_list_state.video_list_state(state, None, False) == "normal"
+
+
+def test_video_list_state_stays_watched_after_a_replay_from_the_start():
+    # Vu once (90 % reached), then replayed and paused at 0:30: the last report is not complete.
+    state = mine()[0]
+    state.watched_at = datetime(2026, 1, 1, tzinfo=UTC)
+
+    assert videos_list_state.video_list_state(state, {"is_completed": False}, False) == "watched"
+    assert videos_list_state.video_list_state(state, None, True) == "normal"
+    state.list_state = "unwatched"
+    assert videos_list_state.video_list_state(state, {"is_completed": False}, False) == "normal"
 
 
 def test_video_list_state_ignores_playback_for_replay_categories():

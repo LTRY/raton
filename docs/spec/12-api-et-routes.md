@@ -324,7 +324,7 @@ n'existait pas.
   duration_seconds, progress_percent, is_completed}` ou `null`, et ce que la
   carte affiche : `shown_state` (`normal`, `watched`, `hidden` : le choix
   enregistre, sinon deduit de la lecture), `auto_state` (l'etat deduit de la
-  lecture seule, ce que « clear » ramene), `replay_category` (fiche d'une
+  lecture seule — Vu a 90 % ou derniere lecture terminee —, ce que « clear » ramene), `replay_category` (fiche d'une
   categorie « sans barre de progression » : ni barre ni Vu automatique)),
   `saved_views` les vues enregistrees avec `active`, et pour la page d'une
   chaine `publication_interval_days` (jours medians entre deux publications,
@@ -568,11 +568,14 @@ watched_at}`.
   chaine suivie, 10 chaines par page (`page` compte des chaines) ; chaque pile
   `{channel: {id, name}, items}` avec les 10 fiches les plus recentes des
   types que suivent ses cloches, en cartes de `GET /api/library`.
-- `GET /api/historique?page=N` : la derniere lecture de chaque media, la plus
+- `GET /api/historique?page=N` : une ligne par media et par jour local, la plus
   recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds}` ;
   chaque ligne `{job_id, created_at, day, video, channel, playback,
-  shown_state, auto_state, replay_category}`, `day` etant le jour local sous
-  lequel elle se range, `video` `{id, title, rating, file_size_bytes,
+  watched_seconds, rewatch, shown_state, auto_state, replay_category}`, `day`
+  etant le jour local sous lequel elle se range, `job_id`/`created_at`/`playback`
+  le dernier rapport de lecture du media ce jour-la, `watched_seconds` la somme
+  de tous ses rapports du jour, `rewatch` vrai quand la fiche etait deja Vu
+  avant ce jour, `video` `{id, title, rating, file_size_bytes,
   list_state, categories, badges}` (`null` si la fiche a ete supprimee) et
   `playback` `{action, media_label, title, position_seconds,
   duration_seconds, watched_seconds, progress_percent, is_completed}`.

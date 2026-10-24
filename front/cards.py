@@ -51,6 +51,7 @@ def history_days(rows: list, day_seconds, today: date) -> list[dict]:
     days: list[dict] = []
     for row in rows:
         playback_view(row.playback)
+        row.watched_label = format_duration(getattr(row, "watched_seconds", 0))
         if not days or days[-1]["key"] != row.day:
             day = date.fromisoformat(row.day)
             days.append(

@@ -77,6 +77,8 @@ def get_historique(
                 else None,
                 channel=LibraryChannelRead(id=channel.id, name=channel.name) if channel else None,
                 playback=PlaybackRead(**row.playback),
+                watched_seconds=row.watched_seconds,
+                rewatch=row.rewatch,
                 shown_state=row.shown_state,
                 auto_state=row.auto_state,
                 replay_category=row.replay_category,

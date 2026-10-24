@@ -42,8 +42,10 @@ voir [11 Interface HTML](11-interface-html.md)) :
   et les shorts que si la cloche shorts est active. Paginee par chaine (10
   chaines par page) ;
 - **Historique** (`/dashboard/historique`) : activite de lecture recente,
-  groupee par journee, paginee ; une ligne montre la progression de lecture
-  tant que la video n'est pas terminee, et une video vue en entier est grisee
+  groupee par journee, paginee ; une ligne par media et par jour, avec le temps
+  regarde ce jour-la (chaque revisionnage compte) et « Revu » si la fiche etait
+  deja Vu ; une ligne montre la progression de lecture tant que la video
+  n'est pas vue, et une video Vu est grisee
   (regles dans [11 Interface HTML](11-interface-html.md)) ;
 - **Exploration** (`/videos`) : la liste complete de la bibliotheque.
 

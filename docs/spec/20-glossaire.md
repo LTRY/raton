@@ -198,7 +198,7 @@ Specs : [02 Fonctionnalites](02-fonctionnalites.md),
 
 ### Vu
 
-Une fiche est vue par un utilisateur quand sa lecture a atteint 90 % de la duree (`user_videos.watched_at`) ou quand il la marque vue depuis une liste. `unwatched` force non-vu, `null` suit la detection automatique. Un seul mot, deux origines ; chaque utilisateur a son propre Vu. `videos.watched_at` est le premier Vu de quiconque (remis a `NULL` si un nouveau fichier video ou audio est telecharge) : il ne sert qu'a la purge.
+Une fiche est vue par un utilisateur quand sa lecture a atteint 90 % de la duree (`user_videos.watched_at`) ou quand il la marque vue depuis une liste. `unwatched` force non-vu, `null` suit la detection automatique. Revoir la fiche ne retire pas son Vu, meme si la lecture s'arrete au debut ; dans l'Historique, la ligne d'un tel jour porte « Revu ». Un seul mot, deux origines ; chaque utilisateur a son propre Vu. `videos.watched_at` est le premier Vu de quiconque (remis a `NULL` si un nouveau fichier video ou audio est telecharge) : il ne sert qu'a la purge.
 
 - **Code** : `user_videos.watched_at` (automatique), `user_videos.list_state = "watched"` (a la main), `videos.watched_at` (purge)
 - **A ne pas confondre avec** : « Lu », qui n'est pas employe. Un evenement de lecture du journal (`played`) s'affiche « Lecture ».
