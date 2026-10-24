@@ -98,8 +98,16 @@ gauche, **Audio** a droite. Une video audio seule s'ouvre sur le volet Audio, de
 meme qu'une URL en `#audio` (lien du mini-lecteur), qui l'emporte sur le volet
 memorise (le rechargement apres telechargement retire le `#`).
 Un petit selecteur a deux icones (camera a gauche, ondes a droite,
-`.media-pager-dots`) indique le volet actif et sert aussi de boutons ; il
-est place au-dessus du carrousel, au centre de la ligne du bouton de retour
+`.media-pager-dots`) indique le volet actif et sert aussi de boutons. C'est
+une pilule en verre liquide (classe `.lg`) dans laquelle une goutte de verre
+teintee (`.media-pager-thumb`, sans flou propre : pas de verre imbrique) se
+place derriere l'icone active. La goutte suit le defilement du carrousel
+lui-meme (`--pager-progress`, pose par `syncDots`), au doigt comme apres un
+clic sur une icone ; elle s'etire en largeur et s'aplatit a mi-chemin
+(`--pager-stretch`), puis rebondit en reprenant sa forme quand le carrousel
+s'arrete sur un volet (classe `media-pager-dots-settle`, pas au chargement de
+la page). Avec `prefers-reduced-motion: reduce`, elle glisse sans s'etirer
+ni rebondir. Le selecteur est place au-dessus du carrousel, au centre de la ligne du bouton de retour
 et du bouton « ⋮ » (`.video-topbar`), hors de `.media-pager` : les scripts
 du carrousel cherchent ses boutons (`data-media-dot`) dans `.video-detail`. Chaque volet fait la meme
 hauteur (16:9 sur toute la largeur de l'ecran, sans cadre ni ombre) : passer de

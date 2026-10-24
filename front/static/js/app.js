@@ -3142,6 +3142,7 @@ function bindMediaPager(pager) {
   const track = pager.querySelector("[data-media-pager-track]");
   const slides = [...pager.querySelectorAll("[data-media-slide]")];
   const dots = [...(pager.closest(".video-detail") || pager).querySelectorAll("[data-media-dot]")];
+  const dotsBar = dots[0]?.closest(".media-pager-dots");
   const actions = pager.closest(".video-detail-card")?.querySelector("[data-video-format-actions]");
   const allowDelete = actions?.dataset.allowDelete === "true";
   if (!track || slides.length === 0) return;
@@ -3171,9 +3172,41 @@ function bindMediaPager(pager) {
       }
     });
     dots.forEach((dot, index) => dot.classList.toggle("media-pager-dot-active", index === active));
+    if (!dotsBar) return;
+    // The glass drop follows the swipe itself, not the active class, and
+    // stretches most halfway between the two icons.
+    const range = track.scrollWidth - track.clientWidth;
+    const progress = range > 0 ? Math.min(1, Math.max(0, track.scrollLeft / range)) : 0;
+    dotsBar.style.setProperty("--pager-progress", progress.toFixed(4));
+    dotsBar.style.setProperty("--pager-stretch", (1 - Math.abs(2 * progress - 1)).toFixed(4));
+    if (progress > 0.05 && progress < 0.95) thumbTravelled = true;
   }
 
-  track.addEventListener("scroll", () => window.requestAnimationFrame(syncDots), { passive: true });
+  // Once the swipe stops, the drop wobbles back into shape (CSS keyframes).
+  // Only after a real trip: the instant jump to the remembered slide on load
+  // must not wobble.
+  let settleTimer = 0;
+  let thumbTravelled = false;
+  function settleThumb() {
+    if (!dotsBar || !thumbTravelled) return;
+    // A finger holding the carousel halfway is not a stop.
+    const progress = Number.parseFloat(dotsBar.style.getPropertyValue("--pager-progress"));
+    if (progress > 0.05 && progress < 0.95) return;
+    thumbTravelled = false;
+    dotsBar.classList.remove("media-pager-dots-settle");
+    void dotsBar.offsetWidth; // restart the animation
+    dotsBar.classList.add("media-pager-dots-settle");
+  }
+
+  track.addEventListener(
+    "scroll",
+    () => {
+      window.requestAnimationFrame(syncDots);
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(settleThumb, 120);
+    },
+    { passive: true },
+  );
   dots.forEach((dot, index) => dot.addEventListener("click", () => scrollToSlide(index, true)));
   // An audio-only video opens on its audio slide.
   const slideMemoryKey = `raton:pager-slide:${videoId}`;

@@ -11514,11 +11514,11 @@ body::before {
     width: 22px;
   }
 
-  /* Icon toggle in the top bar, between the back button and the "⋮"; the
-     dots JS still sets the active class. */
+  /* Icon toggle in the top bar, between the back button and the "⋮": a `.lg`
+     glass pill (the `.lg` rule supplies fill, rim and blur) in which a glass
+     drop (`.media-pager-thumb`) slides behind the active icon. The dots JS
+     sets the active class and the --pager-* variables. */
   .media-pager-dots {
-    background: var(--color-surface-muted);
-    border: 1px solid var(--color-border);
     border-radius: var(--radius-pill);
     gap: 0;
     margin: 0;
@@ -11531,7 +11531,7 @@ body::before {
     align-items: center;
     background: transparent;
     border-radius: var(--radius-pill);
-    color: var(--color-text-muted);
+    color: var(--color-text);
     display: flex;
     height: 30px;
     justify-content: center;
@@ -11561,9 +11561,42 @@ body::before {
 
   .media-pager-dots .media-pager-dot-active,
   .media-pager-dots .media-pager-dot-active:hover {
-    background: var(--color-surface);
-    box-shadow: var(--shadow-sm, 0 1px 3px rgba(43, 32, 24, 0.15));
     color: var(--color-primary);
+  }
+
+  /* Above the drop. */
+  .media-pager-dots .media-pager-dot {
+    z-index: 1;
+  }
+
+  .media-pager-dots .media-pager-dot svg {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .media-pager-dots .media-pager-dot-active svg {
+    transform: scale(1.1);
+  }
+
+  /* No backdrop-filter here: a blur nested in the `.lg` bar would only see the
+     bar. The drop reads as glass through its bright gradient, rim and inner
+     highlight. `translate` follows the scroll with no transition (the swipe
+     drives it); `scale` stretches it while it travels. */
+  .media-pager-thumb {
+    /* Same warm tint as the tab bar's active tab. */
+    background: linear-gradient(180deg, rgba(255, 246, 239, 0.98), rgba(253, 226, 210, 0.92));
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: var(--radius-pill);
+    box-shadow:
+      inset 0 1px 0 var(--color-white),
+      inset 0 -2px 5px color-mix(in srgb, var(--color-primary) 16%, transparent),
+      0 3px 10px color-mix(in srgb, var(--color-primary) 22%, transparent);
+    height: 30px;
+    left: 3px;
+    pointer-events: none;
+    position: absolute;
+    top: 3px;
+    translate: calc(var(--pager-progress, 0) * 46px) 0;
+    width: 46px;
   }
   /* The slides lose their head (format badge, "Supprimer"): the dots already say
      which format is shown, and the delete moves to the "⋮" popover. The head's
@@ -11714,6 +11747,33 @@ body::before {
     position: absolute;
     top: 0;
     z-index: 1;
+  }
+}
+
+/* The media toggle's drop is liquid: it stretches wide and flat halfway
+   through the swipe, then wobbles back into a pill when the carousel stops. */
+@media (max-width: 800px) and (prefers-reduced-motion: no-preference) {
+  .media-pager-thumb {
+    scale: calc(1 + var(--pager-stretch, 0) * 0.32) calc(1 - var(--pager-stretch, 0) * 0.14);
+  }
+
+  .media-pager-dots-settle .media-pager-thumb {
+    animation: media-pager-thumb-settle 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @keyframes media-pager-thumb-settle {
+    0% {
+      scale: 1.12 0.9;
+    }
+    35% {
+      scale: 0.94 1.08;
+    }
+    65% {
+      scale: 1.03 0.97;
+    }
+    100% {
+      scale: 1 1;
+    }
   }
 }
 

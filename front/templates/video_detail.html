@@ -10,7 +10,10 @@
     </a>
     {# Phone only, like the "⋮" below. Outside the pager on purpose: the pager
        scripts look the dots up from `.video-detail`. #}
-    <div class="media-pager-dots" role="group" aria-label="Choisir vidéo ou audio">
+    {# `.media-pager-thumb`: the glass drop behind the active icon, moved by
+       the carousel's scroll position (`syncDots` in app.js). #}
+    <div class="media-pager-dots lg" role="group" aria-label="Choisir vidéo ou audio">
+      <span class="media-pager-thumb" aria-hidden="true"></span>
       <button type="button" class="media-pager-dot media-pager-dot-active" data-media-dot="video" aria-label="Version vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2.5"/><path d="M17 10.5l4-2.5v8l-4-2.5"/></svg></button>
       <button type="button" class="media-pager-dot" data-media-dot="audio" aria-label="Version audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-4M7 17V7M11 20V4M15 16V8M19 13v-2"/></svg></button>
     </div>
