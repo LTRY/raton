@@ -25,7 +25,7 @@ Regles :
 
 ### Utilisateur
 
-Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Indesiree, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, visites de Raton. Pas de mot de passe : Raton reste sur un LAN de confiance.
+Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Indesiree, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, couvre-feu, visites de Raton. Pas de mot de passe : Raton reste sur un LAN de confiance.
 
 - **Code** : `users`, `user_videos`, `user_channels`, `user_settings` ; cookie `raton_user`, en-tete `X-Raton-User`
 - **A ne pas confondre avec** : Un compte (aucune authentification) ; l'utilisateur par defaut, le plus ancien, pour qui agit un client qui n'en nomme aucun (le serveur MCP).
@@ -285,7 +285,7 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 ### Couvre-feu
 
-Plage horaire quotidienne (`22:00` → `10:00` par defaut), activee par un interrupteur de `/settings`, pendant laquelle Raton est ferme : seul l'Historique reste ouvert, pour ecrire le commentaire des fiches.
+Plage horaire quotidienne (`22:00` → `10:00` par defaut), propre a chaque utilisateur et activee par un interrupteur de `/settings`, pendant laquelle Raton lui est ferme : seuls l'accueil (Raton, chat bibliotheque et discussions) et l'Historique restent ouverts, pour discuter et ecrire le commentaire des fiches.
 
 - **Code** : `back/services/common/curfew.py`, reglages `curfew_enabled`, `curfew_start`, `curfew_end`, `GET /api/curfew`, reponse `423`
 - **A ne pas confondre avec** : La limite de temps d'ecran, qui ne ferme rien (Raton le dit seulement, scenario `ecran_ferme`).

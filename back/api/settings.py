@@ -63,7 +63,7 @@ def read_settings(
             for value in SPONSOR_SEGMENT_CATEGORY_CHOICES
         ],
         screen_time_limits=get_screen_time_limits(db, user_id),
-        curfew=curfew_read(db),
+        curfew=curfew_read(db, user_id),
         llm_provider_label=get_llm_provider_display_label(),
     )
 

@@ -204,7 +204,7 @@ ne sort pas de l'API).
 
 Erreurs : toute erreur de `/api` repond `{"detail": "<message en francais>"}`
 (`ErrorRead`, `back/api/errors.py`). Un refus metier porte le message du
-service (`400`, `404`, `409`, `502`) ; pendant le couvre-feu, toute route
+service (`400`, `404`, `409`, `502`) ; pendant le couvre-feu de l'utilisateur, toute route
 qu'il ne laisse pas ouverte repond `423` (dependance `refuse_during_curfew` du
 routeur `/api`, voir [02 Fonctionnalites](02-fonctionnalites.md)) ; une requete invalide repond `422` avec
 un `detail` lisible (`Requête invalide : state : champ obligatoire.`) et
@@ -393,9 +393,9 @@ n'existait pas.
 - `PUT /api/settings` : memes champs (sauf les deux derniers), chacun
   facultatif ; `screen_time_today_minutes` `{video, short, podcast, music}`
   fixe les limites du jour ; `curfew_enabled`, `curfew_start` et `curfew_end`
-  (`HH:MM`, `422` sinon) reglent le couvre-feu. Les listes sont normalisees ; une liste vide de
+  (`HH:MM`, `422` sinon) reglent le couvre-feu de l'utilisateur. Les listes sont normalisees ; une liste vide de
   categories ou de vues enregistrees ramene les valeurs par defaut.
-- `GET /api/curfew` : le couvre-feu `{enabled, start, end, active, ends_at}`
+- `GET /api/curfew` : le couvre-feu de l'utilisateur `{enabled, start, end, active, ends_at}`
   (`ends_at` : fin du couvre-feu en cours, `null` hors couvre-feu) ; toujours
   ouvert.
 - `GET /api/categories` : les categories et leurs couleurs `{label, color}`,

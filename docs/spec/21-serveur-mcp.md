@@ -39,7 +39,7 @@ téléchargement ni d'appel au LLM.
 | `get_nouveautes` | `GET /nouveautes` |
 | `get_library_stats` | `GET /stats` |
 
-Un appel refusé par le back lève une erreur portant son message (`detail`). Pendant le couvre-feu, le back refuse presque tout en `423` (voir [02 Fonctionnalités](02-fonctionnalites.md)) : l'outil lève alors ce message.
+Un appel refusé par le back lève une erreur portant son message (`detail`). Pendant le couvre-feu de l'utilisateur par defaut, le back refuse presque tout en `423` (voir [02 Fonctionnalités](02-fonctionnalites.md)) : l'outil lève alors ce message.
 
 Le serveur n'envoie ni cookie ni en-tête `X-Raton-User` : il lit la
 bibliothèque comme l'utilisateur par défaut, le plus ancien (ses notes en

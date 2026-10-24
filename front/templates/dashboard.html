@@ -3,7 +3,8 @@
 {% block content %}
 {# Home: Raton and the line of this page load (app/services/raton/), then the library chat bar. Nothing else. #}
 <section class="dashboard-home">
-  {{ macros.raton_stage(raton.scenario) }}
+  {# During the couvre-feu Raton's button would lead to a closed page: it points to the Historique. #}
+  {{ macros.raton_stage(raton.scenario, cta=("Écrire dans l’historique", "/dashboard/historique") if curfew_mode else none) }}
 
   {{ macros.chat_widget("dashboard-chat", "", chat_widget_config, "chat-bar") }}
 </section>

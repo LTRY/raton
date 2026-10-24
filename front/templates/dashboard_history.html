@@ -3,7 +3,7 @@
 {% block content %}
 {% if curfew_mode %}
 <section>
-  {{ macros.curfew_banner("Couvre-feu jusqu’à " ~ curfew.end, "Raton dort. Seul l’historique reste ouvert, pour écrire un commentaire sous les vidéos.") }}
+  {{ macros.curfew_banner("Couvre-feu jusqu’à " ~ curfew.end, "Raton dort. Seuls l’accueil et l’historique restent ouverts : écris un commentaire sous les vidéos.") }}
   {{ macros.history_day_list(history_days, category_style_map, history_days|length, current_history_path) }}
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
 </section>

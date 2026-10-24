@@ -730,20 +730,25 @@ Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) 
 
 - une page dont un appel a l'API repond `423` rend `curfew.html` en `423`
   (gestionnaire `ApiError` de `front/main.py`) : la scene de Raton
-  (`curfew_banner`, `bonnet_nuit.webp`), le message du back et le bouton
-  « Écrire dans l'historique » ;
+  (`curfew_banner`, `bonnet_nuit.webp`), le message du back et les boutons
+  « Écrire dans l'historique » et « Discuter avec Raton » ;
+- l'accueil `/` lit `GET /api/curfew` et reste la page habituelle (Raton, chat
+  bibliotheque, tiroir « Discussions ») ; seul le bouton de la replique de
+  Raton devient « Écrire dans l'historique », son lien habituel etant ferme ;
 - `/dashboard/historique` lit `GET /api/curfew` : en couvre-feu, la scene de
-  Raton « Couvre-feu jusqu'à 10:00 » remplace le titre, la sous-navigation et
-  le temps de lecture, et chaque ligne (`media_row` avec `curfew_return_to`)
+  Raton « Couvre-feu jusqu'à 10:00 » remplace le titre, le menu de la
+  Bibliotheque et le temps de lecture, et chaque ligne (`media_row` avec `curfew_return_to`)
   perd ses liens, sa progression, Vu/Ecartee et la notation au profit du
   formulaire du commentaire (`POST /videos/{id}/comment`, retour sur la meme
   page) ;
-- ces deux pages passent `curfew_mode` a `base.html`, qui retire la
-  navigation (barre du haut, barre d'onglets mobile), la feuille d'import, le
-  mini-lecteur et le Raton d'exploration ; « Raton » mene a l'Historique.
+- ces trois pages passent `curfew_mode` a `base.html` : la navigation ne garde
+  que l'accueil (« Raton ») et l'Historique (barre du haut : lien
+  « Historique » ; barre d'onglets mobile : onglets Accueil et Historique), sans
+  feuille d'import, mini-lecteur ni Raton d'exploration.
 
-La carte « Couvre-feu » de `/settings` (ancre `#curfew`) porte l'interrupteur
-et les heures de debut et de fin (`input type="time"`).
+La carte « Couvre-feu » de `/settings` (ancre `#curfew`, juste sous
+« Utilisateurs », avec les reglages propres a l'utilisateur) porte
+l'interrupteur et les heures de debut et de fin (`input type="time"`).
 
 ### Barre de progression de lecture
 

@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, discussion: int | None = None, api: Api = Depends(get_api)):
-    """Home: Raton's line of this visit and the library chat bar, nothing else. `?discussion=`
+    """Home: Raton's line of this visit and the library chat bar, nothing else, couvre-feu or not. `?discussion=`
     opens that discussion of the chat instead of Raton (an unknown one falls back to Raton)."""
     settings = api.get("/settings")
     chat = None
@@ -34,6 +34,8 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
         request,
         "dashboard.html",
         {
+            # The home stays open during the couvre-feu, with only the way to the Historique.
+            "curfew_mode": api.get("/curfew")["active"],
             "raton": {"scenario": record(api.post("/raton/visit"))},
             "chat_widget_config": library_chat_widget_config(
                 chat or api.get("/chat"), settings["llm_provider_label"], api.get("/users")

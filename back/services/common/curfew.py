@@ -1,5 +1,6 @@
-"""The couvre-feu: a nightly range of hours in which the API refuses everything but the
-Historique and the writing of a fiche's commentaire (docs/spec/02-fonctionnalites.md).
+"""The couvre-feu: a user's nightly range of hours in which the API refuses them everything but
+the home page with its chat, the Historique and the writing of a fiche's commentaire
+(docs/spec/02-fonctionnalites.md).
 
 The scheduled jobs run in-process and never go through `/api`, so they are not affected.
 """
@@ -11,7 +12,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from back.models.setting import AppSetting
+from back.models.user import UserSetting
 
 CURFEW_ENABLED_KEY = "curfew_enabled"
 CURFEW_START_KEY = "curfew_start"
@@ -21,11 +22,20 @@ DEFAULT_CURFEW_END = "10:00"
 # The person's clock, the scheduler's too: the hours are typed in this time zone.
 CURFEW_TIMEZONE = ZoneInfo("Europe/Paris")
 
-# (method, route path) still answered during the couvre-feu: what the Historique page needs to
-# list the fiches and save their commentaire, and the state itself so a client can say why.
+# (method, route path) still answered during the couvre-feu: the state itself so a client can say
+# why; the home page (Raton, the library chat and its discussions, the user menu); the Historique
+# and the commentaire it writes.
 OPEN_ROUTES = frozenset(
     {
         ("GET", "/api/curfew"),
+        ("GET", "/api/settings"),
+        ("GET", "/api/users"),
+        ("POST", "/api/raton/visit"),
+        ("GET", "/api/chat"),
+        ("POST", "/api/chat"),
+        ("GET", "/api/chat/conversations/{conversation_id}"),
+        ("DELETE", "/api/chat/conversations/{conversation_id}"),
+        ("GET", "/api/llm-jobs/{job_id}"),
         ("GET", "/api/historique"),
         ("GET", "/api/categories"),
         ("PUT", "/api/videos/{video_id}/comment"),
@@ -64,16 +74,17 @@ def _parse(value: str, default: str) -> time:
         return datetime.strptime(default, "%H:%M").time()
 
 
-def read_curfew(db: Session, now: datetime | None = None) -> Curfew:
-    """The couvre-feu settings and whether it is on at `now` (default: the current time).
+def read_curfew(db: Session, user_id: int, now: datetime | None = None) -> Curfew:
+    """The user's couvre-feu settings and whether it is on at `now` (default: the current time).
 
     The range runs from `start` included to `end` excluded and may span midnight (22:00 → 10:00);
     `start == end` is an empty range, never active.
     """
     stored = dict(
         db.execute(
-            select(AppSetting.key, AppSetting.value).where(
-                AppSetting.key.in_((CURFEW_ENABLED_KEY, CURFEW_START_KEY, CURFEW_END_KEY))
+            select(UserSetting.key, UserSetting.value).where(
+                UserSetting.user_id == user_id,
+                UserSetting.key.in_((CURFEW_ENABLED_KEY, CURFEW_START_KEY, CURFEW_END_KEY)),
             )
         ).all()
     )
@@ -99,16 +110,16 @@ def read_curfew(db: Session, now: datetime | None = None) -> Curfew:
     )
 
 
-def ensure_open(db: Session, method: str, route_path: str, now: datetime | None = None) -> None:
-    """Raise CurfewClosedError when the couvre-feu is on and the route is not one it leaves open.
-
-    An open route costs no query, so the Historique stays as cheap as without the couvre-feu.
-    """
+def ensure_open(
+    db: Session, user_id: int, method: str, route_path: str, now: datetime | None = None
+) -> None:
+    """Raise CurfewClosedError when the user's couvre-feu is on and the route is not one it leaves
+    open."""
     if (method, route_path) in OPEN_ROUTES:
         return
-    curfew = read_curfew(db, now)
+    curfew = read_curfew(db, user_id, now)
     if curfew.active:
         raise CurfewClosedError(
-            f"Couvre-feu jusqu'à {curfew.end} : seul l'historique reste ouvert, "
-            "pour écrire les commentaires."
+            f"Couvre-feu jusqu'à {curfew.end} : seuls l'accueil et l'historique restent ouverts, "
+            "pour discuter avec Raton et écrire les commentaires."
         )

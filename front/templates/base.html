@@ -1,6 +1,6 @@
 <!doctype html>
 {% set current_path = request.url.path if request is defined else "" %}
-{# During the couvre-feu (curfew.html, Historique) the pages carry no way into the closed app. #}
+{# During the couvre-feu (curfew.html, home, Historique) the pages only lead to the home and the Historique. #}
 {% set curfew_mode = curfew_mode|default(false) %}
 <html lang="fr">
   <head>
@@ -33,8 +33,12 @@
     {% include "_import_sheet.html" %}
     {% endif %}
     <header class="topbar lg">
-      <a class="brand" href="{{ '/dashboard/historique' if curfew_mode else '/' }}">Raton</a>
-      {% if not curfew_mode %}
+      <a class="brand" href="/">Raton</a>
+      {% if curfew_mode %}
+      <nav>
+        <a href="/dashboard/historique" {% if current_path.startswith('/dashboard/historique') %}aria-current="page"{% endif %}>Historique</a>
+      </nav>
+      {% else %}
       <nav>
         <a href="/channels" {% if current_path.startswith('/channels') %}aria-current="page"{% endif %}>Chaînes</a>
         <a href="/playlists" {% if current_path.startswith('/playlists') %}aria-current="page"{% endif %}>Playlists</a>
@@ -52,20 +56,22 @@
       </nav>
       {% endif %}
     </header>
-    {% if not curfew_mode %}
     <nav class="mobile-tabbar" aria-label="Navigation principale mobile" data-tabbar>
       {% set tab_active = current_path == '/' %}
       <a class="tab-home{{ ' active' if tab_active else '' }}" href="/" aria-label="Accueil" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g class="tab-home-svg"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9v11h4.5v-5.5h4V20h4.5V9"/></g></svg>
       </a>
+      {% if not curfew_mode %}
       {% set tab_active = current_path.startswith('/channels') %}
       <a class="tab-channels{{ ' active' if tab_active else '' }}" href="/channels" aria-label="Chaînes" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect class="tab-tvbody" x="3" y="7" width="18" height="13" rx="2.5"/><path class="tab-ant" pathLength="1" d="M8 3l4 4 4-4"/></svg>
       </a>
+      {% endif %}
       {% set tab_active = current_path.startswith('/videos') or current_path.startswith('/dashboard') %}
-      <a class="tab-library{{ ' active' if tab_active else '' }}" href="/dashboard/nouveautes" aria-label="Bibliothèque" {% if tab_active %}aria-current="page"{% endif %}>
+      <a class="tab-library{{ ' active' if tab_active else '' }}" href="{{ '/dashboard/historique' if curfew_mode else '/dashboard/nouveautes' }}" aria-label="{{ 'Historique' if curfew_mode else 'Bibliothèque' }}" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 22h19"/><rect class="tab-b1" x="3.5" y="4" width="4.5" height="16" rx="1"/><rect class="tab-b2" x="10" y="4" width="4.5" height="16" rx="1"/><g class="tab-book3"><rect x="16" y="5" width="4.5" height="15" rx="1" transform="rotate(-12 18.25 12.5)"/></g></svg>
       </a>
+      {% if not curfew_mode %}
       {% set tab_active = current_path.startswith('/playlists') %}
       <a class="tab-playlist{{ ' active' if tab_active else '' }}" href="/playlists" aria-label="Playlists" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="tab-pl tab-pl1" pathLength="1" d="M3.5 6h13"/><path class="tab-pl tab-pl2" pathLength="1" d="M3.5 11h13"/><path class="tab-pl tab-pl3" pathLength="1" d="M3.5 16h6"/><path class="tab-tri" d="M14 14.5v6l5.5-3z"/></svg>
@@ -74,8 +80,8 @@
       <a class="tab-settings{{ ' active' if tab_active else '' }}" href="/settings" aria-label="Réglages" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 17h16"/><circle class="tab-k1" cx="15" cy="7" r="2.5"/><circle class="tab-k2" cx="9" cy="17" r="2.5"/></svg>
       </a>
+      {% endif %}
     </nav>
-    {% endif %}
     <main>
       {% block content %}{% endblock %}
     </main>

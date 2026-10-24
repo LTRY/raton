@@ -1,14 +1,17 @@
 {# One Raton line: drawing, line, then the limit notice and the button when the scenario has them.
    `view` comes from app/services/raton/picker.py (`render_line`); `heading` is False on the test page, where
    many stages share a page and only the home line is the page's <h1>. #}
-{% macro raton_stage(view, heading=True) %}
+{# `cta`: a (label, href) shown instead of the line's own button. #}
+{% macro raton_stage(view, heading=True, cta=none) %}
 <div class="raton-stage" data-raton-scenario="{{ view.id }}">
   <img class="raton-art" src="/static/img/raton/{{ view.art }}?v={{ static_asset_version('img/raton/' ~ view.art) }}" alt="" width="260" height="260">
   {% if heading %}<h1 class="raton-line">{{ view.line }}</h1>{% else %}<p class="raton-line">{{ view.line }}</p>{% endif %}
   {% if view.closing %}
   <p class="raton-limit">Limite de temps d'écran atteinte aujourd'hui</p>
   {% endif %}
-  {% if view.cta_label %}
+  {% if cta %}
+  <a class="raton-cta" href="{{ cta[1] }}">{{ cta[0] }}</a>
+  {% elif view.cta_label %}
   <a class="raton-cta" href="{{ view.cta_href }}">{{ view.cta_label }}</a>
   {% endif %}
 </div>
@@ -22,6 +25,7 @@
   <p class="raton-limit">{{ text }}</p>
   {% if cta_href %}
   <a class="raton-cta" href="{{ cta_href }}">Écrire dans l’historique</a>
+  <a class="raton-cta" href="/">Discuter avec Raton</a>
   {% endif %}
 </div>
 {% endmacro %}
