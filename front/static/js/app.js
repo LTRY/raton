@@ -1310,7 +1310,7 @@ document.querySelectorAll("[data-screen-time-carousel]").forEach((carousel) => {
 });
 
 document.querySelectorAll("[data-video-stack-carousel]").forEach((carousel) => {
-  // Counted live: a slide is removed when its fiche gets écartée (dropHiddenCard).
+  // Counted live: a slide is removed when its fiche leaves the list (dropListedCard).
   const slideCount = () => carousel.querySelectorAll(".video-stack-slide").length;
   const container = carousel.closest(".video-stack");
   const previous = container?.querySelector("[data-video-stack-previous]");
@@ -2593,10 +2593,10 @@ function paintListState(container, state) {
   });
 }
 
-// On a list that leaves the Écartée fiches out (`data-drop-hidden`, no `show_hidden=1`), an
-// écartée card goes away at once, as it would on the next load; an emptied carousel of the
-// Nouveautés or day of the Historique goes with it.
-function dropHiddenCard(container) {
+// A list that leaves out the Vu and/or Écartée fiches (the 3-icon selector) names those states
+// in `data-drop-states`: a card that takes one goes away at once, as it would on the next load;
+// an emptied carousel of the Nouveautés or day of the Historique goes with it.
+function dropListedCard(container, state) {
   const card = container.closest(".video-stack-slide") || container.closest("article");
   if (!card) return;
   const stack = card.closest("[data-video-stack]");
@@ -2606,7 +2606,8 @@ function dropHiddenCard(container) {
   stack?.querySelector("[data-video-stack-carousel]")?.dispatchEvent(new Event("scroll"));
   if (stack && !stack.querySelector(".video-stack-slide")) stack.remove();
   if (day && !day.querySelector(".dashboard-media-row")) day.remove();
-  window.showToast?.("Fiche écartée : « Afficher les écartées » la remontre.");
+  const done = state === "hidden" ? "Fiche écartée" : "Fiche marquée vue";
+  window.showToast?.(`${done} : l'affichage « Tout » la remontre.`);
 }
 
 async function submitListState(container, requested) {
@@ -2624,7 +2625,8 @@ async function submitListState(container, requested) {
     if (painted === "unwatched") painted = "normal";
     if (!painted) painted = container.dataset.listStateAuto || "normal";
     paintListState(container, painted);
-    if (painted === "hidden" && container.closest("[data-drop-hidden]")) dropHiddenCard(container);
+    const dropStates = container.closest("[data-drop-states]")?.dataset.dropStates.split(" ") || [];
+    if (dropStates.includes(painted)) dropListedCard(container, painted);
   } catch (error) {
     paintListState(container, container.dataset.listState);
   } finally {

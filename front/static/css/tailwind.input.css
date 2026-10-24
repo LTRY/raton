@@ -675,12 +675,6 @@ h2 {
   color: var(--color-primary);
 }
 
-/* Not a section: pushed to the end of the row (its own line on a phone). */
-.library-subnav .hidden-fiches-toggle {
-  gap: 6px;
-  margin-left: auto;
-}
-
 .library-stats p {
   align-items: center;
   display: flex;
@@ -5228,13 +5222,6 @@ turbo-frame {
   color: var(--color-primary-hover);
 }
 
-/* "Afficher les écartées" when on: the dark grey of an Écartée card. */
-.asset-label-hidden {
-  background: var(--color-surface-muted);
-  border-color: var(--color-text-muted);
-  color: var(--color-text);
-}
-
 .asset-label-metadata {
   background: var(--status-warn-bg);
   border-color: var(--status-warn-border);
@@ -9206,6 +9193,59 @@ summary.channel-menu-item::-webkit-details-marker {
   color: var(--color-text);
 }
 
+/* The 3-icon selector of a list (Tout / sans les Vu / sans les Vu ni les Écartées): the same
+   track and raised thumb as the segmented control above. */
+.list-hide-selector {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 4px;
+}
+
+.list-hide-option,
+.library-subnav a.list-hide-option {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  transition: background-color 200ms ease, color 200ms ease, box-shadow 200ms ease;
+  width: 42px;
+}
+
+.list-hide-option svg {
+  height: 18px;
+  width: 18px;
+}
+
+.list-hide-option:hover {
+  color: var(--color-text);
+}
+
+.list-hide-option.active,
+.library-subnav a.list-hide-option.active {
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(43, 32, 24, 0.15);
+  color: var(--color-primary);
+}
+
+.list-hide-option:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Not a section: pushed to the end of the row. */
+.library-subnav .list-hide-selector {
+  margin-left: auto;
+}
+
 .channel-segmented input:focus-visible + span {
   outline: 2px solid var(--color-ring);
   outline-offset: 2px;
@@ -10241,7 +10281,8 @@ a.channel-explore-btn {
     margin-top: 20px;
   }
 
-  /* Row 1: segmented control + refresh; row 2: search; row 3: sort and filters side by side. */
+  /* Row 1: segmented control + refresh; row 2: search and the 3-icon selector; row 3: sort and
+     filters side by side. */
   .channel-refresh-form {
     position: absolute;
     right: 0;
@@ -10263,16 +10304,22 @@ a.channel-explore-btn {
     padding: 9px 0;
   }
 
+  /* Real bases, not 0: they are what pushes sort and filters onto a row of their own. */
   .channel-search {
-    flex-basis: 100%;
+    flex: 1 1 160px;
+    min-width: 0;
     order: 2;
   }
 
   .channel-sort,
   .channel-filters {
-    flex: 1 1 0;
+    flex: 1 1 120px;
     min-width: 0;
     order: 3;
+  }
+
+  .channel-toolbar .list-hide-selector {
+    order: 2;
   }
 
   .channel-pill-btn {

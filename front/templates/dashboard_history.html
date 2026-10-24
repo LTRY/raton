@@ -5,12 +5,12 @@
   <div class="page-head">
     <h1>Bibliothèque</h1>
   </div>
-  {{ macros.library_subnav("historique", hidden_toggle) }}
+  {{ macros.library_subnav("historique", hide_selector) }}
   <section class="history-reading-time" aria-label="Temps de lecture">
     <h2>Temps de lecture</h2>
     {{ macros.playback_time_cards(playback_time_stats) }}
   </section>
-  <div class="history-day-lists"{% if not hidden_toggle.show %} data-drop-hidden{% endif %}>
+  <div class="history-day-lists" data-drop-states="{{ hide_selector.drop_states }}">
     {{ macros.history_day_list(history_days, category_style_map, history_days|length) }}
   </div>
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}

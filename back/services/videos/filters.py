@@ -9,6 +9,14 @@ from back.models.video import Video
 from back.services.common.categories import parse_video_category_labels
 from back.services.videos.documents import NOTES_FILE
 
+# What a list leaves out, from the 3-icon selector (docs/spec/11-interface-html.md): nothing, the
+# Vu fiches, or the Vu and the Écartée ones.
+LIST_HIDES = ("none", "watched", "watched_hidden")
+
+
+def list_hide(value: str | None, default: str) -> str:
+    return value if value in LIST_HIDES else default
+
 
 def video_category_labels(video: Video) -> list[str]:
     return parse_video_category_labels(getattr(video, "category_labels", None))
@@ -61,10 +69,13 @@ def video_matches_filters(
     rated_only: bool,
     asset_filter_mode: str,
     category_filter_mode: str,
-    hide_hidden: bool = False,
+    hide: str = "none",
     uncategorized_only: bool = False,
+    no_progress_labels: frozenset[str] = frozenset(),
 ) -> bool:
-    if hide_hidden and video.list_state == "hidden":
+    if hide != "none" and video_is_watched(video, no_progress_labels):
+        return False
+    if hide == "watched_hidden" and video.list_state == "hidden":
         return False
     video_assets = video_asset_kinds(video)
     video_categories = set(video_category_labels(video))
@@ -106,10 +117,34 @@ def video_matches_filters(
     return all(groups)
 
 
-def video_not_hidden_condition():
-    """SQL twin of `video.list_state != "hidden"`: an Écartée fiche is left out of the lists unless
-    the page asks to show it (`show_hidden`, docs/spec/11-interface-html.md)."""
-    return or_(Video.list_state.is_(None), Video.list_state != "hidden")
+def video_is_watched(video: Video, no_progress_labels: frozenset[str]) -> bool:
+    """Vu, as a list filters it: marked Vu by hand, or `watched_at` set by the 90% rule while not
+    forced non-vu nor Écartée, outside a "no progress bar" category (replayed, never done)."""
+    if video.list_state == "watched":
+        return True
+    if video.list_state is not None or video.watched_at is None:
+        return False
+    return not no_progress_labels.intersection(video_category_labels(video))
+
+
+def video_watched_condition(no_progress_labels: frozenset[str]):
+    """SQL twin of `video_is_watched`; never NULL, so it can be negated. Needs `Channel`
+    outer-joined (see `video_category_condition`)."""
+    auto = and_(Video.list_state.is_(None), Video.watched_at.is_not(None))
+    replay = _any_of([video_category_condition(label) for label in sorted(no_progress_labels)])
+    if replay is not None:
+        auto = and_(auto, ~replay)
+    return or_(func.coalesce(Video.list_state, "") == "watched", auto)
+
+
+def video_list_hide_condition(hide: str, no_progress_labels: frozenset[str]):
+    """The fiches a list keeps for its `hide` level (`LIST_HIDES`); needs `Channel` outer-joined."""
+    conditions = []
+    if hide != "none":
+        conditions.append(~video_watched_condition(no_progress_labels))
+    if hide == "watched_hidden":
+        conditions.append(func.coalesce(Video.list_state, "") != "hidden")
+    return and_(true(), *conditions)
 
 
 def _present(column):
@@ -169,13 +204,12 @@ def video_filters_condition(
     rated_only: bool,
     asset_filter_mode: str,
     category_filter_mode: str,
-    hide_hidden: bool = False,
+    hide: str = "none",
     uncategorized_only: bool = False,
+    no_progress_labels: frozenset[str] = frozenset(),
 ):
     """SQL twin of `video_matches_filters`: keep the two in step (tests/test_videos_sql_filters.py)."""
-    conditions = []
-    if hide_hidden:
-        conditions.append(video_not_hidden_condition())
+    conditions = [video_list_hide_condition(hide, no_progress_labels)]
     if uncategorized_only:
         conditions.append(video_uncategorized_condition())
     excluded_assets = _any_of(

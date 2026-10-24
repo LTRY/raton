@@ -22,6 +22,8 @@ from back.services.videos.playback import (
 )
 
 HISTORY_PAGE_SIZE = 50
+# The Historique is mostly finished playbacks: hiding the Vu by default would empty it.
+HISTORY_DEFAULT_HIDE = "none"
 
 
 @dataclass
@@ -48,10 +50,13 @@ def history_page(
     page: int = 1,
     now: datetime | None = None,
     page_size: int = HISTORY_PAGE_SIZE,
-    show_hidden: bool = False,
+    hide: str = HISTORY_DEFAULT_HIDE,
 ) -> HistoryPage:
     now = now or datetime.now().astimezone()
-    jobs = dashboard_media_activity_logs(db, show_hidden=show_hidden)
+    no_progress_labels = set(get_no_progress_category_labels(db))
+    jobs = dashboard_media_activity_logs(
+        db, hide=hide, no_progress_labels=frozenset(no_progress_labels)
+    )
     total_pages = max(1, -(-len(jobs) // page_size))
     page = min(max(page, 1), total_pages)
     page_ids = [job.id for job in jobs[(page - 1) * page_size : page * page_size]]
@@ -64,7 +69,6 @@ def history_page(
             .options(selectinload(DownloadJob.video), selectinload(DownloadJob.channel))
         )
     }
-    no_progress_labels = set(get_no_progress_category_labels(db))
     rows = []
     for job_id in page_ids:
         job = loaded[job_id]

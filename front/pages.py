@@ -38,24 +38,33 @@ def current_request_path(request: Request, exclude: tuple[str, ...] = ()) -> str
     return path
 
 
-def shows_hidden(request: Request) -> bool:
-    """`show_hidden=1`: the list also shows the Écartée fiches, which it leaves out by default."""
-    return request.query_params.get("show_hidden") == "1"
+# The 3-icon selector of a list: what each choice leaves out (`hide`, decided by the API).
+LIST_HIDE_OPTIONS = (
+    ("none", "Tout afficher"),
+    ("watched", "Masquer les vus"),
+    ("watched_hidden", "Masquer les vus et les écartées"),
+)
 
 
-def hidden_toggle(request: Request) -> dict:
-    """The "Afficher / Masquer les écartées" button: the same page with `show_hidden` flipped, back
-    on its first page since the number of rows changes."""
-    show = shows_hidden(request)
+def list_hide_selector(request: Request, current: str) -> dict:
+    """The links of the selector: this page with `hide` set, back on its first page since the
+    number of rows changes. `drop_states` are the card states the page removes on the spot."""
     params = [
         (key, value)
         for key, value in request.query_params.multi_items()
-        if key not in ("show_hidden", "page")
+        if key not in ("hide", "page")
     ]
-    if not show:
-        params.append(("show_hidden", "1"))
-    query = urlencode(params)
-    return {"show": show, "href": f"{request.url.path}?{query}" if query else request.url.path}
+    options = [
+        {
+            "value": value,
+            "label": label,
+            "active": value == current,
+            "href": f"{request.url.path}?{urlencode([*params, ('hide', value)])}",
+        }
+        for value, label in LIST_HIDE_OPTIONS
+    ]
+    drop_states = {"none": "", "watched": "watched", "watched_hidden": "watched hidden"}
+    return {"current": current, "options": options, "drop_states": drop_states.get(current, "")}
 
 
 def page_href_builder(request: Request, exclude: tuple[str, ...] = ()):

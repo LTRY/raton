@@ -139,7 +139,7 @@ Sur ecran tactile (`@media (pointer: coarse)`, bloc en fin de
 `tailwind.input.css`), un controle se touche du doigt sans viser : 32 px de
 haut au minimum, vers 44 px quand la place le permet.
 
-- Les pastilles de filtre (`.chip3`, « ★ Notees », « Afficher les ecartees »,
+- Les pastilles de filtre (`.chip3`, « ★ Notees »,
   « Sans categorie ») et les boutons pastilles (« + Categories »,
   `button.category-label`) passent a 32 px de haut, texte 12 px.
 - Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
@@ -602,14 +602,9 @@ Parametres.
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
 
-Aucune des trois ne montre les fiches **ecartees** par defaut (voir
-[Videos](#videos) plus bas). Nouveautes et Historique, qui n'ont pas de panneau
-de filtres, portent au bout de `library_subnav` un bouton bascule
-(`.hidden-fiches-toggle`, `aria-pressed`, icone œil barre / œil) :
-« Afficher les ecartees » recharge la page avec `show_hidden=1`, « Masquer les
-ecartees » la recharge sans ; le lien revient a la premiere page, puisque le
-nombre de lignes change. Exploration et la page d'une chaine portent la meme
-bascule en pastille « Afficher les ecartees » dans leurs filtres.
+Les trois vues, et la page d'une chaine, portent le **selecteur d'affichage**
+(voir [Videos](#videos) plus bas) au bout de `library_subnav` (dans la barre
+d'outils sur une chaine).
 
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
@@ -1290,7 +1285,7 @@ formulaire, le bouton `↻`.
 - **Filtres** (popover, feuille basse sur telephone) : types de fichier et
   categories en pastilles a trois etats (inclure / exclure / neutre, macro
   `filter_chip3`) avec leurs modes « Au moins un / Tous », « ★ Notées »,
-  « Afficher les écartées » et « Sans catégorie » (voir plus bas), le nombre de
+  et « Sans catégorie » (voir plus bas), le nombre de
   fiches correspondantes et un bouton
   « Fermer ». Chaque changement recharge la page ; `app.js` memorise dans
   `sessionStorage` que le panneau etait ouvert et le rouvre. Le bouton affiche
@@ -1456,23 +1451,46 @@ la macro expose cet etat automatique dans `data-list-state-auto` pour que le
 client sache quoi repeindre sans recharger. Cliquer **Vu** sur une video
 ecartee la fait redescendre au palier "vu".
 
-Une fiche ecartee **disparait des listes** : `/videos`, la page d'une chaine,
-Nouveautes et Historique l'excluent cote serveur (seules les fiches dont
-`list_state` vaut `hidden`, jamais celles grisees uniquement par leur
-progression de lecture). Chaque liste a son bouton pour la remontrer : la
-pastille **Afficher les ecartees** (`show_hidden=1`) a cote de **★ Notées**
-dans les filtres de `/videos` et d'une chaine (pastille active « Écartées
-affichées »), le bouton bascule de `library_subnav` sur Nouveautes et
-Historique. Les fiches ecartees y reapparaissent grisees au palier fort, et le
-bouton **Écartée** (ou le glissement) les y remet a l'etat automatique.
+#### Selecteur d'affichage : tout, sans les vus, sans les vus ni les ecartees
 
-Quand la liste masque les ecartees, son conteneur porte `data-drop-hidden`
-(la `turbo-frame` des resultats sur `/videos` et une chaine, `.video-stack-list`
-sur Nouveautes, `.history-day-lists` sur Historique) : ecarter une carte la
-retire aussitot de la page au lieu de la griser, avec un toast qui rappelle le
-bouton pour la remontrer ; une pile de Nouveautes ou une journee d'Historique
-videe disparait avec elle. Les compteurs (nombre de fiches, de medias d'une
-journee) ne se mettent a jour qu'au prochain rendu.
+`/videos`, la page d'une chaine, Nouveautes et Historique portent un
+**selecteur d'affichage** a trois icones (macro `list_hide_selector`,
+`.list-hide-selector`, meme piste et meme pastille relevee que le segment
+Vidéos/Shorts d'une chaine) qui choisit ce que la liste retire, cote serveur
+(parametre `hide`) :
+
+| Icone | `hide` | Libelle (`title`/`aria-label`) | La liste retire |
+| --- | --- | --- | --- |
+| liste | `none` | Tout afficher | rien |
+| œil (celui de **Vu**) | `watched` | Masquer les vus | les fiches vues |
+| œil barre (celui d'**Écartée**) | `watched_hidden` | Masquer les vus et les écartées | les fiches vues et les ecartees |
+
+Par defaut (`hide` absent ou inconnu), la Bibliotheque, une chaine et les
+Nouveautes sont sur `watched_hidden` ; l'Historique est sur `none`, car il
+n'aligne presque que des lectures terminees. Le defaut est decide par l'API,
+qui renvoie le niveau applique (`filters.hide`, `hide`). Chaque icone est un
+lien vers la meme page avec `hide` choisi, revenu a la premiere page (le nombre
+de lignes change) ; les formulaires de filtres de `/videos` et d'une chaine
+portent `hide` en champ cache pour le garder, et « Tout effacer » le garde
+aussi (c'est une facon d'afficher, pas un filtre).
+
+« Vu » suit le glossaire : `list_state = "watched"`, ou `watched_at` pose par la
+regle des 90 % quand `list_state` est vide, hors categorie « sans barre de
+progression ». Une fiche ecartee n'est pas « vue » : sur `watched`, elle reste
+affichee, grisee au palier fort. Ce Vu-la peut differer du grisage automatique
+d'une carte, qui suit la derniere lecture (terminee a 95 %) : une fiche
+relancee apres avoir ete vue n'est plus grisee mais reste retiree par
+`watched`. Sur Historique, la ligne d'une fiche supprimee n'a plus d'etat et
+reste toujours.
+
+Le conteneur de la liste nomme dans `data-drop-states` les etats qu'il retire
+(la `turbo-frame` des resultats sur `/videos` et une chaine,
+`.video-stack-list` sur Nouveautes, `.history-day-lists` sur Historique) :
+une carte marquee **Vu** ou **Écartée** qui prend l'un de ces etats est
+retiree aussitot de la page au lieu d'etre grisee, avec un toast qui rappelle
+l'affichage « Tout » ; une pile de Nouveautes ou une journee d'Historique videe
+disparait avec elle. Les compteurs (nombre de fiches, de medias d'une journee)
+ne se mettent a jour qu'au prochain rendu.
 
 Le facet **Categories** (sur `/videos` comme sur la page d'une chaine) porte
 aussi une case **Sans categorie** (`uncategorized=1`) : elle ne garde que les
