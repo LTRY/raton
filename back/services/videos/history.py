@@ -44,10 +44,14 @@ class HistoryPage:
 
 
 def history_page(
-    db: Session, page: int = 1, now: datetime | None = None, page_size: int = HISTORY_PAGE_SIZE
+    db: Session,
+    page: int = 1,
+    now: datetime | None = None,
+    page_size: int = HISTORY_PAGE_SIZE,
+    show_hidden: bool = False,
 ) -> HistoryPage:
     now = now or datetime.now().astimezone()
-    jobs = dashboard_media_activity_logs(db)
+    jobs = dashboard_media_activity_logs(db, show_hidden=show_hidden)
     total_pages = max(1, -(-len(jobs) // page_size))
     page = min(max(page, 1), total_pages)
     page_ids = [job.id for job in jobs[(page - 1) * page_size : page * page_size]]

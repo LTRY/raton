@@ -86,7 +86,7 @@ def videos_page(
             "selected_excluded_asset_filters": set(filters.excluded_assets),
             "selected_excluded_category_filters": set(filters.excluded_categories),
             "selected_rated_only": filters.rated,
-            "selected_hide_hidden": filters.hide_hidden,
+            "selected_show_hidden": filters.show_hidden,
             "selected_uncategorized_only": filters.uncategorized,
             "selected_asset_filter_mode": filters.asset_filter_mode,
             "selected_category_filter_mode": filters.category_filter_mode,

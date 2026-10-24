@@ -42,7 +42,8 @@ class LibraryFilters:
     excluded_assets: frozenset[str] = field(default_factory=frozenset)
     excluded_categories: frozenset[str] = field(default_factory=frozenset)
     rated_only: bool = False
-    hide_hidden: bool = False
+    # Écartée fiches are left out unless this is set.
+    show_hidden: bool = False
     uncategorized_only: bool = False
     asset_filter_mode: str = "or"
     category_filter_mode: str = "or"
@@ -75,7 +76,7 @@ def library_filters(
     excluded_assets=(),
     excluded_categories=(),
     rated_only: bool = False,
-    hide_hidden: bool = False,
+    show_hidden: bool = False,
     uncategorized_only: bool = False,
     asset_filter_mode: str | None = None,
     category_filter_mode: str | None = None,
@@ -93,7 +94,7 @@ def library_filters(
         excluded_assets=frozenset(excluded_assets) & VIDEO_ASSET_KINDS,
         excluded_categories=_labels(excluded_categories),
         rated_only=rated_only,
-        hide_hidden=hide_hidden,
+        show_hidden=show_hidden,
         uncategorized_only=uncategorized_only,
         asset_filter_mode=asset_filter_mode if asset_filter_mode in FILTER_MODES else "or",
         category_filter_mode=category_filter_mode if category_filter_mode in FILTER_MODES else "or",
@@ -141,7 +142,7 @@ def library_listing(db: Session, filters: LibraryFilters) -> LibraryListing:
         filters.rated_only,
         filters.asset_filter_mode,
         filters.category_filter_mode,
-        filters.hide_hidden,
+        not filters.show_hidden,
         filters.uncategorized_only,
     )
     videos, page, total_pages, count = library_page(

@@ -139,7 +139,7 @@ Sur ecran tactile (`@media (pointer: coarse)`, bloc en fin de
 `tailwind.input.css`), un controle se touche du doigt sans viser : 32 px de
 haut au minimum, vers 44 px quand la place le permet.
 
-- Les pastilles de filtre (`.chip3`, « ★ Notees », « Masquer les ecartees »,
+- Les pastilles de filtre (`.chip3`, « ★ Notees », « Afficher les ecartees »,
   « Sans categorie ») et les boutons pastilles (« + Categories »,
   `button.category-label`) passent a 32 px de haut, texte 12 px.
 - Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
@@ -601,6 +601,15 @@ Parametres.
 
 Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 `library_subnav`.
+
+Aucune des trois ne montre les fiches **ecartees** par defaut (voir
+[Videos](#videos) plus bas). Nouveautes et Historique, qui n'ont pas de panneau
+de filtres, portent au bout de `library_subnav` un bouton bascule
+(`.hidden-fiches-toggle`, `aria-pressed`, icone œil barre / œil) :
+« Afficher les ecartees » recharge la page avec `show_hidden=1`, « Masquer les
+ecartees » la recharge sans ; le lien revient a la premiere page, puisque le
+nombre de lignes change. Exploration et la page d'une chaine portent la meme
+bascule en pastille « Afficher les ecartees » dans leurs filtres.
 
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
@@ -1281,7 +1290,7 @@ formulaire, le bouton `↻`.
 - **Filtres** (popover, feuille basse sur telephone) : types de fichier et
   categories en pastilles a trois etats (inclure / exclure / neutre, macro
   `filter_chip3`) avec leurs modes « Au moins un / Tous », « ★ Notées »,
-  « Masquer les écartées » et « Sans catégorie » (voir plus bas), le nombre de
+  « Afficher les écartées » et « Sans catégorie » (voir plus bas), le nombre de
   fiches correspondantes et un bouton
   « Fermer ». Chaque changement recharge la page ; `app.js` memorise dans
   `sessionStorage` que le panneau etait ouvert et le rouvre. Le bouton affiche
@@ -1407,9 +1416,7 @@ enregistre aucun. Les deux paliers de grisage n'y portent pas les memes noms de
 classe que sur une carte de liste (`dashboard-media-row-completed` et
 `dashboard-media-row-hidden`) : la macro les passe en
 `data-row-watched-class`/`data-row-hidden-class` sur le conteneur, ce qui
-permet au JS de repeindre la ligne sans rien savoir du template. "Historique"
-n'a pas de filtre "Masquer les ecartees" — une video ecartee y reste visible,
-simplement grisee au palier fort. Les deux paliers y sont obtenus en teintant
+permet au JS de repeindre la ligne sans rien savoir du template. Les deux paliers y sont obtenus en teintant
 le texte, alors qu'une carte de liste baisse son `opacity` : la ligne
 d'historique est posee sur le fond deja creme d'un bloc de journee, ou un
 voile d'opacite rendait le titre illisible. Ce sont des pastilles
@@ -1449,10 +1456,23 @@ la macro expose cet etat automatique dans `data-list-state-auto` pour que le
 client sache quoi repeindre sans recharger. Cliquer **Vu** sur une video
 ecartee la fait redescendre au palier "vu".
 
-Le nuage de chips de `/videos` porte une case **Masquer les ecartees**
-(`hide_hidden=1`), a cote de **★ Notées** : elle exclut de la liste les seules
-videos dont `list_state` vaut `hidden`, jamais celles grisees uniquement par
-leur progression de lecture.
+Une fiche ecartee **disparait des listes** : `/videos`, la page d'une chaine,
+Nouveautes et Historique l'excluent cote serveur (seules les fiches dont
+`list_state` vaut `hidden`, jamais celles grisees uniquement par leur
+progression de lecture). Chaque liste a son bouton pour la remontrer : la
+pastille **Afficher les ecartees** (`show_hidden=1`) a cote de **★ Notées**
+dans les filtres de `/videos` et d'une chaine (pastille active « Écartées
+affichées »), le bouton bascule de `library_subnav` sur Nouveautes et
+Historique. Les fiches ecartees y reapparaissent grisees au palier fort, et le
+bouton **Écartée** (ou le glissement) les y remet a l'etat automatique.
+
+Quand la liste masque les ecartees, son conteneur porte `data-drop-hidden`
+(la `turbo-frame` des resultats sur `/videos` et une chaine, `.video-stack-list`
+sur Nouveautes, `.history-day-lists` sur Historique) : ecarter une carte la
+retire aussitot de la page au lieu de la griser, avec un toast qui rappelle le
+bouton pour la remontrer ; une pile de Nouveautes ou une journee d'Historique
+videe disparait avec elle. Les compteurs (nombre de fiches, de medias d'une
+journee) ne se mettent a jour qu'au prochain rendu.
 
 Le facet **Categories** (sur `/videos` comme sur la page d'une chaine) porte
 aussi une case **Sans categorie** (`uncategorized=1`) : elle ne garde que les

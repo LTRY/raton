@@ -492,10 +492,21 @@
 </section>
 {% endmacro %}
 
-{% macro library_subnav(active) %}
+{# `hidden_toggle` (front/pages.py `hidden_toggle`) adds the "Afficher / Masquer les écartées"
+   button of a list without a filters form; /videos and a channel page have a chip instead. #}
+{% macro library_subnav(active, hidden_toggle=none) %}
 <nav class="library-subnav" aria-label="Sections de la bibliothèque">
   <a class="lg" href="/dashboard/nouveautes" {% if active == 'nouveautes' %}aria-current="page"{% endif %}>Nouveautés</a>
   <a class="lg" href="/dashboard/historique" {% if active == 'historique' %}aria-current="page"{% endif %}>Historique</a>
   <a class="lg" href="/videos" {% if active == 'exploration' %}aria-current="page"{% endif %}>Exploration</a>
+  {% if hidden_toggle %}
+  <a class="lg hidden-fiches-toggle{{ ' active' if hidden_toggle.show else '' }}" href="{{ hidden_toggle.href }}" role="button" aria-pressed="{{ 'true' if hidden_toggle.show else 'false' }}" data-hidden-fiches-toggle>
+    <svg class="list-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      {%- if hidden_toggle.show %}<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>
+      {%- else %}<path d="M10.6 5.2A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.9M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/>{% endif %}
+    </svg>
+    <span>{{ "Masquer les écartées" if hidden_toggle.show else "Afficher les écartées" }}</span>
+  </a>
+  {% endif %}
 </nav>
 {% endmacro %}

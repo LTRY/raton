@@ -38,6 +38,26 @@ def current_request_path(request: Request, exclude: tuple[str, ...] = ()) -> str
     return path
 
 
+def shows_hidden(request: Request) -> bool:
+    """`show_hidden=1`: the list also shows the Écartée fiches, which it leaves out by default."""
+    return request.query_params.get("show_hidden") == "1"
+
+
+def hidden_toggle(request: Request) -> dict:
+    """The "Afficher / Masquer les écartées" button: the same page with `show_hidden` flipped, back
+    on its first page since the number of rows changes."""
+    show = shows_hidden(request)
+    params = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key not in ("show_hidden", "page")
+    ]
+    if not show:
+        params.append(("show_hidden", "1"))
+    query = urlencode(params)
+    return {"show": show, "href": f"{request.url.path}?{query}" if query else request.url.path}
+
+
 def page_href_builder(request: Request, exclude: tuple[str, ...] = ()):
     def page_href(page: int) -> str:
         params = [

@@ -675,6 +675,12 @@ h2 {
   color: var(--color-primary);
 }
 
+/* Not a section: pushed to the end of the row (its own line on a phone). */
+.library-subnav .hidden-fiches-toggle {
+  gap: 6px;
+  margin-left: auto;
+}
+
 .library-stats p {
   align-items: center;
   display: flex;
@@ -5220,6 +5226,13 @@ turbo-frame {
   background: #fff7ed;
   border-color: #f97316;
   color: var(--color-primary-hover);
+}
+
+/* "Afficher les écartées" when on: the dark grey of an Écartée card. */
+.asset-label-hidden {
+  background: var(--color-surface-muted);
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .asset-label-metadata {

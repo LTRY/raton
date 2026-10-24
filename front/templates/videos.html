@@ -68,8 +68,8 @@
             <span class="asset-label asset-label-rating">★ Notées</span>
           </label>
           <label class="asset-filter-chip">
-            <input name="hide_hidden" type="checkbox" value="1" {% if selected_hide_hidden %}checked{% endif %}>
-            <span class="asset-label asset-label-hidden">Masquer les écartées</span>
+            <input name="show_hidden" type="checkbox" value="1" {% if selected_show_hidden %}checked{% endif %}>
+            <span class="asset-label asset-label-hidden">Afficher les écartées</span>
           </label>
         </div>
       </div>
@@ -125,7 +125,7 @@
 
   {# Everything that depends on `q` lives in this frame: live search swaps it
      alone, so the search field keeps focus while typing. #}
-  <turbo-frame id="library-results" class="live-results" target="_top">
+  <turbo-frame id="library-results" class="live-results" target="_top"{% if not selected_show_hidden %} data-drop-hidden{% endif %}>
   {% if active_filter_pills %}
   <div class="active-filters-row">
     {% for pill in active_filter_pills %}

@@ -5,7 +5,7 @@ import math
 import re
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from back.models.job import DownloadJob
@@ -16,7 +16,7 @@ from back.services.common.durations import (
     parse_duration_label,
 )
 from back.services.common.job_log import log_job
-from back.services.videos.filters import video_category_labels
+from back.services.videos.filters import video_category_labels, video_not_hidden_condition
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}
 WATCHED_RATIO = 0.9
@@ -318,12 +318,20 @@ def playback_seconds_by_day(
     return seconds_by_day
 
 
-def dashboard_media_activity_logs(db: Session, limit: int | None = None) -> list[DownloadJob]:
+def dashboard_media_activity_logs(
+    db: Session, limit: int | None = None, show_hidden: bool = True
+) -> list[DownloadJob]:
+    """Latest activity job of each media, newest first; `show_hidden=False` drops Écartée fiches
+    (a job whose fiche was deleted has no `list_state` and stays)."""
     query = (
         select(DownloadJob)
         .where(DownloadJob.status.in_(DASHBOARD_ACTIVITY_STATUSES))
         .order_by(desc(DownloadJob.created_at))
     )
+    if not show_hidden:
+        query = query.outerjoin(Video, Video.id == DownloadJob.video_id).where(
+            or_(DownloadJob.video_id.is_(None), video_not_hidden_condition())
+        )
     if limit is not None:
         query = query.limit(limit)
     media_activity_logs = []

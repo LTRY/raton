@@ -29,8 +29,10 @@ router = APIRouter(prefix="/api", tags=["Tableau de bord"])
 
 
 @router.get("/nouveautes", response_model=NouveautesRead, responses=error_responses(422))
-def get_nouveautes(page: int = Query(1, ge=1), db: Session = Depends(get_db)) -> NouveautesRead:
-    stacks, page, total_pages = nouveautes_stacks(db, page)
+def get_nouveautes(
+    page: int = Query(1, ge=1), show_hidden: bool = False, db: Session = Depends(get_db)
+) -> NouveautesRead:
+    stacks, page, total_pages = nouveautes_stacks(db, page, show_hidden=show_hidden)
     return NouveautesRead(
         stacks=[
             NouveautesStackRead(
@@ -45,8 +47,10 @@ def get_nouveautes(page: int = Query(1, ge=1), db: Session = Depends(get_db)) ->
 
 
 @router.get("/historique", response_model=HistoriqueRead, responses=error_responses(422))
-def get_historique(page: int = Query(1, ge=1), db: Session = Depends(get_db)) -> HistoriqueRead:
-    history = history_page(db, page)
+def get_historique(
+    page: int = Query(1, ge=1), show_hidden: bool = False, db: Session = Depends(get_db)
+) -> HistoriqueRead:
+    history = history_page(db, page, show_hidden=show_hidden)
     rows = []
     for row in history.rows:
         video, channel = row.job.video, row.job.channel

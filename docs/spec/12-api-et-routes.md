@@ -106,8 +106,8 @@ Videos :
 
 - `GET /` : accueil (barre de chat de la bibliotheque seule) ;
   `?discussion={id}` ouvre cette discussion du chat au lieu de Raton.
-- `GET /dashboard/nouveautes?page=N` : page complete, une pile de videos recentes par chaine suivie (cloche videos ou shorts active, chaque cloche ne listant que son type), paginee par chaine (10 chaines/page, `page`=chaines et non videos).
-- `GET /dashboard/historique?page=N` : page complete paginee (50/page) de l'activite "Historique".
+- `GET /dashboard/nouveautes?page=N` : page complete, une pile de videos recentes par chaine suivie (cloche videos ou shorts active, chaque cloche ne listant que son type), paginee par chaine (10 chaines/page, `page`=chaines et non videos). Sans les fiches ecartees, sauf avec `show_hidden=1`.
+- `GET /dashboard/historique?page=N` : page complete paginee (50/page) de l'activite "Historique". Sans les fiches ecartees, sauf avec `show_hidden=1`.
 - `GET /dashboard/reprises?page=N` : ancienne URL de la page ci-dessus, conservee en redirection 302 (temporaire, pour ne pas figer un 301 dans le cache des navigateurs) vers `/dashboard/historique`, `page` preservee.
 - `GET /stats` : page de graphiques (stockage et fiches par chaine, par format, par mois) ; voir [11 Interface HTML](11-interface-html.md).
 - `GET /rag` : tableau de bord de l'indexation des notes (etape de chaque
@@ -117,7 +117,8 @@ Videos :
 - `GET /videos` : liste videos. Parametre `sort` : `imported`, `published`
   (defaut sur une chaine), `views` ou `rated` (note decroissante). Avec
   `channel_id` d'une chaine existante, rend `channel_videos.html` (page
-  d'une chaine) au lieu de `videos.html`.
+  d'une chaine) au lieu de `videos.html`. Sans les fiches ecartees, sauf avec
+  `show_hidden=1` ; l'ancien `hide_hidden=1` est ignore (c'est le defaut).
 - `POST /videos/{id}/categories` : modifier les categories de la video, puis
   rediriger vers `next`. L'editeur de la page detail enregistre a chaque
   coche par `PUT /api/videos/{id}/categories`.
@@ -262,11 +263,12 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   en JSON, calculee par le meme service que `/videos` (`library_view`), 50
   fiches par page. Memes noms de parametres que `/videos` : `channel_id`,
   `section`, `sort`, `asset`, `category`, `exclude_asset`,
-  `exclude_category` (repetables), `rated`, `hide_hidden`, `uncategorized`,
+  `exclude_category` (repetables), `rated`, `show_hidden`, `uncategorized`,
   `asset_filter_mode`, `category_filter_mode`, `q`, `page`. Memes regles de
   validation (`library_filters`) : un type de fichier, un tri, une section ou
   un mode inconnu est ignore ou remplace par son defaut, les categories sont
-  normalisees. Seule difference : sans `asset`, aucun filtre de type de
+  normalisees ; sans `show_hidden=true`, les fiches ecartees sont exclues.
+  Seule difference : sans `asset`, aucun filtre de type de
   fichier (la page, elle, preselectionne Video et Audio, ou tous les types
   sur une chaine). Repond `{filters, channel, section, page, total_pages,
   total, counts, items, saved_views}` : `filters` les filtres reellement
@@ -517,7 +519,9 @@ watched_at}`.
 - `GET /api/nouveautes?page=N` : `{stacks, page, total_pages}`, une pile par
   chaine suivie, 10 chaines par page (`page` compte des chaines) ; chaque pile
   `{channel: {id, name}, items}` avec les 10 fiches les plus recentes des
-  types que suivent ses cloches, en cartes de `GET /api/library`.
+  types que suivent ses cloches, en cartes de `GET /api/library`. Les fiches
+  ecartees n'y sont pas, sauf avec `show_hidden=true` : une chaine dont toutes
+  les fiches recentes sont ecartees n'a alors pas de pile.
 - `GET /api/historique?page=N` : la derniere lecture de chaque media, la plus
   recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds}` ;
   chaque ligne `{job_id, created_at, day, video, channel, playback,
@@ -527,7 +531,9 @@ watched_at}`.
   `playback` `{action, media_label, title, position_seconds,
   duration_seconds, watched_seconds, progress_percent, is_completed}`.
   `day_seconds` : le temps de lecture de chaque jour de la page, toutes les
-  lectures du jour comptees.
+  lectures du jour comptees. Les lignes d'une fiche ecartee n'y sont pas, sauf
+  avec `show_hidden=true` (celles d'une fiche supprimee restent : elle n'a plus
+  d'etat).
 - `GET /api/screen-time` : `{periods}`, le temps de lecture par periode
   (`today`, `week`, `month`) et par type (`video`, `short`, `podcast`,
   `music`) : `{seconds, count, limit_minutes}`.

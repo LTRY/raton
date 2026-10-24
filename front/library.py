@@ -71,7 +71,7 @@ def library_query(request: Request, channel_id: int | None, page: int) -> dict:
     }
     for flag, name in (
         ("rated", "rated"),
-        ("hide_hidden", "hide_hidden"),
+        ("show_hidden", "show_hidden"),
         ("uncategorized", "uncategorized"),
     ):
         if params.get(flag) == "1":
@@ -111,12 +111,12 @@ def video_active_filter_pills(request: Request, filters) -> list[dict]:
                 "href": query_without(request, [("rated", None)]),
             }
         )
-    if filters.hide_hidden:
+    if filters.show_hidden:
         pills.append(
             {
-                "label": "Écartées masquées",
-                "kind": "exclude",
-                "href": query_without(request, [("hide_hidden", None)]),
+                "label": "Écartées affichées",
+                "kind": "include",
+                "href": query_without(request, [("show_hidden", None)]),
             }
         )
     for option in VIDEO_ASSET_FILTER_OPTIONS:

@@ -47,7 +47,7 @@ class LibraryFiltersRead(BaseModel):
     excluded_assets: list[str]
     excluded_categories: list[str]
     rated: bool
-    hide_hidden: bool
+    show_hidden: bool
     uncategorized: bool
     asset_filter_mode: str
     category_filter_mode: str

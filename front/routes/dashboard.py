@@ -5,7 +5,7 @@ from front.api import Api, ApiError, get_api
 from front.cards import card_views, history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
 from front.library_chat import library_chat_widget_config
-from front.pages import current_request_path, page_href_builder
+from front.pages import current_request_path, hidden_toggle, page_href_builder, shows_hidden
 from front.records import record
 from front.templating import templates
 
@@ -38,7 +38,9 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
 
 @router.get("/dashboard/nouveautes", response_class=HTMLResponse)
 def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
-    nouveautes = record(api.get("/nouveautes", page=max(page, 1)))
+    nouveautes = record(
+        api.get("/nouveautes", page=max(page, 1), show_hidden=shows_hidden(request))
+    )
     for stack in nouveautes.stacks:
         card_views(stack.items)
     styles = record(api.get("/categories"))
@@ -49,6 +51,7 @@ def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depend
             "video_stacks": nouveautes.stacks,
             "current_new_videos_path": current_request_path(request),
             "category_style_map": category_style_map(styles),
+            "hidden_toggle": hidden_toggle(request),
             "page": nouveautes.page,
             "total_pages": nouveautes.total_pages,
             "page_href": page_href_builder(request),
@@ -69,7 +72,7 @@ def dashboard_resume_page_redirect(request: Request):
 
 @router.get("/dashboard/historique", response_class=HTMLResponse)
 def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
-    history = record(api.get("/historique", page=max(page, 1)))
+    history = record(api.get("/historique", page=max(page, 1), show_hidden=shows_hidden(request)))
     styles = record(api.get("/categories"))
     return templates.TemplateResponse(
         request,
@@ -78,6 +81,7 @@ def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(g
             "history_days": history_days(history.rows, history.day_seconds, local_today()),
             "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
             "category_style_map": category_style_map(styles),
+            "hidden_toggle": hidden_toggle(request),
             "page": history.page,
             "total_pages": history.total_pages,
             "page_href": page_href_builder(request),

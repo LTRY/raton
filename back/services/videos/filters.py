@@ -106,6 +106,12 @@ def video_matches_filters(
     return all(groups)
 
 
+def video_not_hidden_condition():
+    """SQL twin of `video.list_state != "hidden"`: an Écartée fiche is left out of the lists unless
+    the page asks to show it (`show_hidden`, docs/spec/11-interface-html.md)."""
+    return or_(Video.list_state.is_(None), Video.list_state != "hidden")
+
+
 def _present(column):
     """SQL twin of Python truthiness for a nullable text column: neither NULL nor empty."""
     return and_(column.is_not(None), column != "")
@@ -169,7 +175,7 @@ def video_filters_condition(
     """SQL twin of `video_matches_filters`: keep the two in step (tests/test_videos_sql_filters.py)."""
     conditions = []
     if hide_hidden:
-        conditions.append(or_(Video.list_state.is_(None), Video.list_state != "hidden"))
+        conditions.append(video_not_hidden_condition())
     if uncategorized_only:
         conditions.append(video_uncategorized_condition())
     excluded_assets = _any_of(

@@ -4646,7 +4646,7 @@ def test_set_video_list_state_rejects_unknown_value():
         videos_editing.set_video_list_state(db, video, "bogus")
 
 
-def test_videos_page_hide_hidden_excludes_only_hidden_videos():
+def test_videos_page_leaves_out_only_hidden_videos_by_default():
     db = make_session()
     kept = add_video(db)
     channel = kept.channel
@@ -4675,15 +4675,16 @@ def test_videos_page_hide_hidden_excludes_only_hidden_videos():
     db.add_all([hidden, marked_watched])
     db.commit()
 
-    rendered = site(db).get("/videos?hide_hidden=1").text
+    rendered = site(db).get("/videos").text
 
     assert kept.title in rendered
     assert marked_watched.title in rendered
     assert hidden.title not in rendered
-    assert 'name="hide_hidden" type="checkbox" value="1" checked' in rendered
+    assert 'name="show_hidden" type="checkbox" value="1" >' in rendered
+    assert 'target="_top" data-drop-hidden' in rendered
 
 
-def test_videos_page_without_hide_hidden_keeps_hidden_videos():
+def test_videos_page_with_show_hidden_keeps_hidden_videos():
     db = make_session()
     add_video(db)
     hidden = Video(
@@ -4699,10 +4700,97 @@ def test_videos_page_without_hide_hidden_keeps_hidden_videos():
     db.add(hidden)
     db.commit()
 
-    rendered = site(db).get("/videos").text
+    rendered = site(db).get("/videos?show_hidden=1").text
 
     assert hidden.title in rendered
     assert 'class="video-row video-row-hidden"' in rendered
+    assert 'name="show_hidden" type="checkbox" value="1" checked' in rendered
+    assert "Écartées affichées" in rendered
+    assert "data-drop-hidden" not in rendered
+
+
+def test_dashboard_new_videos_page_hides_ecartees_unless_shown():
+    db = make_session()
+    channel = Channel(
+        url="https://example.test/ecartees", name="Chaîne écartée", auto_metadata_enabled=True
+    )
+    only_hidden = Channel(
+        url="https://example.test/all-hidden",
+        name="Chaîne toute écartée",
+        auto_metadata_enabled=True,
+    )
+    db.add_all([channel, only_hidden])
+    make_new_video(db, channel, 0)
+    make_new_video(db, channel, 1).list_state = "hidden"
+    make_new_video(db, only_hidden, 2).list_state = "hidden"
+    db.commit()
+
+    rendered = site(db).get("/dashboard/nouveautes").text
+    shown = site(db).get("/dashboard/nouveautes?show_hidden=1&page=1").text
+
+    assert "Nouveauté 0" in rendered
+    assert "Nouveauté 1" not in rendered
+    assert "Chaîne toute écartée" not in rendered
+    assert 'href="/dashboard/nouveautes?show_hidden=1"' in rendered
+    assert "Afficher les écartées" in rendered
+    assert "data-drop-hidden" in rendered
+    assert "Nouveauté 1" in shown
+    assert "Chaîne toute écartée" in shown
+    # Hiding again drops the page number too: the stacks are not the same any more.
+    assert 'href="/dashboard/nouveautes"' in shown
+    assert "Masquer les écartées" in shown
+    assert 'aria-pressed="true"' in shown
+    assert "data-drop-hidden" not in shown
+
+
+def test_dashboard_history_page_hides_ecartees_unless_shown():
+    db = make_session()
+    channel = Channel(url="https://example.test/history-hidden", name="Chaîne historique")
+    db.add(channel)
+    kept = Video(
+        channel=channel,
+        yt_video_id="history-kept",
+        title="Lecture gardée",
+        url="https://www.youtube.com/watch?v=history-kept",
+        media_type="video",
+        folder_path="/media/history-kept",
+        video_path="/media/history-kept/video.mp4",
+        transcript_status=TranscriptStatus.missing,
+    )
+    hidden = Video(
+        channel=channel,
+        yt_video_id="history-hidden",
+        title="Lecture écartée",
+        url="https://www.youtube.com/watch?v=history-hidden",
+        media_type="video",
+        folder_path="/media/history-hidden",
+        video_path="/media/history-hidden/video.mp4",
+        transcript_status=TranscriptStatus.missing,
+        list_state="hidden",
+    )
+    db.add_all([kept, hidden])
+    for index, video in enumerate((kept, hidden, None)):
+        db.add(
+            DownloadJob(
+                status="played",
+                message=f"Lecture vidéo pendant 0:04 à 0:04: Fiche supprimée {index}",
+                video=video,
+                channel=channel,
+                created_at=datetime(2026, 7, 1, tzinfo=UTC) + timedelta(minutes=index),
+            )
+        )
+    db.commit()
+
+    rendered = site(db).get("/dashboard/historique").text
+    shown = site(db).get("/dashboard/historique?show_hidden=1").text
+
+    assert "Lecture gardée" in rendered
+    assert "Lecture écartée" not in rendered
+    # A row whose fiche was deleted has no Écartée state: it stays.
+    assert rendered.count('<article class="dashboard-media-row') == 2
+    assert "Afficher les écartées" in rendered
+    assert "Lecture écartée" in shown
+    assert shown.count('<article class="dashboard-media-row') == 3
 
 
 def test_video_card_renders_list_state_buttons():
@@ -4750,7 +4838,7 @@ def test_video_card_exposes_auto_list_state_for_unhiding():
     )
     db.commit()
 
-    rendered = site(db).get("/videos").text
+    rendered = site(db).get("/videos?show_hidden=1").text
 
     assert 'data-list-state="hidden" data-list-state-auto="watched"' in rendered
 
@@ -4809,7 +4897,7 @@ def test_resume_page_greys_hidden_video_more_strongly():
     db.commit()
     add_playback_job(db, video)
 
-    rendered = site(db).get("/dashboard/historique").text
+    rendered = site(db).get("/dashboard/historique?show_hidden=1").text
 
     assert 'class="dashboard-media-row video-card dashboard-media-row-hidden"' in rendered
     assert 'class="dashboard-media-row video-card dashboard-media-row-completed"' not in rendered

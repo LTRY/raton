@@ -193,7 +193,7 @@ Une fiche est vue quand la lecture a atteint 90 % de la duree (`watched_at`, rem
 
 ### Ecartee
 
-Fiche que la personne ne veut plus voir dans ses listes : grisee en plus, et masquable par le filtre « Masquer les ecartees ».
+Fiche que la personne ne veut plus voir dans ses listes : elle disparait de la Bibliotheque, des pages de chaine, des Nouveautes et de l'Historique. Le bouton « Afficher les ecartees » de chacune de ces listes (`show_hidden=1`) la remontre, grisee au palier fort, pour pouvoir l'y reprendre ; sa page `/videos/{id}` reste ouverte.
 
 - **Code** : `list_state = "hidden"`
 - **A ne pas confondre avec** : Une fiche supprimee ou purgee. Le mot « cachee » n'est pas employe.
