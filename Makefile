@@ -42,6 +42,8 @@ ci: css lint test compose-config
 
 up:
 	mkdir -p "$(MEDIA_HOST_ROOT)" "$${LOG_HOST_DIR:-.local/logs}"
+	# Before the api migrates the real DB at startup: a preview on it would keep old code there.
+	./scripts/preview.sh retire-stale
 	docker compose up --build -d
 	# The rebuild moves the image tag, leaving the previous build as a dangling image;
 	# drop those so images don't pile up. The BuildKit cache is kept (fast rebuilds).

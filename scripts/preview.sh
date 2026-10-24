@@ -6,6 +6,8 @@
 #   preview.sh down <pr>   remove the PR's preview: containers, images, worktree, DB copy
 #   preview.sh list        one line per preview: <pr> <port> <commit> <container state> <db>
 #   preview.sh sweep       remove the previews of the PRs that are no longer open
+#   preview.sh retire-stale  remove the previews on the real DB whose migration head is not
+#                          main's: run by `make up` before the deploy migrates that DB
 #
 # Each preview is its own compose project (raton-pr-<pr>, docker-compose.preview.yml), built
 # from a git worktree of the PR's head in .local/previews/pr-<pr>. Same-repository PRs only:
@@ -143,10 +145,26 @@ cmd_sweep() {
   done
 }
 
+# A preview on the real DB runs its PR's code against it: once a deploy migrates that DB, the
+# old code writes rows the new schema refuses (a column became NOT NULL...). Its PR must merge
+# main to get a preview again; `up` then picks a copy or the real DB as usual.
+cmd_retire_stale() {
+  local target pr head
+  for pr in $(cmd_list | awk '$5 == "shared" { print $1 }'); do
+    target="${target:-$(python3 "$REPO/scripts/preview_db.py" head "$REPO/alembic/versions")}"
+    head="$(python3 "$REPO/scripts/preview_db.py" head "$(worktree_for "$pr")/alembic/versions" 2>/dev/null || true)"
+    if [ "$head" != "$target" ]; then
+      echo "preview $pr : branchée sur la DB réelle, que ce déploiement migre en $target : retirée"
+      cmd_down "$pr"
+    fi
+  done
+}
+
 case "${1:-}" in
   up) cmd_up "${2:-}" ;;
   down) cmd_down "${2:-}" ;;
   list) cmd_list ;;
   sweep) cmd_sweep ;;
-  *) echo "usage: preview.sh up <pr> | down <pr> | list | sweep" >&2; exit 2 ;;
+  retire-stale) cmd_retire_stale ;;
+  *) echo "usage: preview.sh up <pr> | down <pr> | list | sweep | retire-stale" >&2; exit 2 ;;
 esac
