@@ -2,7 +2,12 @@
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+from back.db.base import *  # noqa: F403
+from back.db.session import Base, get_db
 from back.main import app
 from back.services.ingest import scan_events, scanner
 from back.services.jobs import scheduler
@@ -10,7 +15,16 @@ from back.services.jobs import scheduler
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    # The scan routes read nothing in the DB, but the couvre-feu guard of every `/api` route does.
+    engine = create_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    app.dependency_overrides[get_db] = lambda: sessionmaker(bind=engine)()
+    yield TestClient(app)
+    app.dependency_overrides.pop(get_db, None)
 
 
 def test_scan_now_starts_the_scan_in_the_background(client, monkeypatch):

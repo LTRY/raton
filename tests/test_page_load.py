@@ -18,7 +18,8 @@ from back.models.video import Video
 from tests.site import site_client
 
 # Generous: the point is a constant, not the exact figure (a page with one statement per video blows past it).
-MAX_STATEMENTS = 60
+# Each `/api` call of a page also costs the couvre-feu guard's one read of its settings.
+MAX_STATEMENTS = 70
 
 
 @pytest.fixture

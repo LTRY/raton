@@ -39,7 +39,7 @@ téléchargement ni d'appel au LLM.
 | `get_nouveautes` | `GET /nouveautes` |
 | `get_library_stats` | `GET /stats` |
 
-Un appel refusé par le back lève une erreur portant son message (`detail`).
+Un appel refusé par le back lève une erreur portant son message (`detail`). Pendant le couvre-feu, le back refuse presque tout en `423` (voir [02 Fonctionnalités](02-fonctionnalites.md)) : l'outil lève alors ce message.
 
 ## Limites
 
