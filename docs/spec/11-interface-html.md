@@ -141,7 +141,7 @@ haut au minimum, vers 44 px quand la place le permet.
 
 - Les pastilles de filtre (`.chip3`, « ★ Notees », « Masquer les ecartees »,
   « Sans categorie ») et les boutons pastilles (« + Categories »,
-  « + Playlists », `button.category-label`) passent a 32 px de haut, texte 12 px.
+  `button.category-label`) passent a 32 px de haut, texte 12 px.
 - Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
 - Les etoiles de notation, le menu ⋮ des cartes et le ✕ d'une categorie dans
   les Parametres gardent leur dessin : un `::after` invisible agrandit leur
@@ -1485,13 +1485,20 @@ Contenu ordonne :
    referent est Raton) ; sinon il suit son `href`, la page d'origine (`next`,
    sinon `/videos`). Son `aria-label`/`title` nomme cette page : "Retour a la
    playlist" (detail d'une playlist), "Retour a la chaine" (bibliotheque
-   filtree sur une chaine), sinon "Retour a la bibliotheque". Sous 800 px, il
-   partage sa ligne avec le selecteur video/audio (`.media-pager-dots`, au
-   centre, voir le point 7) et un bouton « ⋮ » en verre
-   (`details.video-more[data-pop]`) qui ouvre un menu
-   (`.video-more-panel`, 300 px) : groupes separes par un filet, chacun sous
-   un petit libelle gris en capitales, et des lignes pleine largeur avec une
-   icone (`.video-more-item`, 44 px de haut, sous-titre gris eventuel). Groupes :
+   filtree sur une chaine), sinon "Retour a la bibliotheque". Il partage sa
+   ligne avec un bouton « ⋮ » en verre, a droite
+   (`details.video-more[data-pop]`), et sous 800 px avec le selecteur
+   video/audio (`.media-pager-dots`, au centre, voir le point 7). Le bouton
+   « ⋮ » ouvre un menu (`.video-more-panel`, 300 px) : groupes separes par un
+   filet, chacun sous un petit libelle gris en capitales, et des lignes pleine
+   largeur avec une icone (`.video-more-item`, 44 px de haut, sous-titre gris
+   eventuel). Groupes : « Playlists » (seul groupe present a toutes les
+   largeurs, seul endroit de la fiche ou ajouter la video a une playlist :
+   une ligne par playlist contenant deja la video, avec un bouton « Retirer »
+   en rouge, puis un select vers une playlist existante — absent quand il n'y
+   en a aucune — et un champ texte pour en creer une nouvelle a la volee,
+   envoyes par la ligne « Ajouter a une playlist » vers
+   `POST /videos/{id}/playlists`), puis, sous 800 px seulement,
    « IA » (« Generer avec l'IA », sous-titre « Notes structurees et resume »,
    rendu seulement si `transcript.txt` existe, qui relaie son clic vers le
    bouton robot `#generate-form .ai-generate-button` par `data-click-proxy` ;
@@ -1512,7 +1519,7 @@ Contenu ordonne :
    `#segments-sponsors` ouvre alors ce panneau, un clic sur un segment le
    ferme, et le statut de la recuperation y est repete
    (`data-retry-status-mirror`, bouton desactive pendant la requete) ;
-   au-dessus de 800 px il est absent ;
+   au-dessus de 800 px le menu ne montre que le groupe « Playlists » ;
 2. labels — labels techniques (`asset-labels`) puis labels categories
    (`category-labels`) ; ces derniers se terminent par un bouton discret
    "+ Categories" (style pointille, identique a celui du bouton "+ Custom"
@@ -1521,15 +1528,13 @@ Contenu ordonne :
    de l'entete, masque par defaut ; un clic bascule le texte du bouton en
    "− Categories" et affiche l'editeur, un second clic le recache (etat non
    persiste, redevient masque au rechargement de la page) ; juste en dessous,
-   un second groupe de labels suit exactement le meme motif pour les
-   playlists ("+ Playlists"/"− Playlists") : liste les playlists contenant
-   deja cette video (avec un lien "Retirer" par playlist), un select vers une
-   playlist existante et un champ texte pour en creer une nouvelle a la volee
-   (meme convention "presets + champ libre" que l'editeur de categories) ;
+   quand la video est dans au moins une playlist, un second groupe de labels
+   donne le titre de ces playlists, sans bouton (l'ajout et le retrait sont
+   dans le menu « ⋮ », point 1) ;
    sous 800 px les labels techniques sont masques (seuls restent les labels
    categories et les playlists), chaque groupe occupe sa propre ligne sous la
-   chaine, aligne sur le bord droit, et commence par son bouton
-   "+ Categories"/"+ Playlists", a la taille de son texte, suivi de ses
+   chaine, aligne sur le bord droit, et le groupe des categories commence par
+   son bouton "+ Categories", a la taille de son texte, suivi de ses
    labels ;
 3. titre ;
 4. chaine ;

@@ -14,16 +14,39 @@
       <button type="button" class="media-pager-dot media-pager-dot-active" data-media-dot="video" aria-label="Version vidéo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="14" height="12" rx="2.5"/><path d="M17 10.5l4-2.5v8l-4-2.5"/></svg></button>
       <button type="button" class="media-pager-dot" data-media-dot="audio" aria-label="Version audio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 14v-4M7 17V7M11 20V4M15 16V8M19 13v-2"/></svg></button>
     </div>
-    {# Phone only (hidden by CSS above 800px, where the tabs and the action bar
-       carry the same things). The AI generation, the sponsor segments, the
-       delete of the downloaded files and the transcript retry live here. The
-       AI and retry items proxy a click to the real buttons, so their
+    {# The playlists group shows at every width: it is the only place to add
+       the video to a playlist. The other groups are phone only (hidden by CSS
+       above 800px, where the tabs and the action bar carry the same things);
+       the AI and retry items proxy a click to the real buttons, so their
        handlers and ids stay single. #}
     <details class="video-more" data-pop>
       <summary class="video-more-toggle lg" aria-label="Plus d'options">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="12" cy="19" r="1.9"/></svg>
       </summary>
       <div class="video-more-panel lg">
+        <section class="video-more-group video-more-playlists">
+          <h2 class="video-more-label">Playlists</h2>
+          {% for link in video_playlist_links %}
+          <form class="video-more-playlist" action="/playlists/{{ link.playlist_id }}/items/{{ link.item_id }}/remove" method="post">
+            <input type="hidden" name="next" value="/videos/{{ video.id }}">
+            <span class="video-more-playlist-title">{{ link.title }}</span>
+            <button class="video-more-playlist-remove" type="submit" aria-label="Retirer de {{ link.title }}">Retirer</button>
+          </form>
+          {% endfor %}
+          <form class="video-more-playlist-add" action="/videos/{{ video.id }}/playlists" method="post">
+            <input type="hidden" name="next" value="/videos/{{ video.id }}">
+            {% if all_playlists %}
+            <select name="playlist_id" aria-label="Playlist existante">
+              <option value="">Playlist existante…</option>
+              {% for playlist in all_playlists %}
+              <option value="{{ playlist.id }}">{{ playlist.title }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+            <input type="text" name="new_playlist_title" placeholder="{{ 'Ou nouvelle playlist' if all_playlists else 'Nouvelle playlist' }}" aria-label="Nouvelle playlist">
+            <button class="video-more-item" type="submit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h12M3 12h12M3 18h7"/><path d="M18 14v6M15 17h6"/></svg><span>Ajouter à une playlist</span></button>
+          </form>
+        </section>
         {% if transcript %}
         <section class="video-more-group">
           <h2 class="video-more-label">IA</h2>
@@ -92,14 +115,15 @@
             <button type="button" class="category-label category-label-add" id="category-editor-toggle" aria-expanded="false" aria-controls="category-editor-form">+ Catégories</button>
           </span>
         </span>
+        {% if video_playlist_links %}
         <span class="video-label-groups video-detail-label-groups">
           <span class="category-labels" aria-label="Playlists">
             {% for link in video_playlist_links %}
             <span class="category-label">{{ link.title }}</span>
             {% endfor %}
-            <button type="button" class="category-label category-label-add" id="playlist-widget-toggle" aria-expanded="false" aria-controls="playlist-widget-form">+ Playlists</button>
           </span>
         </span>
+        {% endif %}
         <form class="rating-control rating-control-detail rating-tier-{{ video.rating }}" action="/videos/{{ video.id }}/rating" data-rating-url="/api/videos/{{ video.id }}/rating" method="post" data-turbo="false" aria-label="Note de la vidéo">
           <input type="hidden" name="next" value="/videos/{{ video.id }}">
           {% for value in range(1, 6) %}
@@ -134,40 +158,6 @@
       </span>
       <span id="category-save-status" class="async-form-status" aria-live="polite" hidden></span>
     </form>
-
-    <div class="category-editor" id="playlist-widget-form" hidden>
-      <span class="category-editor-title">Playlists</span>
-      {% if video_playlist_links %}
-      <ul class="playlist-widget-current">
-        {% for link in video_playlist_links %}
-        <li>
-          <span>{{ link.title }}</span>
-          <form action="/playlists/{{ link.playlist_id }}/items/{{ link.item_id }}/remove" method="post">
-            <input type="hidden" name="next" value="/videos/{{ video.id }}">
-            <button class="danger" type="submit">Retirer</button>
-          </form>
-        </li>
-        {% endfor %}
-      </ul>
-      {% endif %}
-      <form action="/videos/{{ video.id }}/playlists" method="post">
-        <input type="hidden" name="next" value="/videos/{{ video.id }}">
-        <label>
-          Playlist existante
-          <select name="playlist_id">
-            <option value="">— Choisir —</option>
-            {% for playlist in all_playlists %}
-            <option value="{{ playlist.id }}">{{ playlist.title }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Ou nouvelle playlist
-          <input type="text" name="new_playlist_title" placeholder="Titre de la nouvelle playlist">
-        </label>
-        <button type="submit">Ajouter</button>
-      </form>
-    </div>
 
     <div class="video-detail-action-bar">
       {{ macros.format_actions(video, allow_delete=true) }}
@@ -493,17 +483,6 @@
       editorToggle.setAttribute("aria-expanded", String(!isOpen));
       editorToggle.textContent = isOpen ? "+ Catégories" : "− Catégories";
     });
-
-    const playlistWidgetToggle = document.getElementById("playlist-widget-toggle");
-    const playlistWidgetForm = document.getElementById("playlist-widget-form");
-    if (playlistWidgetToggle && playlistWidgetForm) {
-      playlistWidgetToggle.addEventListener("click", () => {
-        const isOpen = !playlistWidgetForm.hidden;
-        playlistWidgetForm.hidden = isOpen;
-        playlistWidgetToggle.setAttribute("aria-expanded", String(!isOpen));
-        playlistWidgetToggle.textContent = isOpen ? "+ Playlists" : "− Playlists";
-      });
-    }
 
     function setStatus(message, level) {
       window.clearTimeout(statusTimer);
