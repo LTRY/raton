@@ -495,12 +495,11 @@
 {# Side menu of the Bibliothèque, opened by the ☰ button left of the title: same drawer as the
    library chat's discussions (`.chat-drawer`), wired by initLibraryMenu (static/js/app.js).
    Spec: docs/spec/11-interface-html.md, "Bibliotheque : Nouveautes, Historique, Exploration". #}
-{% macro library_menu(active) %}
+{% macro library_menu(active, views=[]) %}
 {% set entries = [
   ("nouveautes", "/dashboard/nouveautes", "Nouveautés", '<path d="M12 3c.5 4 2 6.5 7 7.5-5 1-6.5 3.5-7 7.5-.5-4-2-6.5-7-7.5 5-1 6.5-3.5 7-7.5Z"/><path d="M19 15.5c.2 1.6.8 2.6 2.5 3-1.7.4-2.3 1.4-2.5 3-.2-1.6-.8-2.6-2.5-3 1.7-.4 2.3-1.4 2.5-3Z"/>'),
   ("historique", "/dashboard/historique", "Historique", '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4v4h4"/><path d="M12 7.5V12l3 2"/>'),
   ("exploration", "/videos", "Exploration", '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/>'),
-  ("podcasts", "/videos?category=podcast", "Podcasts", '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/>'),
 ] %}
 <div class="library-menu" data-library-menu>
   <button type="button" class="chat-nav-button" data-library-menu-toggle aria-expanded="false" aria-controls="library-menu-drawer" aria-label="Menu de la bibliothèque" title="Menu">
@@ -520,6 +519,15 @@
       <span>{{ label }}</span>
     </a>
     {% endfor %}
+    {% if views %}
+    <p class="chat-drawer-label">Sous-bibliothèques</p>
+    {% for view in views %}
+    <a class="chat-drawer-item" href="{{ view.href }}"{% if view.active %} aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16l-6 8v6l-4 2v-8Z"/></svg>
+      <span>{{ view.name }}</span>
+    </a>
+    {% endfor %}
+    {% endif %}
   </nav>
 </div>
 {% endmacro %}

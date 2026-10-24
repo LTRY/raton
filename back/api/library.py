@@ -45,6 +45,20 @@ def filters_read(filters: LibraryFilters) -> LibraryFiltersRead:
     )
 
 
+def saved_view_read(view: dict) -> SavedViewRead:
+    return SavedViewRead(
+        name=view["name"],
+        active=view["active"],
+        assets=view.get("assets", []),
+        categories=view.get("categories", []),
+        excluded_assets=view.get("excluded_assets", []),
+        excluded_categories=view.get("excluded_categories", []),
+        rated=bool(view.get("rated")),
+        asset_filter_mode=str(view.get("asset_filter_mode") or "or"),
+        category_filter_mode=str(view.get("category_filter_mode") or "or"),
+    )
+
+
 @router.get("/library", response_model=LibraryPageRead, responses=error_responses(404, 422))
 def get_library(
     channel_id: int | None = None,
@@ -97,20 +111,7 @@ def get_library(
         total=listing.filtered_video_count,
         counts=listing.section_counts,
         items=card_reads(db, listing.videos),
-        saved_views=[
-            SavedViewRead(
-                name=view["name"],
-                active=view["active"],
-                assets=view.get("assets", []),
-                categories=view.get("categories", []),
-                excluded_assets=view.get("excluded_assets", []),
-                excluded_categories=view.get("excluded_categories", []),
-                rated=bool(view.get("rated")),
-                asset_filter_mode=str(view.get("asset_filter_mode") or "or"),
-                category_filter_mode=str(view.get("category_filter_mode") or "or"),
-            )
-            for view in library_saved_views(db, filters)
-        ],
+        saved_views=[saved_view_read(view) for view in library_saved_views(db, filters)],
         publication_interval_days=publication_interval_days(listing.publication_dates)
         if listing.publication_dates is not None
         else None,
@@ -119,6 +120,13 @@ def get_library(
         else None,
         explore_page_size=CHANNEL_VIDEO_PAGE_SIZE,
     )
+
+
+@router.get("/library/views", response_model=list[SavedViewRead])
+def get_saved_views(db: Session = Depends(get_db)) -> list[SavedViewRead]:
+    """The vues enregistrees (none `active`): the Bibliothèque menu of the pages other than
+    `/videos`, which gets them with `GET /api/library`."""
+    return [saved_view_read(view) for view in library_saved_views(db)]
 
 
 @router.get("/library/cards", response_model=list[LibraryVideoRead], responses=error_responses(422))

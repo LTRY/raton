@@ -285,6 +285,9 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   qu'« Explorer la suite » importe) et `explore_page_size`. Une fiche
   ancienne sans chaine recoit la sienne (et ses labels) en etant listee.
   `404` si `channel_id` ne designe aucune chaine.
+- `GET /api/library/views` : les vues enregistrees (memes champs que
+  `saved_views`, `active` toujours faux) : le menu de la Bibliotheque des
+  pages autres que `/videos`.
 - `GET /api/library/cards?ids=1,2,3` : les cartes de ces fiches (memes
   champs que `items`), dans cet ordre, les inconnues ignorees (au plus 200) :
   la page d'une chaine y ajoute les fiches qu'une exploration importe. Le nombre de requetes SQL ne depend pas de la

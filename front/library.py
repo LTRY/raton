@@ -185,6 +185,14 @@ def video_library_view_path(view, request: Request) -> str:
     return f"/videos?{urlencode(params)}"
 
 
+def library_view_links(views, request: Request) -> list[dict]:
+    """The vues enregistrees as links of the Bibliothèque menu."""
+    return [
+        {"name": view.name, "active": view.active, "href": video_library_view_path(view, request)}
+        for view in views
+    ]
+
+
 def channel_periodicity(median_days: float | None) -> str | None:
     """A channel's posting rhythm, from the median days between two publications."""
     if median_days is None:

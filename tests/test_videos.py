@@ -2086,11 +2086,12 @@ def test_videos_page_renders_default_rated_sub_library(monkeypatch):
     rendered = response.text
 
     assert rated.title in rendered
-    assert '<nav class="library-subnav" aria-label="Sous-bibliothèques">' in rendered
+    assert 'aria-label="Sous-bibliothèques"' not in rendered
     assert (
-        '<a class="lg active" href="/videos?asset_filters=1&amp;asset_filter_mode=or&amp;category_filter_mode=or&amp;rated=1">Notés</a>'
+        '<a class="chat-drawer-item" href="/videos?asset_filters=1&amp;asset_filter_mode=or&amp;category_filter_mode=or&amp;rated=1" aria-current="page">'
         in rendered
     )
+    assert '<a class="chat-drawer-item" href="/videos" aria-current="page">' not in rendered
 
 
 def test_videos_page_empty_sub_library_filters_show_all_videos(monkeypatch):
@@ -2607,23 +2608,26 @@ def test_library_pages_open_the_library_menu_from_the_title_row():
     db = make_session()
     client = site(db)
 
-    for path, current in (
-        ("/dashboard/nouveautes", "/dashboard/nouveautes"),
-        ("/dashboard/historique", "/dashboard/historique"),
-        ("/videos", "/videos"),
-        ("/videos?category=podcast", "/videos?category=podcast"),
-    ):
+    for path in ("/dashboard/nouveautes", "/dashboard/historique", "/videos"):
         rendered = client.get(path).text
         head = rendered[rendered.index('<div class="page-head">') : rendered.index("<h1>")]
         assert "data-library-menu-toggle" in head, path
-        for href in (
-            "/dashboard/nouveautes",
-            "/dashboard/historique",
-            "/videos",
-            "/videos?category=podcast",
-        ):
+        for href in ("/dashboard/nouveautes", "/dashboard/historique", "/videos"):
             marker = f'<a class="chat-drawer-item" href="{href}" aria-current="page">'
-            assert (marker in rendered) == (href == current), (path, href)
+            assert (marker in rendered) == (href == path), (path, href)
+        # The default vues enregistrees, under their own label.
+        assert '<p class="chat-drawer-label">Sous-bibliothèques</p>' in rendered, path
+        assert "<span>Notés</span>" in rendered, path
+
+
+def test_saved_views_api_lists_them_none_active():
+    db = make_session()
+
+    views = site(db).get("/api/library/views").json()
+
+    assert views
+    assert {view["name"] for view in views} >= {"Notés"}
+    assert not any(view["active"] for view in views)
 
 
 def make_new_video(db, channel, index, is_new=True):

@@ -294,7 +294,7 @@ Liste des fiches, avec filtres, tri et recherche.
 
 ### Menu de la Bibliotheque
 
-Tiroir lateral ouvert par le bouton ☰ a gauche du titre `Bibliotheque` : un lien par section (Nouveautes, Historique, Exploration, Podcasts).
+Tiroir lateral ouvert par le bouton ☰ a gauche du titre `Bibliotheque` : un lien par section (Nouveautes, Historique, Exploration) puis un par vue enregistree (« Sous-bibliothèques »).
 
 - **Code** : macro `library_menu` (`front/templates/_macros.html`), `initLibraryMenu` (`front/static/js/app.js`)
 - **A ne pas confondre avec** : Le tiroir « Discussions » du chat bibliotheque, dont il reprend le style, ni le menu Bibliotheque de la barre du haut (bureau).

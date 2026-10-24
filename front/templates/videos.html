@@ -3,7 +3,7 @@
 {% block content %}
 <section>
   <div class="page-head">
-    {{ macros.library_menu("podcasts" if selected_category_filters|list == ['podcast'] else "exploration") }}
+    {{ macros.library_menu("" if library_views|selectattr("active")|list else "exploration", library_views) }}
     <h1>Bibliothèque</h1>
     {# Tied to the filters form below by `form=`: the field sits on the title row like on
        /channels and /playlists, but still submits and live-searches with the filters. #}
@@ -13,14 +13,6 @@
     </label>
   </div>
   {{ macros.library_subnav("exploration") }}
-
-  {% if library_views %}
-  <nav class="library-subnav" aria-label="Sous-bibliothèques">
-    {% for view in library_views %}
-    <a class="lg{{ ' active' if view.active else '' }}" href="{{ view.href }}">{{ view.name }}</a>
-    {% endfor %}
-  </nav>
-  {% endif %}
 
   {# Folded on a phone so the fiches start on the first screen; the summary only
      shows there (docs/spec/11-interface-html.md, "Bibliotheque > Exploration"). #}

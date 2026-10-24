@@ -446,9 +446,8 @@ par `.chat-composer`.
     Tant que le menu Bibliotheque est ouvert, la barre perd son flou
     (`:has(.nav-library-menu[open])`) : le menu a son propre verre, et un flou
     imbrique ne verrait que le fond de la barre ;
-  - les pastilles de sous-navigation de la bibliotheque (`library_subnav` et les
-    vues enregistrees de `/videos`) ; l'etat courant (`aria-current` ou
-    `.active`) garde sa teinte chaude, plus de bleu plein ;
+  - les pastilles de sous-navigation de la bibliotheque (`library_subnav`) ;
+    l'etat courant (`aria-current`) garde sa teinte chaude, plus de bleu plein ;
   - les liens-boutons `.button-link` (Retour, Precedent/Suivant, Cout LLM…) :
     texte `--color-primary` sur verre, plus de bleu ni d'ardoise.
 - **Barre d'enregistrement des parametres** (`.settings-actions`, collante en
@@ -608,11 +607,15 @@ Les trois vues partagent le titre `Bibliotheque` et la sous-navigation
 discussions du chat bibliotheque (`.chat-drawer`, voir « Widget de chat ») : 320px
 au plus, 86 % de la largeur sur telephone, voile sombre ; ✕, Echap ou le voile le
 referment, et il est referme avant que Turbo ne garde la page en cache (le bouton
-retour ne le rouvre pas). Il contient le titre « Bibliothèque » puis un lien par
-section, avec son icone : **Nouveautés**, **Historique**, **Exploration** et
-**Podcasts** (`/videos?category=podcast`, l'Exploration filtree sur la categorie
-`podcast`). La section affichee est surlignee (`aria-current="page"`) ;
-Podcasts l'est quand le seul filtre de categorie de `/videos` est `podcast`.
+retour ne le rouvre pas). Il contient le titre « Bibliothèque », un lien par
+section avec son icone (**Nouveautés**, **Historique**, **Exploration**), puis,
+sous « Sous-bibliothèques », un lien par vue enregistree (reglees dans
+`/settings`) qui ouvre `/videos` avec ses filtres. Les vues viennent de
+`saved_views` de `GET /api/library` sur `/videos` et de `GET /api/library/views`
+sur Nouveautes et Historique. L'entree affichee est surlignee
+(`aria-current="page"`) : la vue enregistree dont les filtres sont ceux de
+`/videos`, sinon Exploration. Il n'y a plus de barre de pastilles des vues sur
+`/videos` : elles sont dans ce menu.
 
 **Import** (feuille d'import de la Bibliotheque) : le formulaire de
 telechargement manuel par URL. Champs : URL YouTube, deux
@@ -1229,8 +1232,8 @@ Contenu :
 
 ### Page d'une chaine
 
-Template : `channel_videos.html`. La barre de sous-bibliotheques
-(`library_views`) n'existe que sur la bibliotheque globale. Le formulaire
+Template : `channel_videos.html`. Les sous-bibliotheques
+(`library_views`, menu de la Bibliotheque) n'y sont pas. Le formulaire
 d'import par URL non plus. Tout le CSS de la page est prefixe `.channel-*` (et
 `.video-row-channel` pour les cartes) : les autres listes gardent leur
 rendu. Les animations (cascade des cartes, sonnerie des cloches, reflet des

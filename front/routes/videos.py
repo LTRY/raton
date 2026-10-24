@@ -12,11 +12,11 @@ from front.library import (
     VIDEO_ASSET_FILTER_OPTIONS,
     channel_periodicity,
     library_query,
+    library_view_links,
     normalized_channel_id,
     shorts_feature_flags,
     video_active_filter_pills,
     video_filters_clear_href,
-    video_library_view_path,
 )
 from front.pages import (
     append_query,
@@ -74,14 +74,7 @@ def videos_page(
             "selected_asset_filters": set(filters.assets),
             "category_filter_options": styles,
             "category_style_map": category_style_map(styles),
-            "library_views": [
-                {
-                    "name": view.name,
-                    "active": view.active,
-                    "href": video_library_view_path(view, request),
-                }
-                for view in library.saved_views
-            ],
+            "library_views": library_view_links(library.saved_views, request),
             "selected_category_filters": set(filters.categories),
             "selected_excluded_asset_filters": set(filters.excluded_assets),
             "selected_excluded_category_filters": set(filters.excluded_categories),
