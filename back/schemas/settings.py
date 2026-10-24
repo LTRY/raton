@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -28,6 +29,15 @@ class CurfewRead(BaseModel):
     ends_at: datetime | None
 
 
+class RatonLanguageRead(BaseModel):
+    """How Raton speaks to the user in the chat."""
+
+    # "vous" or "tu".
+    address: str
+    # The name Raton calls the user by; empty for none.
+    nickname: str
+
+
 class SettingsRead(BaseModel):
     media_root: str
     global_quota_bytes: int
@@ -47,6 +57,7 @@ class SettingsRead(BaseModel):
     # `week`, `month`; the week and month ones are the day's, scaled).
     screen_time_limits: dict[str, dict[str, int]]
     curfew: CurfewRead
+    raton_language: RatonLanguageRead
     # Who answers the LLM requests, such as "Claude API (claude-haiku-4-5)"; set by the
     # environment, so not in `SettingsUpdate`.
     llm_provider_label: str
@@ -78,6 +89,8 @@ class SettingsUpdate(BaseModel):
     curfew_enabled: bool | None = None
     curfew_start: str | None = None
     curfew_end: str | None = None
+    raton_address: Literal["vous", "tu"] | None = None
+    raton_nickname: str | None = None
 
     @field_validator("curfew_start", "curfew_end")
     @classmethod

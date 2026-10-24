@@ -191,3 +191,15 @@ def test_curfew_is_each_users_own(db):
     assert client.get("/api/library").status_code == 423
     assert client.get("/api/library", headers={"X-Raton-User": str(other.id)}).status_code == 200
     assert read_curfew(db, other.id).enabled is False
+
+
+def test_the_user_page_stays_open_during_the_curfew_for_the_user_switch(db, front_client):
+    add_user(db, "Camille")
+    start_curfew_now(db)
+
+    page = front_client(db).get("/user")
+
+    assert page.status_code == 200
+    assert page.text.count('action="/users/switch"') == 2
+    assert 'action="/user"' not in page.text
+    assert "/rename" not in page.text

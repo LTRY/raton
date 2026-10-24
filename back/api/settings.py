@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from back.api.curfew import curfew_read
@@ -11,10 +11,12 @@ from back.api.users import current_user_id
 from back.db.session import get_db
 from back.schemas.settings import (
     CategoryStyleRead,
+    RatonLanguageRead,
     SettingsRead,
     SettingsUpdate,
     SponsorCategoryRead,
 )
+from back.services.common.raton_language import RatonLanguageError, read_raton_language
 from back.services.common.settings import (
     SPONSOR_SEGMENT_CATEGORY_CHOICES,
     SPONSOR_SEGMENT_CATEGORY_LABELS,
@@ -64,37 +66,43 @@ def read_settings(
         ],
         screen_time_limits=get_screen_time_limits(db, user_id),
         curfew=curfew_read(db, user_id),
+        raton_language=RatonLanguageRead(**vars(read_raton_language(db, user_id))),
         llm_provider_label=get_llm_provider_display_label(),
     )
 
 
-@router.put("/settings", response_model=SettingsRead, responses=error_responses(422))
+@router.put("/settings", response_model=SettingsRead, responses=error_responses(400, 422))
 def update_settings(
     payload: SettingsUpdate,
     db: Session = Depends(get_db),
     user_id: int = Depends(current_user_id),
 ) -> SettingsRead:
     # save_settings normalizes labels, colours and saved views itself.
-    save_settings(
-        db,
-        user_id,
-        media_root=str(Path(payload.media_root).expanduser())
-        if payload.media_root is not None
-        else None,
-        global_quota_bytes=payload.global_quota_bytes,
-        category_labels=payload.video_category_labels,
-        category_label_styles=payload.video_category_label_styles,
-        library_views=payload.video_library_views,
-        no_progress_category_labels=payload.no_progress_category_labels,
-        auto_notes_enabled=payload.auto_notes_enabled,
-        auto_notes_excluded_category_labels=payload.auto_notes_excluded_category_labels,
-        sponsor_segment_categories=payload.sponsor_segment_categories,
-        sponsor_skip_enabled=payload.sponsor_skip_enabled,
-        screen_time_today_minutes=payload.screen_time_today_minutes.model_dump()
-        if payload.screen_time_today_minutes
-        else None,
-        curfew_enabled=payload.curfew_enabled,
-        curfew_start=payload.curfew_start,
-        curfew_end=payload.curfew_end,
-    )
+    try:
+        save_settings(
+            db,
+            user_id,
+            media_root=str(Path(payload.media_root).expanduser())
+            if payload.media_root is not None
+            else None,
+            global_quota_bytes=payload.global_quota_bytes,
+            category_labels=payload.video_category_labels,
+            category_label_styles=payload.video_category_label_styles,
+            library_views=payload.video_library_views,
+            no_progress_category_labels=payload.no_progress_category_labels,
+            auto_notes_enabled=payload.auto_notes_enabled,
+            auto_notes_excluded_category_labels=payload.auto_notes_excluded_category_labels,
+            sponsor_segment_categories=payload.sponsor_segment_categories,
+            sponsor_skip_enabled=payload.sponsor_skip_enabled,
+            screen_time_today_minutes=payload.screen_time_today_minutes.model_dump()
+            if payload.screen_time_today_minutes
+            else None,
+            curfew_enabled=payload.curfew_enabled,
+            curfew_start=payload.curfew_start,
+            curfew_end=payload.curfew_end,
+            raton_address=payload.raton_address,
+            raton_nickname=payload.raton_nickname,
+        )
+    except RatonLanguageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return read_settings(db, user_id)

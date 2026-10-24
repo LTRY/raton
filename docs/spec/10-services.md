@@ -66,6 +66,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
 | `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; nettoyage de la saisie (`normalized_search_query`) ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
+| `raton_language` | Langage de Raton d'un utilisateur : tutoiement ou vouvoiement, surnom ; lu par le prompt du chat bibliothèque |
 | `curfew` | Couvre-feu d'un utilisateur : heures stockées, état à un instant donné, routes `/api` qu'il laisse ouvertes (`ensure_open`) |
 | `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/jobs`) et les statuts après lesquels un job ne change plus |
 

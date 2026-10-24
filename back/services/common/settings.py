@@ -26,6 +26,13 @@ from back.services.common.library_views import (
     parse_video_library_views,
     serialize_video_library_views,
 )
+from back.services.common.raton_language import (
+    RATON_ADDRESS_KEY,
+    RATON_ADDRESSES,
+    RATON_NICKNAME_KEY,
+    RatonLanguageError,
+    normalize_raton_nickname,
+)
 
 logger = logging.getLogger(__name__)
 MEDIA_ROOT_KEY = "media_root"
@@ -263,15 +270,22 @@ def save_settings(
     curfew_enabled: bool | None = None,
     curfew_start: str | None = None,
     curfew_end: str | None = None,
+    raton_address: str | None = None,
+    raton_nickname: str | None = None,
 ) -> None:
     """Store the given settings, leave the others as they are, and commit.
 
     Shared by the /settings form and `PUT /api/settings`. The saved views, the screen-time
-    limits and the couvre-feu are the user's own; the other settings are the library's. `category_labels` stores bare labels
+    limits, the couvre-feu and Raton's language are the user's own; the other settings are the library's. `category_labels` stores bare labels
     (colours assigned when read); `category_label_styles`, applied after it, stores labels with their
     colours. A screen-time limit given as None keeps its current value; every limit is at least one
-    minute. The couvre-feu hours are stored as `HH:MM` (ValueError otherwise).
+    minute. The couvre-feu hours are stored as `HH:MM` (ValueError otherwise); a refused Raton
+    language raises RatonLanguageError before anything is stored.
     """
+    if raton_address is not None and raton_address not in RATON_ADDRESSES:
+        raise RatonLanguageError("Raton dit « tu » ou « vous ».")
+    if raton_nickname is not None:
+        raton_nickname = normalize_raton_nickname(raton_nickname)
     if media_root is not None:
         set_setting(db, MEDIA_ROOT_KEY, media_root)
     if global_quota_bytes is not None:
@@ -324,4 +338,8 @@ def save_settings(
         set_user_setting(db, user_id, CURFEW_START_KEY, normalize_curfew_time(curfew_start))
     if curfew_end is not None:
         set_user_setting(db, user_id, CURFEW_END_KEY, normalize_curfew_time(curfew_end))
+    if raton_address is not None:
+        set_user_setting(db, user_id, RATON_ADDRESS_KEY, raton_address)
+    if raton_nickname is not None:
+        set_user_setting(db, user_id, RATON_NICKNAME_KEY, raton_nickname)
     db.commit()

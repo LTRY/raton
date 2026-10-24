@@ -19,7 +19,6 @@
       <nav class="settings-nav" data-settings-nav aria-label="Sections des paramètres">
         <a href="#general" class="settings-nav-link">Général</a>
         <a href="#utilisateurs" class="settings-nav-link">Utilisateurs</a>
-        <a href="#curfew" class="settings-nav-link">Couvre-feu</a>
         <a href="#library-stats" class="settings-nav-link">Bibliothèque</a>
         <a href="#llm-usage" class="settings-nav-link">Coûts LLM</a>
         <a href="#auto-scan" class="settings-nav-link">Suivi automatique</a>
@@ -48,7 +47,7 @@
         {# Its fields belong to the forms after the settings form (`form=`): forms cannot nest. #}
         <div class="settings-card" id="utilisateurs">
           <h2 class="settings-card-title">Utilisateurs</h2>
-          <p class="settings-hint">Les fiches, leurs fichiers, transcripts et notes générées sont partagés. Vu, Indésirée, notes en étoiles, commentaires, cloches, Nouveautés, playlists, discussions, historique, sous-bibliothèques, temps d’écran et couvre-feu sont propres à chaque utilisateur. On change d’utilisateur depuis le bouton rond du tiroir « Discussions » de l’accueil.</p>
+          <p class="settings-hint">Les fiches, leurs fichiers, transcripts et notes générées sont partagés. Vu, Indésirée, notes en étoiles, commentaires, cloches, Nouveautés, playlists, discussions, historique, sous-bibliothèques, temps d’écran et couvre-feu sont propres à chaque utilisateur. Le bouton rond du tiroir « Discussions » de l’accueil ouvre la page de l’utilisateur : changer d’utilisateur, couvre-feu, façon dont Raton lui parle.</p>
           <ul class="settings-users">
             {% for user in users.users %}
             <li class="settings-user">
@@ -64,23 +63,6 @@
             </li>
             {% endfor %}
           </ul>
-        </div>
-
-        <div class="settings-card" id="curfew">
-          <div class="settings-curfew">
-            <h2 class="settings-card-title">Couvre-feu</h2>
-            <p class="settings-hint">Pendant ces heures, Raton ferme : plus de lecture, de recherche ni de réglages. Seuls l’accueil (Raton et ses discussions) et l’historique restent ouverts, pour écrire un commentaire sous les vidéos. Les tâches de la nuit (scan, purge, notes) continuent. Propre à chaque utilisateur, il ne se désactive pas pendant qu’il est en cours.</p>
-            <div class="settings-checkbox-list">
-              <label class="settings-checkbox-option">
-                <input type="checkbox" name="curfew_enabled"{% if curfew.enabled %} checked{% endif %}>
-                <span>Activer le couvre-feu</span>
-              </label>
-            </div>
-            <div class="settings-curfew-hours">
-              <label>De <input name="curfew_start" type="time" value="{{ curfew.start }}" required></label>
-              <label>à <input name="curfew_end" type="time" value="{{ curfew.end }}" required></label>
-            </div>
-          </div>
         </div>
 
         <div class="settings-card library-stats" id="library-stats">

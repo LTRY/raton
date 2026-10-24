@@ -11,9 +11,10 @@ l'ecran.
 ## Utilisateurs
 
 Plusieurs personnes peuvent utiliser la meme instance. Chacune choisit son
-utilisateur depuis le bouton rond en bas du tiroir « Discussions » de
-l'accueil (comme le bouton de compte d'une app de chat), ou en ajoute un ;
-on les renomme ou les supprime dans `/settings`. Pas de mot de passe (LAN de
+utilisateur, ou en ajoute un, sur sa page `/user` (« Paramètres de
+l'utilisateur »), ouverte par le bouton rond en bas du tiroir « Discussions »
+de l'accueil (comme le bouton de compte d'une app de chat) ; on les renomme
+ou les supprime dans `/settings`. Pas de mot de passe (LAN de
 confiance, voir [15 Securite](15-securite.md)).
 
 - **Partage** : les chaines, les fiches, leurs fichiers media, transcripts,
@@ -24,7 +25,22 @@ confiance, voir [15 Securite](15-securite.md)).
 - **Propre a chaque utilisateur** : Vu/Indesiree, notes en etoiles (chaines et
   fiches), commentaires, Nouveau et cloches, playlists, discussions (chat de
   fiche et chat bibliotheque), historique et positions de lecture, temps de
-  lecture et limites de temps d'ecran, vues enregistrees, phrases de Raton.
+  lecture et limites de temps d'ecran, vues enregistrees, phrases de Raton,
+  langage de Raton et couvre-feu.
+
+### Paramètres de l'utilisateur
+
+La page `/user` reunit les reglages propres a l'utilisateur courant :
+
+- **Nom** : le renommer ;
+- **Changer d'utilisateur** : la liste des utilisateurs, et l'ajout d'un
+  nouveau ;
+- **Raton et toi** (langage de Raton) : Raton le vouvoie (par defaut) ou le
+  tutoie, et l'appelle par un surnom (40 caracteres au plus, vide pour
+  aucun). Les reponses du chat bibliotheque suivent ce choix (consigne du
+  prompt systeme, `address_rule` dans `back/services/llm/prompts.py`) ; les
+  repliques de l'accueil ne changent pas ;
+- **Couvre-feu** : voir ci-dessous.
 
 Le detail est dans [05 Modele de donnees](05-modele-de-donnees.md),
 « Utilisateurs ».
@@ -58,7 +74,7 @@ stockage) et le temps de lecture par type de media sont dans `/settings`.
 
 ### Couvre-feu
 
-Un interrupteur de `/settings` (carte « Couvre-feu », sous « Utilisateurs »,
+Un interrupteur de la page de l'utilisateur `/user` (carte « Couvre-feu »,
 desactive par defaut) ferme Raton chaque jour sur une plage horaire, `22:00` a
 `10:00` par defaut (heures `Europe/Paris`, debut inclus, fin exclue ; la plage
 peut passer minuit ; un debut egal a la fin ne ferme jamais). C'est un reglage
@@ -82,8 +98,9 @@ active. Pendant son couvre-feu :
   sans lien ni action, chacune avec le champ du commentaire de la fiche et le
   bouton « Enregistrer le commentaire ».
 
-Le couvre-feu ne se desactive pas pendant qu'il est en cours (`/settings` est
-ferme) ; changer d'utilisateur depuis l'accueil reste possible, sans mot de
+Le couvre-feu ne se desactive pas pendant qu'il est en cours (`/user` reste
+ouverte mais n'affiche plus ses formulaires) ; changer d'utilisateur depuis
+`/user` reste possible, sans mot de
 passe comme le reste des utilisateurs. Les jobs planifies (scan, purge, notes automatiques) tournent dans le
 back sans passer par l'API : ils continuent.
 
