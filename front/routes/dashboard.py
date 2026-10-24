@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from front.api import Api, ApiError, get_api
 from front.cards import card_views, history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
+from front.library import library_view_links
 from front.library_chat import library_chat_widget_config
 from front.pages import current_request_path, page_href_builder
 from front.records import record
@@ -47,6 +48,7 @@ def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depend
         "dashboard_new_videos.html",
         {
             "video_stacks": nouveautes.stacks,
+            "library_views": library_view_links(record(api.get("/library/views")), request),
             "current_new_videos_path": current_request_path(request),
             "category_style_map": category_style_map(styles),
             "page": nouveautes.page,
@@ -76,6 +78,7 @@ def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(g
         "dashboard_history.html",
         {
             "history_days": history_days(history.rows, history.day_seconds, local_today()),
+            "library_views": library_view_links(record(api.get("/library/views")), request),
             "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
             "category_style_map": category_style_map(styles),
             "page": history.page,

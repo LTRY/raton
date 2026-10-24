@@ -205,10 +205,11 @@ def saved_view_is_active(view: dict, filters: LibraryFilters) -> bool:
     )
 
 
-def library_saved_views(db: Session, filters: LibraryFilters) -> list[dict]:
-    """The vues enregistrees, each flagged `active` when it matches the current filters."""
+def library_saved_views(db: Session, filters: LibraryFilters | None = None) -> list[dict]:
+    """The vues enregistrees, each flagged `active` when it matches the current filters (never
+    without filters: a page other than the library list shows none of them)."""
     return [
-        {**view, "active": saved_view_is_active(view, filters)}
+        {**view, "active": filters is not None and saved_view_is_active(view, filters)}
         for view in get_video_library_views(db)
     ]
 

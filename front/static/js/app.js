@@ -2420,6 +2420,47 @@ function initChatWidget(root) {
 }
 
 document.querySelectorAll("[data-chat-widget]").forEach(initChatWidget);
+
+// Navigation of the Bibliothèque (macros `library_menu`, `library_title`): on a phone, the ☰
+// button opens and closes it like the discussions drawer of the library chat. On a wider screen
+// the CSS shows it as a column and hides the button. Its entries are plain links.
+function initLibraryMenu(root) {
+  const toggle = document.querySelector("[data-library-menu-toggle]");
+  const drawer = root.querySelector("[data-library-menu-drawer]");
+  const backdrop = root.querySelector("[data-library-menu-backdrop]");
+  if (!toggle) return;
+
+  function open() {
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    toggle.setAttribute("aria-expanded", "true");
+    (drawer.querySelector("[aria-current='page']") || drawer.querySelector("a"))?.focus({ preventScroll: true });
+  }
+
+  function close({ restoreFocus = false } = {}) {
+    drawer.hidden = true;
+    backdrop.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
+    if (restoreFocus) toggle.focus({ preventScroll: true });
+  }
+
+  toggle.addEventListener("click", () => (drawer.hidden ? open() : close()));
+  backdrop.addEventListener("click", () => close());
+  root.querySelector("[data-library-menu-close]")?.addEventListener("click", () => close({ restoreFocus: true }));
+  drawer.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close({ restoreFocus: true });
+  });
+}
+
+document.querySelectorAll("[data-library-menu]").forEach(initLibraryMenu);
+// Close it before Turbo snapshots the page, so the back button never restores it open.
+if (!window.__libraryMenuCacheBound) {
+  window.__libraryMenuCacheBound = true;
+  document.addEventListener("turbo:before-cache", () => {
+    document.querySelectorAll("[data-library-menu-drawer], [data-library-menu-backdrop]").forEach((el) => (el.hidden = true));
+    document.querySelectorAll("[data-library-menu-toggle]").forEach((el) => el.setAttribute("aria-expanded", "false"));
+  });
+}
 // Raton's call to action on the home page gets the same pointer-following light.
 // Also re-run for fragments swapped in later (turbo-frame), hence the guard.
 function bindGlassLight(root) {

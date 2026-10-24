@@ -176,9 +176,10 @@ nouveaux et les notes 5 en grandes tuiles, plus une tuile sur 7, avec au moins
 et les videos en grille de cartes.
 La page s'ouvre sur les shorts quand seule la cloche shorts de la chaine est
 active (un `section` explicite dans l'URL l'emporte).
-Les sous-bibliotheques configurables (barre de navigation
-`library_views`, reglables depuis `/settings`) ne s'affichent que sur la
-bibliotheque globale `/videos`, pas sur la page d'une chaine.
+Les sous-bibliotheques configurables (`library_views`, reglables depuis
+`/settings`) sont des liens du menu de la Bibliotheque (tiroir ☰ sur telephone, colonne
+a gauche sur bureau, sur Nouveautes, Historique et Exploration), pas de la page
+d'une chaine.
 
 ## Detail video
 

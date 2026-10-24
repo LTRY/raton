@@ -292,6 +292,13 @@ Liste des fiches, avec filtres, tri et recherche.
 - **Code** : `/videos`
 - **A ne pas confondre avec** : La bibliotheque *entiere* au sens du chat bibliotheque.
 
+### Menu de la Bibliotheque
+
+Navigation des pages Bibliotheque (tiroir ouvert par le bouton ☰ a gauche du titre sur telephone, colonne a gauche sur bureau) : un lien par section (Nouveautes, Historique, Exploration) puis un par vue enregistree (« Sous-bibliothèques »).
+
+- **Code** : macro `library_menu` (`front/templates/_macros.html`), `initLibraryMenu` (`front/static/js/app.js`)
+- **A ne pas confondre avec** : Le tiroir « Discussions » du chat bibliotheque, dont il reprend le style, ni le menu Bibliotheque de la barre du haut (bureau).
+
 ### Vue enregistree
 
 Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.

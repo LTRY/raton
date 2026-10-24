@@ -2086,11 +2086,12 @@ def test_videos_page_renders_default_rated_sub_library(monkeypatch):
     rendered = response.text
 
     assert rated.title in rendered
-    assert '<nav class="library-subnav" aria-label="Sous-bibliothèques">' in rendered
+    assert 'aria-label="Sous-bibliothèques"' not in rendered
     assert (
-        '<a class="lg active" href="/videos?asset_filters=1&amp;asset_filter_mode=or&amp;category_filter_mode=or&amp;rated=1">Notés</a>'
+        '<a class="chat-drawer-item" href="/videos?asset_filters=1&amp;asset_filter_mode=or&amp;category_filter_mode=or&amp;rated=1" aria-current="page">'
         in rendered
     )
+    assert '<a class="chat-drawer-item" href="/videos" aria-current="page">' not in rendered
 
 
 def test_videos_page_empty_sub_library_filters_show_all_videos(monkeypatch):
@@ -2588,19 +2589,52 @@ def test_video_activity_sets_watched_at_at_ninety_percent():
     assert db.get(Video, video.id).watched_at is not None
 
 
-def test_library_pages_share_the_nouveautes_historique_exploration_subnav():
+def test_library_pages_name_the_section_shown_next_to_the_title():
     db = make_session()
+    client = site(db)
 
-    rendered = site(db).get("/dashboard/nouveautes").text
+    for path, name in (
+        ("/dashboard/nouveautes", "Nouveautés"),
+        ("/dashboard/historique", "Historique"),
+        ("/videos", "Exploration"),
+        ("/videos?asset_filters=1&asset_filter_mode=or&category_filter_mode=or&rated=1", "Notés"),
+    ):
+        rendered = client.get(path).text
+        assert (
+            f'<h1><span class="library-title-label">Bibliothèque </span><span class="library-current">{name}</span></h1>'
+            in rendered
+        )
+        assert "library-subnav" not in rendered
 
-    assert 'class="library-subnav"' in rendered
-    assert (
-        '<a class="lg" href="/dashboard/nouveautes" aria-current="page">Nouveautés</a>' in rendered
-    )
-    assert '<a class="lg" href="/dashboard/historique" >Historique</a>' in rendered
-    assert '<a class="lg" href="/videos" >Exploration</a>' in rendered
+    rendered = client.get("/dashboard/nouveautes").text
     assert 'href="/videos?focus=search"' not in rendered
     assert 'aria-label="Recherche"' not in rendered
+
+
+def test_library_pages_open_the_library_menu_from_the_title_row():
+    db = make_session()
+    client = site(db)
+
+    for path in ("/dashboard/nouveautes", "/dashboard/historique", "/videos"):
+        rendered = client.get(path).text
+        head = rendered[rendered.index('<div class="page-head">') : rendered.index("<h1>")]
+        assert "data-library-menu-toggle" in head, path
+        for href in ("/dashboard/nouveautes", "/dashboard/historique", "/videos"):
+            marker = f'<a class="chat-drawer-item" href="{href}" aria-current="page">'
+            assert (marker in rendered) == (href == path), (path, href)
+        # The default vues enregistrees, under their own label.
+        assert '<p class="chat-drawer-label">Sous-bibliothèques</p>' in rendered, path
+        assert "<span>Notés</span>" in rendered, path
+
+
+def test_saved_views_api_lists_them_none_active():
+    db = make_session()
+
+    views = site(db).get("/api/library/views").json()
+
+    assert views
+    assert {view["name"] for view in views} >= {"Notés"}
+    assert not any(view["active"] for view in views)
 
 
 def make_new_video(db, channel, index, is_new=True):
@@ -2919,7 +2953,7 @@ def test_dashboard_history_renders_one_collapsible_block_per_day():
     rendered = site(db).get("/dashboard/historique").text
 
     assert (
-        '<a class="lg" href="/dashboard/historique" aria-current="page">Historique</a>' in rendered
+        '<a class="chat-drawer-item" href="/dashboard/historique" aria-current="page">' in rendered
     )
     assert rendered.count('<details class="dashboard-day-group"') == 2
     assert "<strong>Aujourd’hui</strong>" in rendered
@@ -2934,7 +2968,7 @@ def test_dashboard_history_page_groups_by_day_and_opens_every_block():
     rendered = site(db).get("/dashboard/historique").text
 
     assert (
-        '<a class="lg" href="/dashboard/historique" aria-current="page">Historique</a>' in rendered
+        '<a class="chat-drawer-item" href="/dashboard/historique" aria-current="page">' in rendered
     )
     assert "À reprendre" not in rendered
     assert rendered.count('<details class="dashboard-day-group" open>') == 2

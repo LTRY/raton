@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
 {% block content %}
-<section>
+{% set active_view = library_views|selectattr("active")|first %}
+<div class="library-layout">
+{{ macros.library_menu("" if active_view else "exploration", library_views) }}
+<section class="library-main">
   <div class="page-head">
-    <h1>Bibliothèque</h1>
+    {{ macros.library_title(active_view.name if active_view else "Exploration") }}
     {# Tied to the filters form below by `form=`: the field sits on the title row like on
        /channels and /playlists, but still submits and live-searches with the filters. #}
     <label class="page-search">
@@ -11,15 +14,6 @@
       <input name="q" type="search" value="{{ search_query|default('') }}" form="library-filters" placeholder="Rechercher une fiche" aria-label="Rechercher une fiche" enterkeyhint="search" autocomplete="off">
     </label>
   </div>
-  {{ macros.library_subnav("exploration") }}
-
-  {% if library_views %}
-  <nav class="library-subnav" aria-label="Sous-bibliothèques">
-    {% for view in library_views %}
-    <a class="lg{{ ' active' if view.active else '' }}" href="{{ view.href }}">{{ view.name }}</a>
-    {% endfor %}
-  </nav>
-  {% endif %}
 
   {# Folded on a phone so the fiches start on the first screen; the summary only
      shows there (docs/spec/11-interface-html.md, "Bibliotheque > Exploration"). #}
@@ -157,4 +151,5 @@
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
   </turbo-frame>
 </section>
+</div>
 {% endblock %}

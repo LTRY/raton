@@ -492,10 +492,50 @@
 </section>
 {% endmacro %}
 
-{% macro library_subnav(active) %}
-<nav class="library-subnav" aria-label="Sections de la bibliothèque">
-  <a class="lg" href="/dashboard/nouveautes" {% if active == 'nouveautes' %}aria-current="page"{% endif %}>Nouveautés</a>
-  <a class="lg" href="/dashboard/historique" {% if active == 'historique' %}aria-current="page"{% endif %}>Historique</a>
-  <a class="lg" href="/videos" {% if active == 'exploration' %}aria-current="page"{% endif %}>Exploration</a>
-</nav>
+{# Navigation of the Bibliothèque: a drawer opened by the ☰ button of `library_title` on a phone,
+   a column always shown left of the page on a wider screen. Same drawer as the library chat's
+   discussions (`.chat-drawer`), wired by initLibraryMenu (static/js/app.js).
+   Spec: docs/spec/11-interface-html.md, "Bibliotheque : Nouveautes, Historique, Exploration". #}
+{% macro library_menu(active, views=[]) %}
+{% set entries = [
+  ("nouveautes", "/dashboard/nouveautes", "Nouveautés", '<path d="M12 3c.5 4 2 6.5 7 7.5-5 1-6.5 3.5-7 7.5-.5-4-2-6.5-7-7.5 5-1 6.5-3.5 7-7.5Z"/><path d="M19 15.5c.2 1.6.8 2.6 2.5 3-1.7.4-2.3 1.4-2.5 3-.2-1.6-.8-2.6-2.5-3 1.7-.4 2.3-1.4 2.5-3Z"/>'),
+  ("historique", "/dashboard/historique", "Historique", '<path d="M3.5 12a8.5 8.5 0 1 0 2.5-6"/><path d="M3.5 4v4h4"/><path d="M12 7.5V12l3 2"/>'),
+  ("exploration", "/videos", "Exploration", '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5Z"/>'),
+] %}
+<div class="library-menu" data-library-menu>
+  <div class="chat-drawer-backdrop" data-library-menu-backdrop hidden></div>
+  <nav class="chat-drawer" id="library-menu-drawer" data-library-menu-drawer aria-label="Bibliothèque" hidden>
+    <div class="chat-drawer-head">
+      <span class="chat-drawer-brand">Bibliothèque</span>
+      <button type="button" class="chat-nav-button" data-library-menu-close aria-label="Fermer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    {% for key, href, label, icon in entries %}
+    <a class="chat-drawer-item" href="{{ href }}"{% if active == key %} aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ icon|safe }}</svg>
+      <span>{{ label }}</span>
+    </a>
+    {% endfor %}
+    {% if views %}
+    <p class="chat-drawer-label">Sous-bibliothèques</p>
+    {% for view in views %}
+    <a class="chat-drawer-item" href="{{ view.href }}"{% if view.active %} aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16l-6 8v6l-4 2v-8Z"/></svg>
+      <span>{{ view.name }}</span>
+    </a>
+    {% endfor %}
+    {% endif %}
+  </nav>
+</div>
+{% endmacro %}
+
+{# Title row start of a Bibliothèque page: the ☰ button (phone only) and the title, which names
+   the section or sous-bibliothèque shown (alone on a phone, as a pill after « Bibliothèque »
+   on a wider screen). #}
+{% macro library_title(current) %}
+<button type="button" class="chat-nav-button library-menu-toggle" data-library-menu-toggle aria-expanded="false" aria-controls="library-menu-drawer" aria-label="Menu de la bibliothèque" title="Menu">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h11M4 17h16"/></svg>
+</button>
+<h1><span class="library-title-label">Bibliothèque </span><span class="library-current">{{ current }}</span></h1>
 {% endmacro %}

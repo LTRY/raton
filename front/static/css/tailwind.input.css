@@ -654,27 +654,6 @@ h2 {
   overflow-wrap: anywhere;
 }
 
-.library-subnav {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 16px;
-}
-
-.library-subnav a {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-  font-size: 14px;
-  font-weight: 700;
-  padding: 6px 14px;
-}
-
-.library-subnav a[aria-current="page"] {
-  background: var(--color-tint);
-  border-color: var(--color-tint-border);
-  color: var(--color-primary);
-}
-
 .library-stats p {
   align-items: center;
   display: flex;
@@ -1065,34 +1044,6 @@ button.secondary {
 
 .asset-filter-form {
   flex-wrap: wrap;
-}
-
-.library-subnav {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 14px;
-}
-
-.library-subnav a {
-  align-items: center;
-  background: var(--color-white);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  box-sizing: border-box;
-  color: var(--color-text);
-  display: inline-flex;
-  font-size: 14px;
-  font-weight: 600;
-  min-height: 44px;
-  padding: 0 16px;
-}
-
-.library-subnav a.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-white);
 }
 
 .mobile-filter-drawer {
@@ -7378,6 +7329,106 @@ turbo-frame {
   width: 20px;
 }
 
+/* Navigation of the Bibliothèque (macros `library_menu`, `library_title`): the discussions
+   drawer, holding links, on a phone; a sticky column left of the page on a wider screen. */
+.library-menu,
+.library-menu-toggle {
+  --chat-line: var(--color-border);
+}
+
+.library-main .page-head h1 {
+  min-width: 0;
+}
+
+/* Name of the section or sous-bibliothèque shown, after « Bibliothèque ». */
+.library-current {
+  background: var(--color-tint);
+  border: 1px solid var(--color-tint-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 700;
+  margin-left: 8px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 4px 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* On a phone the title is the section's name alone, so it fits on the ☰ button's row. */
+@media (max-width: 800px) {
+  .library-title-label {
+    display: none;
+  }
+
+  .library-current {
+    background: none;
+    border: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+@media (min-width: 801px) {
+  .library-layout {
+    align-items: start;
+    display: grid;
+    gap: 32px;
+    grid-template-columns: 220px minmax(0, 1fr);
+    margin: 0 auto;
+    max-width: 1280px;
+  }
+
+  .library-main {
+    margin: 0 0 28px;
+    min-width: 0;
+  }
+
+  .library-menu-toggle,
+  .library-menu .chat-drawer-backdrop,
+  .library-menu .chat-drawer-head {
+    display: none;
+  }
+
+  /* Always shown: the `hidden` the phone drawer starts with does not apply here. */
+  .library-menu .chat-drawer,
+  .library-menu .chat-drawer[hidden] {
+    animation: none;
+    background: transparent;
+    box-shadow: none;
+    display: flex;
+    max-height: calc(100vh - 120px);
+    padding: 0;
+    position: sticky;
+    top: 104px;
+    width: auto;
+    z-index: auto;
+  }
+
+  .library-menu .chat-drawer-item {
+    font-size: 15px;
+    min-height: 42px;
+  }
+
+  .library-menu .chat-drawer-item svg {
+    height: 20px;
+    width: 20px;
+  }
+}
+
+.library-menu .chat-drawer-item {
+  text-decoration: none;
+}
+
+.library-menu .chat-drawer-item[aria-current="page"] {
+  background: var(--color-tint);
+  font-weight: 700;
+}
+
 .chat-messages {
   display: flex;
   flex-direction: column;
@@ -11124,19 +11175,6 @@ body::before {
   background: var(--glass-fill-strong);
 }
 
-.library-subnav a.lg:not([aria-current="page"], .active) {
-  background: var(--glass-fill-strong);
-  border-color: var(--glass-rim);
-}
-
-/* The saved-view pills mark the current one with `.active` (the section pills
-   use aria-current): the same tinted state, not the legacy solid blue. */
-.library-subnav a.lg.active {
-  background: var(--color-tint);
-  border-color: var(--color-tint-border);
-  color: var(--color-primary);
-}
-
 .button-link.lg,
 .button-link.secondary.lg {
   background: var(--glass-fill-strong);
@@ -11149,7 +11187,6 @@ body::before {
 }
 
 @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-  .library-subnav a.lg:not([aria-current="page"], .active),
   .button-link.lg,
   .button-link.secondary.lg {
     background: var(--glass-fill);
