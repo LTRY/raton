@@ -59,6 +59,7 @@ def get_historique(page: int = Query(1, ge=1), db: Session = Depends(get_db)) ->
                     id=video.id,
                     title=video.title,
                     rating=video.rating,
+                    comment=video.comment,
                     file_size_bytes=video.file_size_bytes,
                     list_state=video.list_state,
                     categories=video.category_labels,

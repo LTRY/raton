@@ -275,6 +275,23 @@
           </fieldset>
         </div>
 
+        <div class="settings-card" id="curfew">
+          <div class="settings-curfew">
+            <h2 class="settings-card-title">Couvre-feu</h2>
+            <p class="settings-hint">Pendant ces heures, Raton ferme : plus de lecture, de recherche ni de réglages. Seul l’historique reste ouvert, pour écrire un commentaire sous les vidéos. Les tâches de la nuit (scan, purge, notes) continuent. Le couvre-feu ne se désactive pas pendant qu’il est en cours.</p>
+            <div class="settings-checkbox-list">
+              <label class="settings-checkbox-option">
+                <input type="checkbox" name="curfew_enabled"{% if curfew.enabled %} checked{% endif %}>
+                <span>Activer le couvre-feu</span>
+              </label>
+            </div>
+            <div class="settings-curfew-hours">
+              <label>De <input name="curfew_start" type="time" value="{{ curfew.start }}" required></label>
+              <label>à <input name="curfew_end" type="time" value="{{ curfew.end }}" required></label>
+            </div>
+          </div>
+        </div>
+
         <div class="settings-card" id="rag">
           <h2 class="settings-card-title">Indexation RAG</h2>
           <p class="settings-hint">Où en est l’indexation des notes et ce que fera le passage de la nuit.</p>

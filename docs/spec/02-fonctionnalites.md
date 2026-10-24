@@ -29,6 +29,28 @@ voir [11 Interface HTML](11-interface-html.md)) :
 Les statistiques de la bibliotheque (nombre de chaines, fiches, transcripts,
 stockage) et le temps de lecture par type de media sont dans `/settings`.
 
+### Couvre-feu
+
+Un interrupteur de `/settings` (carte « Couvre-feu », desactive par defaut)
+ferme Raton chaque jour sur une plage horaire, `22:00` a `10:00` par defaut
+(heures `Europe/Paris`, debut inclus, fin exclue ; la plage peut passer
+minuit ; un debut egal a la fin ne ferme jamais). Pendant le couvre-feu :
+
+- l'API refuse toutes ses routes en `423` (« Couvre-feu jusqu'à 10:00 :
+  ... »), sauf `GET /api/curfew`, `GET /api/historique`, `GET /api/categories`
+  et `PUT /api/videos/{id}/comment` (`OPEN_ROUTES`,
+  `back/services/common/curfew.py`) : plus de lecture, de recherche, de chat,
+  d'import ni de reglage, y compris pour le serveur MCP ;
+- toute page du front affiche la page « Couvre-feu » (Raton en bonnet de nuit,
+  bouton « Écrire dans l'historique ») ;
+- l'**Historique** reste ouvert : il ne montre plus que les lignes de lecture,
+  sans lien ni action, chacune avec le champ du commentaire de la fiche et le
+  bouton « Enregistrer le commentaire ».
+
+Le couvre-feu ne se desactive pas pendant qu'il est en cours (`/settings` est
+ferme). Les jobs planifies (scan, purge, notes automatiques) tournent dans le
+back sans passer par l'API : ils continuent.
+
 ### Import d'un fichier local
 
 La feuille d'import de la Bibliotheque (telechargement manuel d'une video

@@ -2,6 +2,9 @@
 {% import "_macros.html" as macros %}
 {% block content %}
 <section>
+  {% if curfew_mode %}
+  {{ macros.curfew_banner("Couvre-feu jusqu’à " ~ curfew.end, "Raton dort. Seul l’historique reste ouvert, pour écrire un commentaire sous les vidéos.") }}
+  {% else %}
   <div class="page-head">
     <h1>Bibliothèque</h1>
   </div>
@@ -10,7 +13,8 @@
     <h2>Temps de lecture</h2>
     {{ macros.playback_time_cards(playback_time_stats) }}
   </section>
-  {{ macros.history_day_list(history_days, category_style_map, history_days|length) }}
+  {% endif %}
+  {{ macros.history_day_list(history_days, category_style_map, history_days|length, current_history_path if curfew_mode else none) }}
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
 </section>
 {% endblock %}

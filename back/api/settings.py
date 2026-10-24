@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from back.api.curfew import curfew_read
 from back.api.errors import error_responses
 from back.db.session import get_db
 from back.schemas.settings import (
@@ -59,6 +60,7 @@ def read_settings(db: Session = Depends(get_db)) -> SettingsRead:
             for value in SPONSOR_SEGMENT_CATEGORY_CHOICES
         ],
         screen_time_limits=get_screen_time_limits(db),
+        curfew=curfew_read(db),
         llm_provider_label=get_llm_provider_display_label(),
     )
 
@@ -83,5 +85,8 @@ def update_settings(payload: SettingsUpdate, db: Session = Depends(get_db)) -> S
         screen_time_today_minutes=payload.screen_time_today_minutes.model_dump()
         if payload.screen_time_today_minutes
         else None,
+        curfew_enabled=payload.curfew_enabled,
+        curfew_start=payload.curfew_start,
+        curfew_end=payload.curfew_end,
     )
     return read_settings(db)

@@ -14,6 +14,14 @@ from back.services.common.categories import (
     serialize_video_category_label_styles,
     serialize_video_category_labels,
 )
+from back.services.common.curfew import (
+    CURFEW_ENABLED_KEY,
+    CURFEW_END_KEY,
+    CURFEW_START_KEY,
+    DEFAULT_CURFEW_END,
+    DEFAULT_CURFEW_START,
+    normalize_curfew_time,
+)
 from back.services.common.library_views import (
     DEFAULT_VIDEO_LIBRARY_VIEWS,
     parse_video_library_views,
@@ -213,6 +221,9 @@ def ensure_default_settings(db: Session) -> None:
         SPONSOR_SEGMENT_CATEGORIES_KEY: default_sponsor_segment_categories_value(),
         SPONSOR_SKIP_ENABLED_KEY: "true",
         VIDEO_LIBRARY_VIEWS_KEY: default_video_library_views_value(),
+        CURFEW_ENABLED_KEY: "false",
+        CURFEW_START_KEY: DEFAULT_CURFEW_START,
+        CURFEW_END_KEY: DEFAULT_CURFEW_END,
         **{
             SCREEN_TIME_LIMIT_KEYS[kind]: str(value)
             for kind, value in DEFAULT_SCREEN_TIME_LIMITS.items()
@@ -238,13 +249,16 @@ def save_settings(
     sponsor_segment_categories: list[str] | None = None,
     sponsor_skip_enabled: bool | None = None,
     screen_time_today_minutes: dict[str, int | None] | None = None,
+    curfew_enabled: bool | None = None,
+    curfew_start: str | None = None,
+    curfew_end: str | None = None,
 ) -> None:
     """Store the given settings, leave the others as they are, and commit.
 
     Shared by the /settings form and `PUT /api/settings`. `category_labels` stores bare labels
     (colours assigned when read); `category_label_styles`, applied after it, stores labels with their
     colours. A screen-time limit given as None keeps its current value; every limit is at least one
-    minute.
+    minute. The couvre-feu hours are stored as `HH:MM` (ValueError otherwise).
     """
     if media_root is not None:
         set_setting(db, MEDIA_ROOT_KEY, media_root)
@@ -290,4 +304,10 @@ def save_settings(
         for kind, value in screen_time_today_minutes.items():
             minutes = value if isinstance(value, int) else current_limits[kind]["today"]
             set_setting(db, SCREEN_TIME_LIMIT_KEYS[kind], str(max(1, minutes)))
+    if curfew_enabled is not None:
+        set_setting(db, CURFEW_ENABLED_KEY, "true" if curfew_enabled else "false")
+    if curfew_start is not None:
+        set_setting(db, CURFEW_START_KEY, normalize_curfew_time(curfew_start))
+    if curfew_end is not None:
+        set_setting(db, CURFEW_END_KEY, normalize_curfew_time(curfew_end))
     db.commit()
