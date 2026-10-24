@@ -190,6 +190,9 @@ Cles connues :
   `auto_notes_last_run_at`, `auto_notes_last_run_summary`,
   `auto_notes_batch_id`, `auto_notes_batch_submitted_at` : notes automatiques,
   voir [13 Jobs, logs et planification](13-jobs-logs-planification.md)
+- `curfew_enabled` (`true`/`false`, `false` par defaut), `curfew_start`,
+  `curfew_end` (`HH:MM`, `22:00` et `10:00` par defaut) : le couvre-feu, commun
+  a tous les utilisateurs, voir [02 Fonctionnalites](02-fonctionnalites.md)
 - `last_auto_scan_at`, `last_auto_scan_status`, `last_auto_scan_imported_count` :
   etat du dernier scan planifie (cloche), voir
   [13 Jobs, logs et planification](13-jobs-logs-planification.md)

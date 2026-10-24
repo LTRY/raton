@@ -283,6 +283,13 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 ## Interface
 
+### Couvre-feu
+
+Plage horaire quotidienne (`22:00` → `10:00` par defaut), activee par un interrupteur de `/settings`, pendant laquelle Raton est ferme : seul l'Historique reste ouvert, pour ecrire le commentaire des fiches.
+
+- **Code** : `back/services/common/curfew.py`, reglages `curfew_enabled`, `curfew_start`, `curfew_end`, `GET /api/curfew`, reponse `423`
+- **A ne pas confondre avec** : La limite de temps d'ecran, qui ne ferme rien (Raton le dit seulement, scenario `ecran_ferme`).
+
 ### Raton
 
 Assistant de la page d'accueil `/` : choisit une replique et un dessin a chaque chargement.

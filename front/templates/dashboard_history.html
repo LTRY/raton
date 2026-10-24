@@ -1,6 +1,13 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
 {% block content %}
+{% if curfew_mode %}
+<section>
+  {{ macros.curfew_banner("Couvre-feu jusqu’à " ~ curfew.end, "Raton dort. Seul l’historique reste ouvert, pour écrire un commentaire sous les vidéos.") }}
+  {{ macros.history_day_list(history_days, category_style_map, history_days|length, current_history_path) }}
+  {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
+</section>
+{% else %}
 <div class="library-layout">
 {{ macros.library_menu("historique", library_views) }}
 <section class="library-main">
@@ -18,4 +25,5 @@
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}
 </section>
 </div>
+{% endif %}
 {% endblock %}

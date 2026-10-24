@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% import "_macros.html" as macros %}
+{% block content %}
+<section>
+  {{ macros.curfew_banner("Couvre-feu", detail, "/dashboard/historique") }}
+</section>
+{% endblock %}

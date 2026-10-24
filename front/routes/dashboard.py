@@ -81,6 +81,9 @@ def dashboard_resume_page_redirect(request: Request):
 
 @router.get("/dashboard/historique", response_class=HTMLResponse)
 def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
+    """During the couvre-feu the page only lists the fiches with their commentaire to write: the
+    rest of the app is closed (the back refuses its calls)."""
+    curfew = record(api.get("/curfew"))
     history = record(
         api.get("/historique", page=max(page, 1), hide=request.query_params.get("hide"))
     )
@@ -89,9 +92,16 @@ def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(g
         request,
         "dashboard_history.html",
         {
+            "curfew_mode": curfew.active,
+            "curfew": curfew,
+            "current_history_path": current_request_path(request),
             "history_days": history_days(history.rows, history.day_seconds, local_today()),
-            "library_views": library_view_links(record(api.get("/library/views")), request),
-            "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
+            "library_views": []
+            if curfew.active
+            else library_view_links(record(api.get("/library/views")), request),
+            "playback_time_stats": None
+            if curfew.active
+            else screen_time_rings(record(api.get("/screen-time"))),
             "category_style_map": category_style_map(styles),
             "hide_selector": list_hide_selector(request, history.hide),
             "page": history.page,

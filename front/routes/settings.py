@@ -68,6 +68,7 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
             "video_category_label_styles": styles,
             "video_library_views": settings["video_library_views"],
             "screen_time_limits": settings["screen_time_limits"],
+            "curfew": settings["curfew"],
             "no_progress_categories": settings["no_progress_category_labels"],
             "no_progress_category_options": with_unknown_labels(
                 styles, settings["no_progress_category_labels"]
@@ -113,6 +114,9 @@ def settings_form(
     sponsor_skip_enabled: str = Form(default=""),
     auto_notes_enabled: str = Form(default=""),
     auto_notes_excluded_categories: list[str] = Form(default=[]),
+    curfew_enabled: str = Form(default=""),
+    curfew_start: str = Form("22:00"),
+    curfew_end: str = Form("10:00"),
     api: Api = Depends(get_api),
 ):
     """The no-JS form of /settings: the colour editor writes its JSON in `video_category_styles`;
@@ -127,6 +131,9 @@ def settings_form(
         "auto_notes_excluded_category_labels": form_list_values(auto_notes_excluded_categories),
         "sponsor_segment_categories": form_list_values(sponsor_segment_categories),
         "sponsor_skip_enabled": bool(form_text_value(sponsor_skip_enabled)),
+        "curfew_enabled": bool(form_text_value(curfew_enabled)),
+        "curfew_start": curfew_start,
+        "curfew_end": curfew_end,
         "screen_time_today_minutes": {
             "video": screen_time_video_today,
             "short": screen_time_short_today,

@@ -14,6 +14,18 @@
 </div>
 {% endmacro %}
 
+{# The couvre-feu's Raton (curfew.html, Historique during the couvre-feu): same stage as the home. #}
+{% macro curfew_banner(line, text, cta_href=None) %}
+<div class="raton-stage curfew-stage">
+  <img class="raton-art" src="/static/img/raton/bonnet_nuit.webp?v={{ static_asset_version('img/raton/bonnet_nuit.webp') }}" alt="" width="260" height="260">
+  <h1 class="raton-line">{{ line }}</h1>
+  <p class="raton-limit">{{ text }}</p>
+  {% if cta_href %}
+  <a class="raton-cta" href="{{ cta_href }}">Écrire dans l’historique</a>
+  {% endif %}
+</div>
+{% endmacro %}
+
 {% macro pagination(current_page, total_pages, page_href) %}
 {% if total_pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
@@ -397,7 +409,10 @@
 {% endmacro %}
 
 {# `row` is a row of GET /api/historique: the API says how it is greyed out. #}
-{% macro media_row(row, category_style_map) %}
+{# With `curfew_return_to` (the page to come back to), the couvre-feu's row: it only writes the
+   commentaire, no link, no action. #}
+{% macro media_row(row, category_style_map, curfew_return_to=None) %}
+{% set curfew_mode = curfew_return_to is not none %}
 {% set playback = row.playback %}
 {% set categories = row.video.categories if row.video else [] %}
 {% set is_replay_category = row.replay_category %}
@@ -407,7 +422,9 @@
   <div class="video-card-main">
     <div class="video-card-heading">
       <div class="video-card-title-row">
-        {% if row.video %}
+        {% if row.video and curfew_mode %}
+        <span class="video-title">{{ row.video.title }}</span>
+        {% elif row.video %}
         <a class="video-title" href="/videos/{{ row.video.id }}">{{ row.video.title }}</a>
         {% elif playback.title %}
         <span class="video-title">{{ playback.title }}</span>
@@ -435,18 +452,27 @@
     </div>
     {% if row.channel or row.watched_label or row.rewatch %}
     <p class="video-meta">
-      {% if row.channel %}<span><a class="video-meta-link" href="/videos?channel_id={{ row.channel.id }}">{{ row.channel.name }}</a></span>{% endif %}
+      {% if row.channel and curfew_mode %}<span>{{ row.channel.name }}</span>{% elif row.channel %}<span><a class="video-meta-link" href="/videos?channel_id={{ row.channel.id }}">{{ row.channel.name }}</a></span>{% endif %}
       {% if row.watched_label %}<span class="history-row-time">{{ row.watched_label }} regardé</span>{% endif %}
       {% if row.rewatch %}<span class="history-row-rewatch">Revu</span>{% endif %}
     </p>
     {% endif %}
-    {% if not is_watched and not is_replay_category %}
+    {% if curfew_mode %}
+    {% if row.video %}
+    <form class="personal-notes-form curfew-comment-form" action="/videos/{{ row.video.id }}/comment" method="post">
+      <input type="hidden" name="next" value="{{ curfew_return_to }}">
+      <label class="visually-hidden" for="curfew-comment-{{ row.job_id }}">Commentaire sur {{ row.video.title }}</label>
+      <textarea id="curfew-comment-{{ row.job_id }}" name="comment" rows="3" placeholder="Ajouter un commentaire, un résumé, une idée à retenir...">{{ row.video.comment or "" }}</textarea>
+      <button class="secondary" type="submit">Enregistrer le commentaire</button>
+    </form>
+    {% endif %}
+    {% elif not is_watched and not is_replay_category %}
     <div class="video-card-progress" aria-label="Progression {{ playback.position_label }} sur {{ playback.duration_label }}">
       <span>{{ playback.position_label }} / {{ playback.duration_label }}</span>
       <div class="media-progress-track"><span style="width: {{ playback.progress_percent }}%"></span></div>
     </div>
     {% endif %}
-    {% if row.video %}
+    {% if row.video and not curfew_mode %}
     <div class="video-card-footer">
       <span class="video-card-footer-size">{{ format_video_file_size(row.video.file_size_bytes) }}</span>
       {{ list_state_actions(row.video, list_state, row.auto_state, "dashboard-media-row-completed", "dashboard-media-row-hidden") }}
@@ -462,7 +488,7 @@
 </article>
 {% endmacro %}
 
-{% macro history_day_list(days, category_style_map, open_days=2) %}
+{% macro history_day_list(days, category_style_map, open_days=2, curfew_return_to=None) %}
 {% for day in days %}
 <details class="dashboard-day-group" {% if loop.index <= open_days %}open{% endif %}>
   <summary>
@@ -473,7 +499,7 @@
   </summary>
   <div class="dashboard-day-list">
     {% for row in day.rows %}
-    {{ media_row(row, category_style_map) }}
+    {{ media_row(row, category_style_map, curfew_return_to) }}
     {% endfor %}
   </div>
 </details>

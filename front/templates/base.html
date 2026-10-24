@@ -1,5 +1,7 @@
 <!doctype html>
 {% set current_path = request.url.path if request is defined else "" %}
+{# During the couvre-feu (curfew.html, Historique) the pages carry no way into the closed app. #}
+{% set curfew_mode = curfew_mode|default(false) %}
 <html lang="fr">
   <head>
     <meta charset="utf-8">
@@ -27,11 +29,12 @@
         <span class="pull-refresh-spinner" aria-hidden="true"></span>
       </span>
     </div>
-    {% if current_path.startswith('/channels') or current_path.startswith('/playlists') or current_path == '/videos' or current_path.startswith('/dashboard') %}
+    {% if not curfew_mode and (current_path.startswith('/channels') or current_path.startswith('/playlists') or current_path == '/videos' or current_path.startswith('/dashboard')) %}
     {% include "_import_sheet.html" %}
     {% endif %}
     <header class="topbar lg">
-      <a class="brand" href="/">Raton</a>
+      <a class="brand" href="{{ '/dashboard/historique' if curfew_mode else '/' }}">Raton</a>
+      {% if not curfew_mode %}
       <nav>
         <a href="/channels" {% if current_path.startswith('/channels') %}aria-current="page"{% endif %}>Chaînes</a>
         <a href="/playlists" {% if current_path.startswith('/playlists') %}aria-current="page"{% endif %}>Playlists</a>
@@ -47,7 +50,9 @@
         <a href="/settings" {% if current_path.startswith('/settings') %}aria-current="page"{% endif %}>Paramètres</a>
         <a href="/logs" {% if current_path.startswith('/logs') %}aria-current="page"{% endif %}>Logs</a>
       </nav>
+      {% endif %}
     </header>
+    {% if not curfew_mode %}
     <nav class="mobile-tabbar" aria-label="Navigation principale mobile" data-tabbar>
       {% set tab_active = current_path == '/' %}
       <a class="tab-home{{ ' active' if tab_active else '' }}" href="/" aria-label="Accueil" {% if tab_active %}aria-current="page"{% endif %}>
@@ -70,6 +75,7 @@
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 17h16"/><circle class="tab-k1" cx="15" cy="7" r="2.5"/><circle class="tab-k2" cx="9" cy="17" r="2.5"/></svg>
       </a>
     </nav>
+    {% endif %}
     <main>
       {% block content %}{% endblock %}
     </main>
@@ -82,6 +88,7 @@
       {% endif %}
       {% block toasts %}{% endblock %}
     </div>
+    {% if not curfew_mode %}
     {# Raton keeps the channel exploration company (static/js/app.js, initExplorer); permanent so it survives navigation. #}
     <div class="explorer-raton" id="explorer-raton" data-explorer-raton data-turbo-permanent hidden>
       <img class="explorer-raton-art" src="/static/img/raton/laptop.webp?v={{ static_asset_version('img/raton/laptop.webp') }}" alt="" width="96" height="96">
@@ -113,6 +120,7 @@
       <button type="button" class="mini-player-close" data-mini-player-close aria-label="Fermer le lecteur">×</button>
       <audio data-mini-player-audio preload="metadata"></audio>
     </div>
+    {% endif %}
     <script src="/static/js/app.js?v={{ static_asset_version('js/app.js') }}"></script>
   </body>
 </html>

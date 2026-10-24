@@ -608,6 +608,11 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+/* Couvre-feu: a smaller Raton above the Historique, whose rows are what the page is for. */
+.curfew-stage .raton-art { max-width: min(160px, 40vw); }
+.curfew-stage .raton-line { font-size: 28px; }
+.curfew-comment-form { margin-top: 8px; }
+
 /* Test page: every line of every scenario, stacked in a scrolling list. */
 .raton-variations {
   display: flex;
@@ -720,6 +725,12 @@ h2 {
 .settings-screen-time-grid input { box-sizing: border-box; min-width: 0; width: 100%; }
 .settings-screen-time-grid small { color: var(--color-text-muted); }
 .settings-screen-time-header { color: var(--color-text-muted); font-size: 12px; font-weight: 800; }
+
+.settings-curfew { display: grid; gap: 10px; min-width: 0; }
+.settings-curfew-hours { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; }
+/* `.settings-form label` stacks a label above its field: these sit on one line. */
+.settings-form .settings-curfew label { align-items: center; display: flex; gap: 6px; }
+.settings-curfew-hours input { min-width: 0; }
 
 .screen-time-variant { display: grid; gap: 10px; }
 .screen-time-variant + .screen-time-variant { border-top: 1px solid var(--color-border); margin-top: 6px; padding-top: 14px; }

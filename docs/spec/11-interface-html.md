@@ -724,6 +724,27 @@ Comme le bloc de journee porte deja la date, la ligne d'activite ne repete ni
 regarde ce jour-la (et « Revu »), la progression, puis une derniere ligne avec
 le poids du fichier a gauche et les actions Vu/Indesiree + la notation a droite.
 
+### Couvre-feu
+
+Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) :
+
+- une page dont un appel a l'API repond `423` rend `curfew.html` en `423`
+  (gestionnaire `ApiError` de `front/main.py`) : la scene de Raton
+  (`curfew_banner`, `bonnet_nuit.webp`), le message du back et le bouton
+  « Écrire dans l'historique » ;
+- `/dashboard/historique` lit `GET /api/curfew` : en couvre-feu, la scene de
+  Raton « Couvre-feu jusqu'à 10:00 » remplace le titre, la sous-navigation et
+  le temps de lecture, et chaque ligne (`media_row` avec `curfew_return_to`)
+  perd ses liens, sa progression, Vu/Ecartee et la notation au profit du
+  formulaire du commentaire (`POST /videos/{id}/comment`, retour sur la meme
+  page) ;
+- ces deux pages passent `curfew_mode` a `base.html`, qui retire la
+  navigation (barre du haut, barre d'onglets mobile), la feuille d'import, le
+  mini-lecteur et le Raton d'exploration ; « Raton » mene a l'Historique.
+
+La carte « Couvre-feu » de `/settings` (ancre `#curfew`) porte l'interrupteur
+et les heures de debut et de fin (`input type="time"`).
+
 ### Barre de progression de lecture
 
 Une carte video (macro `video_card`) ou une ligne `Historique` (`media_row`)
