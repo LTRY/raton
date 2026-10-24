@@ -345,6 +345,17 @@ def playback_seconds_by_day(
     return seconds_by_day
 
 
+def playback_media_key(job: DownloadJob, playback: dict) -> tuple:
+    """What tells the activity jobs of one media apart from another's."""
+    if job.video_id:
+        return ("video", job.video_id)
+    if playback["title"]:
+        # The video row is gone (`video_id` is SET NULL on delete): its activity
+        # jobs can only be told apart from another video's by the recorded title.
+        return ("title", job.channel_id, playback["title"])
+    return ("job", job.id)
+
+
 def dashboard_media_activity_logs(
     db: Session, user_id: int, limit: int | None = None
 ) -> list[DownloadJob]:
@@ -362,14 +373,7 @@ def dashboard_media_activity_logs(
         playback = playback_activity_view(job)
         if not playback:
             continue
-        if job.video_id:
-            media_key = ("video", job.video_id)
-        elif playback["title"]:
-            # The video row is gone (`video_id` is SET NULL on delete): its activity
-            # jobs can only be told apart from another video's by the recorded title.
-            media_key = ("title", job.channel_id, playback["title"])
-        else:
-            media_key = ("job", job.id)
+        media_key = playback_media_key(job, playback)
         if media_key in seen_media_keys:
             continue
         seen_media_keys.add(media_key)

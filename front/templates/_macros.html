@@ -433,9 +433,11 @@
       </span>
       {% endif %}
     </div>
-    {% if row.channel %}
+    {% if row.channel or row.watched_label or row.rewatch %}
     <p class="video-meta">
-      <span><a class="video-meta-link" href="/videos?channel_id={{ row.channel.id }}">{{ row.channel.name }}</a></span>
+      {% if row.channel %}<span><a class="video-meta-link" href="/videos?channel_id={{ row.channel.id }}">{{ row.channel.name }}</a></span>{% endif %}
+      {% if row.watched_label %}<span class="history-row-time">{{ row.watched_label }} regardé</span>{% endif %}
+      {% if row.rewatch %}<span class="history-row-rewatch">Revu</span>{% endif %}
     </p>
     {% endif %}
     {% if not is_watched and not is_replay_category %}

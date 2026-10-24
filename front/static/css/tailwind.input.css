@@ -3216,6 +3216,12 @@ button.secondary {
   font-weight: 700;
 }
 
+/* "Revu": the fiche was already Vu before this day, the row is a replay. */
+.dashboard-media-row .history-row-rewatch {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
 .dashboard-media-row .video-card-footer {
   justify-content: flex-end;
   margin-top: 2px;

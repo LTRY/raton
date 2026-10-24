@@ -670,21 +670,21 @@ sans espace vertical : `.video-stack-list` porte le cadre et chaque pile
 n'est separee de la precedente que par un filet.
 
 **Historique** (`/dashboard/historique`, `dashboard_history.html`) : activite
-de lecture recente, paginee (50 par page), decoupee en un bloc
+de lecture recente, une ligne par media et par journee, paginee (50 lignes par
+page), decoupee en un bloc
 `details.dashboard-day-group` repliable par journee de lecture (macro
 partagee `history_day_list` dans `_macros.html`) — regles ci-dessous. Le temps de lecture y figure
 deux fois : le carrousel de cartes « Temps de lecture » (macro
 `playback_time_cards`, memes chiffres que `/settings` et que la barre de limite
 de Raton) en haut de page, et, dans l'en-tete de chaque journee, le temps total
 regarde ce jour-la (« 1 h 12 de lecture »). Ce total compte toutes les lectures
-de la journee, alors que la liste ne garde qu'une ligne par media ; il ne
-depend donc pas de la pagination.
+de la journee ; il ne depend pas de la pagination.
 
 ### Historique groupe par journee
 
 La vue `Historique` ne liste pas les lectures a plat : elle les regroupe
 par jour de lecture (`DownloadJob.created_at`, ramene au fuseau local du
-serveur comme les stats de temps de lecture — voir `history_day_groups` dans
+serveur comme les stats de temps de lecture — voir `history_days` dans
 `front/cards.py`). Chaque journee est un bloc repliable a part entiere qui
 porte, dans son en-tete, le libelle du jour et le nombre de medias. Le rendu
 est la macro `history_day_list` (`_macros.html`).
@@ -698,14 +698,22 @@ est la macro `history_day_list` (`_macros.html`).
   couvrent que les lectures de cette page.
 - L'ordre reste antichronologique, aussi bien entre les journees qu'a
   l'interieur d'une journee.
-- La deduplication de `dashboard_media_activity_logs` (une ligne par video)
-  reste globale : une video reprise plusieurs jours de suite n'apparait que
-  dans le bloc du jour le plus recent.
+- Une ligne par media **et par journee** (`history_page`,
+  `back/services/videos/history.py`) : une video lue trois jours de suite a une
+  ligne dans chacun des trois blocs, et la somme des temps des lignes d'un bloc
+  est le total de son en-tete.
+- Le lecteur envoie un rapport a chaque pause, fin ou depart de la page, avec
+  les seules secondes regardees depuis le rapport precedent : le temps d'une
+  ligne (« 12:34 regardé ») additionne tous les rapports du media ce jour-la,
+  revisionnages compris (un media vu trois fois compte trois fois). La
+  progression de la ligne est celle du dernier rapport du jour.
+- **Revu** : la fiche etait deja Vu (`user_videos.watched_at`) avant ce jour-la.
+  La ligne reste grisee comme Vu meme si le revisionnage s'est arrete au debut.
 
 Comme le bloc de journee porte deja la date, la ligne d'activite ne repete ni
-`Publie le` ni `Vu le` : elle garde le titre, les labels, la chaine, la
-progression, puis une derniere ligne avec le poids du fichier a gauche et les
-actions Vu/Ecartee + la notation a droite.
+`Publie le` ni `Vu le` : elle garde le titre, les labels, la chaine, le temps
+regarde ce jour-la (et « Revu »), la progression, puis une derniere ligne avec
+le poids du fichier a gauche et les actions Vu/Ecartee + la notation a droite.
 
 ### Barre de progression de lecture
 
@@ -716,9 +724,12 @@ terminee et que la video n'appartient pas a une categorie "sans barre de
 progression" (reglable dans `/settings`, cle `no_progress_category_labels`,
 defaut **amv**/**musique** — voir « Parametres » plus bas).
 
-- Lecture terminee (`is_completed`, calcule dans `playback_activity_view`/
-  `back/services/videos/playback.py` a partir de la position et de la duree de lecture) et video
-  hors de ces categories : la barre disparait et la carte est grisee
+- Fiche Vu automatiquement (`user_videos.watched_at` : une lecture a atteint
+  90 %) ou derniere lecture terminee (`is_completed`, calcule dans
+  `playback_activity_view`/`back/services/videos/playback.py` a partir de la
+  position et de la duree de lecture), video hors de ces categories : la barre
+  disparait et la carte est grisee. Un revisionnage arrete au debut ne
+  retire pas ce Vu (`video_auto_list_state`, `back/services/videos/list_state.py`)
   (classe `video-row-watched` sur `/videos`/dashboard, `dashboard-media-row-completed`
   pour `Historique`) pour signaler que le media a ete vu en entier.
 - Video appartenant a une categorie "sans barre de progression"
@@ -1475,7 +1486,7 @@ rechargement : une ligne deja vue a l'arrivee sur la page n'a pas de markup de
 progression du tout, donc la repasser en non-vue ne fait pas reapparaitre la
 barre avant le prochain rendu.
 
-Le grisage automatique existant (derniere lecture terminee) est conserve et
+Le grisage automatique existant (Vu a 90 % ou derniere lecture terminee) est conserve et
 sert d'etat par defaut. Le bouton **Vu** s'affiche donc deja allume sur une
 video terminee ; cliquer dessus ecrit `unwatched` et annule ce grisage.
 Cliquer **Écartée** sur une video deja ecartee la remet a l'etat automatique —

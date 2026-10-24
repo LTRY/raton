@@ -8,9 +8,17 @@ from back.services.common.categories import parse_video_category_labels
 VIDEO_LIST_STATES = ("watched", "unwatched", "hidden")
 
 
-def video_auto_list_state(playback: dict | None, is_replay_category: bool) -> str:
-    """State deduced from playback progress alone, without a manual choice."""
-    if playback and playback.get("is_completed") and not is_replay_category:
+def video_auto_list_state(
+    playback: dict | None, is_replay_category: bool, reached_watched: bool = False
+) -> str:
+    """State deduced from playback, without a manual choice.
+
+    `reached_watched` is the user's `watched_at`: once a playback reached 90 %, the fiche stays
+    Vu, so replaying it from the start doesn't turn it back to normal through its last report.
+    """
+    if is_replay_category:
+        return "normal"
+    if reached_watched or (playback and playback.get("is_completed")):
         return "watched"
     return "normal"
 
@@ -24,7 +32,7 @@ def video_list_state(state: UserVideo, playback: dict | None, is_replay_category
         return "watched"
     if stored == "unwatched":
         return "normal"
-    return video_auto_list_state(playback, is_replay_category)
+    return video_auto_list_state(playback, is_replay_category, state.watched_at is not None)
 
 
 def card_list_states(
@@ -40,6 +48,6 @@ def card_list_states(
     )
     return (
         video_list_state(state, playback, replay),
-        video_auto_list_state(playback, replay),
+        video_auto_list_state(playback, replay, state.watched_at is not None),
         replay,
     )
