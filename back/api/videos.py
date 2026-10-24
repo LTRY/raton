@@ -46,6 +46,7 @@ from back.services.jobs.download_requests import (
 )
 from back.services.jobs.downloads import run_media_download_job, run_transcript_retry_job
 from back.services.media.media_storage import delete_video_media_file
+from back.services.videos.deletion import delete_video
 from back.services.videos.detail_view import (
     VideoDetail,
     video_detail,
@@ -286,6 +287,11 @@ def download_media(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     background_tasks.add_task(run_media_download_job, job.id, video.url, media_type, video_quality)
     return JobQueuedRead.from_job(job)
+
+
+@router.delete("/videos/{video_id}", status_code=204, responses=error_responses(404, 422))
+def delete_fiche(video_id: int, db: Session = Depends(get_db)) -> None:
+    delete_video(db, fiche(db, video_id))
 
 
 @router.delete(

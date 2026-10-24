@@ -82,12 +82,17 @@ Creation d'une nouvelle fiche :
 5. rollback supprime le dossier final si le commit echoue.
 
 Import de metadonnees alors que le dossier final existe deja sans fiche
-(fiche supprimee, fichiers conserves) : le dossier est reutilise sur place,
+(chaine supprimee, fichiers conserves) : le dossier est reutilise sur place,
 sans staging. Les medias (video, audio), sous-titres et miniature deja
 presents sont conserves et rattaches a la nouvelle fiche ; seuls les
 sous-titres ou la miniature manquants sont telecharges, et `metadata.json` /
 `transcript.txt` sont reecrits. Le dossier n'est jamais supprime si l'import
 echoue.
+
+Suppression d'une fiche par la personne : la ligne est supprimee et commitee,
+puis le dossier final est efface, seulement s'il est strictement a l'interieur
+du dossier media (voir « Suppression d'une fiche » dans
+[02 Fonctionnalites](02-fonctionnalites.md)).
 
 Ajout d'un format sur fiche existante :
 

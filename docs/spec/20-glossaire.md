@@ -198,6 +198,13 @@ Fiche que la personne ne veut plus voir dans ses listes : grisee en plus, et mas
 - **Code** : `list_state = "hidden"`
 - **A ne pas confondre avec** : Une fiche supprimee ou purgee. Le mot « cachee » n'est pas employe.
 
+### Suppression de fiche
+
+La personne supprime une fiche depuis sa page : la fiche et son dossier sur le disque disparaissent, et le scan ne la reimporte plus. Un import demande par la personne la recree.
+
+- **Code** : `delete_video`, table `deleted_videos`
+- **A ne pas confondre avec** : La purge (fichiers media seuls, la fiche reste), une fiche ecartee (toujours dans la bibliotheque), la suppression d'une chaine (qui laisse les fichiers sur le disque).
+
 ### Purge
 
 Suppression quotidienne (4h) des **fichiers media** d'une fiche vue depuis 7 jours, sauf note 4+. La fiche reste.

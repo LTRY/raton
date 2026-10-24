@@ -118,7 +118,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `local_upload` | Import d'un fichier vidéo ou audio déposé depuis l'appareil |
 | `channel_exploration` | Arrêt et progression d'une exploration de chaîne (import de métadonnées de toute une chaîne) |
 | `staging` | Dossier de staging : les fichiers y arrivent, puis rejoignent le dossier final en une fois |
-| `identity` | Chaîne d'une vidéo et URL canonique |
+| `identity` | Chaîne d'une vidéo, vidéo déjà connue du scan (fiche existante ou supprimée), URL canonique |
 | `throttle` | Pauses entre requêtes YouTube et `RateLimitedError` |
 | `scan_events` | État du scan en cours, lu par la page des paramètres |
 
@@ -140,6 +140,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture ; catégories sans barre de progression (`card_list_states`) |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
 | `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
+| `deletion` | Suppression d'une fiche : ses lignes, son dossier dans le dossier media, son identifiant gardé pour le scan |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, transcript horodaté, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |

@@ -1,4 +1,5 @@
-"""Which library channel a YouTube video belongs to, and the canonical URL of a video."""
+"""Which library channel a YouTube video belongs to, whether the scan knows it, and the canonical
+URL of a video."""
 
 import json
 from urllib.parse import quote, unquote, urlparse
@@ -8,11 +9,19 @@ from sqlalchemy.orm import Session
 
 from back.core.config import local_media_path
 from back.models.channel import Channel
+from back.models.deleted_video import DeletedVideo
 from back.models.video import Video
 
 
 def video_already_downloaded(db: Session, yt_video_id: str) -> bool:
     return db.scalar(select(Video.id).where(Video.yt_video_id == yt_video_id)) is not None
+
+
+def video_known(db: Session, yt_video_id: str) -> bool:
+    """A video the scan must not import: it has a fiche, or the person deleted its fiche."""
+    return video_already_downloaded(db, yt_video_id) or (
+        db.get(DeletedVideo, yt_video_id) is not None
+    )
 
 
 def canonical_video_url(video_url: str, yt_video_id: str, source_section: str = "videos") -> str:

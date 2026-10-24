@@ -376,6 +376,21 @@ inférieure à `MINIMUM_SKIP_SECONDS` (1,0 s). La sortie est une liste de
 bornes. Cette normalisation n'écrit rien dans la DB, l'affichage de l'onglet
 Segments continue de lister les lignes brutes.
 
+### `deleted_videos`
+
+Identifiant YouTube d'une fiche supprimee par la personne, pour que le scan ne
+la reimporte pas (voir « Suppression d'une fiche » dans
+[02 Fonctionnalites](02-fonctionnalites.md)).
+
+Champs :
+
+- `yt_video_id` : cle primaire ;
+- `deleted_at` : date de la premiere suppression.
+
+Seul le scan la lit (`back/services/ingest/identity.py:video_known`). La ligne
+reste quand la fiche est recreee par un import : la fiche existante suffit
+alors a la rendre connue.
+
 ## Migrations
 
 Les migrations Alembic sont la source de verite pour l'evolution de schema.
@@ -385,5 +400,6 @@ l'historique du schema d'origine : elle active d'abord l'extension Postgres
 `pgvector` (`CREATE EXTENSION IF NOT EXISTS vector`, socle des chunks de notes),
 puis cree toutes les tables. Son `downgrade()` defait tout, extension et type
 `transcript_status` compris. `0002_drop_ai_analysis` retire la colonne
-`videos.ai_analysis_json` (l'onglet Analyse IA n'existe plus). Les migrations
+`videos.ai_analysis_json` (l'onglet Analyse IA n'existe plus).
+`0004_deleted_videos` cree la table `deleted_videos`. Les migrations
 suivantes se nomment `NNNN_short_slug`.

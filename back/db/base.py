@@ -1,4 +1,5 @@
 from back.models.channel import Channel
+from back.models.deleted_video import DeletedVideo
 from back.models.job import DownloadJob
 from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.library_chat_message import LibraryChatMessage
@@ -12,6 +13,7 @@ from back.models.video_sponsor_segment import VideoSponsorSegment
 __all__ = [
     "AppSetting",
     "Channel",
+    "DeletedVideo",
     "DownloadJob",
     "LibraryChatConversation",
     "LibraryChatMessage",

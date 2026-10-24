@@ -128,6 +128,10 @@ Videos :
   et la lecture est rapportee par `POST /api/videos/{id}/activity` : ni l'un ni
   l'autre n'a de route HTML.
 - `GET /videos/{id}` : detail video.
+- `POST /videos/{id}/delete` : supprimer la fiche (voir « Suppression d'une
+  fiche » dans [02 Fonctionnalites](02-fonctionnalites.md)), puis rediriger
+  vers `next` avec le message « Fiche supprimée. » ; `/videos` si `next` est la
+  page de la fiche. Une fiche deja supprimee (`404`) redirige pareil.
 - `POST /videos/{id}/media/{media_type}/delete` : supprimer un format local
   (`audio` ou `video`) ; utilisee uniquement depuis la page detail video.
 - `POST /videos/{id}/media/{media_type}/download` : telecharger le format
@@ -495,6 +499,8 @@ watched_at}`.
   (facultatif, `1080` par defaut) : `202 {job_id, status, message,
   status_url}`, le telechargement tourne en arriere-plan ; `400` pour un
   autre format ou une qualite inconnue.
+- `DELETE /api/videos/{id}` : `204`, supprime la fiche et son dossier et
+  garde son identifiant YouTube pour le scan ; `404` si elle n'existe pas.
 - `DELETE /api/videos/{id}/media/{audio|video}` : `204` ; `400` si le
   format est refuse (meme regle que `POST /videos/{id}/media/{type}/delete`).
 - `POST /api/videos/{id}/transcript/download` : nouvelle tentative de
