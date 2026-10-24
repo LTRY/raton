@@ -9,6 +9,7 @@ from scripts.previews import (
     prod_status,
     render_page,
     same_origin,
+    version_status,
 )
 
 OPEN_PR = {
@@ -133,3 +134,21 @@ def test_page_shows_the_reviews_card_only_when_the_scheduler_is_on():
 
     assert "Revue des journaux" not in without
     assert "Revue des journaux" in with_card
+
+
+def test_version_status_compares_the_deployed_commit_with_origin_main():
+    old, new = "a" * 40, "b" * 40
+
+    assert version_status(new, new, 0) == ("À jour avec origin/main (bbbbbbb)", "ok")
+    assert version_status(old, new, 2)[1] == "stale"
+    assert "2 commits" in version_status(old, new, 2)[0]
+    assert "1 commit :" in version_status(old, new, 1)[0]
+    assert version_status(old, new, None)[1] == "stale"
+    assert version_status(None, new, None)[1] == "none"
+    assert version_status(old, None, None)[1] == "none"
+
+
+def test_production_card_shows_the_version_line():
+    page = render_page("h", [], {}, {}, None, prod_version=("En retard <de 2>", "stale"))
+
+    assert "En retard &lt;de 2&gt;" in page

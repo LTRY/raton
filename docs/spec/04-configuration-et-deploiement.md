@@ -257,7 +257,14 @@ Le bouton demande une confirmation, est desactive pendant un deploiement, et la
 sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
 **Production** affiche l'etat du dernier deploiement lance depuis la page
 (« Deploiement en cours… », « Deployee », « Echec du deploiement ») ; il
-s'oublie quand la page redemarre. Un script qui ne peut pas demarrer (par exemple
+s'oublie quand la page redemarre. Elle affiche aussi si la version deployee est
+a jour : le commit dont l'image `raton-api` a ete construite (label
+`raton.git-sha`, pose par `make up` via l'argument de build `GIT_SHA`, lu par
+`docker inspect`) compare au `origin/main` recupere par `git fetch` (au plus
+toutes les 30 s). Le texte est « A jour avec origin/main », « En retard de N
+commits » (en rouge, a redeployer), ou « Version deployee inconnue » quand
+l'image n'a pas le label (deploiement anterieur, ou `docker compose up` sans
+`make up`) ; elle reste vraie meme si le depot a ete avance sans redeployer. Un script qui ne peut pas demarrer (par exemple
 non executable) termine le travail en echec et l'ecrit dans le journal ; les
 scripts lances par la page restent donc en mode `100755` dans git. Comme le reste de la page, ce bouton n'a pas
 d'authentification : toute machine du reseau local peut redeployer la vraie

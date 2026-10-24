@@ -10,6 +10,9 @@ export MEDIA_HOST_ROOT
 # The ops container mounts the repository at this very path (see the `ops` service).
 export RATON_REPO := $(CURDIR)
 
+# Stamped on the api image (label raton.git-sha): the previews page compares it with origin/main.
+export GIT_SHA := $(shell git rev-parse HEAD 2>/dev/null)
+
 install:
 	uv sync --python 3.14 --extra dev
 

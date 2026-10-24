@@ -68,6 +68,10 @@ RUN apt-get update \
 COPY --chown=raton:raton alembic.ini ./
 COPY --chown=raton:raton alembic ./alembic
 COPY --chown=raton:raton back ./back
+# The commit this image was built from, read by the previews page (scripts/previews.py) to tell
+# whether the deployed main is up to date with origin/main. Last, so a new commit only rebuilds this layer.
+ARG GIT_SHA=unknown
+LABEL raton.git-sha=$GIT_SHA
 USER raton
 
 EXPOSE 8001

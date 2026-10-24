@@ -19,6 +19,7 @@ import argparse
 import html
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -97,11 +98,54 @@ def list_open_prs() -> tuple[list[dict], str | None]:
     return sorted(json.loads(result.stdout), key=lambda pr: -pr["number"]), None
 
 
+def run_text(command: list[str], timeout: float = 15) -> str | None:
+    """Stdout of a command, None when it fails, times out or cannot start."""
+    try:
+        result = subprocess.run(
+            command, cwd=REPO, capture_output=True, text=True, check=False, timeout=timeout
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def deployed_sha() -> str | None:
+    """The commit the running api image was built from (label set by `make up`), None if unknown."""
+    sha = run_text(
+        ["docker", "inspect", "--format", '{{ index .Config.Labels "raton.git-sha" }}', API_CONTAINER]
+    )
+    return sha if sha and re.fullmatch(r"[0-9a-f]{40}", sha) else None
+
+
+# `git fetch` on every refresh of the page (every 4 s while a job runs) would hammer GitHub.
+ORIGIN_TTL = 30.0
+_origin_cache: tuple[float, str | None] = (0.0, None)
+
+
+def origin_main_sha() -> str | None:
+    """The current head of origin/main, fetched at most every ORIGIN_TTL seconds."""
+    global _origin_cache
+    fetched_at, sha = _origin_cache
+    if time.time() - fetched_at < ORIGIN_TTL:
+        return sha
+    run_text(["git", "fetch", "-q", "origin", "main"], timeout=30)
+    sha = run_text(["git", "rev-parse", "origin/main"])
+    _origin_cache = (time.time(), sha)
+    return sha
+
+
+def commits_behind(deployed: str, origin: str) -> int | None:
+    """How many commits origin/main has that the deployed commit lacks, None if git cannot say."""
+    count = run_text(["git", "rev-list", "--count", f"{deployed}..{origin}"])
+    return int(count) if count and count.isdigit() else None
+
+
 def log_path(pr: int) -> Path:
     return LOG_DIR / f"pr-{pr}.log"
 
 
 PROD_LOG = LOG_DIR / "prod.log"
+API_CONTAINER = "raton-api"
 
 
 def run_in_background(job: Job, command: list[str], log_file: Path) -> None:
@@ -180,6 +224,23 @@ def prod_status(job: Job | None) -> tuple[str, str]:
     if job.returncode != 0:
         return ("Échec du déploiement", "error")
     return ("Déployée", "ok")
+
+
+def version_status(deployed: str | None, origin: str | None, behind: int | None) -> tuple[str, str]:
+    """(French label, CSS class) comparing the deployed main with origin/main."""
+    if deployed is None:
+        return ("Version déployée inconnue (visible après le prochain make up)", "none")
+    if origin is None:
+        return (f"Déployée : {deployed[:7]} (origin/main injoignable)", "none")
+    if deployed == origin:
+        return (f"À jour avec origin/main ({deployed[:7]})", "ok")
+    if behind:
+        plural = "s" if behind > 1 else ""
+        return (
+            f"En retard de {behind} commit{plural} : {deployed[:7]} déployé, origin/main {origin[:7]}",
+            "stale",
+        )
+    return (f"Différente d'origin/main : {deployed[:7]} déployé, origin/main {origin[:7]}", "stale")
 
 
 JOB_BUSY_LABELS = {"up": "Construction…", "rebase": "Rebase…", "down": "Suppression…"}
@@ -300,8 +361,11 @@ def render_row(
     )
 
 
-def render_prod(job: Job | None) -> str:
+def render_prod(job: Job | None, version: tuple[str, str] | None = None) -> str:
     label, css = prod_status(job)
+    version_line = ""
+    if version is not None:
+        version_line = f'<div class="status {version[1]}">{html.escape(version[0])}</div>'
     disabled = " disabled" if css == "busy" else ""
     # The real stack and its data: a stray tap must not rebuild it.
     confirm = "return confirm('Déployer main sur la vraie instance de Raton ?')"
@@ -309,6 +373,7 @@ def render_prod(job: Job | None) -> str:
     return (
         '<div class="pr prod"><div class="info"><h2>Production</h2>'
         '<div class="meta">Met le dépôt à jour sur origin/main puis lance make up.</div>'
+        f"{version_line}"
         f'<div class="status {css}">{html.escape(label)}</div></div>'
         f'<div class="actions"><form method="post" action="/prod/deploy" onsubmit="{confirm}">'
         f'<button class="primary"{disabled}>Déployer main en production</button></form>{log}</div>'
@@ -325,6 +390,7 @@ def render_page(
     prod_job: Job | None = None,
     reviews: list[ops_review.Review] | None = None,
     review_busy: bool = False,
+    prod_version: tuple[str, str] | None = None,
 ) -> str:
     rows = [
         render_row(host, pr["number"], pr, previews.get(pr["number"]), job_by_pr.get(pr["number"]))
@@ -354,7 +420,7 @@ def render_page(
 <div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de Raton par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/" class="refresh">Rafraîchir</a></div>
-{render_prod(prod_job)}
+{render_prod(prod_job, prod_version)}
 {review_card}
 {banner}{"".join(rows)}{empty}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
@@ -385,6 +451,8 @@ class Handler(BaseHTTPRequestHandler):
             with jobs_lock:
                 job_by_pr = dict(jobs)
                 prod = prod_job
+            deployed, origin = deployed_sha(), origin_main_sha()
+            behind = commits_behind(deployed, origin) if deployed and origin else None
             page = render_page(
                 self.headers.get("Host"),
                 prs,
@@ -394,6 +462,7 @@ class Handler(BaseHTTPRequestHandler):
                 prod,
                 ops_review.list_reviews(limit=60) if SCHEDULER_ON else None,
                 ops_review.running_since is not None,
+                version_status(deployed, origin, behind),
             )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
