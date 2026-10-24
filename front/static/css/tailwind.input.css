@@ -5067,20 +5067,23 @@ turbo-frame {
   white-space: nowrap;
 }
 
-.channel-delete {
+.channel-delete,
+.fiche-delete {
   border-top: 1px solid var(--color-border, var(--color-border));
   margin-top: 4px;
   padding-top: 10px;
 }
 
-.channel-delete > summary {
+.channel-delete > summary,
+.fiche-delete > summary {
   color: var(--color-danger);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
 }
 
-.channel-delete-panel {
+.channel-delete-panel,
+.fiche-delete-panel {
   background: #fef2f2;
   border: 1px solid #fca5a5;
   border-radius: var(--radius-sm);
@@ -5091,16 +5094,24 @@ turbo-frame {
 }
 
 .channel-delete-panel p,
-.channel-delete-panel ul {
+.channel-delete-panel ul,
+.fiche-delete-panel p,
+.fiche-delete-panel ul {
   margin: 0;
 }
 
-.channel-delete-panel ul {
+.channel-delete-panel ul,
+.fiche-delete-panel ul {
   padding-left: 20px;
 }
 
-.channel-delete-title {
+.channel-delete-title,
+.fiche-delete-title {
   font-weight: 700;
+}
+
+.fiche-delete-title {
+  overflow-wrap: anywhere;
 }
 
 .video-card-heading,

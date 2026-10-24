@@ -437,6 +437,19 @@
             <dd>{{ "Disponible" if video.has_transcript else video.transcript_status }}</dd>
           </div>
         </dl>
+        <details class="fiche-delete" id="fiche-delete">
+          <summary>Supprimer la fiche</summary>
+          <form class="fiche-delete-panel" action="/videos/{{ video.id }}/delete" method="post" data-turbo="false">
+            <input type="hidden" name="next" value="{{ back_path }}">
+            <p class="fiche-delete-title">Supprimer « {{ video.title }} » ? Cette action est définitive.</p>
+            <ul>
+              <li>la fiche : note, catégories, commentaire, notes IA, discussion, transcription indexée, segments sponsor et présence dans les playlists ;</li>
+              <li>son dossier sur le disque{% if video.file_size_bytes %} ({{ format_video_file_size(video.file_size_bytes) }}){% endif %} : média, miniature, <code>metadata.json</code> et transcript.</li>
+            </ul>
+            <p>Le scan quotidien ne la réimportera pas ; un import manuel de son URL la recrée. Les journaux et l'historique de lecture sont conservés.</p>
+            <button class="danger" type="submit">Oui, supprimer définitivement</button>
+          </form>
+        </details>
         </div>
       </div>
 

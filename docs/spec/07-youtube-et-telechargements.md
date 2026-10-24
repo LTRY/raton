@@ -142,6 +142,10 @@ s'arrete pas non plus a la premiere video connue (`skip_known`) : la page
 demandee peut commencer par des fiches deja importees (cloche, import par URL),
 et s'y arreter n'importerait rien.
 
+Une video dont la personne a supprime la fiche (`deleted_videos`) compte
+comme connue pour le scan et l'exploration : elle n'est jamais reimportee
+(`video_known`).
+
 Les shorts ne s'arretent pas a la premiere video connue (leur URL `/watch` est
 reparee en `/shorts/`) : le listing s'arrete des qu'une page ne contient aucun
 short inconnu, au lieu de relire les 3 pages chaque nuit.

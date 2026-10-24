@@ -45,7 +45,8 @@ Onglets (`.transcript-tab`, `data-tab="..."`), dans l'ordre :
 - `Plus d'informations` (`data-tab="info"`) : premier onglet a gauche ;
   toujours present ; panneau HTML independant regroupant metadonnees
   enrichies, chapitres, tags, description, et le bloc
-  Publication/Telechargement/Taille/Transcript ;
+  Publication/Telechargement/Taille/Transcript, puis le bouton « Supprimer la
+  fiche » (voir [02 Fonctionnalites](02-fonctionnalites.md)) ;
 - `Segments` (`data-tab="segments"`) : toujours present (jamais `hidden`,
   c'est le seul point d'entree du bouton "Rechercher les segments sponsors") ;
   libelle suffixe du nombre de segments affiches (`Segments (3)`) ; panneau

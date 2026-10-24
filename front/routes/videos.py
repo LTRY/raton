@@ -248,6 +248,22 @@ def fetch_video_sponsorblock_segments(video_id: int, api: Api = Depends(get_api)
     return redirect(f"/videos/{video_id}?{urlencode({'message': message})}#segments-sponsors")
 
 
+@router.post("/videos/{video_id}/delete")
+def delete_video_form(
+    video_id: int, return_to: str = Form("/videos", alias="next"), api: Api = Depends(get_api)
+):
+    target = internal_return_path(return_to)
+    # The fiche's own page is gone once deleted.
+    if target.split("?")[0].split("#")[0] == f"/videos/{video_id}":
+        target = "/videos"
+    try:
+        api.delete(f"/videos/{video_id}")
+    except ApiError as exc:
+        if exc.status != 404:
+            raise
+    return redirect(append_query(target, {"message": "Fiche supprimée."}))
+
+
 @router.post("/videos/{video_id}/media/{media_type}/delete")
 def delete_video_media_form(
     video_id: int,

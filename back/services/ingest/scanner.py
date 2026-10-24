@@ -11,7 +11,7 @@ from back.models.channel import Channel
 from back.models.video import Video
 from back.services.common.job_log import log_job
 from back.services.ingest import scan_events, throttle
-from back.services.ingest.identity import canonical_video_url, video_already_downloaded
+from back.services.ingest.identity import canonical_video_url, video_known
 from back.services.ingest.metadata_import import import_video_metadata
 from back.services.ingest.throttle import (
     RateLimitedError,
@@ -105,7 +105,7 @@ def scan_channel_section(
             yt_video_id = entry.get("id")
             if not yt_video_id:
                 continue
-            if video_already_downloaded(db, yt_video_id):
+            if video_known(db, yt_video_id):
                 if is_shorts:
                     existing = db.scalar(select(Video).where(Video.yt_video_id == yt_video_id))
                     if existing and "/shorts/" not in existing.url:

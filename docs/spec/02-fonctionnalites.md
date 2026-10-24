@@ -200,7 +200,31 @@ Elle affiche :
   commentaire…), detaillee dans
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md) ; l'onglet
   **Segments** est decrit ci-dessous ;
-- section discussion LLM.
+- section discussion LLM ;
+- en bas de l'onglet **Plus d'informations**, la suppression de la fiche (voir
+  ci-dessous).
+
+### Suppression d'une fiche
+
+Le bouton « Supprimer la fiche » deplie d'abord un avertissement detaillant ce
+qui sera supprime : la fiche (note, categories, commentaire, notes IA,
+discussion, transcription indexee, segments sponsor et presence dans les
+playlists) et **son dossier sur le disque** (media, miniature,
+`metadata.json`, transcript, avec sa taille). Les journaux et l'historique de
+lecture restent. La suppression n'a lieu qu'apres confirmation, puis la page
+revient a la liste d'ou la fiche avait ete ouverte (`/videos` si c'etait la
+fiche elle-meme) avec le message « Fiche supprimée. ».
+
+Contraintes :
+
+- la ligne `videos` part d'abord (cascade DB vers ses lignes liees), puis le
+  dossier : un dossier qui resiste reste seulement orphelin sur le disque ;
+- le dossier n'est efface que s'il est strictement a l'interieur du dossier
+  media (`media_root`) ; sinon il est laisse en place ;
+- l'identifiant YouTube est garde dans `deleted_videos` : le scan des cloches
+  et l'exploration d'une chaine ne la reimportent jamais (elle compte comme une
+  video connue). Un import demande par la personne (formulaire d'import,
+  playlist) la recree normalement.
 
 ### Segments sponsorises
 
