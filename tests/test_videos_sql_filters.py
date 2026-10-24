@@ -15,11 +15,14 @@ from back.db.base import *  # noqa: F403
 from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
+from back.models.user import UserVideo
 from back.models.video import Video
+from back.services.common.user_state import video_state_join, video_states
 from back.services.videos.filters import video_filters_condition, video_matches_filters
 from back.services.videos.library_view import LIBRARY_PAGE_SIZE
 from back.services.youtube.view_counts import backfill_view_counts
 from tests.site import site_client
+from tests.users import VIDEO_STATE_FIELDS, pop_state, set_video_state, user_id
 
 
 @pytest.fixture
@@ -46,9 +49,12 @@ def add_video(db, key, channel=None, **fields):
         url=f"https://youtube.com/watch?v={key}",
         folder_path=f"/media/{key}",
     )
+    state = pop_state(fields, VIDEO_STATE_FIELDS)
     video = Video(**{**defaults, **fields})
     db.add(video)
     db.flush()
+    if state:
+        set_video_state(db, video, **state)
     return video
 
 
@@ -84,6 +90,7 @@ def test_sql_filters_match_the_python_twin(db):
         statement = (
             select(Video)
             .outerjoin(Channel, Video.channel_id == Channel.id)
+            .outerjoin(UserVideo, video_state_join(user_id(db)))
             .where(video_filters_condition(*args))
         )
         return {video.id for video in db.scalars(statement)}
@@ -121,12 +128,17 @@ def test_sql_filters_match_the_python_twin(db):
             video.category_labels = video.channel.category_labels
     db.commit()
     videos = list(db.scalars(select(Video)))
+    states = video_states(db, user_id(db), [video.id for video in videos])
     for args, ids_before in zip(cases, before, strict=True):
         expected = {
             video.id
             for video in videos
             if video_matches_filters(
-                video, *args[:7], hide_hidden=args[7], uncategorized_only=args[8]
+                video,
+                states[video.id],
+                *args[:7],
+                hide_hidden=args[7],
+                uncategorized_only=args[8],
             )
         }
         assert ids_before == expected == sql_ids(args), args

@@ -10,6 +10,7 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.playlist import Playlist
 from tests.site import site_client
+from tests.users import user_id
 
 
 @pytest.fixture
@@ -21,7 +22,7 @@ def client_and_playlist():
     )
     Base.metadata.create_all(engine)
     db = sessionmaker(bind=engine, expire_on_commit=False)()
-    playlist = Playlist(title="Ma playlist", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="Ma playlist", source="manual")
     db.add(playlist)
     db.commit()
     app.dependency_overrides[get_db] = lambda: db

@@ -304,8 +304,8 @@
       </div>
     </div>
 
-    {# Low-rated videos whose media the retention purge removed after watching (see the media storage purge service). #}
-    {% if video.watched_at and not video.media_urls.video and not video.media_urls.audio and video.rating < 4 %}
+    {# Decided by the back (`files_purged`): the retention purge removed the shared files after the first Vu. #}
+    {% if video.files_purged %}
     <p class="empty-state">Fichiers retirés automatiquement du serveur après visionnage. Vous pouvez les retélécharger.</p>
     {% endif %}
 

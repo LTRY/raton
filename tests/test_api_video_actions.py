@@ -14,6 +14,7 @@ from back.models.job import DownloadJob
 from back.models.video import Video
 from back.models.video_sponsor_segment import VideoSponsorSegment
 from back.services.youtube import sponsor_segments
+from tests.users import add_user, set_video_state, stored_video_state
 
 
 @pytest.fixture
@@ -42,10 +43,10 @@ def video(db, tmp_path):
         title="Fiche",
         url="https://youtube.com/watch?v=abc",
         folder_path=str(tmp_path),
-        is_new=True,
     )
     db.add(video)
     db.commit()
+    set_video_state(db, video, is_new=True)
     return video
 
 
@@ -54,8 +55,32 @@ def test_open_takes_the_fiche_out_of_nouveautes(client, db, video):
 
     assert response.status_code == 200
     assert response.json()["is_new"] is False
-    db.refresh(video)
-    assert video.is_new is False
+    assert stored_video_state(db, video).is_new is False
+
+
+def test_actions_change_only_the_state_of_the_user_named_by_the_request(client, db, video):
+    other = add_user(db, "Invité")
+    as_other = {"X-Raton-User": str(other.id)}
+
+    client.put(f"/api/videos/{video.id}/rating", json={"rating": 5}, headers=as_other)
+    client.put(f"/api/videos/{video.id}/list-state", json={"state": "hidden"}, headers=as_other)
+    client.put(f"/api/videos/{video.id}/comment", json={"comment": "Le mien"}, headers=as_other)
+    opened = client.post(f"/api/videos/{video.id}/open", headers=as_other).json()
+    # The cookie the browser sends through the front's relay names the user too.
+    client.cookies.set("raton_user", str(other.id))
+    by_cookie = client.get(f"/api/videos/{video.id}").json()
+    client.cookies.clear()
+    mine = client.get(f"/api/videos/{video.id}").json()
+
+    assert opened["rating"] == 5 and opened["list_state"] == "hidden"
+    assert by_cookie["comment"] == "Le mien"
+    # The default user's state is untouched: still Nouveau, no stars, no comment.
+    assert (mine["rating"], mine["list_state"], mine["comment"], mine["is_new"]) == (
+        0,
+        None,
+        None,
+        True,
+    )
 
 
 def test_list_state_sets_and_clears_the_choice(client, video):

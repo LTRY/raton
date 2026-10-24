@@ -26,6 +26,7 @@ from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.llm_job import LlmJob
 from back.models.setting import AppSetting
+from back.models.user import UserSetting
 from back.models.video import TranscriptStatus, Video
 from back.models.video_sponsor_segment import VideoSponsorSegment
 from back.schemas.llm import QuestionCreate
@@ -53,6 +54,15 @@ from front import main as front_main
 from front.records import record
 from front.routes import videos as front_videos_routes
 from tests.site import site_client
+from tests.users import (
+    mine,
+    my_channel,
+    set_channel_state,
+    set_video_state,
+    stored_channel_state,
+    stored_video_state,
+    user_id,
+)
 
 
 def make_session():
@@ -131,10 +141,10 @@ def test_video_card_has_local_title_without_youtube_or_transcript_link():
         video_path="/media/video.mp4",
         thumbnail_path="/media/thumbnail.webp",
         metadata_path="/media/metadata.json",
-        rating=0,
         file_size_bytes=0,
         view_count=12345,
         duration_seconds=123,
+        user_states=mine(rating=0),
     )
     db.add(video)
     db.commit()
@@ -226,7 +236,7 @@ def test_video_detail_page_renders_internal_page_without_youtube_action(monkeypa
     db = make_session()
     video = add_video(db)
     video.thumbnail_path = "/media/video/thumbnail.webp"
-    video.comment = "À revoir pour le passage sur les exemples."
+    set_video_state(db, video, comment="À revoir pour le passage sur les exemples.")
     db.commit()
 
     response = site(db).get(f"/videos/{video.id}")
@@ -265,18 +275,18 @@ def test_video_comment_form_updates_comment():
 
     assert response.status_code == 303
     assert response.headers["location"] == "/videos/1#notes"
-    assert video.comment == "Note perso\nsur deux lignes"
+    assert stored_video_state(db, video).comment == "Note perso\nsur deux lignes"
 
 
 def test_video_comment_form_clears_blank_comment():
     db = make_session()
     video = add_video(db)
-    video.comment = "Ancienne note"
+    set_video_state(db, video, comment="Ancienne note")
     db.commit()
 
     post_form(db, f"/videos/{video.id}/comment", {"comment": "   ", "next": "/videos/1#notes"})
 
-    assert video.comment is None
+    assert stored_video_state(db, video).comment is None
 
 
 def test_video_detail_page_embeds_transcript_and_discussion(monkeypatch, tmp_path):
@@ -329,12 +339,12 @@ def test_video_asset_labels_includes_notes_only_when_notes_file_exists(tmp_path)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
 
-    labels_without_notes = front_cards.badge_labels(video_badges(video))
+    labels_without_notes = front_cards.badge_labels(video_badges(video, False))
     assert not any(label["kind"] == "notes" for label in labels_without_notes)
 
     (folder / "transcript.notes.txt").write_text("- Fait 1", encoding="utf-8")
 
-    labels_with_notes = front_cards.badge_labels(video_badges(video))
+    labels_with_notes = front_cards.badge_labels(video_badges(video, False))
     assert {"text": "Notes", "kind": "notes"} in labels_with_notes
 
 
@@ -581,7 +591,10 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     db.commit()
     job_id = job.id
 
-    assert llm_api.get_llm_job(job_id, BackgroundTasks(), db).partial_short_summary is None
+    assert (
+        llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db)).partial_short_summary
+        is None
+    )
 
     streamed = "# Résumé\n## Résumé court\nLigne 1."
     polled = []
@@ -589,7 +602,7 @@ def test_generate_job_exposes_the_summary_while_it_streams(monkeypatch, tmp_path
     class FakeProvider:
         def complete(self, messages, on_text=None, system=None):
             on_text(streamed)
-            polled.append(llm_api.get_llm_job(job_id, BackgroundTasks(), db))
+            polled.append(llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db)))
             return CompletionResult(
                 text=GENERATION_RESULT_TEXT,
                 model="claude-haiku-4-5",
@@ -639,7 +652,7 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
         lambda fn, *args, **kwargs: scheduled.append((fn, args, kwargs)),
     )
 
-    status = llm_api.get_llm_job(job.id, background_tasks, db)
+    status = llm_api.get_llm_job(job.id, background_tasks, db, user_id(db))
     assert status.status == "done"
     assert "- Fait 1\n- Fait 2" in status.documents.notes
     assert len(scheduled) == 1
@@ -651,7 +664,7 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
 
     # Idempotent replay ("applied") must not reschedule indexing a second time.
     scheduled.clear()
-    llm_api.get_llm_job(job.id, background_tasks, db)
+    llm_api.get_llm_job(job.id, background_tasks, db, user_id(db))
     assert scheduled == []
 
 
@@ -803,7 +816,7 @@ def test_video_api_returns_the_timed_transcript_lines(tmp_path):
     db = make_session()
     video = timed_transcript_video(db, tmp_path, with_media=False)
 
-    detail = api_videos.get_video(video.id, db)
+    detail = api_videos.get_video(video.id, db, user_id(db))
 
     assert [line.model_dump() for line in detail.transcript_lines] == [
         {"start_seconds": 1.0, "text": "Bonjour"},
@@ -954,7 +967,7 @@ def test_transcript_job_status_pending_while_queued(tmp_path):
     db.add(job)
     db.commit()
 
-    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
 
     assert status.status == "pending"
     assert status.documents is None
@@ -982,7 +995,7 @@ def test_transcript_job_status_reports_failure(tmp_path):
     db.add(job)
     db.commit()
 
-    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
 
     assert status.status == "failed"
     assert "API indisponible." in status.message
@@ -1001,7 +1014,7 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     db.commit()
 
     queued = llm_api.ask_about_video(
-        video.id, QuestionCreate(question="Question ?"), BackgroundTasks(), db
+        video.id, QuestionCreate(question="Question ?"), BackgroundTasks(), db, user_id(db)
     )
 
     job = db.get(LlmJob, queued.job_id)
@@ -1014,7 +1027,7 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     job.result = "Réponse du LLM."
     db.commit()
 
-    resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
 
     assert resolved.status == "done"
     assert [message.model_dump() for message in resolved.chat_messages] == [
@@ -1024,7 +1037,7 @@ def test_chat_enqueues_job_and_resolving_appends_history(tmp_path):
     assert (folder / "transcript.chat.json").exists()
 
     # Re-polling must not duplicate the appended messages.
-    second_resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    second_resolved = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
     assert len(second_resolved.chat_messages) == 2
 
 
@@ -1063,14 +1076,14 @@ def test_video_chat_queues_job_and_resolves_after_background_task(monkeypatch, t
     )
 
     job_id = llm_api.ask_about_video(
-        video.id, QuestionCreate(question="Question ?"), background_tasks, db
+        video.id, QuestionCreate(question="Question ?"), background_tasks, db, user_id(db)
     ).job_id
     assert scheduled == [(llm_jobs.run_llm_job, (job_id,), {})]
 
     # Simulate the background task the request scheduled.
     llm_jobs.run_llm_job(job_id)
 
-    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
+    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db))
 
     assert resolved.status == "done"
     assert [message.model_dump() for message in resolved.chat_messages] == [
@@ -1100,7 +1113,7 @@ def test_clearing_the_video_chat_deletes_its_file(tmp_path):
     video.transcript_path = str(transcript)
     video.transcript_status = TranscriptStatus.downloaded
     db.commit()
-    llm_api.clear_video_chat(video.id, db)
+    llm_api.clear_video_chat(video.id, db, user_id(db))
 
     assert not (folder / "transcript.chat.json").exists()
 
@@ -1845,7 +1858,7 @@ def test_videos_page_search_ranks_title_matches_first_and_searches_notes(monkeyp
     db = make_session()
     by_note = add_video(db)
     by_note.title = "Episode 12"
-    by_note.comment = "Très bon passage sur le jardinage"
+    set_video_state(db, by_note, comment="Très bon passage sur le jardinage")
     by_note.downloaded_at = datetime(2026, 2, 1, tzinfo=UTC)
     by_title = Video(
         channel=by_note.channel,
@@ -2026,7 +2039,7 @@ def test_videos_page_does_not_treat_manual_media_on_channel_metadata_as_form_imp
 def test_videos_page_filters_by_rated_videos(monkeypatch):
     db = make_session()
     rated = add_video(db)
-    rated.rating = 4
+    set_video_state(db, rated, rating=4)
     channel = rated.channel
     regular = Video(
         channel=channel,
@@ -2077,7 +2090,7 @@ def test_videos_page_filters_fold_counts_active_filters():
 def test_videos_page_renders_default_rated_sub_library(monkeypatch):
     db = make_session()
     rated = add_video(db)
-    rated.rating = 4
+    set_video_state(db, rated, rating=4)
     db.commit()
 
     response = site(db).get(
@@ -2110,7 +2123,7 @@ def test_videos_page_or_filter_mode_matches_any_selected_condition(monkeypatch):
     rated_metadata.media_type = "metadata"
     rated_metadata.video_path = None
     rated_metadata.metadata_path = "/media/metadata/info.json"
-    rated_metadata.rating = 5
+    set_video_state(db, rated_metadata, rating=5)
     regular_video = Video(
         channel=rated_metadata.channel,
         yt_video_id="regular-video",
@@ -2406,7 +2419,9 @@ def test_channel_next_import_button_uses_next_youtube_page(monkeypatch):
 
 def test_channel_shorts_page_filters_local_videos_and_imports_shorts(monkeypatch):
     db = make_session()
-    channel = Channel(url="https://example.test/channel", name="Chaîne test", rating=4)
+    channel = Channel(
+        url="https://example.test/channel", name="Chaîne test", user_states=my_channel(rating=4)
+    )
     regular = Video(
         channel=channel,
         yt_video_id="regular123",
@@ -2461,8 +2476,7 @@ def test_channel_page_default_section_follows_shorts_bell(
     channel = Channel(
         name="Canal",
         url="https://www.youtube.com/@canal",
-        auto_metadata_enabled=videos_bell,
-        auto_shorts_enabled=shorts_bell,
+        user_states=my_channel(auto_metadata_enabled=videos_bell, auto_shorts_enabled=shorts_bell),
     )
     db.add_all(
         [
@@ -2502,7 +2516,7 @@ def test_content_views_only_link_to_raton_pages():
     video = add_video(db)
     channel = video.channel
 
-    videos_playback.record_playback_activity(db, video, "video", 12, 120, 12)
+    videos_playback.record_playback_activity(db, user_id(db), video, "video", 12, 120, 12)
     client = site(db)
 
     dashboard = client.get("/dashboard/historique").text
@@ -2523,7 +2537,9 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
     video = add_video(db)
     base = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
     for offset, media_type, position in ((0, "video", 120), (1, "audio", 45), (2, "video", 252.5)):
-        videos_playback.record_playback_activity(db, video, media_type, position, 600, 10)
+        videos_playback.record_playback_activity(
+            db, user_id(db), video, media_type, position, 600, 10
+        )
         job = db.scalars(
             select(DownloadJob)
             .where(DownloadJob.status == "played")
@@ -2532,7 +2548,7 @@ def test_video_detail_exposes_server_resume_position_per_media_kind():
         job.created_at = base + timedelta(minutes=offset)
         db.commit()
 
-    positions = videos_playback.latest_playback_positions(db, video.id)
+    positions = videos_playback.latest_playback_positions(db, user_id(db), video.id)
 
     assert positions["video"] == {
         "position_seconds": 252.5,
@@ -2555,7 +2571,7 @@ def test_video_detail_omits_server_resume_position_without_playback():
 
     rendered = site(db).get(f"/videos/{video.id}").text
 
-    assert videos_playback.latest_playback_positions(db, video.id) == {}
+    assert videos_playback.latest_playback_positions(db, user_id(db), video.id) == {}
     assert "data-resume-server-position" not in rendered
 
 
@@ -2563,7 +2579,7 @@ def test_video_activity_logs_media_playback():
     db = make_session()
     video = add_video(db)
 
-    videos_playback.record_playback_activity(db, video, "video", 252, 600, 83)
+    videos_playback.record_playback_activity(db, user_id(db), video, "video", 252, 600, 83)
     job = db.scalar(select(DownloadJob).where(DownloadJob.status == "played"))
 
     assert job is not None
@@ -2582,10 +2598,10 @@ def test_video_activity_sets_watched_at_at_ninety_percent():
     db = make_session()
     video = add_video(db)
 
-    videos_playback.record_playback_activity(db, video, "video", 300, 600, 10)
+    videos_playback.record_playback_activity(db, user_id(db), video, "video", 300, 600, 10)
     assert db.get(Video, video.id).watched_at is None
 
-    videos_playback.record_playback_activity(db, video, "video", 540, 600, 10)
+    videos_playback.record_playback_activity(db, user_id(db), video, "video", 540, 600, 10)
     assert db.get(Video, video.id).watched_at is not None
 
 
@@ -2647,8 +2663,8 @@ def make_new_video(db, channel, index, is_new=True):
         folder_path=f"/media/new-{channel.name}-{index}",
         video_path=f"/media/new-{channel.name}-{index}/video.mp4",
         transcript_status=TranscriptStatus.missing,
-        is_new=is_new,
         downloaded_at=datetime(2026, 7, 1, tzinfo=UTC) + timedelta(minutes=index),
+        user_states=mine(is_new=is_new),
     )
     db.add(video)
     return video
@@ -2658,7 +2674,9 @@ def test_dashboard_new_videos_page_paginates_by_channel_ten_at_a_time():
     db = make_session()
     channels = [
         Channel(
-            url=f"https://example.test/new{i}", name=f"Chaîne {i:02d}", auto_metadata_enabled=True
+            url=f"https://example.test/new{i}",
+            name=f"Chaîne {i:02d}",
+            user_states=my_channel(auto_metadata_enabled=True),
         )
         for i in range(15)
     ]
@@ -2683,7 +2701,9 @@ def test_dashboard_new_videos_page_paginates_by_channel_ten_at_a_time():
 def test_dashboard_new_videos_page_stack_caps_at_ten_most_recent_videos():
     db = make_session()
     channel = Channel(
-        url="https://example.test/busy", name="Chaîne active", auto_metadata_enabled=True
+        url="https://example.test/busy",
+        name="Chaîne active",
+        user_states=my_channel(auto_metadata_enabled=True),
     )
     db.add(channel)
     for index in range(15):
@@ -2703,7 +2723,9 @@ def test_dashboard_new_videos_page_stack_caps_at_ten_most_recent_videos():
 def test_dashboard_new_videos_page_still_shows_already_visited_videos():
     db = make_session()
     channel = Channel(
-        url="https://example.test/visited", name="Chaîne visitée", auto_metadata_enabled=True
+        url="https://example.test/visited",
+        name="Chaîne visitée",
+        user_states=my_channel(auto_metadata_enabled=True),
     )
     db.add(channel)
     make_new_video(db, channel, 0, is_new=False)
@@ -2717,7 +2739,9 @@ def test_dashboard_new_videos_page_still_shows_already_visited_videos():
 def test_dashboard_new_videos_page_excludes_channels_without_the_bell():
     db = make_session()
     followed = Channel(
-        url="https://example.test/followed", name="Chaîne suivie", auto_metadata_enabled=True
+        url="https://example.test/followed",
+        name="Chaîne suivie",
+        user_states=my_channel(auto_metadata_enabled=True),
     )
     not_followed = Channel(url="https://example.test/playlist-origin", name="Chaîne de playlist")
     db.add_all([followed, not_followed])
@@ -2734,16 +2758,19 @@ def test_dashboard_new_videos_page_excludes_channels_without_the_bell():
 def test_dashboard_new_videos_page_lists_only_the_kinds_whose_bell_is_on():
     db = make_session()
     videos_only = Channel(
-        url="https://example.test/v", name="Cloche vidéos", auto_metadata_enabled=True
+        url="https://example.test/v",
+        name="Cloche vidéos",
+        user_states=my_channel(auto_metadata_enabled=True),
     )
     shorts_only = Channel(
-        url="https://example.test/s", name="Cloche shorts", auto_shorts_enabled=True
+        url="https://example.test/s",
+        name="Cloche shorts",
+        user_states=my_channel(auto_shorts_enabled=True),
     )
     both = Channel(
         url="https://example.test/b",
         name="Deux cloches",
-        auto_metadata_enabled=True,
-        auto_shorts_enabled=True,
+        user_states=my_channel(auto_metadata_enabled=True, auto_shorts_enabled=True),
     )
     silent = Channel(url="https://example.test/n", name="Sans cloche")
     db.add_all([videos_only, shorts_only, both, silent])
@@ -2807,6 +2834,7 @@ def test_dashboard_history_page_paginates_beyond_dashboard_limit():
         db.add(
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:04 à 0:04: Position",
                 video=video,
                 channel=channel,
@@ -2835,6 +2863,7 @@ def test_history_day_groups_splits_activity_per_day_with_relative_labels():
     def played_job(created_at: datetime) -> DownloadJob:
         return DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -2881,6 +2910,7 @@ def test_history_day_groups_carries_reading_time_counting_every_playback():
     def played_job(created_at: datetime, watched: int) -> DownloadJob:
         return DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -2928,6 +2958,7 @@ def history_playback_jobs(db) -> None:
         db.add(
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message=json.dumps(
                     {
                         "type": "playback",
@@ -2994,6 +3025,7 @@ def test_dashboard_history_page_renders_novideo_job_and_styled_category_label():
         [
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:04 à 0:04: Position",
                 video=video,
                 channel=channel,
@@ -3001,6 +3033,7 @@ def test_dashboard_history_page_renders_novideo_job_and_styled_category_label():
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise audio pendant 0:04 à 0:04: Titre ancien format",
                 video=None,
                 channel=channel,
@@ -3008,6 +3041,7 @@ def test_dashboard_history_page_renders_novideo_job_and_styled_category_label():
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Lecture audio à 0:02:",
                 video=None,
                 channel=channel,
@@ -3018,6 +3052,7 @@ def test_dashboard_history_page_renders_novideo_job_and_styled_category_label():
             # Several activity pings of one video whose row is gone since.
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message=json.dumps(
                     {
                         "type": "playback",
@@ -3059,6 +3094,7 @@ def test_dashboard_renders_media_playback_as_progress_bar():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -3104,6 +3140,7 @@ def test_videos_page_renders_playback_progress_on_the_thumbnail():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -3135,6 +3172,7 @@ def test_videos_page_hides_progress_bar_and_dims_fully_watched_video():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -3165,6 +3203,7 @@ def test_videos_page_hides_progress_bar_without_dimming_for_musique_category():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -3194,6 +3233,7 @@ def test_dashboard_renders_legacy_media_playback_as_progress_bar():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message="Reprise vidéo pendant 0:11 à 0:11: France Suède",
             video=video,
             channel=video.channel,
@@ -3219,6 +3259,7 @@ def test_dashboard_shows_one_resume_card_per_media():
         [
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:04 à 0:04: Ancienne position",
                 video=video,
                 channel=video.channel,
@@ -3226,6 +3267,7 @@ def test_dashboard_shows_one_resume_card_per_media():
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:11 à 0:11: Position récente",
                 video=video,
                 channel=video.channel,
@@ -3245,6 +3287,8 @@ def test_dashboard_shows_one_resume_card_per_media():
 def test_playback_time_stats_groups_today_week_and_month_by_media_kind():
     db = make_session()
     video = add_video(db)
+    # Created before the rows below, which join the session only when added.
+    user_id(db)
     podcast = Video(
         channel=video.channel,
         yt_video_id="podcast123",
@@ -3295,6 +3339,7 @@ def test_playback_time_stats_groups_today_week_and_month_by_media_kind():
     ) -> DownloadJob:
         return DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -3357,7 +3402,7 @@ def test_two_unit_duration_for_screen_time_rings():
 def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
     db = make_session()
     video = add_video(db)
-    video.channel.rating = 3
+    set_channel_state(db, video.channel, rating=3)
     short_metadata = Video(
         channel=video.channel,
         yt_video_id="short-metadata",
@@ -3371,7 +3416,11 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
         [
             short_metadata,
             DownloadJob(
-                status="played", message="Lecture vidéo", video=video, channel=video.channel
+                status="played",
+                user_id=user_id(db),
+                message="Lecture vidéo",
+                video=video,
+                channel=video.channel,
             ),
             DownloadJob(
                 status="prompt", message="Prompt envoyé", video=video, channel=video.channel
@@ -3420,6 +3469,7 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
         [
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:04 à 0:04: Ancienne position",
                 video=video,
                 channel=video.channel,
@@ -3427,6 +3477,7 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Reprise vidéo pendant 0:11 à 0:11: Position récente",
                 video=video,
                 channel=video.channel,
@@ -3436,8 +3487,8 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
     )
     db.commit()
 
-    all_logs = videos_playback.dashboard_media_activity_logs(db)
-    limited_logs = videos_playback.dashboard_media_activity_logs(db, limit=0)
+    all_logs = videos_playback.dashboard_media_activity_logs(db, user_id(db))
+    limited_logs = videos_playback.dashboard_media_activity_logs(db, user_id(db), limit=0)
 
     assert len(all_logs) == 1
     assert "0:11" in all_logs[0].message
@@ -3446,8 +3497,12 @@ def test_dashboard_media_activity_logs_dedupes_and_respects_limit():
 
 def test_channels_page_shows_rated_channels_by_default():
     db = make_session()
-    rated = Channel(url="https://example.test/rated", name="Rated", rating=5)
-    unrated = Channel(url="https://example.test/unrated", name="Unrated", rating=0)
+    rated = Channel(
+        url="https://example.test/rated", name="Rated", user_states=my_channel(rating=5)
+    )
+    unrated = Channel(
+        url="https://example.test/unrated", name="Unrated", user_states=my_channel(rating=0)
+    )
     db.add_all([rated, unrated])
     db.commit()
 
@@ -3469,7 +3524,9 @@ def test_channels_page_shows_rated_channels_by_default():
 
 def test_channels_page_shows_last_played_activity_without_video_title():
     db = make_session()
-    channel = Channel(url="https://example.test/channel", name="Chaîne active", rating=5)
+    channel = Channel(
+        url="https://example.test/channel", name="Chaîne active", user_states=my_channel(rating=5)
+    )
     video = Video(
         channel=channel,
         yt_video_id="active-video",
@@ -3484,6 +3541,7 @@ def test_channels_page_shows_last_played_activity_without_video_title():
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message="Lecture",
             channel_id=channel.id,
             video_id=video.id,
@@ -3501,21 +3559,29 @@ def test_channels_page_shows_last_played_activity_without_video_title():
 
 def test_channels_page_sorts_by_last_played_activity():
     db = make_session()
-    older = Channel(url="https://example.test/older", name="Older", rating=5)
-    newer = Channel(url="https://example.test/newer", name="Newer", rating=1)
-    inactive = Channel(url="https://example.test/inactive", name="Inactive", rating=5)
+    older = Channel(
+        url="https://example.test/older", name="Older", user_states=my_channel(rating=5)
+    )
+    newer = Channel(
+        url="https://example.test/newer", name="Newer", user_states=my_channel(rating=1)
+    )
+    inactive = Channel(
+        url="https://example.test/inactive", name="Inactive", user_states=my_channel(rating=5)
+    )
     db.add_all([older, newer, inactive])
     db.commit()
     db.add_all(
         [
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Lecture",
                 channel_id=older.id,
                 created_at=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Lecture",
                 channel_id=newer.id,
                 created_at=datetime(2026, 7, 3, 10, 0, tzinfo=UTC),
@@ -3533,21 +3599,29 @@ def test_channels_page_sorts_by_last_played_activity():
 
 def test_channels_page_sorts_by_last_played_activity_by_default():
     db = make_session()
-    older = Channel(url="https://example.test/older", name="Older", rating=5)
-    newer = Channel(url="https://example.test/newer", name="Newer", rating=1)
-    inactive = Channel(url="https://example.test/inactive", name="Inactive", rating=5)
+    older = Channel(
+        url="https://example.test/older", name="Older", user_states=my_channel(rating=5)
+    )
+    newer = Channel(
+        url="https://example.test/newer", name="Newer", user_states=my_channel(rating=1)
+    )
+    inactive = Channel(
+        url="https://example.test/inactive", name="Inactive", user_states=my_channel(rating=5)
+    )
     db.add_all([older, newer, inactive])
     db.commit()
     db.add_all(
         [
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Lecture",
                 channel_id=older.id,
                 created_at=datetime(2026, 7, 1, 10, 0, tzinfo=UTC),
             ),
             DownloadJob(
                 status="played",
+                user_id=user_id(db),
                 message="Lecture",
                 channel_id=newer.id,
                 created_at=datetime(2026, 7, 3, 10, 0, tzinfo=UTC),
@@ -3565,8 +3639,10 @@ def test_channels_page_sorts_by_last_played_activity_by_default():
 
 def test_channels_page_sorts_alphabetically():
     db = make_session()
-    beta = Channel(url="https://example.test/beta", name="Beta", rating=5)
-    alpha = Channel(url="https://example.test/alpha", name="Alpha", rating=1)
+    beta = Channel(url="https://example.test/beta", name="Beta", user_states=my_channel(rating=5))
+    alpha = Channel(
+        url="https://example.test/alpha", name="Alpha", user_states=my_channel(rating=1)
+    )
     db.add_all([beta, alpha])
     db.commit()
 
@@ -3578,8 +3654,12 @@ def test_channels_page_sorts_alphabetically():
 
 def test_channels_page_can_show_all_channels():
     db = make_session()
-    rated = Channel(url="https://example.test/rated", name="Rated", rating=5)
-    unrated = Channel(url="https://example.test/unrated", name="Unrated", rating=0)
+    rated = Channel(
+        url="https://example.test/rated", name="Rated", user_states=my_channel(rating=5)
+    )
+    unrated = Channel(
+        url="https://example.test/unrated", name="Unrated", user_states=my_channel(rating=0)
+    )
     db.add_all([rated, unrated])
     db.commit()
 
@@ -3594,10 +3674,16 @@ def test_channels_page_can_show_all_channels():
 def test_channels_page_searches_visible_channels():
     db = make_session()
     rated = Channel(
-        url="https://example.test/rated", name="Rated", rating=5, category_labels="maker"
+        url="https://example.test/rated",
+        name="Rated",
+        category_labels="maker",
+        user_states=my_channel(rating=5),
     )
     unrated = Channel(
-        url="https://example.test/cinema", name="Cinema", rating=0, category_labels="film"
+        url="https://example.test/cinema",
+        name="Cinema",
+        category_labels="film",
+        user_states=my_channel(rating=0),
     )
     db.add_all([rated, unrated])
     db.commit()
@@ -3619,9 +3705,14 @@ def test_channels_page_searches_visible_channels():
 def test_channels_page_search_ignores_accents_and_ranks_names_first():
     db = make_session()
     by_label = Channel(
-        url="https://example.test/a", name="Alpha", rating=0, category_labels="cinéma"
+        url="https://example.test/a",
+        name="Alpha",
+        category_labels="cinéma",
+        user_states=my_channel(rating=0),
     )
-    by_name = Channel(url="https://example.test/z", name="Zoom Cinéma", rating=0)
+    by_name = Channel(
+        url="https://example.test/z", name="Zoom Cinéma", user_states=my_channel(rating=0)
+    )
     db.add_all([by_label, by_name])
     db.commit()
 
@@ -3636,7 +3727,9 @@ def test_channels_page_search_ignores_accents_and_ranks_names_first():
 
 def test_channel_categories_form_saves_defaults_and_updates_uncategorized_videos():
     db = make_session()
-    channel = Channel(url="https://example.test/channel", name="Chaîne test", rating=5)
+    channel = Channel(
+        url="https://example.test/channel", name="Chaîne test", user_states=my_channel(rating=5)
+    )
     empty_video = Video(
         channel=channel,
         yt_video_id="empty-video",
@@ -3681,7 +3774,10 @@ def test_channel_categories_form_saves_defaults_and_updates_uncategorized_videos
 def test_channels_page_renders_channel_category_picker_and_badges():
     db = make_session()
     channel = Channel(
-        url="https://example.test/channel", name="Chaîne test", rating=5, category_labels="maker"
+        url="https://example.test/channel",
+        name="Chaîne test",
+        category_labels="maker",
+        user_states=my_channel(rating=5),
     )
     db.add(channel)
     db.commit()
@@ -3707,7 +3803,9 @@ def test_channels_page_renders_channel_category_picker_and_badges():
 
 def test_channel_rating_updates_channel_and_returns_to_filter():
     db = make_session()
-    channel = Channel(url="https://example.test/channel", name="Chaîne test", rating=5)
+    channel = Channel(
+        url="https://example.test/channel", name="Chaîne test", user_states=my_channel(rating=5)
+    )
     db.add(channel)
     db.commit()
 
@@ -3715,7 +3813,7 @@ def test_channel_rating_updates_channel_and_returns_to_filter():
         db, f"/channels/{channel.id}/rating", {"rating": "2", "next": "/channels?rated=true"}
     )
 
-    assert channel.rating == 2
+    assert stored_channel_state(db, channel).rating == 2
     assert response.headers["location"] == "/channels?rated=true"
 
 
@@ -3758,7 +3856,7 @@ def test_new_channels_are_rated_by_default(monkeypatch, no_profile_backfill):
 
     assert response.headers["location"] == f"/channels?sort=added&added_channel_id={channel.id}"
     assert channel is not None
-    assert channel.rating == 1
+    assert stored_channel_state(db, channel).rating == 1
 
 
 def channels_page(db, query: str = "") -> str:
@@ -3767,7 +3865,9 @@ def channels_page(db, query: str = "") -> str:
 
 def test_channels_page_shows_added_channel_toast_with_link():
     db = make_session()
-    channel = Channel(url="https://example.test/channel", name="Nouvelle chaîne", rating=1)
+    channel = Channel(
+        url="https://example.test/channel", name="Nouvelle chaîne", user_states=my_channel(rating=1)
+    )
     db.add(channel)
     db.commit()
 
@@ -3785,7 +3885,13 @@ def test_channels_page_shows_added_channel_toast_with_link():
 
 def test_channels_page_ignores_unknown_added_channel_id():
     db = make_session()
-    db.add(Channel(url="https://example.test/channel", name="Nouvelle chaîne", rating=1))
+    db.add(
+        Channel(
+            url="https://example.test/channel",
+            name="Nouvelle chaîne",
+            user_states=my_channel(rating=1),
+        )
+    )
     db.commit()
 
     for query in ("", "added_channel_id=9999", "added_channel_id=abc"):
@@ -3795,7 +3901,11 @@ def test_channels_page_ignores_unknown_added_channel_id():
 
 def test_redirect_message_is_rendered_as_a_toast_not_an_inline_notice():
     db = make_session()
-    db.add(Channel(url="https://example.test/channel", name="Léo Duff", rating=1))
+    db.add(
+        Channel(
+            url="https://example.test/channel", name="Léo Duff", user_states=my_channel(rating=1)
+        )
+    )
     db.commit()
 
     message = "25 fiches vidéos importées pour Léo Duff."
@@ -3862,7 +3972,7 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
         url="https://www.youtube.com/channel/UCknown",
         name="Leo Duff",
         yt_channel_id="UCknown",
-        rating=1,
+        user_states=my_channel(rating=1),
     )
     db.add(known)
     db.commit()
@@ -3891,7 +4001,9 @@ def test_channels_page_lists_youtube_candidates_and_flags_known_channels(monkeyp
 
 def test_channels_search_ends_with_a_youtube_search_card():
     db = make_session()
-    db.add(Channel(url="https://example.test/leo", name="Leo Duff", rating=1))
+    db.add(
+        Channel(url="https://example.test/leo", name="Leo Duff", user_states=my_channel(rating=1))
+    )
     db.commit()
 
     rendered = channels_page(db, "q=Leo&sort=alpha")
@@ -3948,7 +4060,7 @@ def test_add_channel_refuses_a_channel_already_in_the_library(monkeypatch, no_pr
             url="https://www.youtube.com/channel/UC123",
             name="Déjà là",
             yt_channel_id="UC123",
-            rating=1,
+            user_states=my_channel(rating=1),
         )
     )
     db.commit()
@@ -4090,7 +4202,7 @@ def test_api_create_channel_saves_resolved_url_from_name(monkeypatch):
     # A free-text name is refused by `ChannelCreate` (it goes through the YouTube search);
     # a handle is resolved, and the URL YouTube gives back is the one saved.
     channel = api_channels.create_channel(
-        api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db
+        api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db, user_id(db)
     )
 
     assert channel.name == "Chaîne API"
@@ -4118,7 +4230,7 @@ def test_api_create_channel_refuses_a_channel_added_under_another_url(monkeypatc
 
     with pytest.raises(HTTPException) as exc:
         api_channels.create_channel(
-            api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db
+            api_channels.ChannelCreate(url="@api-channel"), BackgroundTasks(), db, user_id(db)
         )
 
     assert exc.value.status_code == 409
@@ -4157,7 +4269,7 @@ def test_api_create_channel_returns_not_found_for_missing_handle(monkeypatch):
 
     with pytest.raises(HTTPException) as exc:
         api_channels.create_channel(
-            api_channels.ChannelCreate(url="@missing-handle"), BackgroundTasks(), db
+            api_channels.ChannelCreate(url="@missing-handle"), BackgroundTasks(), db, user_id(db)
         )
 
     assert exc.value.status_code == 404
@@ -4268,7 +4380,7 @@ def test_settings_form_saves_video_library_views(tmp_path):
     )
 
     assert response.headers["location"] == "/settings"
-    assert json.loads(db.get(AppSetting, "video_library_views").value) == [
+    assert json.loads(db.get(UserSetting, (user_id(db), "video_library_views")).value) == [
         {
             "name": "Maker notés",
             "asset_filter_mode": "or",
@@ -4517,6 +4629,7 @@ def test_settings_api_updates_media_root_and_quota(tmp_path):
             video_category_labels=["Maker", "Science", "maker"],
         ),
         db,
+        user_id(db),
     )
 
     assert result.media_root == str(tmp_path)
@@ -4544,6 +4657,7 @@ def test_settings_api_updates_category_label_colors(tmp_path):
             ],
         ),
         db,
+        user_id(db),
     )
 
     assert result.video_category_labels == ["maker", "science"]
@@ -4576,6 +4690,7 @@ def test_settings_api_updates_video_library_views(tmp_path):
             ],
         ),
         db,
+        user_id(db),
     )
 
     assert result.video_library_views == [
@@ -4590,67 +4705,42 @@ def test_settings_api_updates_video_library_views(tmp_path):
             "rated": False,
         }
     ]
-    assert json.loads(db.get(AppSetting, "video_library_views").value) == result.video_library_views
+    assert (
+        json.loads(db.get(UserSetting, (user_id(db), "video_library_views")).value)
+        == result.video_library_views
+    )
 
 
 def test_video_list_state_follows_playback_when_unset():
-    video = Video(
-        yt_video_id="ls-auto",
-        title="Auto",
-        url="https://youtube.com/watch?v=ls-auto",
-        folder_path="/media/ls-auto",
-    )
+    state = mine()[0]
 
-    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "watched"
-    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "normal"
-    assert videos_list_state.video_list_state(video, None, False) == "normal"
+    assert videos_list_state.video_list_state(state, {"is_completed": True}, False) == "watched"
+    assert videos_list_state.video_list_state(state, {"is_completed": False}, False) == "normal"
+    assert videos_list_state.video_list_state(state, None, False) == "normal"
 
 
 def test_video_list_state_ignores_playback_for_replay_categories():
-    video = Video(
-        yt_video_id="ls-replay",
-        title="Replay",
-        url="https://youtube.com/watch?v=ls-replay",
-        folder_path="/media/ls-replay",
-    )
+    state = mine()[0]
 
-    assert videos_list_state.video_list_state(video, {"is_completed": True}, True) == "normal"
+    assert videos_list_state.video_list_state(state, {"is_completed": True}, True) == "normal"
 
 
 def test_video_list_state_honours_manual_watched_even_on_replay_category():
-    video = Video(
-        yt_video_id="ls-manual",
-        title="Manuel",
-        url="https://youtube.com/watch?v=ls-manual",
-        folder_path="/media/ls-manual",
-        list_state="watched",
-    )
+    state = mine(list_state="watched")[0]
 
-    assert videos_list_state.video_list_state(video, None, True) == "watched"
+    assert videos_list_state.video_list_state(state, None, True) == "watched"
 
 
 def test_video_list_state_unwatched_cancels_completed_playback():
-    video = Video(
-        yt_video_id="ls-unwatched",
-        title="Non lu",
-        url="https://youtube.com/watch?v=ls-unwatched",
-        folder_path="/media/ls-unwatched",
-        list_state="unwatched",
-    )
+    state = mine(list_state="unwatched")[0]
 
-    assert videos_list_state.video_list_state(video, {"is_completed": True}, False) == "normal"
+    assert videos_list_state.video_list_state(state, {"is_completed": True}, False) == "normal"
 
 
 def test_video_list_state_hidden_wins_over_playback():
-    video = Video(
-        yt_video_id="ls-hidden",
-        title="Écartée",
-        url="https://youtube.com/watch?v=ls-hidden",
-        folder_path="/media/ls-hidden",
-        list_state="hidden",
-    )
+    state = mine(list_state="hidden")[0]
 
-    assert videos_list_state.video_list_state(video, {"is_completed": False}, False) == "hidden"
+    assert videos_list_state.video_list_state(state, {"is_completed": False}, False) == "hidden"
 
 
 def test_set_video_list_state_persists_each_value():
@@ -4658,18 +4748,18 @@ def test_set_video_list_state_persists_each_value():
     video = add_video(db)
 
     for state in ("watched", "unwatched", "hidden"):
-        videos_editing.set_video_list_state(db, video, state)
-        assert db.get(Video, video.id).list_state == state
+        videos_editing.set_video_list_state(db, user_id(db), video, state)
+        assert stored_video_state(db, video).list_state == state
 
 
 def test_set_video_list_state_clear_resets_to_null():
     db = make_session()
     video = add_video(db)
-    videos_editing.set_video_list_state(db, video, "hidden")
+    videos_editing.set_video_list_state(db, user_id(db), video, "hidden")
 
-    videos_editing.set_video_list_state(db, video, "clear")
+    videos_editing.set_video_list_state(db, user_id(db), video, "clear")
 
-    assert db.get(Video, video.id).list_state is None
+    assert stored_video_state(db, video).list_state is None
 
 
 def test_set_video_list_state_rejects_unknown_value():
@@ -4677,7 +4767,7 @@ def test_set_video_list_state_rejects_unknown_value():
     video = add_video(db)
 
     with pytest.raises(ValueError, match="État de liste inconnu."):
-        videos_editing.set_video_list_state(db, video, "bogus")
+        videos_editing.set_video_list_state(db, user_id(db), video, "bogus")
 
 
 def test_videos_page_hide_hidden_excludes_only_hidden_videos():
@@ -4693,7 +4783,7 @@ def test_videos_page_hide_hidden_excludes_only_hidden_videos():
         folder_path="/media/hidden",
         video_path="/media/hidden/video.mp4",
         transcript_status=TranscriptStatus.missing,
-        list_state="hidden",
+        user_states=mine(list_state="hidden"),
     )
     marked_watched = Video(
         channel=channel,
@@ -4704,7 +4794,7 @@ def test_videos_page_hide_hidden_excludes_only_hidden_videos():
         folder_path="/media/watched",
         video_path="/media/watched/video.mp4",
         transcript_status=TranscriptStatus.missing,
-        list_state="watched",
+        user_states=mine(list_state="watched"),
     )
     db.add_all([hidden, marked_watched])
     db.commit()
@@ -4728,7 +4818,7 @@ def test_videos_page_without_hide_hidden_keeps_hidden_videos():
         folder_path="/media/hidden456",
         video_path="/media/hidden456/video.mp4",
         transcript_status=TranscriptStatus.missing,
-        list_state="hidden",
+        user_states=mine(list_state="hidden"),
     )
     db.add(hidden)
     db.commit()
@@ -4742,7 +4832,7 @@ def test_videos_page_without_hide_hidden_keeps_hidden_videos():
 def test_video_card_renders_list_state_buttons():
     db = make_session()
     video = add_video(db)
-    video.list_state = "watched"
+    set_video_state(db, video, list_state="watched")
     db.commit()
 
     rendered = site(db).get("/videos").text
@@ -4764,12 +4854,13 @@ def test_video_auto_list_state_reflects_playback_only():
 def test_video_card_exposes_auto_list_state_for_unhiding():
     db = make_session()
     video = add_video(db)
-    video.list_state = "hidden"
+    set_video_state(db, video, list_state="hidden")
     db.commit()
     db.add(
         DownloadJob(
             video_id=video.id,
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -4806,6 +4897,7 @@ def add_playback_job(db, video, position=5, duration=600):
     db.add(
         DownloadJob(
             status="played",
+            user_id=user_id(db),
             message=json.dumps(
                 {
                     "type": "playback",
@@ -4839,7 +4931,7 @@ def test_resume_page_renders_list_state_buttons():
 def test_resume_page_greys_hidden_video_more_strongly():
     db = make_session()
     video = add_video(db)
-    video.list_state = "hidden"
+    set_video_state(db, video, list_state="hidden")
     db.commit()
     add_playback_job(db, video)
 
@@ -4852,7 +4944,7 @@ def test_resume_page_greys_hidden_video_more_strongly():
 def test_resume_page_greys_manually_watched_video():
     db = make_session()
     video = add_video(db)
-    video.list_state = "watched"
+    set_video_state(db, video, list_state="watched")
     db.commit()
     add_playback_job(db, video)
 
@@ -4934,7 +5026,7 @@ def test_video_detail_has_no_purge_message_for_archived_video():
     video = add_video(db)
     video.video_path = None
     video.watched_at = datetime(2026, 6, 3, tzinfo=UTC)
-    video.rating = 5
+    set_video_state(db, video, rating=5)
     db.commit()
 
     rendered = site(db).get(f"/videos/{video.id}").text

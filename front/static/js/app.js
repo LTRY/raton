@@ -313,11 +313,19 @@ document.querySelectorAll("[data-chip3]").forEach((button) => {
 const RESUME_MINIMUM_SECONDS = 3;
 const RESUME_END_BUFFER_SECONDS = 5;
 
+// Each user of the browser (meta `raton-user` of base.html) resumes from their own position.
+// No user chosen yet keeps the key without suffix, the one written before users existed.
+function userResumeKey(storageKey) {
+  const user = document.querySelector('meta[name="raton-user"]')?.content;
+  return user ? `${storageKey}:u${user}` : storageKey;
+}
+
 function readStoredResume(storageKey) {
+  const key = userResumeKey(storageKey);
   try {
-    const position = Number.parseFloat(window.localStorage.getItem(storageKey) || "");
+    const position = Number.parseFloat(window.localStorage.getItem(key) || "");
     if (!Number.isFinite(position)) return null;
-    const at = Number.parseFloat(window.localStorage.getItem(`${storageKey}:at`) || "");
+    const at = Number.parseFloat(window.localStorage.getItem(`${key}:at`) || "");
     return { position, at: Number.isFinite(at) ? at : 0 };
   } catch {
     return null;
@@ -325,9 +333,10 @@ function readStoredResume(storageKey) {
 }
 
 function writeStoredResume(storageKey, position) {
+  const key = userResumeKey(storageKey);
   try {
-    window.localStorage.setItem(storageKey, position.toString());
-    window.localStorage.setItem(`${storageKey}:at`, Date.now().toString());
+    window.localStorage.setItem(key, position.toString());
+    window.localStorage.setItem(`${key}:at`, Date.now().toString());
   } catch {
     // Playback should continue even when storage is unavailable.
   }

@@ -8,8 +8,10 @@ from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from back.models.channel import Channel
+from back.models.user import UserVideo
 from back.models.video import Video
 from back.services.common.search import video_search_rank
+from back.services.common.user_state import video_rating, video_state_join
 from back.services.videos.filters import video_asset_kind_condition, video_section_condition
 
 
@@ -18,7 +20,7 @@ def library_order_by(sort: str) -> tuple:
         return (desc(Video.published_at), desc(Video.downloaded_at), desc(Video.id))
     if sort == "rated":
         return (
-            desc(Video.rating),
+            desc(video_rating),
             desc(Video.published_at),
             desc(Video.downloaded_at),
             desc(Video.id),
@@ -35,23 +37,28 @@ def library_order_by(sort: str) -> tuple:
 
 
 def library_page(
-    db: Session, where, sort: str, search_query: str, page: int, page_size: int
+    db: Session, user_id: int, where, sort: str, search_query: str, page: int, page_size: int
 ) -> tuple[list[Video], int, int, int]:
     """One page of the fiches matching `where`: (videos, page, total_pages, matching count).
 
-    `where` may read `Channel`, which is outer-joined (a fiche inherits its channel's labels).
+    `where` may read `Channel`, which is outer-joined (a fiche inherits its channel's labels),
+    and `UserVideo`, the user's own state, outer-joined too.
     """
     with_channel = Video.channel_id == Channel.id
     listed = (
-        select(Video)
+        select(Video, UserVideo.comment)
         .outerjoin(Channel, with_channel)
+        .outerjoin(UserVideo, video_state_join(user_id))
         .where(where)
         .options(selectinload(Video.channel))
         .order_by(*library_order_by(sort))
     )
     if search_query:
         # Word-based, accent-insensitive ranking is Python-only: rank the SQL-filtered candidates.
-        ranked = [(video_search_rank(video, search_query), video) for video in db.scalars(listed)]
+        ranked = [
+            (video_search_rank(video, search_query, comment), video)
+            for video, comment in db.execute(listed)
+        ]
         # Stable sort: the selected sort still orders videos inside a relevance tier.
         matching = [
             video
@@ -62,7 +69,12 @@ def library_page(
         page = min(max(page, 1), total_pages)
         start = (page - 1) * page_size
         return matching[start : start + page_size], page, total_pages, count
-    count = db.scalar(select(func.count(Video.id)).outerjoin(Channel, with_channel).where(where))
+    count = db.scalar(
+        select(func.count(Video.id))
+        .outerjoin(Channel, with_channel)
+        .outerjoin(UserVideo, video_state_join(user_id))
+        .where(where)
+    )
     total_pages = max(1, -(-count // page_size))
     page = min(page, total_pages)
     videos = list(db.scalars(listed.offset((page - 1) * page_size).limit(page_size)))

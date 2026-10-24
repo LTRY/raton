@@ -1,9 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
 from back.core.config import local_media_path
+from back.models.user import UserVideo
 from back.models.video import Video
 from back.services.common.files import directory_size
 from back.services.common.job_log import log_job
@@ -57,19 +58,31 @@ def delete_video_media_file(db: Session, video: Video, media_type: str) -> None:
     db.commit()
 
 
-def purge_watched_media(db: Session, now: datetime | None = None) -> int:
-    """Delete the media files of videos watched more than RETENTION ago.
+def _archived(video_id_column):
+    """SQL: a user rated the fiche ARCHIVE_MIN_RATING or more, so the purge keeps its files."""
+    return exists().where(
+        UserVideo.video_id == video_id_column, UserVideo.rating >= ARCHIVE_MIN_RATING
+    )
 
-    Videos rated ARCHIVE_MIN_RATING or more are archived and never touched. The
-    row, thumbnail, metadata, transcript and notes stay. Each file is committed
-    separately so a failure leaves the database matching what is on disk.
+
+def is_archived(db: Session, video: Video) -> bool:
+    return bool(db.scalar(select(_archived(video.id))))
+
+
+def purge_watched_media(db: Session, now: datetime | None = None) -> int:
+    """Delete the media files of videos first watched (by anyone) more than RETENTION ago.
+
+    Videos a user rated ARCHIVE_MIN_RATING or more are archived and never touched: the files
+    are shared, so one user's stars keep them for everyone. The row, thumbnail, metadata,
+    transcript and notes stay. Each file is committed separately so a failure leaves the
+    database matching what is on disk.
     """
     cutoff = (now or datetime.now(UTC)) - RETENTION
     videos = db.scalars(
         select(Video).where(
             Video.watched_at.is_not(None),
             Video.watched_at < cutoff,
-            Video.rating < ARCHIVE_MIN_RATING,
+            ~_archived(Video.id),
             or_(Video.video_path.is_not(None), Video.audio_path.is_not(None)),
         )
     ).all()

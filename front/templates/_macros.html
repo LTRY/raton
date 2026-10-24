@@ -94,10 +94,40 @@
         </button>
         <p class="chat-drawer-label" data-chat-recent-label>Récents</p>
         <ul class="chat-drawer-list" data-chat-conversations-list></ul>
-        <button type="button" class="chat-drawer-new" data-chat-drawer-new>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Nouvelle discussion</span>
-        </button>
+        <div class="chat-drawer-foot">
+          {% if config.userMenu %}
+          {# The user switch, where a chat app puts its account button; the forms work without JavaScript (front/routes/users.py). #}
+          <details class="chat-user-menu" data-chat-user-menu>
+            <summary class="chat-user-button" aria-label="Utilisateur : {{ config.userMenu.current.name }}" title="{{ config.userMenu.current.name }}">{{ config.userMenu.current.initial }}</summary>
+            <div class="chat-user-panel">
+              <p class="chat-user-label">Utilisateurs</p>
+              <ul class="chat-user-list">
+                {% for user in config.userMenu.users %}
+                <li>
+                  <form method="post" action="/users/switch">
+                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                    <button type="submit" class="chat-user-choice"{% if user.current %} aria-current="true" disabled{% endif %}>
+                      <span class="chat-user-avatar" aria-hidden="true">{{ user.initial }}</span>
+                      <span class="chat-user-name">{{ user.name }}</span>
+                      {% if user.current %}<svg class="chat-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>{% endif %}
+                    </button>
+                  </form>
+                </li>
+                {% endfor %}
+              </ul>
+              <form class="chat-user-add" method="post" action="/users">
+                <input type="text" name="name" maxlength="40" placeholder="Nouvel utilisateur" aria-label="Nom du nouvel utilisateur" autocomplete="off" required>
+                <button type="submit">Ajouter</button>
+              </form>
+              <a class="chat-user-manage" href="/settings#utilisateurs">Renommer ou supprimer…</a>
+            </div>
+          </details>
+          {% endif %}
+          <button type="button" class="chat-drawer-new" data-chat-drawer-new>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Nouvelle discussion</span>
+          </button>
+        </div>
       </nav>
     </div>
     {% if title %}

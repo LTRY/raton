@@ -19,7 +19,7 @@ que des paquets situés plus haut dans ce tableau.
 
 | Paquet | Rôle | Dépend de |
 |---|---|---|
-| `common/` | Socle partagé : réglages, catégories, vues enregistrées, notes en étoiles, durées, recherche par mots, fichiers, journal des jobs | — |
+| `common/` | Socle partagé : utilisateurs et leur état sur les fiches et les chaînes, réglages, catégories, vues enregistrées, notes en étoiles, durées, recherche par mots, fichiers, journal des jobs | — |
 | `youtube/` | Tout ce qui parle à YouTube (yt-dlp, SponsorBlock), sans toucher aux fiches | `common` |
 | `llm/` | Appels à l'API Anthropic : fournisseur, prompts, coût des jobs | `common` |
 | `media/` | Fichiers média sur disque : purge, quota, miniatures, extraction audio | `common` |
@@ -57,10 +57,12 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `settings` | Réglages stockés en DB (`app_settings`) : lecture avec valeur par défaut, enregistrement du formulaire `/settings` partagé avec `/api` |
+| `users` | Les utilisateurs : liste, ajout, renommage, suppression (avec tout ce qui leur est propre), utilisateur par défaut et celui pour qui agit une requête (`current_user`) |
+| `user_state` | État propre à un utilisateur sur une fiche (`user_videos`) ou une chaîne (`user_channels`) : lecture par lot avec valeurs par défaut, création à l'écriture, jointures SQL d'un utilisateur, abonnés d'une section (`channel_followers`), Nouveau des abonnés (`mark_new_for`) |
+| `settings` | Réglages stockés en DB : ceux de la bibliothèque (`app_settings`) et ceux d'un utilisateur (`user_settings`), lecture avec valeur par défaut, enregistrement du formulaire `/settings` partagé avec `/api` |
 | `categories` | Catégories des chaînes, fiches et playlists et leurs couleurs : normalisation, lecture, écriture |
 | `library_views` | Vues enregistrées de la bibliothèque : forme stockée, lecture, normalisation ; types de fichiers filtrables (`VIDEO_ASSET_KINDS`) |
-| `ratings` | Note en étoiles (0 à 5) d'une chaîne ou d'une fiche |
+| `ratings` | Note en étoiles (0 à 5) qu'un utilisateur donne à une chaîne ou une fiche |
 | `durations` | Durées `m:ss` / `h:mm:ss` et leur lecture, partagées par les services et les templates |
 | `search` | Recherche par mots, insensible à la casse et aux accents, et classement par pertinence ; nettoyage de la saisie (`normalized_search_query`) ; utilisée par `/videos`, `/channels` et le chat bibliothèque |
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
@@ -91,7 +93,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `media_storage` | Purge quotidienne des fichiers des fiches Vu, suppression d'un seul format, type de média d'après les chemins |
+| `media_storage` | Purge quotidienne des fichiers des fiches Vu (sauf celles qu'un utilisateur a notées 4+ : `is_archived`), suppression d'un seul format, type de média d'après les chemins |
 | `storage` | Espace utilisé et marge restante sous le quota global pour les téléchargements automatiques |
 | `thumbnails` | Copies réduites de la miniature de chaque fiche |
 | `audio_extract` | Audio tiré d'une vidéo déjà téléchargée, sans nouveau téléchargement |

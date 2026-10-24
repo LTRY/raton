@@ -27,6 +27,12 @@ from back.services.llm.provider import CompletionResult
 from back.services.rag import retrieval as rag_retrieval
 from back.services.rag.retrieval import RetrievedChunk
 from back.services.youtube import channel_info
+from tests.users import add_user, stored_channel_state, user_id
+
+
+def toolbox_for(db, **kwargs) -> LibraryChatToolbox:
+    """The tools as the default user runs them."""
+    return LibraryChatToolbox(db, user_id(db), **kwargs)
 
 
 def make_session():
@@ -77,9 +83,10 @@ def ask(db, monkeypatch, provider, question="Une question ?", conversation_id=No
         LibraryQuestionCreate(question=question, conversation_id=conversation_id),
         BackgroundTasks(),
         db,
+        user_id(db),
     ).job_id
     llm_jobs.run_llm_job(job_id)
-    return llm_api.get_llm_job(job_id, BackgroundTasks(), db).library_chat.model_dump()
+    return llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db)).library_chat.model_dump()
 
 
 def test_chat_about_library_queues_job_and_resolves_after_background_task(monkeypatch):
@@ -118,7 +125,10 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     )
 
     queued = llm_api.ask_library(
-        LibraryQuestionCreate(question="Qu'est-ce que le stoïcisme ?"), background_tasks, db
+        LibraryQuestionCreate(question="Qu'est-ce que le stoïcisme ?"),
+        background_tasks,
+        db,
+        user_id(db),
     )
 
     assert queued.status_url == f"/api/llm-jobs/{queued.job_id}"
@@ -135,7 +145,7 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
 
     assert "dichotomie du contrôle" in provider.tool_outputs[0]
 
-    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
+    resolved = llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db))
     resolved_payload = resolved.library_chat.model_dump()
 
     assert resolved.status == "done"
@@ -159,7 +169,7 @@ def test_chat_about_library_queues_job_and_resolves_after_background_task(monkey
     assert resolved_payload["total_video_count"] == 1
 
     # Idempotent replay ("applied") must not duplicate messages.
-    second = llm_api.get_llm_job(job_id, BackgroundTasks(), db)
+    second = llm_api.get_llm_job(job_id, BackgroundTasks(), db, user_id(db))
     assert second.library_chat.model_dump()["messages"] == resolved_payload["messages"]
 
 
@@ -213,7 +223,7 @@ def test_answer_cannot_cite_a_channel_or_video_no_tool_returned(monkeypatch):
 
 
 def test_inline_references_stay_in_the_text_only_when_a_tool_returned_them():
-    toolbox = LibraryChatToolbox(make_session())
+    toolbox = toolbox_for(make_session())
     toolbox.channel_ids.update({3})
     toolbox.video_ids.update({7})
 
@@ -230,7 +240,7 @@ def test_inline_references_stay_in_the_text_only_when_a_tool_returned_them():
 
 
 def test_inline_reference_label_may_contain_square_brackets():
-    toolbox = LibraryChatToolbox(make_session())
+    toolbox = toolbox_for(make_session())
     toolbox.video_ids.update({7, 8})
 
     text, sources = toolbox.extract_sources(
@@ -245,7 +255,7 @@ def test_inline_reference_label_may_contain_square_brackets():
 
 
 def test_inline_reference_without_label_is_kept_when_backed_and_dropped_otherwise():
-    toolbox = LibraryChatToolbox(make_session())
+    toolbox = toolbox_for(make_session())
     toolbox.video_ids.update({7})
 
     text, sources = toolbox.extract_sources("Voir [[video:7]] et [[video:99]].")
@@ -257,7 +267,7 @@ def test_inline_reference_without_label_is_kept_when_backed_and_dropped_otherwis
 def test_reference_already_cited_in_the_history_stays_a_link():
     db = make_session()
     video = add_video(db, "Vidéo déjà citée")
-    conversation = LibraryChatConversation(title="Avant")
+    conversation = LibraryChatConversation(user_id=user_id(db), title="Avant")
     db.add(conversation)
     db.flush()
     db.add(
@@ -270,7 +280,7 @@ def test_reference_already_cited_in_the_history_stays_a_link():
         )
     )
     db.commit()
-    toolbox = LibraryChatToolbox(db, conversation_id=conversation.id)
+    toolbox = toolbox_for(db, conversation_id=conversation.id)
 
     text, sources = toolbox.extract_sources(
         f"Reprenons [[video:{video.id}|Vidéo déjà citée]] de [[chaine:{video.channel.id}|Chaîne test]]."
@@ -289,7 +299,7 @@ def test_video_tool_searches_titles_and_restricts_to_a_channel():
     other_channel = Channel(url="https://example.test/autre", name="Autre chaîne")
     second = add_video(db, "Python pour la data", channel=other_channel)
     add_video(db, "Recette de cuisine", channel=other_channel)
-    toolbox = LibraryChatToolbox(db)
+    toolbox = toolbox_for(db)
 
     everywhere = toolbox.run("chercher_videos", {"requete": "python"})
     assert f"[video:{first.id}]" in everywhere and f"[video:{second.id}]" in everywhere
@@ -317,7 +327,7 @@ def test_tool_failure_is_reported_to_the_model_instead_of_failing_the_job(monkey
 
     monkeypatch.setattr(rag_retrieval, "retrieve_relevant_chunks", broken)
 
-    output = LibraryChatToolbox(db).run("chercher_dans_les_notes", {"requete": "sujet"})
+    output = toolbox_for(db).run("chercher_dans_les_notes", {"requete": "sujet"})
 
     assert output == "Erreur de l'outil chercher_dans_les_notes : index indisponible"
 
@@ -325,7 +335,9 @@ def test_tool_failure_is_reported_to_the_model_instead_of_failing_the_job(monkey
 def test_chat_about_library_rejects_empty_question(monkeypatch):
     db = make_session()
     with pytest.raises(HTTPException) as refused:
-        llm_api.ask_library(LibraryQuestionCreate(question="   "), BackgroundTasks(), db)
+        llm_api.ask_library(
+            LibraryQuestionCreate(question="   "), BackgroundTasks(), db, user_id(db)
+        )
 
     assert refused.value.status_code == 400
 
@@ -354,13 +366,13 @@ def test_deleting_a_discussion_deletes_its_messages_only(monkeypatch):
     kept = ask(db, monkeypatch, fake_provider("Gardée."))
     deleted = ask(db, monkeypatch, fake_provider("Supprimée."))
 
-    llm_api.delete_library_conversation(deleted["conversation_id"], db)
+    llm_api.delete_library_conversation(deleted["conversation_id"], db, user_id(db))
 
     assert chat_messages(db, deleted["conversation_id"]) == []
     assert len(chat_messages(db, kept["conversation_id"])) == 2
-    assert [item.id for item in list_conversations(db)] == [kept["conversation_id"]]
+    assert [item.id for item in list_conversations(db, user_id(db))] == [kept["conversation_id"]]
     with pytest.raises(HTTPException) as missing:
-        llm_api.delete_library_conversation(deleted["conversation_id"], db)
+        llm_api.delete_library_conversation(deleted["conversation_id"], db, user_id(db))
     assert missing.value.status_code == 404
 
 
@@ -392,16 +404,40 @@ def test_a_question_follows_its_discussion_and_without_one_starts_another(monkey
     ]
     assert other["conversations"][1]["title"] == "Première ?"
     # The home page opens on Raton: no discussion until one is picked.
-    home = llm_api.get_library_chat(db)
+    home = llm_api.get_library_chat(db, user_id(db))
     assert home.conversation_id is None and home.messages == []
     assert len(home.conversations) == 2
+
+
+def test_a_discussion_is_its_user_s_own(monkeypatch):
+    db = make_session()
+    mine = ask(db, monkeypatch, fake_provider("Réponse."), "La mienne ?")
+    other = add_user(db, "Invité").id
+
+    listed_by_other = llm_api.get_library_chat(db, other).conversations
+    with pytest.raises(HTTPException) as refused:
+        llm_api.get_library_conversation(mine["conversation_id"], db, other)
+    with pytest.raises(HTTPException) as continued:
+        llm_api.ask_library(
+            LibraryQuestionCreate(question="Suite ?", conversation_id=mine["conversation_id"]),
+            BackgroundTasks(),
+            db,
+            other,
+        )
+
+    assert listed_by_other == []
+    assert refused.value.status_code == 404
+    assert continued.value.status_code == 404
 
 
 def test_a_question_to_an_unknown_discussion_is_refused():
     db = make_session()
     with pytest.raises(HTTPException) as refused:
         llm_api.ask_library(
-            LibraryQuestionCreate(question="Suite ?", conversation_id=999), BackgroundTasks(), db
+            LibraryQuestionCreate(question="Suite ?", conversation_id=999),
+            BackgroundTasks(),
+            db,
+            user_id(db),
         )
 
     assert refused.value.status_code == 404
@@ -411,8 +447,8 @@ def test_a_question_to_an_unknown_discussion_is_refused():
 def test_a_reference_cited_in_another_discussion_is_not_backed():
     db = make_session()
     video = add_video(db, "Citée ailleurs")
-    elsewhere = LibraryChatConversation(title="Ailleurs")
-    here = LibraryChatConversation(title="Ici")
+    elsewhere = LibraryChatConversation(user_id=user_id(db), title="Ailleurs")
+    here = LibraryChatConversation(user_id=user_id(db), title="Ici")
     db.add_all([elsewhere, here])
     db.flush()
     db.add(
@@ -422,7 +458,7 @@ def test_a_reference_cited_in_another_discussion_is_not_backed():
     )
     db.commit()
 
-    text, sources = LibraryChatToolbox(db, conversation_id=here.id).extract_sources(
+    text, sources = toolbox_for(db, conversation_id=here.id).extract_sources(
         f"Voir [[video:{video.id}|Citée ailleurs]]."
     )
 
@@ -434,13 +470,15 @@ def test_an_answer_whose_discussion_was_deleted_fails_instead_of_landing_elsewhe
     db = make_session()
     monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: fake_provider("Trop tard."))
     monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
-    queued = llm_api.ask_library(LibraryQuestionCreate(question="Q ?"), BackgroundTasks(), db)
+    queued = llm_api.ask_library(
+        LibraryQuestionCreate(question="Q ?"), BackgroundTasks(), db, user_id(db)
+    )
     llm_jobs.run_llm_job(queued.job_id)
-    llm_api.delete_library_conversation(queued.conversation_id, db)
+    llm_api.delete_library_conversation(queued.conversation_id, db, user_id(db))
     db.get(LlmJob, queued.job_id).conversation_id = None  # ON DELETE SET NULL, as on PostgreSQL
     db.commit()
 
-    status = llm_api.get_llm_job(queued.job_id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(queued.job_id, BackgroundTasks(), db, user_id(db))
 
     assert status.status == "failed"
     assert "Discussion supprimée" in status.message
@@ -518,12 +556,13 @@ def test_library_chat_adds_a_channel_found_on_youtube(monkeypatch):
         == "Chaîne ajoutée : [chaine:1] Léo Duff — @LeoDuff — 822000 abonné(s)"
     )
     channel = db.query(Channel).one()
-    assert (channel.url, channel.name, channel.yt_channel_id, channel.rating) == (
-        "https://www.youtube.com/@LeoDuff",
-        "Léo Duff",
-        "UCleo",
-        1,
-    )
+    # Added with one star for the user who asked.
+    assert (
+        channel.url,
+        channel.name,
+        channel.yt_channel_id,
+        stored_channel_state(db, channel).rating,
+    ) == ("https://www.youtube.com/@LeoDuff", "Léo Duff", "UCleo", 1)
     assert payload["messages"][-1] == {
         "role": "assistant",
         "content": "J'ai ajouté Léo Duff à votre bibliothèque.",
@@ -539,7 +578,7 @@ def test_library_chat_cannot_add_a_channel_youtube_did_not_return(monkeypatch):
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
-    toolbox = LibraryChatToolbox(db)
+    toolbox = toolbox_for(db)
 
     assert "Identifiant inconnu" in toolbox.run("ajouter_chaine", {"youtube_id": "UCleo"})
     toolbox.run("chercher_sur_youtube", {"requete": "Léo Duff"})
@@ -560,7 +599,7 @@ def test_library_chat_does_not_duplicate_a_channel_already_in_the_library(monkey
         "search_channels",
         lambda query: youtube_candidates(("UCleo", "Léo Duff", "@LeoDuff", 822000)),
     )
-    toolbox = LibraryChatToolbox(db)
+    toolbox = toolbox_for(db)
 
     assert f"déjà dans la bibliothèque [chaine:{known.id}]" in toolbox.run(
         "chercher_sur_youtube", {"requete": "Léo Duff"}
@@ -658,9 +697,7 @@ def test_toolbox_records_a_label_then_a_result_for_each_tool_call(monkeypatch):
     db.add(Channel(url="https://example.test/underscore", name="Underscore_"))
     db.commit()
     seen = []
-    toolbox = LibraryChatToolbox(
-        db, on_progress=lambda steps: seen.append([dict(step) for step in steps])
-    )
+    toolbox = toolbox_for(db, on_progress=lambda steps: seen.append([dict(step) for step in steps]))
 
     toolbox.run("chercher_chaines", {"requete": "underscore"})
     toolbox.run("chercher_videos", {"requete": "reverse engineering"})
@@ -679,7 +716,7 @@ def test_toolbox_step_result_says_the_nearest_channel_when_only_a_loose_match_ex
     db = make_session()
     db.add(Channel(url="https://example.test/underscore", name="Underscore_"))
     db.commit()
-    toolbox = LibraryChatToolbox(db)
+    toolbox = toolbox_for(db)
 
     toolbox.run("chercher_chaines", {"requete": "underscore reverse"})
 
@@ -695,7 +732,7 @@ def test_pending_job_status_exposes_the_tool_calls_made_so_far():
     db.add(job)
     db.commit()
 
-    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db)
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
 
     assert status.status == "pending"
     assert status.tool_calls == [{"label": "Recherche dans les notes générées…", "result": None}]
@@ -738,6 +775,7 @@ def add_playback(db, video, position, duration=600, created_at=None, title=None)
     job = DownloadJob(
         channel_id=video.channel_id if video else None,
         video_id=video.id if video else None,
+        user_id=user_id(db),
         status="played",
         message=json.dumps(
             {
@@ -766,7 +804,7 @@ def test_history_tool_lists_latest_playback_once_per_video_and_cites_it():
     add_playback(db, seen, 100, created_at=datetime.now(UTC) - timedelta(hours=2))
     add_playback(db, seen, 600, created_at=datetime.now(UTC) - timedelta(hours=1))
     add_playback(db, old, 50, created_at=datetime.now(UTC) - timedelta(days=90))
-    toolbox = LibraryChatToolbox(db)
+    toolbox = toolbox_for(db)
 
     output = toolbox.run("consulter_historique", {})
 
@@ -783,6 +821,6 @@ def test_history_tool_lists_latest_playback_once_per_video_and_cites_it():
 
 
 def test_history_tool_reports_an_empty_history():
-    toolbox = LibraryChatToolbox(make_session())
+    toolbox = toolbox_for(make_session())
 
     assert "Aucune lecture" in toolbox.run("consulter_historique", {})

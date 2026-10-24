@@ -10,7 +10,9 @@ from sqlalchemy.orm import Session
 
 from back.api.errors import error_responses
 from back.api.lookups import fiche
+from back.api.users import current_user_id
 from back.db.session import get_db
+from back.models.user import UserVideo
 from back.models.video import Video
 from back.schemas.actions import (
     CategoriesUpdate,
@@ -39,6 +41,7 @@ from back.services.common.ratings import InvalidRatingError, set_rating
 from back.services.common.settings import (
     get_sponsor_skip_enabled,
 )
+from back.services.common.user_state import video_states
 from back.services.jobs.download_requests import (
     InvalidMediaFormatError,
     queue_media_download,
@@ -75,13 +78,15 @@ def list_videos(
     channel_id: int | None = None,
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoPage:
     where = Video.channel_id == channel_id if channel_id else true()
     videos, page, total_pages, total = library_page(
-        db, where, "imported", "", page, LIBRARY_PAGE_SIZE
+        db, user_id, where, "imported", "", page, LIBRARY_PAGE_SIZE
     )
+    states = video_states(db, user_id, [video.id for video in videos])
     return VideoPage(
-        items=[VideoRead.model_validate(video) for video in videos],
+        items=[VideoRead.of(video, states[video.id].rating) for video in videos],
         page=page,
         total_pages=total_pages,
         total=total,
@@ -90,15 +95,16 @@ def list_videos(
 
 def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
     video = detail.video
+    state = detail.state
     metadata = detail.metadata
     documents = detail.documents
     return VideoDetailRead(
-        **VideoRead.model_validate(video).model_dump(),
-        is_new=video.is_new,
-        list_state=video.list_state,
-        comment=video.comment,
+        **VideoRead.of(video, state.rating).model_dump(),
+        is_new=state.is_new,
+        list_state=state.list_state,
+        comment=state.comment,
         duration_seconds=video.duration_seconds,
-        watched_at=video.watched_at,
+        watched_at=state.watched_at,
         # Both paths can be set at once: check each column, never media_type.
         media_urls=VideoMediaUrls(
             video=f"/api/videos/{video.id}/video" if video.video_path else None,
@@ -121,16 +127,18 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
         sponsor_skip_enabled=detail.sponsor_skip_enabled,
         skip_segments=detail.skip_segments,
         resume_positions=detail.resume_positions,
+        files_purged=detail.files_purged,
         playlists=[
             VideoPlaylistRead(
                 playlist_id=item.playlist_id, title=item.playlist.title, item_id=item.id
             )
             for item in video.playlist_items
+            if item.playlist.user_id == state.user_id
         ],
         channel=VideoChannelRead(id=video.channel.id, name=video.channel.name)
         if video.channel
         else None,
-        badges=video_badges(video),
+        badges=video_badges(video, state.is_new),
         has_transcript=video.transcript_path is not None,
         transcript_lines=detail.transcript_lines,
     )
@@ -139,9 +147,11 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
 @router.get(
     "/videos/{video_id}", response_model=VideoDetailRead, responses=error_responses(404, 422)
 )
-def get_video(video_id: int, db: Session = Depends(get_db)) -> VideoDetailRead:
+def get_video(
+    video_id: int, db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> VideoDetailRead:
     """Read only: unlike the HTML page, it leaves the fiche in the Nouveautés."""
-    return video_detail_read(video_detail(db, fiche(db, video_id)))
+    return video_detail_read(video_detail(db, user_id, fiche(db, video_id)))
 
 
 @router.get(
@@ -162,26 +172,29 @@ def get_video_sponsor_segments(video_id: int, db: Session = Depends(get_db)) -> 
     )
 
 
-def video_state(video: Video) -> VideoStateRead:
+def video_state(db: Session, user_id: int, video: Video) -> VideoStateRead:
+    state: UserVideo = video_states(db, user_id, [video.id])[video.id]
     return VideoStateRead(
         id=video.id,
-        is_new=video.is_new,
-        list_state=video.list_state,
-        rating=video.rating,
+        is_new=state.is_new,
+        list_state=state.list_state,
+        rating=state.rating,
         categories=parse_video_category_labels(video.category_labels),
-        comment=video.comment,
-        watched_at=video.watched_at,
+        comment=state.comment,
+        watched_at=state.watched_at,
     )
 
 
 @router.post(
     "/videos/{video_id}/open", response_model=VideoStateRead, responses=error_responses(404, 422)
 )
-def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
-    """What opening the fiche's page does: takes it out of the Nouveautés."""
+def open_video(
+    video_id: int, db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> VideoStateRead:
+    """What opening the fiche's page does: takes it out of the user's Nouveautés."""
     video = fiche(db, video_id)
-    mark_video_opened(db, video)
-    return video_state(video)
+    mark_video_opened(db, user_id, video)
+    return video_state(db, user_id, video)
 
 
 @router.put(
@@ -190,15 +203,18 @@ def open_video(video_id: int, db: Session = Depends(get_db)) -> VideoStateRead:
     responses=error_responses(400, 404, 422),
 )
 def update_rating(
-    video_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
+    video_id: int,
+    payload: RatingUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoStateRead:
-    """0 to 5 stars; 400 with the service's message otherwise."""
+    """The user's 0 to 5 stars; 400 with the service's message otherwise."""
     video = fiche(db, video_id)
     try:
-        set_rating(db, video, payload.rating)
+        set_rating(db, user_id, video, payload.rating)
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return video_state(video)
+    return video_state(db, user_id, video)
 
 
 @router.put(
@@ -207,14 +223,17 @@ def update_rating(
     responses=error_responses(400, 404, 422),
 )
 def update_list_state(
-    video_id: int, payload: ListStateUpdate, db: Session = Depends(get_db)
+    video_id: int,
+    payload: ListStateUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoStateRead:
     video = fiche(db, video_id)
     try:
-        set_video_list_state(db, video, payload.state)
+        set_video_list_state(db, user_id, video, payload.state)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return video_state(video)
+    return video_state(db, user_id, video)
 
 
 @router.put(
@@ -223,22 +242,28 @@ def update_list_state(
     responses=error_responses(404, 422),
 )
 def update_categories(
-    video_id: int, payload: CategoriesUpdate, db: Session = Depends(get_db)
+    video_id: int,
+    payload: CategoriesUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoStateRead:
     video = fiche(db, video_id)
     set_video_categories(db, video, payload.categories)
-    return video_state(video)
+    return video_state(db, user_id, video)
 
 
 @router.put(
     "/videos/{video_id}/comment", response_model=VideoStateRead, responses=error_responses(404, 422)
 )
 def update_comment(
-    video_id: int, payload: CommentUpdate, db: Session = Depends(get_db)
+    video_id: int,
+    payload: CommentUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoStateRead:
     video = fiche(db, video_id)
-    set_video_comment(db, video, payload.comment)
-    return video_state(video)
+    set_video_comment(db, user_id, video, payload.comment)
+    return video_state(db, user_id, video)
 
 
 @router.post(
@@ -247,13 +272,18 @@ def update_comment(
     responses=error_responses(400, 404, 422),
 )
 def log_activity(
-    video_id: int, payload: PlaybackActivity, db: Session = Depends(get_db)
+    video_id: int,
+    payload: PlaybackActivity,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> VideoStateRead:
-    """A playback report of a player; may mark the fiche Vu (`mark_watched_if_complete`)."""
+    """A playback report of the user's player; may mark the fiche Vu
+    (`mark_watched_if_complete`)."""
     video = fiche(db, video_id)
     try:
         record_playback_activity(
             db,
+            user_id,
             video,
             payload.media_type,
             payload.position_seconds,
@@ -262,7 +292,7 @@ def log_activity(
         )
     except InvalidPlaybackMediaError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return video_state(video)
+    return video_state(db, user_id, video)
 
 
 @router.post(

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from back.api.cards import card_reads
 from back.api.errors import error_responses
+from back.api.users import current_user_id
 from back.db.session import get_db
 from back.schemas.library import (
     LibraryChannelRead,
@@ -76,6 +77,7 @@ def get_library(
     q: str | None = None,
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> LibraryPageRead:
     """Same parameter names as `/videos`, but no preset file types: no `asset`, no file filter."""
     filters = library_filters(
@@ -94,7 +96,7 @@ def get_library(
         search_query=q,
         page=page,
     )
-    listing = library_listing(db, filters)
+    listing = library_listing(db, user_id, filters)
     if channel_id is not None and listing.channel is None:
         raise HTTPException(status_code=404, detail="Chaîne introuvable")
     for video in listing.videos:
@@ -110,8 +112,8 @@ def get_library(
         total_pages=listing.total_pages,
         total=listing.filtered_video_count,
         counts=listing.section_counts,
-        items=card_reads(db, listing.videos),
-        saved_views=[saved_view_read(view) for view in library_saved_views(db, filters)],
+        items=card_reads(db, user_id, listing.videos),
+        saved_views=[saved_view_read(view) for view in library_saved_views(db, user_id, filters)],
         publication_interval_days=publication_interval_days(listing.publication_dates)
         if listing.publication_dates is not None
         else None,
@@ -123,14 +125,18 @@ def get_library(
 
 
 @router.get("/library/views", response_model=list[SavedViewRead])
-def get_saved_views(db: Session = Depends(get_db)) -> list[SavedViewRead]:
-    """The vues enregistrees (none `active`): the Bibliothèque menu of the pages other than
-    `/videos`, which gets them with `GET /api/library`."""
-    return [saved_view_read(view) for view in library_saved_views(db)]
+def get_saved_views(
+    db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> list[SavedViewRead]:
+    """The user's vues enregistrees (none `active`): the Bibliothèque menu of the pages other
+    than `/videos`, which gets them with `GET /api/library`."""
+    return [saved_view_read(view) for view in library_saved_views(db, user_id)]
 
 
 @router.get("/library/cards", response_model=list[LibraryVideoRead], responses=error_responses(422))
-def get_cards(ids: str = "", db: Session = Depends(get_db)) -> list[LibraryVideoRead]:
+def get_cards(
+    ids: str = "", db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> list[LibraryVideoRead]:
     """The cards of these fiches (`ids=1,2,3`, unknown ones left out), in that order: a channel
     page adds the fiches an exploration imports while it is open."""
-    return card_reads(db, videos_by_ids(db, ids, CHANNEL_IMPORT_PROGRESS_LIMIT))
+    return card_reads(db, user_id, videos_by_ids(db, ids, CHANNEL_IMPORT_PROGRESS_LIMIT))

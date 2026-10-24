@@ -176,12 +176,17 @@ lecture la ou elle s'etait arretee (`front/static/js/app.js`,
 
 La position est connue a deux endroits :
 
-- **`localStorage`**, cle `raton:media-position:{id}:{video|audio}`,
-  ecrite toutes les 5 s de lecture, a la pause et a la sortie de page. Une
-  cle soeur `...:at` porte l'horodatage (ms) de la derniere ecriture ;
+- **`localStorage`**, cle `raton:media-position:{id}:{video|audio}`, suivie
+  de `:u{user_id}` quand le navigateur a choisi un utilisateur (balise
+  `<meta name="raton-user">` de `base.html`, lue par `userResumeKey`) : chaque
+  utilisateur d'un meme appareil reprend a sa position. Sans utilisateur
+  choisi, la cle reste sans suffixe (celle d'avant les utilisateurs). Ecrite
+  toutes les 5 s de lecture, a la pause et a la sortie de page. Une cle soeur
+  `...:at` porte l'horodatage (ms) de la derniere ecriture ;
 - **serveur** : le journal d'activite (`POST /api/videos/{id}/activity`, jobs
-  `played`) contient deja `position_seconds`. `latest_playback_positions`
-  (`back/services/videos/playback.py`) en extrait la derniere position par type de media, et
+  `played` de l'utilisateur) contient deja `position_seconds`.
+  `latest_playback_positions` (`back/services/videos/playback.py`) en extrait
+  la derniere position de l'utilisateur par type de media, et
   `/videos/{id}` l'expose sur le lecteur via `data-resume-server-position` /
   `data-resume-server-at` (et `data-track-resume-server-*` sur le bouton
   "Ecouter").
@@ -291,15 +296,17 @@ pour les lecteurs video/audio classiques (`front/static/js/app.js`,
 Le seuil de 90 % de lecture est evalue cote serveur par
 `POST /api/videos/{id}/activity` (`record_playback_activity`, qui appelle
 `mark_watched_if_complete`, `back/services/videos/playback.py`) : la premiere fois que
-`position_seconds / duration_seconds >= 0.9`, `videos.watched_at` est pose une
-seule fois. Sa remise a `NULL` et la purge des fichiers 7 jours plus tard sont
-decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).
+`position_seconds / duration_seconds >= 0.9` dans la lecture d'un utilisateur,
+son `user_videos.watched_at` est pose une seule fois ; `videos.watched_at` est
+pose a la premiere de ces dates, tous utilisateurs confondus, et n'est pas
+deplace par les suivants. Sa remise a `NULL` et la purge des fichiers 7 jours
+plus tard sont decrites dans [06 Stockage fichiers](06-stockage-fichiers.md).
 
 Sur `/videos/{id}`, le message « Fichiers retirés automatiquement du serveur
-après visionnage. Vous pouvez les retélécharger. » s'affiche quand
-`watched_at` est pose, que `video_path` et `audio_path` sont tous deux absents
-et que `rating < 4`. Le bouton de telechargement manuel existant permet de
-retelecharger.
+après visionnage. Vous pouvez les retélécharger. » s'affiche quand le back dit
+`files_purged` : `videos.watched_at` est pose, `video_path` et `audio_path`
+sont tous deux absents et aucun utilisateur n'a note la fiche 4 ou plus. Le
+bouton de telechargement manuel existant permet de retelecharger.
 
 ## Segments sponsorisés
 

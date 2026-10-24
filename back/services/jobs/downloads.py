@@ -135,8 +135,8 @@ def run_channel_metadata_import_job(
     channel_id: int,
     page: int = 1,
     section: str = "videos",
-    mark_new: bool = False,
 ) -> None:
+    """Import one page of the channel's section; never Nouveau (only the daily scan is news)."""
     db = SessionLocal()
     try:
         job = db.get(DownloadJob, job_id)
@@ -166,8 +166,6 @@ def run_channel_metadata_import_job(
             # video added by URL): stopping at the first one would import nothing.
             "skip_known": True,
         }
-        if mark_new:
-            scan_options["mark_new"] = True
 
         def should_stop() -> bool:
             # A column query reads the committed value; `db.get` would return the cached row.

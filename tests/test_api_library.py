@@ -14,10 +14,11 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.job import DownloadJob
-from back.models.setting import AppSetting
+from back.models.user import UserSetting
 from back.models.video import Video
 from back.services.common.library_views import VIDEO_ASSET_KINDS
 from front.library import VIDEO_ASSET_FILTER_OPTIONS
+from tests.users import VIDEO_STATE_FIELDS, pop_state, set_video_state, user_id
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -34,6 +35,8 @@ def db():
     app.dependency_overrides[get_db] = lambda: session
     session.statements = []
     event.listen(engine, "before_cursor_execute", lambda *args: session.statements.append(args[2]))
+    # Created up front, so the first request does not count its INSERT.
+    user_id(session)
     yield session
     app.dependency_overrides.pop(get_db, None)
 
@@ -46,6 +49,7 @@ def add_channel(db, name):
 
 
 def add_video(db, key, channel, *, minutes=0, short=False, **fields):
+    state = pop_state(fields, VIDEO_STATE_FIELDS)
     video = Video(
         channel_id=channel.id,
         yt_video_id=key,
@@ -58,6 +62,8 @@ def add_video(db, key, channel, *, minutes=0, short=False, **fields):
     )
     db.add(video)
     db.flush()
+    if state:
+        set_video_state(db, video, **state)
     return video
 
 
@@ -71,6 +77,7 @@ def test_api_library_lists_cards_with_their_playback_and_applied_filters(db):
         DownloadJob(
             status="played",
             video_id=played.id,
+            user_id=user_id(db),
             message=json.dumps(
                 {"type": "playback", "position_seconds": 50, "duration_seconds": 100}
             ),
@@ -148,7 +155,8 @@ def test_api_library_refuses_an_unknown_channel(db):
 
 def test_api_library_flags_the_active_saved_view(db):
     db.add(
-        AppSetting(
+        UserSetting(
+            user_id=user_id(db),
             key="video_library_views",
             value='[{"name":"Notés","rated":true},{"name":"Audio","assets":["audio"]}]',
         )

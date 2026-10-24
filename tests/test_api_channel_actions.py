@@ -12,6 +12,7 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from tests.users import add_user
 
 CSV_HEADER = "ID des chaînes,URL des chaînes,Titres des chaînes\n"
 
@@ -56,8 +57,6 @@ def channel(db):
         name="Chan",
         url="https://www.youtube.com/@chan",
         yt_channel_id="UCchan",
-        auto_metadata_enabled=False,
-        auto_shorts_enabled=False,
     )
     db.add(channel)
     db.commit()
@@ -85,11 +84,26 @@ def test_turning_a_bell_on_syncs_the_catalogue_once(client, db, channel, tasks):
     assert db.get(DownloadJob, job_id).message == (
         "Recherche automatique des nouveautés (shorts) de Chan en file d'attente."
     )
-    # Already on: nothing to sync. The existing catalogue is not news (mark_new=False).
+    # Already on: nothing to sync. The existing catalogue is not news: the job marks nothing.
     assert again.json()["job"] is None
     assert off.json()["job"] is None
     assert off.json()["channel"]["auto_shorts_enabled"] is False
-    assert tasks == [("run_channel_metadata_import_job", job_id, channel.id, 1, "shorts", False)]
+    assert tasks == [("run_channel_metadata_import_job", job_id, channel.id, 1, "shorts")]
+
+
+def test_a_bell_is_the_user_s_own(client, db, channel, tasks):
+    other = add_user(db, "Invité")
+
+    client.put(
+        f"/api/channels/{channel.id}/bells/videos",
+        json={"enabled": True},
+        headers={"X-Raton-User": str(other.id)},
+    )
+    mine = client.get(f"/api/channels/{channel.id}").json()
+    theirs = client.get(f"/api/channels/{channel.id}", headers={"X-Raton-User": str(other.id)})
+
+    assert mine["auto_metadata_enabled"] is False
+    assert theirs.json()["auto_metadata_enabled"] is True
 
 
 def test_a_bell_section_must_be_videos_or_shorts(client, channel):

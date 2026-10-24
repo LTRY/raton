@@ -16,6 +16,11 @@ class DownloadJob(Base):
     video_id: Mapped[int | None] = mapped_column(
         ForeignKey("videos.id", ondelete="SET NULL"), nullable=True
     )
+    # Whose activity a `played` or `prompt` line is (history, positions, screen time); NULL on
+    # the other lines, which are the library's, and on lines older than the users.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

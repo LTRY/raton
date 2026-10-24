@@ -1,4 +1,5 @@
-"""The Historique: the latest playback of each media, newest first, grouped by local day.
+"""The Historique of a user: their latest playback of each media, newest first, grouped by
+local day.
 
 Days are cut in the server's local timezone, like the screen-time totals of
 `playback_time_stats`, so a media counted in "Aujourd'hui" by the rings sits in the
@@ -12,7 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from back.models.job import DownloadJob
+from back.models.user import UserVideo
 from back.services.common.settings import get_no_progress_category_labels
+from back.services.common.user_state import video_states
 from back.services.videos.list_state import card_list_states, video_auto_list_state
 from back.services.videos.playback import (
     dashboard_media_activity_logs,
@@ -28,6 +31,8 @@ HISTORY_PAGE_SIZE = 50
 class HistoryRow:
     job: DownloadJob
     day: date
+    # The user's state on the fiche; None once the fiche is gone.
+    state: UserVideo | None
     playback: dict
     shown_state: str
     auto_state: str
@@ -44,10 +49,14 @@ class HistoryPage:
 
 
 def history_page(
-    db: Session, page: int = 1, now: datetime | None = None, page_size: int = HISTORY_PAGE_SIZE
+    db: Session,
+    user_id: int,
+    page: int = 1,
+    now: datetime | None = None,
+    page_size: int = HISTORY_PAGE_SIZE,
 ) -> HistoryPage:
     now = now or datetime.now().astimezone()
-    jobs = dashboard_media_activity_logs(db)
+    jobs = dashboard_media_activity_logs(db, user_id)
     total_pages = max(1, -(-len(jobs) // page_size))
     page = min(max(page, 1), total_pages)
     page_ids = [job.id for job in jobs[(page - 1) * page_size : page * page_size]]
@@ -61,12 +70,15 @@ def history_page(
         )
     }
     no_progress_labels = set(get_no_progress_category_labels(db))
+    states = video_states(db, user_id, [job.video_id for job in loaded.values() if job.video_id])
     rows = []
     for job_id in page_ids:
         job = loaded[job_id]
         playback = playback_activity_view(job)
         if job.video:
-            shown, auto, replay = card_list_states(job.video, playback, no_progress_labels)
+            shown, auto, replay = card_list_states(
+                job.video, states[job.video_id], playback, no_progress_labels
+            )
         else:
             # The fiche is gone: only what the playback itself says.
             replay = False
@@ -75,6 +87,7 @@ def history_page(
             HistoryRow(
                 job=job,
                 day=local_datetime(job.created_at, now.tzinfo).date(),
+                state=states[job.video_id] if job.video else None,
                 playback=playback,
                 shown_state=shown,
                 auto_state=auto,
@@ -89,7 +102,9 @@ def history_page(
         played = list(
             db.scalars(
                 select(DownloadJob).where(
-                    DownloadJob.status == "played", DownloadJob.created_at >= start
+                    DownloadJob.status == "played",
+                    DownloadJob.user_id == user_id,
+                    DownloadJob.created_at >= start,
                 )
             )
         )

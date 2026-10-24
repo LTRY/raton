@@ -41,6 +41,11 @@ téléchargement ni d'appel au LLM.
 
 Un appel refusé par le back lève une erreur portant son message (`detail`).
 
+Le serveur n'envoie ni cookie ni en-tête `X-Raton-User` : il lit la
+bibliothèque comme l'utilisateur par défaut, le plus ancien (ses notes en
+étoiles, ses Nouveautés, ses playlists ; voir
+[12 API et routes](12-api-et-routes.md), « Utilisateur d'une requête »).
+
 ## Limites
 
 - Pas d'outil d'écriture (ajouter une chaîne, marquer Vu, générer des notes,

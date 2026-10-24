@@ -16,6 +16,15 @@ from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.video import Video
 from back.services.channels.listing import CHANNEL_PAGE_SIZE
+from tests.users import (
+    CHANNEL_STATE_FIELDS,
+    VIDEO_STATE_FIELDS,
+    pop_state,
+    set_channel_state,
+    set_video_state,
+    stored_channel_state,
+    user_id,
+)
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 RATING_REFUSED = {"detail": "La note doit être comprise entre 0 et 5."}
@@ -33,6 +42,8 @@ def db():
     app.dependency_overrides[get_db] = lambda: session
     session.statements = []
     event.listen(engine, "before_cursor_execute", lambda *args: session.statements.append(args[2]))
+    # Created up front, so the first request does not count its INSERT.
+    user_id(session)
     yield session
     app.dependency_overrides.pop(get_db, None)
 
@@ -43,15 +54,19 @@ def client():
 
 
 def add_channel(db, name, **fields):
+    state = pop_state(fields, CHANNEL_STATE_FIELDS)
     channel = Channel(
         name=name, url=f"https://youtube.com/@{name}", yt_channel_id=f"UC-{name}", **fields
     )
     db.add(channel)
     db.flush()
+    if state:
+        set_channel_state(db, channel, **state)
     return channel
 
 
 def add_video(db, channel, key, **fields):
+    state = pop_state(fields, VIDEO_STATE_FIELDS)
     video = Video(
         channel_id=channel.id if channel else None,
         yt_video_id=key,
@@ -62,6 +77,8 @@ def add_video(db, channel, key, **fields):
     )
     db.add(video)
     db.flush()
+    if state:
+        set_video_state(db, video, **state)
     return video
 
 
@@ -71,7 +88,15 @@ def test_list_pages_every_channel_with_its_counts(client, db):
     played = add_channel(db, "joue", rating=4, category_labels="science,cuisine")
     add_video(db, played, "a")
     add_video(db, played, "b")
-    db.add(DownloadJob(status="played", message="{}", channel_id=played.id, created_at=NOW))
+    db.add(
+        DownloadJob(
+            status="played",
+            message="{}",
+            channel_id=played.id,
+            user_id=user_id(db),
+            created_at=NOW,
+        )
+    )
     db.commit()
 
     first = client.get("/api/channels").json()
@@ -179,8 +204,7 @@ def test_rating_a_channel_or_a_fiche(client, db):
     assert set(video_rated.json()) >= {"is_new", "list_state", "categories", "comment"}
     assert (too_high.status_code, too_high.json()) == (400, RATING_REFUSED)
     assert (negative.status_code, negative.json()) == (400, RATING_REFUSED)
-    db.refresh(channel)
-    assert channel.rating == 5
+    assert stored_channel_state(db, channel).rating == 5
 
 
 def test_adding_a_channel_refuses_an_out_of_range_rating_in_french(client, db):

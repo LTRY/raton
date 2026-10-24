@@ -2,6 +2,7 @@
 the relayed ones) are served by the back app as the test configured it (`get_db` overridden)."""
 
 import httpx
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from back.main import app as back_app
@@ -12,7 +13,11 @@ from front.main import app as front_app
 
 def site_client(**kwargs) -> TestClient:
     api = Api(TestClient(back_app))
-    front_app.dependency_overrides[get_api] = lambda: api
+
+    def api_for(request: Request) -> Api:
+        return api.for_request(request)
+
+    front_app.dependency_overrides[get_api] = api_for
     proxy._client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=back_app), base_url="http://testserver"
     )

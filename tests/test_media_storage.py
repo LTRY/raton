@@ -8,8 +8,10 @@ from back.db.session import Base
 from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.video import Video
+from back.services.common.user_state import blank_video_state
 from back.services.media.media_storage import purge_watched_media
 from back.services.videos.playback import mark_watched_if_complete
+from tests.users import add_user, set_video_state
 
 
 def make_session():
@@ -45,7 +47,6 @@ def add_video(
         video_path=video_path,
         audio_path=audio_path,
         transcript_path=str(folder / "transcript.txt"),
-        rating=rating,
         file_size_bytes=size,
         watched_at=None
         if watched_days_ago is None
@@ -53,6 +54,8 @@ def add_video(
     )
     db.add(video)
     db.commit()
+    if rating:
+        set_video_state(db, video, rating=rating)
     return video
 
 
@@ -66,11 +69,13 @@ def test_video_watched_at_defaults_to_none(tmp_path):
 def test_mark_watched_requires_ninety_percent(tmp_path):
     db = make_session()
     video = add_video(db, tmp_path / "vid")
+    state = blank_video_state(1, video.id)
 
-    assert mark_watched_if_complete(video, 89, 100) is False
-    assert video.watched_at is None
-    assert mark_watched_if_complete(video, 90, 100) is True
+    assert mark_watched_if_complete(video, state, 89, 100) is False
+    assert video.watched_at is None and state.watched_at is None
+    assert mark_watched_if_complete(video, state, 90, 100) is True
     assert video.watched_at is not None
+    assert state.watched_at == video.watched_at
 
 
 def test_mark_watched_never_overwrites_first_date(tmp_path):
@@ -78,16 +83,32 @@ def test_mark_watched_never_overwrites_first_date(tmp_path):
     first = datetime(2026, 1, 1, tzinfo=UTC)
     video = add_video(db, tmp_path / "vid")
     video.watched_at = first
+    state = blank_video_state(1, video.id)
+    state.watched_at = first
 
-    assert mark_watched_if_complete(video, 100, 100) is False
+    assert mark_watched_if_complete(video, state, 100, 100) is False
+    assert video.watched_at == first and state.watched_at == first
+
+
+def test_a_second_user_watching_keeps_the_purge_countdown_of_the_first(tmp_path):
+    db = make_session()
+    first = datetime(2026, 1, 1, tzinfo=UTC)
+    video = add_video(db, tmp_path / "vid")
+    video.watched_at = first
+    other = blank_video_state(2, video.id)
+
+    # Vu for the second user too, but the shared files still go 7 days after the first Vu.
+    assert mark_watched_if_complete(video, other, 100, 100) is True
+    assert other.watched_at > first
     assert video.watched_at == first
 
 
 def test_mark_watched_ignores_unknown_duration(tmp_path):
     db = make_session()
     video = add_video(db, tmp_path / "vid")
+    state = blank_video_state(1, video.id)
 
-    assert mark_watched_if_complete(video, 50, 0) is False
+    assert mark_watched_if_complete(video, state, 50, 0) is False
     assert video.watched_at is None
 
 
@@ -121,6 +142,16 @@ def test_purge_keeps_recently_watched_unwatched_and_archived(tmp_path):
         db.refresh(video)
         assert video.video_path is not None
         assert (tmp_path / video.yt_video_id / "video.mp4").exists()
+
+
+def test_purge_keeps_a_video_any_user_rated_four_or_more(tmp_path):
+    db = make_session()
+    video = add_video(db, tmp_path / "vid", watched_days_ago=30, rating=1)
+    set_video_state(db, video, add_user(db, "Invité").id, rating=4)
+
+    assert purge_watched_media(db) == 0
+    db.refresh(video)
+    assert video.video_path is not None
 
 
 def test_purge_purges_when_rating_dropped_below_archive_threshold(tmp_path):
@@ -167,5 +198,8 @@ def test_mark_watched_rejects_non_finite_values(tmp_path):
         (50, float("inf")),
         (float("inf"), float("inf")),
     ]:
-        assert mark_watched_if_complete(video, position, duration) is False
+        assert (
+            mark_watched_if_complete(video, blank_video_state(1, video.id), position, duration)
+            is False
+        )
         assert video.watched_at is None

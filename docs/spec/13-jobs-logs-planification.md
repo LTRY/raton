@@ -43,10 +43,11 @@ Ils servent a afficher :
 Comportement et vocabulaire : [02 Fonctionnalites](02-fonctionnalites.md),
 section « Cloches de suivi quotidien », et glossaire. Cote jobs,
 `POST /channels/{id}/auto-metadata` bascule la cloche du champ `section`
-(`videos` par defaut, ou `shorts`) sans toucher l'autre ; a l'activation, il
-cree un job `queued` puis lance
-`run_channel_metadata_import_job(job.id, channel.id, page=1, section=<section>, mark_new=False)`
-en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
+(`videos` par defaut, ou `shorts`) de l'utilisateur courant sans toucher
+l'autre ; a l'activation, il cree un job `queued` puis lance
+`run_channel_metadata_import_job(job.id, channel.id, page=1, section=<section>)`
+en arriere-plan, qui ne marque rien Nouveau : seuls les scans automatiques
+ulterieurs posent `is_new`.
 
 ## Import playlist (URL)
 
@@ -66,7 +67,8 @@ en arriere-plan : seuls les scans automatiques ulterieurs posent `is_new`.
 1. passe le job `running` ;
 2. parcourt toutes les pages de `list_playlist_entries` jusqu'a une page
    vide (plafond 40 pages) ;
-3. pour chaque entree, appelle `import_video_metadata(..., is_new=False)`
+3. pour chaque entree, appelle `import_video_metadata(...)` (sans `new_for` :
+   rien n'est Nouveau)
    puis cree la ligne `playlist_items` correspondante si elle n'existe pas
    deja — **continue au-dela d'une video deja connue** (pas d'arret anticipe
    comme `scan_channel_section`, voir
@@ -102,7 +104,8 @@ utilisateur ligne par ligne a faire avant de lancer l'import.
 `run_playlist_csv_import_job` (`back/services/jobs/playlists.py`) :
 
 1. passe le job `running` ;
-2. pour chaque ligne, appelle `import_video_metadata(..., is_new=False)` puis
+2. pour chaque ligne, appelle `import_video_metadata(...)` (rien n'est
+   Nouveau) puis
    cree la ligne `playlist_items` (`position` = ordre du CSV, `added_at` =
    horodatage de la ligne) ;
 3. une video introuvable/privee depuis l'export (ligne obsolete) est loggee
@@ -137,10 +140,11 @@ rattrapage au demarrage existent en plus du cron (voir ci-dessous).
   (`channels.last_scanned_at`, jamais scannees d'abord) : un scan coupe par un
   429 reprend ainsi la ou il s'est arrete au lieu de toujours oublier les
   memes chaines ;
-- scanne uniquement les chaines dont au moins une cloche est active : l'onglet
-  videos si `auto_metadata_enabled` est vrai, l'onglet shorts si
-  `auto_shorts_enabled` est vrai, avec `mark_new=True` : les fiches importees
-  sont marquees `is_new = true` ;
+- scanne uniquement les chaines ou au moins un utilisateur a une cloche
+  active : l'onglet videos si l'`auto_metadata_enabled` d'un utilisateur est
+  vrai, l'onglet shorts si l'`auto_shorts_enabled` d'un utilisateur est vrai,
+  avec `new_for` = ces utilisateurs (`channel_followers`) : les fiches
+  importees sont Nouveau (`user_videos.is_new = true`) pour eux seuls ;
 - borne sa charge (plafond de fiches par onglet, pauses, arret au premier
   `HTTP 429` : log `warning`, status `rate_limited`, chaines restantes reprises
   le lendemain) — voir "Limites de debit YouTube" dans

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from back.api.cards import card_reads
 from back.api.errors import error_responses
+from back.api.users import current_user_id
 from back.db.session import get_db
 from back.schemas.dashboard import (
     HistoriqueRead,
@@ -29,13 +30,17 @@ router = APIRouter(prefix="/api", tags=["Tableau de bord"])
 
 
 @router.get("/nouveautes", response_model=NouveautesRead, responses=error_responses(422))
-def get_nouveautes(page: int = Query(1, ge=1), db: Session = Depends(get_db)) -> NouveautesRead:
-    stacks, page, total_pages = nouveautes_stacks(db, page)
+def get_nouveautes(
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+) -> NouveautesRead:
+    stacks, page, total_pages = nouveautes_stacks(db, user_id, page)
     return NouveautesRead(
         stacks=[
             NouveautesStackRead(
                 channel=LibraryChannelRead(id=channel.id, name=channel.name),
-                items=card_reads(db, videos),
+                items=card_reads(db, user_id, videos),
             )
             for channel, videos in stacks
         ],
@@ -45,11 +50,15 @@ def get_nouveautes(page: int = Query(1, ge=1), db: Session = Depends(get_db)) ->
 
 
 @router.get("/historique", response_model=HistoriqueRead, responses=error_responses(422))
-def get_historique(page: int = Query(1, ge=1), db: Session = Depends(get_db)) -> HistoriqueRead:
-    history = history_page(db, page)
+def get_historique(
+    page: int = Query(1, ge=1),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+) -> HistoriqueRead:
+    history = history_page(db, user_id, page)
     rows = []
     for row in history.rows:
-        video, channel = row.job.video, row.job.channel
+        video, channel, state = row.job.video, row.job.channel, row.state
         rows.append(
             HistoryRowRead(
                 job_id=row.job.id,
@@ -58,13 +67,13 @@ def get_historique(page: int = Query(1, ge=1), db: Session = Depends(get_db)) ->
                 video=HistoryVideoRead(
                     id=video.id,
                     title=video.title,
-                    rating=video.rating,
+                    rating=state.rating,
                     file_size_bytes=video.file_size_bytes,
-                    list_state=video.list_state,
+                    list_state=state.list_state,
                     categories=video.category_labels,
-                    badges=video_badges(video),
+                    badges=video_badges(video, state.is_new),
                 )
-                if video
+                if video and state
                 else None,
                 channel=LibraryChannelRead(id=channel.id, name=channel.name) if channel else None,
                 playback=PlaybackRead(**row.playback),
@@ -82,10 +91,12 @@ def get_historique(page: int = Query(1, ge=1), db: Session = Depends(get_db)) ->
 
 
 @router.get("/screen-time", response_model=ScreenTimeRead)
-def get_screen_time(db: Session = Depends(get_db)) -> ScreenTimeRead:
+def get_screen_time(
+    db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> ScreenTimeRead:
     now = datetime.now().astimezone()
-    stats = playback_time_stats(recent_played_jobs(db, now), now)
-    limits = get_screen_time_limits(db)
+    stats = playback_time_stats(recent_played_jobs(db, user_id, now), now)
+    limits = get_screen_time_limits(db, user_id)
     return ScreenTimeRead(
         periods={
             period: {

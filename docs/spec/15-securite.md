@@ -11,6 +11,13 @@ Les pages principales ne sont pas authentifiees dans cet etat cible actuel.
 Cette absence d'authentification n'est pas un bug tant que l'app n'est pas
 exposee hors LAN.
 
+Les utilisateurs (voir [20 Glossaire](20-glossaire.md), « Utilisateur ») ne
+sont pas des comptes : aucun mot de passe, et n'importe qui sur le LAN peut
+choisir n'importe quel utilisateur (bouton du tiroir « Discussions », cookie
+`raton_user`, en-tete `X-Raton-User`), en ajouter, en renommer ou en
+supprimer. Ils separent ce que chacun garde pour soi (Vu, etoiles, playlists,
+discussions...), pas ce que chacun a le droit de voir.
+
 La page des previews (conteneur `raton-ops`, `make previews`, port `8999`) n'est pas authentifiee non
 plus, alors que son bouton **Deployer main en production** reconstruit la vraie
 instance : sur ce LAN, n'importe qui peut la redeployer. Garde-fous : origine

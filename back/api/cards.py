@@ -1,7 +1,7 @@
 """The card of a fiche in every `/api` list (library, Nouveautés, channel page, history).
 
-One builder so that every list shows the same fields; the latest playback of the whole page is
-read in one query (`library_cards`).
+One builder so that every list shows the same fields; the user's state and latest playback of
+the whole page are read in one query each (`library_cards`).
 """
 
 from sqlalchemy.orm import Session
@@ -16,15 +16,16 @@ from back.services.videos.list_state import card_list_states
 
 def card_read(card: dict, no_progress_labels: set[str]) -> LibraryVideoRead:
     video = card["video"]
+    state = card["state"]
     playback = card["playback"]
-    shown_state, auto_state, replay = card_list_states(video, playback, no_progress_labels)
+    shown_state, auto_state, replay = card_list_states(video, state, playback, no_progress_labels)
     return LibraryVideoRead(
-        **VideoRead.model_validate(video).model_dump(),
+        **VideoRead.of(video, state.rating).model_dump(),
         channel_name=card["channel_name"],
         duration_seconds=video.duration_seconds,
         view_count=video.view_count,
-        is_new=video.is_new,
-        list_state=video.list_state,
+        is_new=state.is_new,
+        list_state=state.list_state,
         # Both paths can be set at once: check each column, never media_type.
         has_video=video.video_path is not None,
         has_audio=video.audio_path is not None,
@@ -36,6 +37,6 @@ def card_read(card: dict, no_progress_labels: set[str]) -> LibraryVideoRead:
     )
 
 
-def card_reads(db: Session, videos: list[Video]) -> list[LibraryVideoRead]:
+def card_reads(db: Session, user_id: int, videos: list[Video]) -> list[LibraryVideoRead]:
     no_progress_labels = set(get_no_progress_category_labels(db))
-    return [card_read(card, no_progress_labels) for card in library_cards(db, videos)]
+    return [card_read(card, no_progress_labels) for card in library_cards(db, user_id, videos)]

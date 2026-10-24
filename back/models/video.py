@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import (
     BigInteger,
     Boolean,
-    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -29,10 +28,7 @@ class TranscriptStatus(str, enum.Enum):  # noqa: UP042
 
 class Video(Base):
     __tablename__ = "videos"
-    __table_args__ = (
-        CheckConstraint("rating >= 0 AND rating <= 5", name="ck_videos_rating_range"),
-        UniqueConstraint("yt_video_id", name="uq_videos_yt_video_id"),
-    )
+    __table_args__ = (UniqueConstraint("yt_video_id", name="uq_videos_yt_video_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     channel_id: Mapped[int | None] = mapped_column(
@@ -46,19 +42,16 @@ class Video(Base):
     imported_via_form: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, index=True
     )
-    is_new: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
-    # NULL = suit la détection automatique ; sinon "watched", "unwatched" ou "hidden".
-    list_state: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     category_labels: Mapped[str | None] = mapped_column(Text, nullable=True)
-    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     published_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
     downloaded_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
-    # First time playback reached 90% (see back/services/videos/playback.py); starts the
-    # retention countdown. Never overwritten, so replays don't push the deletion back.
+    # First time anyone's playback reached 90% (see back/services/videos/playback.py); starts the
+    # retention countdown of the shared files. Never overwritten, so replays don't push the
+    # deletion back. Each user's own Vu is `user_videos.watched_at`.
     watched_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
@@ -74,7 +67,6 @@ class Video(Base):
         default=TranscriptStatus.missing,
         nullable=False,
     )
-    rating: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     # Copy of `view_count` from metadata.json, so the "views" sort can run in SQL instead of reading every file.
     view_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
@@ -96,3 +88,6 @@ class Video(Base):
     playlist_items = relationship(
         "PlaylistItem", back_populates="video", cascade="all, delete-orphan"
     )
+    # Each user's stars, Vu/Écartée, comment and Nouveau (back/models/user.py); the ORM cascade
+    # also cleans them up on sqlite, whose foreign keys are not enforced.
+    user_states = relationship("UserVideo", cascade="all, delete-orphan")

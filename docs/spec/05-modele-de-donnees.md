@@ -13,15 +13,6 @@ Champs :
 - `url` : URL YouTube unique ;
 - `name` : nom affiche ;
 - `yt_channel_id` : identifiant YouTube si disponible ;
-- `auto_metadata_enabled` : cloche de suivi quotidien des videos, desactivee
-  par defaut ; active l'import metadata quotidien planifie de l'onglet videos
-  et le marquage `is_new` des nouvelles fiches trouvees par ce scan planifie
-  (la synchronisation immediate declenchee par l'activation de la cloche ne
-  marque pas `is_new`, voir plus bas) ;
-- `auto_shorts_enabled` : cloche de suivi quotidien des shorts, desactivee par
-  defaut, independante de la precedente ; meme comportement, applique a
-  l'onglet shorts de la chaine ;
-- `rating` : note utilisateur de 0 à 5 (defaut 1) ;
 - `category_labels` : categories associees a la chaine, appliquees aux
   nouvelles videos importees qui n'ont pas encore de categorie ;
 - `description` : texte de presentation de la chaine (nullable) ;
@@ -41,9 +32,13 @@ Champs :
   [06 Stockage fichiers](06-stockage-fichiers.md)) ;
 - `created_at`, `updated_at`.
 
+Les cloches et la note en etoiles d'une chaine sont propres a chaque
+utilisateur : elles sont dans `user_channels` (voir « Utilisateurs »).
+
 Relations :
 
-- `Channel.videos` cascade delete-orphan.
+- `Channel.videos` cascade delete-orphan ;
+- `Channel.user_states` (`user_channels`) cascade delete-orphan.
 
 ### `videos`
 
@@ -58,19 +53,7 @@ Champs :
 - `download_source` : `auto` ou `manual` ;
 - `imported_via_form` : `true` si la fiche vient d'un import manuel via le
   formulaire (utilise par le filtre "Import manuel" de la bibliotheque) ;
-- `is_new` : label technique `Nouveau`, pose uniquement par le scan planifie
-  du suivi quotidien (pas par la synchronisation immediate declenchee a
-  l'activation de la cloche, ni par un import manuel), retire des la visite
-  de `/videos/{id}` ;
-- `list_state` : etat de grisage force manuellement depuis les listes video,
-  nullable. `null` = aucun forcage, la carte suit la detection automatique
-  (derniere lecture terminee) ; `watched` = marquee vue a la main ; `unwatched`
-  = forcee non-vue, ce qui annule la detection automatique ; `hidden` = ecartee,
-  soit un grisage renforce plus le filtre "Masquer les ecartees" de `/videos`.
-  Un `watched` pose a la main est respecte meme sur une categorie replay, alors
-  que la detection automatique y reste neutralisee ;
-- `category_labels` : categories associees a la video ;
-- `comment` : commentaire libre de la personne, optionnel ;
+- `category_labels` : categories associees a la video (partagees) ;
 - `published_at` ;
 - `downloaded_at` ;
 - `folder_path` : dossier final du contenu ;
@@ -81,12 +64,16 @@ Champs :
 - `subtitle_path` : sous-titres bruts telecharges, nullable ;
 - `transcript_path` : `transcript.txt`, nullable ;
 - `transcript_status` : `missing`, `downloaded`, `failed` ;
-- `rating` : note utilisateur de 0 à 5 ;
 - `file_size_bytes` : taille totale du dossier media ;
-- `watched_at` : date (avec fuseau, indexee, nullable) a laquelle la lecture a atteint 90 % de la duree pour la premiere fois ; posee par `POST /api/videos/{id}/activity` (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)), remise a `NULL` quand un telechargement ajoute un format, et point de depart de la retention de [06 Stockage fichiers](06-stockage-fichiers.md). `NULL` = jamais vue a 90 % (donc jamais purgee) ;
+- `watched_at` : date (avec fuseau, indexee, nullable) a laquelle la lecture d'**un utilisateur quelconque** a atteint 90 % de la duree pour la premiere fois ; posee par `POST /api/videos/{id}/activity` (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)), remise a `NULL` quand un telechargement ajoute un format, et point de depart de la retention de [06 Stockage fichiers](06-stockage-fichiers.md). `NULL` = jamais vue a 90 % (donc jamais purgee). Le Vu de chaque utilisateur est `user_videos.watched_at` ;
 - `view_count` : nombre de vues recopie de `metadata.json` (entier, indexe, nullable), pose a l'import (telechargement manuel, import de metadonnees) et par le rattrapage de demarrage (`back/services/youtube/view_counts.py`, une ancienne migration). Sert au tri « les plus vues » de `/videos`, execute en SQL ; `NULL` compte comme 0. Un `metadata.json` lisible sans compteur donne 0, un fichier illisible laisse `NULL` (reessaye au demarrage suivant) ;
 - `duration_seconds` : duree recopiee de `metadata.json` (entier, nullable), posee au meme moment que `view_count` (une ancienne migration). Sert a la duree affichee sur les cartes : `metadata.json` est le dump complet de yt-dlp (~140 Ko) et n'est pas relu pour chaque carte d'une liste. Un fichier lisible sans duree donne 0 (non affichee), un fichier illisible laisse `NULL` ;
 - `created_at`, `updated_at`.
+
+La note en etoiles, l'etat Vu/Ecartee, le commentaire et le label Nouveau
+d'une fiche sont propres a chaque utilisateur : ils sont dans `user_videos`
+(voir « Utilisateurs »). `Video.user_states` les regroupe, cascade
+delete-orphan.
 
 Contraintes :
 
@@ -108,6 +95,10 @@ l'import est un instantane, a relancer manuellement si besoin.
 Champs :
 
 - `id` ;
+- `user_id` : FK `users.id`, `ON DELETE CASCADE`, non nul, indexe — l'utilisateur
+  a qui la playlist appartient : lui seul la voit et la modifie (une playlist
+  d'un autre repond `404` comme une playlist supprimee) ; une duplication
+  appartient au meme utilisateur ;
 - `title` ;
 - `source` : `manual`, `url` ou `csv` ;
 - `source_url` : URL de la playlist d'origine, uniquement pour
@@ -126,7 +117,7 @@ Champs :
   duplication de playlist reprend ses labels ;
 - `free_listening` : booleen, faux par defaut. Vrai = « ecoute libre » : le
   lecteur de la playlist n'enregistre aucune activite de lecture et ne marque
-  aucune video comme vue (musique, podcasts). Ne change pas `videos.watched_at`
+  aucune video comme vue (musique, podcasts). Ne change pas un `watched_at`
   deja renseigne par ailleurs ;
 - `created_at`, `updated_at`.
 
@@ -163,6 +154,10 @@ Champs :
 - `id` ;
 - `channel_id` nullable ;
 - `video_id` nullable ;
+- `user_id` : FK `users.id`, `ON DELETE SET NULL`, nullable, indexe — a qui
+  est une ligne d'activite `played` ou `prompt` (historique, positions, temps
+  d'ecran, tri « activite » des chaines de cet utilisateur) ; `NULL` sur les
+  autres lignes, qui sont celles de la bibliotheque ;
 - `status` ;
 - `message` ;
 - `created_at`.
@@ -183,27 +178,18 @@ Statuts utilises :
 
 ### `app_settings`
 
-Cle-valeur texte.
+Cle-valeur texte : les reglages de la bibliotheque, communs a tous les
+utilisateurs. Ceux d'un utilisateur sont dans `user_settings`.
 
 Cles connues :
 
 - `media_root`
 - `global_quota_bytes`
 - `video_category_labels`
-- `video_library_views`
 - `auto_notes_enabled`, `auto_notes_excluded_category_labels`,
   `auto_notes_last_run_at`, `auto_notes_last_run_summary`,
   `auto_notes_batch_id`, `auto_notes_batch_submitted_at` : notes automatiques,
   voir [13 Jobs, logs et planification](13-jobs-logs-planification.md)
-- `screen_time_<kind>_today_limit_minutes` pour `kind` dans
-  `video`/`short`/`podcast`/`music` — seule la limite journaliere est
-  configurable ; les limites "semaine" et "mois" affichees au dashboard sont
-  derivees automatiquement (x7 et x30) a partir de cette limite journaliere
-- `raton_last_seen_at`, `raton_session_previous_visit_at` et
-  `raton_visit_shown` : dernières visites et phrases déjà affichées dans la
-  visite en cours (liste JSON), utilisées par les scenarios de l'accueil, voir
-  [18 Raton](18-raton-scenarios.md). Les anciennes clés `raton_tone` et
-  `raton_rotation_index` ne sont plus lues.
 - `last_auto_scan_at`, `last_auto_scan_status`, `last_auto_scan_imported_count` :
   etat du dernier scan planifie (cloche), voir
   [13 Jobs, logs et planification](13-jobs-logs-planification.md)
@@ -233,6 +219,11 @@ Champs :
   `clean_transcript` (nettoyage LLM retire, voir
   [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) ;
 - `provider` : `anthropic` ;
+- `user_id` : FK `users.id`, `ON DELETE SET NULL`, nullable — qui a pose la
+  question d'un job `chat` ou `library_chat` : la reponse va dans sa
+  discussion ; `null` pour les autres types, et pour les jobs anterieurs aux
+  utilisateurs (la reponse va alors a l'utilisateur par defaut, ou a celui de
+  la discussion) ;
 - `video_id` : FK `videos.id`, cascade delete, **nullable** — null uniquement
   pour `kind="library_chat"` (le chat cross-video n'est rattache a aucune
   video precise, voir `library_chat_messages` ci-dessous) ;
@@ -304,13 +295,16 @@ Les discussions du chat cross-video ("toute la bibliotheque"), distinctes du
 chat par-video (fichier `transcript.chat.json`, voir
 [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md)) : pas
 de fichier naturel ou stocker un historique qui n'est rattache a aucune video
-precise, d'ou une table. Plusieurs discussions, mais pas de multi-utilisateur
-(coherent avec le reste de l'app, usage LAN personnel). La migration `0003`
-a range les messages de l'ancien fil unique dans une premiere discussion.
+precise, d'ou une table. Plusieurs discussions par utilisateur. La migration
+`0003` a range les messages de l'ancien fil unique dans une premiere
+discussion.
 
 Champs :
 
 - `id` ;
+- `user_id` : FK `users.id`, `ON DELETE CASCADE`, non nul, indexe — l'utilisateur
+  dont c'est la discussion : lui seul la liste, la rouvre, la continue ou la
+  supprime ;
 - `title` : la premiere question, sur une ligne, coupee a 80 caracteres
   (`back/services/library_chat/history.py:conversation_title`) ;
 - `created_at` ;
@@ -376,6 +370,83 @@ inférieure à `MINIMUM_SKIP_SECONDS` (1,0 s). La sortie est une liste de
 bornes. Cette normalisation n'écrit rien dans la DB, l'affichage de l'onglet
 Segments continue de lister les lignes brutes.
 
+## Utilisateurs
+
+Les fiches, leurs fichiers, transcripts et notes generees sont partages ; ce
+que chaque utilisateur garde pour lui est dans les tables ci-dessous. Une
+fiche ou une chaine qu'un utilisateur n'a jamais touchee n'a pas de ligne :
+la lecture donne les valeurs par defaut, l'ecriture cree la ligne
+(`back/services/common/user_state.py`). Vocabulaire :
+[20 Glossaire](20-glossaire.md), « Utilisateur ».
+
+### `users`
+
+- `id` ;
+- `name` : nom affiche, unique (insensible a la casse a la saisie), 40
+  caracteres au plus ;
+- `created_at`.
+
+L'utilisateur **par defaut** est le plus ancien (plus petit `id`) : celui pour
+qui agit une requete qui n'en nomme aucun (voir
+[12 API et routes](12-api-et-routes.md)). Une DB sans utilisateur (demo,
+tests, installation neuve) en recoit un, « Moi », a la premiere requete. Le
+dernier utilisateur ne peut pas etre supprime ; supprimer un utilisateur
+supprime tout ce qui lui est propre (ses lignes ci-dessous, ses playlists, ses
+discussions) et laisse ses lignes d'activite sans utilisateur.
+
+### `user_videos`
+
+Etat d'une fiche pour un utilisateur ; cle primaire `(user_id, video_id)`, les
+deux en `ON DELETE CASCADE`.
+
+- `rating` : note en etoiles de 0 a 5 (defaut 0) ;
+- `list_state` : etat de grisage force a la main depuis les listes, nullable.
+  `null` = aucun forcage, la carte suit la detection automatique (derniere
+  lecture terminee de cet utilisateur) ; `watched` = marquee vue a la main ;
+  `unwatched` = forcee non-vue, ce qui annule la detection automatique ;
+  `hidden` = ecartee, soit un grisage renforce plus le filtre "Masquer les
+  ecartees" de `/videos`. Un `watched` pose a la main est respecte meme sur une
+  categorie replay, alors que la detection automatique y reste neutralisee ;
+- `comment` : commentaire libre, optionnel ;
+- `is_new` : label `Nouveau`, pose uniquement par le scan planifie du suivi
+  quotidien, pour chaque utilisateur dont la cloche de la section est active
+  (pas par la synchronisation immediate declenchee a l'activation de la
+  cloche, ni par un import manuel) ; retire des que cet utilisateur visite
+  `/videos/{id}` ;
+- `watched_at` : premiere fois que la lecture de cet utilisateur a atteint
+  90 % ; jamais deplacee par une relecture.
+
+### `user_channels`
+
+Etat d'une chaine pour un utilisateur ; cle primaire `(user_id, channel_id)`.
+
+- `rating` : note en etoiles de 0 a 5 (defaut 0 : la chaine reste hors du
+  filtre « Notées ») ; l'utilisateur qui ajoute une chaine (formulaire, import
+  des abonnements, chat bibliotheque) lui donne 1 etoile, sauf note choisie ;
+- `auto_metadata_enabled` : cloche de suivi quotidien des videos ;
+- `auto_shorts_enabled` : cloche de suivi quotidien des shorts, independante
+  de la precedente.
+
+Le scan planifie passe sur une chaine des qu'au moins un utilisateur y a une
+cloche active (voir [13 Jobs, logs et planification](13-jobs-logs-planification.md)).
+
+### `user_settings`
+
+Cle-valeur texte d'un utilisateur ; cle primaire `(user_id, key)`. Cles
+connues :
+
+- `video_library_views` : ses vues enregistrees ;
+- `screen_time_<kind>_today_limit_minutes` pour `kind` dans
+  `video`/`short`/`podcast`/`music` — seule la limite journaliere est
+  configurable ; les limites "semaine" et "mois" affichees au dashboard sont
+  derivees automatiquement (x7 et x30) a partir de cette limite journaliere ;
+- `raton_last_seen_at`, `raton_session_previous_visit_at` et
+  `raton_visit_shown` : ses dernieres visites et les phrases deja affichees
+  dans la visite en cours (liste JSON), utilisees par les scenarios de
+  l'accueil, voir [18 Raton](18-raton-scenarios.md).
+
+Une cle absente prend la valeur par defaut du code.
+
 ## Migrations
 
 Les migrations Alembic sont la source de verite pour l'evolution de schema.
@@ -387,3 +458,11 @@ puis cree toutes les tables. Son `downgrade()` defait tout, extension et type
 `transcript_status` compris. `0002_drop_ai_analysis` retire la colonne
 `videos.ai_analysis_json` (l'onglet Analyse IA n'existe plus). Les migrations
 suivantes se nomment `NNNN_short_slug`.
+
+`0004_users` cree les tables des utilisateurs et un premier utilisateur,
+« Moi », a qui elle donne tout ce qui etait personnel : les notes en etoiles,
+etats Vu/Ecartee, commentaires et labels Nouveau des fiches, les notes et
+cloches des chaines, les reglages devenus personnels, les playlists, les
+discussions et les lignes d'activite `played`/`prompt`. Elle retire ensuite
+ces colonnes de `videos` et `channels`. Son `downgrade()` remet l'etat du plus
+ancien utilisateur dans ces colonnes ; celui des autres est perdu.

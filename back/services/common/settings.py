@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from back.core.config import get_settings
 from back.core.logging import log_event
 from back.models.setting import AppSetting
+from back.models.user import UserSetting
 from back.services.common.categories import (
     DEFAULT_VIDEO_CATEGORY_COLORS,
     DEFAULT_VIDEO_CATEGORY_LABELS,
@@ -74,6 +75,23 @@ def set_setting(db: Session, key: str, value: str) -> AppSetting:
         setting.value = value
     # The key only: values can be secrets or long prompts.
     log_event(logger, "setting.set", key=key)
+    return setting
+
+
+def get_user_setting(db: Session, user_id: int, key: str, default: str) -> str:
+    """A setting of one user (saved views, screen-time limits, Raton's visits)."""
+    setting = db.get(UserSetting, (user_id, key))
+    return setting.value if setting else default
+
+
+def set_user_setting(db: Session, user_id: int, key: str, value: str) -> UserSetting:
+    setting = db.get(UserSetting, (user_id, key))
+    if setting is None:
+        setting = UserSetting(user_id=user_id, key=key, value=value)
+        db.add(setting)
+    else:
+        setting.value = value
+    log_event(logger, "user_setting.set", key=key, user_id=user_id)
     return setting
 
 
@@ -170,17 +188,19 @@ def default_video_library_views_value() -> str:
     return serialize_video_library_views(DEFAULT_VIDEO_LIBRARY_VIEWS)
 
 
-def get_video_library_views(db: Session) -> list[dict[str, str | bool | list[str]]]:
+def get_video_library_views(db: Session, user_id: int) -> list[dict[str, str | bool | list[str]]]:
     return parse_video_library_views(
-        get_setting(db, VIDEO_LIBRARY_VIEWS_KEY, default_video_library_views_value())
+        get_user_setting(db, user_id, VIDEO_LIBRARY_VIEWS_KEY, default_video_library_views_value())
     )
 
 
-def get_screen_time_limits(db: Session) -> dict[str, dict[str, int]]:
+def get_screen_time_limits(db: Session, user_id: int) -> dict[str, dict[str, int]]:
     return {
         kind: {
             period: max(
-                1, int(get_setting(db, SCREEN_TIME_LIMIT_KEYS[kind], str(default))) * multiplier
+                1,
+                int(get_user_setting(db, user_id, SCREEN_TIME_LIMIT_KEYS[kind], str(default)))
+                * multiplier,
             )
             for period, multiplier in SCREEN_TIME_PERIOD_MULTIPLIERS.items()
         }
@@ -212,11 +232,6 @@ def ensure_default_settings(db: Session) -> None:
         AUTO_NOTES_EXCLUDED_CATEGORY_LABELS_KEY: default_auto_notes_excluded_category_labels_value(),
         SPONSOR_SEGMENT_CATEGORIES_KEY: default_sponsor_segment_categories_value(),
         SPONSOR_SKIP_ENABLED_KEY: "true",
-        VIDEO_LIBRARY_VIEWS_KEY: default_video_library_views_value(),
-        **{
-            SCREEN_TIME_LIMIT_KEYS[kind]: str(value)
-            for kind, value in DEFAULT_SCREEN_TIME_LIMITS.items()
-        },
     }
     for key, value in defaults.items():
         if db.get(AppSetting, key) is None:
@@ -226,6 +241,7 @@ def ensure_default_settings(db: Session) -> None:
 
 def save_settings(
     db: Session,
+    user_id: int,
     *,
     media_root: str | None = None,
     global_quota_bytes: int | None = None,
@@ -241,7 +257,8 @@ def save_settings(
 ) -> None:
     """Store the given settings, leave the others as they are, and commit.
 
-    Shared by the /settings form and `PUT /api/settings`. `category_labels` stores bare labels
+    Shared by the /settings form and `PUT /api/settings`. The saved views and the screen-time
+    limits are the user's own; the other settings are the library's. `category_labels` stores bare labels
     (colours assigned when read); `category_label_styles`, applied after it, stores labels with their
     colours. A screen-time limit given as None keeps its current value; every limit is at least one
     minute.
@@ -259,7 +276,9 @@ def save_settings(
             serialize_video_category_label_styles(category_label_styles),
         )
     if library_views is not None:
-        set_setting(db, VIDEO_LIBRARY_VIEWS_KEY, serialize_video_library_views(library_views))
+        set_user_setting(
+            db, user_id, VIDEO_LIBRARY_VIEWS_KEY, serialize_video_library_views(library_views)
+        )
     if no_progress_category_labels is not None:
         set_setting(
             db,
@@ -286,8 +305,8 @@ def save_settings(
     if sponsor_skip_enabled is not None:
         set_setting(db, SPONSOR_SKIP_ENABLED_KEY, "true" if sponsor_skip_enabled else "false")
     if screen_time_today_minutes is not None:
-        current_limits = get_screen_time_limits(db)
+        current_limits = get_screen_time_limits(db, user_id)
         for kind, value in screen_time_today_minutes.items():
             minutes = value if isinstance(value, int) else current_limits[kind]["today"]
-            set_setting(db, SCREEN_TIME_LIMIT_KEYS[kind], str(max(1, minutes)))
+            set_user_setting(db, user_id, SCREEN_TIME_LIMIT_KEYS[kind], str(max(1, minutes)))
     db.commit()

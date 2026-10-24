@@ -83,7 +83,6 @@ def get_or_create_channel_from_info(
     db: Session,
     info: dict,
     fallback_url: str | None = None,
-    rating: int = 0,
 ) -> Channel | None:
     name, url, yt_channel_id = channel_values_from_info(info, fallback_url)
     if not name or not url:
@@ -99,7 +98,7 @@ def get_or_create_channel_from_info(
         if channel.name != name:
             channel.name = name
         return channel
-    channel = Channel(url=url, name=name, yt_channel_id=yt_channel_id, rating=rating)
+    channel = Channel(url=url, name=name, yt_channel_id=yt_channel_id)
     db.add(channel)
     db.flush()
     return channel

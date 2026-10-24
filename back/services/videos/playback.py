@@ -9,6 +9,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
 from back.models.job import DownloadJob
+from back.models.user import UserVideo
 from back.models.video import Video
 from back.services.common.durations import (
     format_compact_duration,
@@ -16,6 +17,7 @@ from back.services.common.durations import (
     parse_duration_label,
 )
 from back.services.common.job_log import log_job
+from back.services.common.user_state import video_state
 from back.services.videos.filters import video_category_labels
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}
@@ -31,21 +33,30 @@ PLAYBACK_STATS_KINDS = [
 
 
 def mark_watched_if_complete(
-    video: Video, position_seconds: float, duration_seconds: float, now: datetime | None = None
+    video: Video,
+    state: UserVideo,
+    position_seconds: float,
+    duration_seconds: float,
+    now: datetime | None = None,
 ) -> bool:
-    """Mark the fiche Vu (`watched_at`) the first time playback reaches WATCHED_RATIO.
+    """Mark the fiche Vu for the user (`state.watched_at`) the first time their playback reaches
+    WATCHED_RATIO; True when it just did.
 
-    Does not commit. The date is set once and never moved by playback, so replaying a video
-    doesn't postpone the purge of its files. A new download adding a format resets it to
+    The fiche's own `watched_at` takes the first such date of anyone: it starts the purge of the
+    shared files. Does not commit. Both dates are set once and never moved by playback, so
+    replaying a video doesn't postpone the purge. A new download adding a format resets them to
     NULL (see `manual_download`), restarting the countdown.
     """
     if not (math.isfinite(position_seconds) and math.isfinite(duration_seconds)):
         return False
-    if video.watched_at is not None or duration_seconds <= 0:
+    if duration_seconds <= 0 or position_seconds / duration_seconds < WATCHED_RATIO:
         return False
-    if position_seconds / duration_seconds < WATCHED_RATIO:
+    now = now or datetime.now(UTC)
+    if video.watched_at is None:
+        video.watched_at = now
+    if state.watched_at is not None:
         return False
-    video.watched_at = now or datetime.now(UTC)
+    state.watched_at = now
     return True
 
 
@@ -58,19 +69,23 @@ class InvalidPlaybackMediaError(ValueError):
 
 def record_playback_activity(
     db: Session,
+    user_id: int,
     video: Video,
     media_type: str,
     position_seconds: float,
     duration_seconds: float,
     watched_seconds: float,
 ) -> DownloadJob:
-    """Record one playback report of the players: the Vu mark, then a `played` job, in one commit.
+    """Record one playback report of the user's players: the Vu mark, then a `played` job, in one
+    commit.
 
     The JSON shape of the job is the one `playback_activity_payload_view` reads back.
     """
     if media_type not in PLAYBACK_MEDIA_TYPES:
         raise InvalidPlaybackMediaError("Type de média invalide")
-    mark_watched_if_complete(video, position_seconds, duration_seconds)
+    mark_watched_if_complete(
+        video, video_state(db, user_id, video.id), position_seconds, duration_seconds
+    )
     position_seconds = max(position_seconds, 0)
     duration_seconds = max(duration_seconds, 0)
     watched_seconds = max(watched_seconds, 0)
@@ -93,6 +108,7 @@ def record_playback_activity(
         ),
         channel_id=video.channel_id,
         video_id=video.id,
+        user_id=user_id,
     )
 
 
@@ -179,18 +195,24 @@ def playback_activity_view(job: DownloadJob) -> dict[str, str | float] | None:
     )
 
 
-def latest_playback_positions(db: Session, video_id: int) -> dict[str, dict[str, float | int]]:
-    """Dernière position de lecture connue du serveur, par type de média.
+def latest_playback_positions(
+    db: Session, user_id: int, video_id: int
+) -> dict[str, dict[str, float | int]]:
+    """The user's last playback position the server knows, per media type.
 
-    Sert de repli à la reprise côté client : la position vit d'abord dans le
-    `localStorage` du navigateur, qui est propre à chaque appareil et que Safari
-    iOS purge après 7 jours sans visite. `at_ms` permet au client de départager
-    sa copie locale et celle du serveur (la plus récente gagne).
+    The client's fallback for resuming: the position lives first in the browser's
+    `localStorage`, which is per device (and per user, see app.js) and which iOS Safari
+    clears after 7 days without a visit. `at_ms` lets the client pick between its local copy
+    and the server's (the most recent wins).
     """
     positions: dict[str, dict[str, float | int]] = {}
     jobs = db.scalars(
         select(DownloadJob)
-        .where(DownloadJob.status == "played", DownloadJob.video_id == video_id)
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.video_id == video_id,
+            DownloadJob.user_id == user_id,
+        )
         .order_by(desc(DownloadJob.created_at), desc(DownloadJob.id))
     )
     for job in jobs:
@@ -252,8 +274,9 @@ def empty_playback_stats() -> dict[str, dict[str, dict[str, str | float]]]:
     }
 
 
-def recent_played_jobs(db: Session, now: datetime | None = None) -> list[DownloadJob]:
-    """ "played" jobs that can still count in `playback_time_stats`, with their video loaded in one query.
+def recent_played_jobs(db: Session, user_id: int, now: datetime | None = None) -> list[DownloadJob]:
+    """The user's "played" jobs that can still count in `playback_time_stats`, with their video
+    loaded in one query.
 
     `playback_stats_kind` reads `job.video` for every job, so a lazy load there costs one statement per
     video, and the table grows with every playback. The longest period is 30 days; two days of margin
@@ -265,7 +288,11 @@ def recent_played_jobs(db: Session, now: datetime | None = None) -> list[Downloa
     return list(
         db.scalars(
             select(DownloadJob)
-            .where(DownloadJob.status == "played", DownloadJob.created_at >= cutoff)
+            .where(
+                DownloadJob.status == "played",
+                DownloadJob.user_id == user_id,
+                DownloadJob.created_at >= cutoff,
+            )
             .options(selectinload(DownloadJob.video))
             .order_by(desc(DownloadJob.created_at))
         )
@@ -318,10 +345,13 @@ def playback_seconds_by_day(
     return seconds_by_day
 
 
-def dashboard_media_activity_logs(db: Session, limit: int | None = None) -> list[DownloadJob]:
+def dashboard_media_activity_logs(
+    db: Session, user_id: int, limit: int | None = None
+) -> list[DownloadJob]:
+    """The user's latest activity line of each media, newest first."""
     query = (
         select(DownloadJob)
-        .where(DownloadJob.status.in_(DASHBOARD_ACTIVITY_STATUSES))
+        .where(DownloadJob.status.in_(DASHBOARD_ACTIVITY_STATUSES), DownloadJob.user_id == user_id)
         .order_by(desc(DownloadJob.created_at))
     )
     if limit is not None:
@@ -347,14 +377,18 @@ def dashboard_media_activity_logs(db: Session, limit: int | None = None) -> list
     return media_activity_logs
 
 
-def latest_playback_by_video(db: Session, video_ids: list[int]) -> dict[int, dict]:
-    """Last playback of each of these fiches, for the progress bar of their cards."""
+def latest_playback_by_video(db: Session, user_id: int, video_ids: list[int]) -> dict[int, dict]:
+    """The user's last playback of each of these fiches, for the progress bar of their cards."""
     latest: dict[int, dict] = {}
     if not video_ids:
         return latest
     jobs = db.scalars(
         select(DownloadJob)
-        .where(DownloadJob.status == "played", DownloadJob.video_id.in_(video_ids))
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.user_id == user_id,
+            DownloadJob.video_id.in_(video_ids),
+        )
         .order_by(desc(DownloadJob.created_at))
     )
     for job in jobs:
