@@ -23,6 +23,8 @@ services:
     build:
       context: .
       target: back
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
     depends_on:
       db:
         condition: service_healthy
