@@ -12,10 +12,12 @@ Before changing Raton, read the relevant files under `docs/spec/`. Every behavio
 
 Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`); `.github/workflows/ci.yml` runs `make ci`, the docs image build and a secret scan on each one. Agents do not deploy: merging a PR deploys nothing, the user deploys by hand with `make up`. Spec: `docs/spec/04-configuration-et-deploiement.md`.
 
-1. Work on a dedicated branch, never directly on `main`. Start every new task from an up-to-date `origin/main`: `git fetch origin main` first, then branch from (or fast-forward to) `origin/main`. The `SessionStart` hook in `.claude/settings.json` (`.claude/hooks/sync-origin-main.sh`) does this automatically at session start when the branch has no commits of its own and no modified tracked files; when a new task starts mid-session, do it by hand.
+1. Work on a dedicated branch, never directly on `main`. Start every new task from an up-to-date `origin/main`: `git fetch origin main` first, then branch from (or fast-forward to) `origin/main`. The `SessionStart` hook in `.claude/settings.json` (`.claude/hooks/sync-origin-main.sh`) does this automatically at session start when the branch has no commits of its own and no modified tracked files; when a new task starts mid-session and the session has not opened its PR yet, do it by hand (once the PR is open, follow-up work stays on its branch: see the one-PR-per-session rule below).
 2. Do the task: implement it and commit on the branch.
 3. Run `make ci` before opening the PR. If it fails, fix the issue and re-run it — never open a PR on a red `make ci`.
 4. Push the branch and open a pull request against `main` (`gh pr create`), without waiting to be asked. Don't merge the branch into `main` locally.
+
+One pull request per session. A session opens at most one PR; follow-up work in the same session goes on that PR's branch. When a new request is a very different subject from the session's PR, don't open a second PR: propose two options to the user — (1) do it anyway in this session, on the same PR (add its title tag if needed), or (2) do it in a separate session, and in that case show a self-contained prompt, ready to copy and paste into a new session (goal, files involved, context, what done looks like). Right after opening the PR, rename the session with the PR title (`set_session_title`, from the claude-code-remote MCP server; cloud sessions only).
 
 Do **not** run `make up`, `make uninstall`, `make previews`, `scripts/preview.sh`, `scripts/deploy.sh` or `scripts/docs.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
 

@@ -409,6 +409,19 @@ Regles :
   contiennent de lien vers une session Claude Code
   (`https://claude.ai/code/session_...`, trailer `Claude-Session:`).
 
+### Une PR par session
+
+Une session d'agent ouvre au plus une PR ; le travail qui suit dans la meme
+session va sur la branche de cette PR (l'etiquette du titre s'ajuste au besoin).
+Quand une nouvelle demande porte sur un sujet tres different de celui de la PR
+de la session, l'agent n'ouvre pas de seconde PR : il propose deux options a
+l'utilisateur — (1) la traiter quand meme dans cette session, sur la meme PR,
+ou (2) la traiter dans une session separee, et dans ce cas il fournit un prompt
+autonome, pret a copier-coller dans une nouvelle session (objectif, fichiers
+concernes, contexte, critere de fin). Juste apres l'ouverture de la PR, l'agent
+renomme la session avec le titre de la PR (`set_session_title`, serveur MCP
+claude-code-remote ; sessions cloud uniquement).
+
 ## Regle post-modification
 
 Voir « Regle de maintenance obligatoire » dans le [README](README.md) et les
