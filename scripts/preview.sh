@@ -3,6 +3,7 @@
 # 9000 + its number. Driven by hand or by the previews page (scripts/previews.py).
 #
 #   preview.sh up <pr>     build the PR's current head and (re)start its preview
+#   preview.sh rebase <pr>  rebase the PR's branch on main (GitHub's update-branch, force-pushes it)
 #   preview.sh down <pr>   remove the PR's preview: containers, images, worktree, DB copy
 #   preview.sh list        one line per preview: <pr> <port> <commit> <container state> <db>
 #   preview.sh sweep       remove the previews of the PRs that are no longer open
@@ -111,6 +112,22 @@ cmd_up() {
   exit 1
 }
 
+# Done by GitHub (no local checkout): the PR's head moves, so its preview shows as behind until
+# the next `up`. Fails on a conflict, which has to be solved by hand.
+cmd_rebase() {
+  require_pr "${1:-}"
+  local pr="$1" info
+  info="$(gh pr view "$pr" --json state,isCrossRepository --jq '.state + " " + (.isCrossRepository | tostring)')"
+  if [ "${info%% *}" != "OPEN" ]; then
+    echo "preview.sh: la PR $pr n'est pas ouverte (${info%% *})" >&2; exit 1
+  fi
+  if [ "${info#* }" != "false" ]; then
+    echo "preview.sh: la PR $pr vient d'un fork : pas de rebase" >&2; exit 1
+  fi
+  gh pr update-branch "$pr" --rebase
+  echo "PR $pr rebasée sur main"
+}
+
 cmd_down() {
   require_pr "${1:-}"
   local pr="$1" src
@@ -162,9 +179,10 @@ cmd_retire_stale() {
 
 case "${1:-}" in
   up) cmd_up "${2:-}" ;;
+  rebase) cmd_rebase "${2:-}" ;;
   down) cmd_down "${2:-}" ;;
   list) cmd_list ;;
   sweep) cmd_sweep ;;
   retire-stale) cmd_retire_stale ;;
-  *) echo "usage: preview.sh up <pr> | down <pr> | list | sweep | retire-stale" >&2; exit 2 ;;
+  *) echo "usage: preview.sh up <pr> | rebase <pr> | down <pr> | list | sweep | retire-stale" >&2; exit 2 ;;
 esac

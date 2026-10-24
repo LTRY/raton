@@ -49,7 +49,7 @@ class Preview:
 
 @dataclass
 class Job:
-    action: str  # "up" or "down"; "deploy" for the production
+    action: str  # "up", "rebase" or "down"; "deploy" for the production
     started: float
     returncode: int | None = None
 
@@ -182,15 +182,20 @@ def prod_status(job: Job | None) -> tuple[str, str]:
     return ("Déployée", "ok")
 
 
+JOB_BUSY_LABELS = {"up": "Construction…", "rebase": "Rebase…", "down": "Suppression…"}
+JOB_ERROR_LABELS = {
+    "up": "Échec du déploiement",
+    "rebase": "Échec du rebase",
+    "down": "Échec de la suppression",
+}
+
+
 def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[str, str]:
     """(French label, CSS class) of a PR's preview."""
     if job is not None and job.returncode is None:
-        return ("Construction…" if job.action == "up" else "Suppression…", "busy")
+        return (JOB_BUSY_LABELS[job.action], "busy")
     if job is not None and job.returncode != 0:
-        return (
-            "Échec du déploiement" if job.action == "up" else "Échec de la suppression",
-            "error",
-        )
+        return (JOB_ERROR_LABELS[job.action], "error")
     if preview is None:
         return ("Pas de preview", "none")
     if preview.state != "running":
@@ -269,6 +274,12 @@ def render_row(
         actions.append(
             f'<form method="post" action="/prs/{number}/up">'
             f'<button class="primary"{disabled}>{verb}</button></form>'
+        )
+    if pr and not pr.get("isCrossRepository"):
+        disabled = " disabled" if busy else ""
+        actions.append(
+            f'<form method="post" action="/prs/{number}/rebase">'
+            f"<button{disabled}>Rebase</button></form>"
         )
     if preview is not None:
         disabled = " disabled" if busy else ""
@@ -410,7 +421,7 @@ class Handler(BaseHTTPRequestHandler):
             len(parts) == 3
             and parts[0] == "prs"
             and parts[1].isdigit()
-            and parts[2] in ("up", "down")
+            and parts[2] in ("up", "rebase", "down")
         ):
             start_job(int(parts[1]), parts[2])
             self.redirect_home()
