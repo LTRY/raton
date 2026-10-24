@@ -859,9 +859,20 @@ attribut `data-chat-config` :
     referment. Il contient, de haut en bas : le titre « Discussions »,
     l'entree « Raton » (retour a l'ecran de Raton), « Récents » puis une
     ligne par discussion (titre tronque, corbeille discrete ; celle ouverte
-    est surlignee, `aria-current`), et le bouton pilule « Nouvelle
-    discussion » colle en bas du tiroir, qui place aussi le curseur dans le
-    champ.
+    est surlignee, `aria-current`), puis, colles en bas du tiroir sur une
+    ligne (`.chat-drawer-foot`), le bouton rond de l'utilisateur a gauche et
+    le bouton pilule « Nouvelle discussion », qui place aussi le curseur dans
+    le champ. Les discussions listees sont celles de l'utilisateur courant.
+  - Le bouton rond (`.chat-user-button`, initiale du nom de l'utilisateur
+    courant ; sur le modele du bouton de compte d'une app de chat) ouvre au
+    dessus de lui un panneau (`<details>`, sans JavaScript) : « Utilisateurs »,
+    une ligne par utilisateur (pastille de l'initiale, nom, coche sur le
+    courant, desactive), puis un champ « Nouvel utilisateur » et « Ajouter »,
+    et le lien « Renommer ou supprimer… » vers `/settings#utilisateurs`.
+    Choisir un utilisateur (`POST /users/switch`) ou en ajouter un
+    (`POST /users`) recharge l'accueil pour lui, avec la notification
+    « Bonjour <nom> ! » (voir [12 API et routes](12-api-et-routes.md)). Les
+    donnees viennent de `GET /api/users` (`userMenu` de la config du widget).
   - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
     Raton : rien d'affiche, `conversationId` a `null`, et la question
     suivante ouvre une discussion (voir
@@ -1445,7 +1456,7 @@ bouton quand il passe actif. Faute de libelle visible, chaque bouton porte un
 tactile ni au lecteur d'ecran). Ils griment la ligne en
 deux paliers : **Vu** applique le grisage existant (`.video-row-watched`),
 **Écartée** une teinte de noir nettement plus forte (`.video-row-hidden`), avec
-la vignette desaturee. Les deux ecrivent `videos.list_state` (voir
+la vignette desaturee. Les deux ecrivent le `list_state` de l'utilisateur (`user_videos`, voir
 [05 Modele de donnees](05-modele-de-donnees.md)) via
 `PUT /api/videos/{id}/list-state` en `fetch`, sans rechargement : la ligne et les
 deux boutons sont repeints immediatement.
@@ -1628,6 +1639,13 @@ inchanges.
 
 Permet de modifier :
 
+- les utilisateurs (carte « Utilisateurs », ancre `#utilisateurs`, juste
+  apres « General ») : rappel de ce qui est partage et de ce qui est propre a
+  chacun, puis une ligne par utilisateur (son nom dans un champ, « vous » sur
+  l'utilisateur courant, « Renommer », et « Supprimer » avec confirmation
+  quand il en reste plusieurs). Ses champs appartiennent a des formulaires
+  places apres celui des parametres (`form=`), les formulaires ne
+  s'imbriquant pas ;
 - media root ;
 - quota global ;
 - styles des categories de video ;
@@ -1646,9 +1664,10 @@ Permet de modifier :
   toutes cochees par defaut) et la case « Sauter automatiquement les segments
   detectes » (`sponsor_skip_enabled`, cochee par defaut) — comportement dans
   [08 Medias et lecteurs](08-medias-et-lecteurs.md) ;
-- vues sauvegardees de la bibliotheque video ;
+- vues sauvegardees de la bibliotheque video (celles de l'utilisateur
+  courant) ;
 - limites de temps d'ecran par type (`video`/`short`/`podcast`/`music`) et par
-  periode (`today`/`week`/`month`) ;
+  periode (`today`/`week`/`month`), celles de l'utilisateur courant ;
 - carte "Raton" : simple lien vers la page `/raton/variations` (toutes les
   repliques de Raton), voir [18 Raton](18-raton-scenarios.md).
 

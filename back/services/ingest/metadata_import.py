@@ -3,6 +3,7 @@
 Called by the scan, the playlist imports, the channel exploration and the import form.
 """
 
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from back.models.video import Video
 from back.services.common.files import directory_size, remove_directory
 from back.services.common.job_log import log_job
 from back.services.common.settings import get_media_root
+from back.services.common.user_state import mark_new_for
 from back.services.ingest.identity import canonical_video_url, get_or_create_channel_from_info
 from back.services.ingest.staging import (
     commit_video_with_files,
@@ -47,9 +49,12 @@ def import_video_metadata(
     source_section: str = "videos",
     subtitle_languages: list[str] | None = None,
     subtitle_source: str = "auto",
-    is_new: bool = False,
+    new_for: Collection[int] = (),
 ) -> Video:
-    """The fiche of `video_url`, created with its side files when the library lacks it."""
+    """The fiche of `video_url`, created with its side files when the library lacks it.
+
+    A fiche created here is Nouveau for the users of `new_for`; an existing one is left as is.
+    """
     ensure_public_http_url(video_url)
     extracted = _extract_info(video_url)
     info = {**preview, **extracted} if preview else extracted
@@ -103,7 +108,6 @@ def import_video_metadata(
             folder,
             download_source=download_source,
             source_section=source_section,
-            is_new=is_new,
         )
         if adopting:
             db.add(video)
@@ -111,6 +115,9 @@ def import_video_metadata(
         else:
             commit_video_with_files(db, video, staging, folder)
         db.refresh(video)
+        if new_for:
+            mark_new_for(db, video.id, new_for)
+            db.commit()
         ensure_video_thumbnails(video)
         if download_source == "manual":
             log_job(
@@ -202,7 +209,6 @@ def _new_fiche(
     *,
     download_source: str,
     source_section: str,
-    is_new: bool,
 ) -> Video:
     """The unsaved fiche, its paths pointing where `work`'s files end up in `folder`."""
     files = discover_downloaded_files(work)
@@ -218,7 +224,6 @@ def _new_fiche(
         media_type=media_type_for_paths(video_path, audio_path, str(metadata_path)),
         download_source=download_source,
         imported_via_form=download_source == "manual",
-        is_new=is_new,
         category_labels=channel.category_labels if channel else None,
         published_at=parse_yt_date(info.get("upload_date")) or published_at,
         downloaded_at=datetime.now(UTC),

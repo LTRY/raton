@@ -24,15 +24,17 @@ class PlaylistItemNotFoundError(ValueError):
         super().__init__("Élément introuvable")
 
 
-def find_playlist(db: Session, playlist_id: int) -> Playlist:
+def find_playlist(db: Session, user_id: int, playlist_id: int) -> Playlist:
+    """The user's playlist; another user's is as unknown as a deleted one."""
     playlist = db.get(Playlist, playlist_id)
-    if playlist is None:
+    if playlist is None or playlist.user_id != user_id:
         raise PlaylistNotInLibraryError()
     return playlist
 
 
-def find_playlist_item(db: Session, playlist_id: int, item_id: int) -> PlaylistItem:
-    """An item, only if it belongs to that playlist."""
+def find_playlist_item(db: Session, user_id: int, playlist_id: int, item_id: int) -> PlaylistItem:
+    """An item, only if it belongs to that playlist of the user."""
+    find_playlist(db, user_id, playlist_id)
     item = db.get(PlaylistItem, item_id)
     if item is None or item.playlist_id != playlist_id:
         raise PlaylistItemNotFoundError()
@@ -126,6 +128,7 @@ def apply_item_order(db: Session, playlist: Playlist, ordered_item_ids: list[int
 def duplicate_playlist(db: Session, playlist: Playlist) -> Playlist:
     """Copy as a manual playlist: the copy is detached from the YouTube/CSV source."""
     copy = Playlist(
+        user_id=playlist.user_id,
         title=f"{playlist.title} (copie)"[:500],
         source="manual",
         category_labels=playlist.category_labels,
@@ -161,16 +164,18 @@ def playlist_title_from_filename(filename: str) -> str:
     return stem or "Playlist importée"
 
 
-def create_playlist(db: Session, title: str, source: str = "manual", **fields) -> Playlist:
-    playlist = Playlist(title=title, source=source, **fields)
+def create_playlist(
+    db: Session, user_id: int, title: str, source: str = "manual", **fields
+) -> Playlist:
+    playlist = Playlist(user_id=user_id, title=title, source=source, **fields)
     db.add(playlist)
     db.commit()
     db.refresh(playlist)
     return playlist
 
 
-def create_manual_playlist(db: Session, title: str) -> Playlist:
-    return create_playlist(db, playlist_title(title))
+def create_manual_playlist(db: Session, user_id: int, title: str) -> Playlist:
+    return create_playlist(db, user_id, playlist_title(title))
 
 
 def delete_playlist(db: Session, playlist: Playlist) -> None:

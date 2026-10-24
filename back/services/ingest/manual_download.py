@@ -64,7 +64,6 @@ def download_manual_media(
     download_transcript: bool,
     subtitle_languages: list[str] | None = None,
     subtitle_source: str = "auto",
-    is_new: bool = False,
     video_quality: str = "1080",
 ) -> Video:
     if media_type not in {"video", "audio"}:

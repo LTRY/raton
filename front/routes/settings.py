@@ -41,6 +41,7 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
         request,
         "settings.html",
         {
+            "users": api.get("/users"),
             "channel_count": counts["channels"],
             "rated_channel_count": counts["rated_channels"],
             "video_count": counts["videos"],

@@ -11,7 +11,7 @@ from back.db.base import *  # noqa: F403
 from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
-from back.models.setting import AppSetting
+from back.models.user import UserSetting
 from back.models.video import Video
 from back.services.videos.library_view import (
     LIBRARY_PAGE_SIZE,
@@ -21,6 +21,14 @@ from back.services.videos.library_view import (
     library_saved_views,
 )
 from tests.site import site_client
+from tests.users import (
+    CHANNEL_STATE_FIELDS,
+    VIDEO_STATE_FIELDS,
+    pop_state,
+    set_channel_state,
+    set_video_state,
+    user_id,
+)
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -40,15 +48,19 @@ def db():
 
 
 def add_channel(db, name, **fields):
+    state = pop_state(fields, CHANNEL_STATE_FIELDS)
     channel = Channel(
         name=name, url=f"https://youtube.com/@{name}", yt_channel_id=f"UC-{name}", **fields
     )
     db.add(channel)
     db.flush()
+    if state:
+        set_channel_state(db, channel, **state)
     return channel
 
 
 def add_video(db, key, channel, *, short=False, minutes=0, **fields):
+    state = pop_state(fields, VIDEO_STATE_FIELDS)
     video = Video(
         channel_id=channel.id,
         yt_video_id=key,
@@ -62,6 +74,8 @@ def add_video(db, key, channel, *, short=False, minutes=0, **fields):
     )
     db.add(video)
     db.flush()
+    if state:
+        set_video_state(db, video, **state)
     return video
 
 
@@ -71,8 +85,8 @@ def test_library_listing_pages_the_whole_library_newest_first(db):
         add_video(db, f"v{index}", channel, minutes=index)
     db.commit()
 
-    first = library_listing(db, LibraryFilters(assets=frozenset({"video"})))
-    last = library_listing(db, LibraryFilters(assets=frozenset({"video"}), page=99))
+    first = library_listing(db, user_id(db), LibraryFilters(assets=frozenset({"video"})))
+    last = library_listing(db, user_id(db), LibraryFilters(assets=frozenset({"video"}), page=99))
 
     assert first.channel is None
     assert first.section == "videos"
@@ -90,9 +104,11 @@ def test_library_listing_opens_a_shorts_only_channel_on_its_shorts(db):
     db.commit()
     every_asset = frozenset({"video", "shorts", "metadata", "transcript", "audio", "imported"})
 
-    default = library_listing(db, LibraryFilters(channel_id=channel.id, assets=every_asset))
+    default = library_listing(
+        db, user_id(db), LibraryFilters(channel_id=channel.id, assets=every_asset)
+    )
     videos = library_listing(
-        db, LibraryFilters(channel_id=channel.id, section="videos", assets=every_asset)
+        db, user_id(db), LibraryFilters(channel_id=channel.id, section="videos", assets=every_asset)
     )
 
     assert default.channel == channel
@@ -106,7 +122,7 @@ def test_library_cards_carry_the_latest_playback(db):
     video = add_video(db, "v", add_channel(db, "Chan"), duration_seconds=125)
     db.commit()
 
-    [card] = library_cards(db, [video])
+    [card] = library_cards(db, user_id(db), [video])
 
     assert card["video"] is video
     assert card["channel_name"] == "Chan"
@@ -116,14 +132,15 @@ def test_library_cards_carry_the_latest_playback(db):
 
 def test_library_saved_views_flag_the_one_matching_the_filters(db):
     db.add(
-        AppSetting(
+        UserSetting(
+            user_id=user_id(db),
             key="video_library_views",
             value='[{"name":"Notés","rated":true},{"name":"Audio","assets":["audio"]}]',
         )
     )
     db.commit()
 
-    views = library_saved_views(db, LibraryFilters(rated_only=True))
+    views = library_saved_views(db, user_id(db), LibraryFilters(rated_only=True))
 
     assert [(view["name"], view["active"]) for view in views] == [
         ("Notés", True),

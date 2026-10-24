@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from back.models.channel import Channel
 from back.models.video import Video
 from back.services.common.job_log import log_job
+from back.services.common.user_state import channel_followers, followed_channel_ids
 from back.services.ingest import scan_events, throttle
 from back.services.ingest.identity import canonical_video_url, video_already_downloaded
 from back.services.ingest.metadata_import import import_video_metadata
@@ -35,7 +36,7 @@ def scan_channel(
     page: int = 1,
     page_size: int = 25,
     max_pages: int = 3,
-    mark_new: bool = False,
+    new_for: Collection[int] = (),
     max_imports: int | None = None,
 ) -> int:
     return scan_channel_section(
@@ -45,7 +46,7 @@ def scan_channel(
         page_size=page_size,
         max_pages=max_pages,
         section="videos",
-        mark_new=mark_new,
+        new_for=new_for,
         max_imports=max_imports,
     )
 
@@ -57,12 +58,15 @@ def scan_channel_section(
     page_size: int = 25,
     max_pages: int = 3,
     section: str = "videos",
-    mark_new: bool = False,
+    new_for: Collection[int] = (),
     max_imports: int | None = None,
     should_stop: Callable[[], bool] | None = None,
     skip_known: bool = False,
 ) -> int:
     """Import the metadata of the channel's new videos and return how many were imported.
+
+    The imported fiches are Nouveau for the users of `new_for` (the scan passes the followers of
+    the section; the other imports nobody).
 
     Listing and importing are two phases so `max_imports` can leave a backlog for the next scan:
     the entries to import are collected first, then imported oldest first. The leftovers are then
@@ -159,7 +163,7 @@ def scan_channel_section(
                 preview=entry,
                 download_source="auto",
                 source_section=section,
-                is_new=mark_new,
+                new_for=new_for,
             )
             log_job(
                 db,
@@ -217,11 +221,11 @@ def run_scan(db: Session, enforce_storage_headroom: bool = False) -> dict[str, i
             )
             return {"status": "storage_low", "downloaded": 0, "deleted": 0}
         imported = 0
-        followed = Channel.auto_metadata_enabled.is_(True) | Channel.auto_shorts_enabled.is_(True)
-        # Least recently scanned first: a scan stopped by a rate limit resumes where it stopped.
+        # A channel is scanned when anyone follows it. Least recently scanned first: a scan
+        # stopped by a rate limit resumes where it stopped.
         channels = db.scalars(
             select(Channel)
-            .where(followed)
+            .where(Channel.id.in_(followed_channel_ids()))
             .order_by(Channel.last_scanned_at.asc().nulls_first(), Channel.id)
         ).all()
         started = time.monotonic()
@@ -238,16 +242,18 @@ def run_scan(db: Session, enforce_storage_headroom: bool = False) -> dict[str, i
                     )
                 scan_events.emit(f"Chaîne {index}/{len(channels)} : {channel.name}…")
                 channel_imported = 0
-                if channel.auto_metadata_enabled:
+                video_followers = channel_followers(db, channel.id, "videos")
+                if video_followers:
                     channel_imported += scan_channel(
-                        db, channel, mark_new=True, max_imports=MAX_IMPORTS_PER_SECTION
+                        db, channel, new_for=video_followers, max_imports=MAX_IMPORTS_PER_SECTION
                     )
-                if channel.auto_shorts_enabled:
+                short_followers = channel_followers(db, channel.id, "shorts")
+                if short_followers:
                     channel_imported += scan_channel_section(
                         db,
                         channel,
                         section="shorts",
-                        mark_new=True,
+                        new_for=short_followers,
                         max_imports=MAX_IMPORTS_PER_SECTION,
                     )
                 channel.last_scanned_at = datetime.now(UTC)

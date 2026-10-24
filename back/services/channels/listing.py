@@ -1,5 +1,5 @@
 """The channel list of /channels and `GET /api/channels`: sort, Notées filter, search, page,
-fiche counts."""
+fiche counts. Stars and last playback are the user's own."""
 
 from dataclasses import dataclass
 
@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.user import UserChannel
 from back.models.video import Video
 from back.services.common.search import channel_search_rank
+from back.services.common.user_state import channel_rating, channel_state_join
 from back.services.youtube.channel_info import search_channels
 
 CHANNEL_SORTS = ("rating", "activity", "alpha", "added")
@@ -29,33 +31,40 @@ class ChannelPage:
     channel_count: int
 
 
-def channel_entries(db: Session, sort: str, rated_only: bool, search_query: str) -> list[dict]:
-    """Every listed channel with the date of its last playback, in `sort` order.
+def channel_entries(
+    db: Session, user_id: int, sort: str, rated_only: bool, search_query: str
+) -> list[dict]:
+    """Every listed channel with the date of the user's last playback, in `sort` order.
 
     With a search, only the matching channels, by relevance tier then `sort`.
     """
     last_played_subquery = (
         select(DownloadJob.channel_id, func.max(DownloadJob.created_at).label("last_played_at"))
-        .where(DownloadJob.status == "played", DownloadJob.channel_id.is_not(None))
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.user_id == user_id,
+            DownloadJob.channel_id.is_not(None),
+        )
         .group_by(DownloadJob.channel_id)
         .subquery()
     )
     last_played = nullslast(desc(last_played_subquery.c.last_played_at))
     if sort == "rating":
-        ordering = (desc(Channel.rating), last_played, Channel.name)
+        ordering = (desc(channel_rating), last_played, Channel.name)
     elif sort == "alpha":
-        ordering = (Channel.name, desc(Channel.rating), last_played)
+        ordering = (Channel.name, desc(channel_rating), last_played)
     elif sort == "added":
         ordering = (desc(Channel.created_at), desc(Channel.id))
     else:
-        ordering = (last_played, desc(Channel.rating), Channel.name)
+        ordering = (last_played, desc(channel_rating), Channel.name)
     query = (
         select(Channel, last_played_subquery.c.last_played_at)
         .outerjoin(last_played_subquery, Channel.id == last_played_subquery.c.channel_id)
+        .outerjoin(UserChannel, channel_state_join(user_id))
         .order_by(*ordering)
     )
     if rated_only:
-        query = query.where(Channel.rating > 0)
+        query = query.where(channel_rating > 0)
     entries = [
         {"channel": channel, "last_played_at": last_played_at}
         for channel, last_played_at in db.execute(query)
@@ -91,7 +100,7 @@ def channels_by_yt_id(db: Session, yt_channel_ids: list[str]) -> dict[str, Chann
 
 
 def channel_page(
-    db: Session, sort: str | None, rated_only: bool, search_query: str, page: int
+    db: Session, user_id: int, sort: str | None, rated_only: bool, search_query: str, page: int
 ) -> ChannelPage:
     """One page of `channel_entries`; an unknown sort falls back to the default one.
 
@@ -99,7 +108,7 @@ def channel_page(
     holds hundreds of channels, not thousands of fiches. Fiches are counted for the page only.
     """
     sort = sort if sort in CHANNEL_SORTS else DEFAULT_CHANNEL_SORT
-    entries = channel_entries(db, sort, rated_only, search_query)
+    entries = channel_entries(db, user_id, sort, rated_only, search_query)
     total_pages = max(1, -(-len(entries) // CHANNEL_PAGE_SIZE))
     page = min(max(page, 1), total_pages)
     start = (page - 1) * CHANNEL_PAGE_SIZE
@@ -107,9 +116,9 @@ def channel_page(
     counts = video_counts_by_channel(db, [entry["channel"].id for entry in page_entries])
     for entry in page_entries:
         entry["video_count"] = counts.get(entry["channel"].id, 0)
-    count_query = select(func.count(Channel.id))
+    count_query = select(func.count(Channel.id)).outerjoin(UserChannel, channel_state_join(user_id))
     if rated_only:
-        count_query = count_query.where(Channel.rating > 0)
+        count_query = count_query.where(channel_rating > 0)
     return ChannelPage(
         entries=page_entries,
         page=page,

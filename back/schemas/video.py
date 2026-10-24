@@ -32,12 +32,18 @@ class VideoRead(BaseModel):
     published_at: datetime | None
     downloaded_at: datetime | None
     transcript_status: TranscriptStatus
+    # The reading user's own stars (`user_videos`), not a column of the fiche.
     rating: int
     imported_via_form: bool
     categories: Categories
     file_size_bytes: int
 
-    model_config = ConfigDict(from_attributes=True)
+    @classmethod
+    def of(cls, video, rating: int) -> VideoRead:
+        """A fiche as one user sees it: its columns, plus that user's `rating`."""
+        own = {"rating", "categories"}
+        fields = {name: getattr(video, name) for name in VideoRead.model_fields if name not in own}
+        return cls(**fields, rating=rating, categories=video.category_labels)
 
 
 class VideoPage(BaseModel):
@@ -170,6 +176,9 @@ class VideoDetailRead(VideoRead):
     sponsor_skip_enabled: bool
     skip_segments: list[SkipSegmentRead]
     resume_positions: dict[str, PlaybackPositionRead]
+    # The purge removed the shared files after the first Vu (anyone's): the page says so.
+    files_purged: bool
+    # The user's playlists that hold the fiche.
     playlists: list[VideoPlaylistRead]
     channel: VideoChannelRead | None
     # What the fiche holds, in badge order: new, audio, video, metadata, transcript, notes,

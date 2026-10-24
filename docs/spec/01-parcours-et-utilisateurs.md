@@ -3,11 +3,28 @@ title: "01 Parcours et utilisateurs"
 ---
 # 01 Parcours et utilisateurs
 
-## Utilisateur principal
+## Utilisateurs
 
 L'utilisateur principal est l'operateur local de Raton. Il utilise
 l'application depuis la machine hote ou depuis une machine du LAN. Ses objectifs
 sont ceux de [00 Vision](00-vision.md).
+
+D'autres personnes du foyer peuvent partager l'instance : chacune a son
+utilisateur, qui garde pour lui ce qui est personnel (Vu, etoiles, playlists,
+discussions...) et partage les medias et les notes generees (voir
+[02 Fonctionnalites](02-fonctionnalites.md), « Utilisateurs »). Les donnees
+d'avant les utilisateurs appartiennent au premier, « Moi ».
+
+### Changer d'utilisateur
+
+1. Sur l'accueil `/`, l'utilisateur ouvre le tiroir « Discussions » (☰).
+2. En bas a gauche, le bouton rond porte l'initiale de l'utilisateur courant ;
+   il ouvre la liste des utilisateurs.
+3. Choisir un nom recharge l'accueil pour lui : ses discussions, sa phrase de
+   Raton, et sur les autres pages ses Nouveautes, son historique, ses notes et
+   ses playlists. Le choix est garde par le navigateur.
+4. « Nouvel utilisateur » + « Ajouter » cree un utilisateur et le choisit.
+5. Renommer ou supprimer : section « Utilisateurs » de `/settings`.
 
 ## Parcours principaux
 

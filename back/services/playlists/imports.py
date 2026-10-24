@@ -217,7 +217,6 @@ def import_playlist_entry(
             preview=preview,
             download_source="auto",
             source_section="videos",
-            is_new=False,
         )
     add_video_to_playlist(db, playlist.id, video.id, added_at=added_at)
     log_job(db, "metadata", f"Ajouté à la playlist: {video.title}", video_id=video.id)

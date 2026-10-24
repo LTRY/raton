@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from back.schemas.actions import JobQueuedRead
 from back.schemas.video import Categories
@@ -11,7 +11,8 @@ from back.services.youtube.channel_info import is_channel_reference
 class ChannelCreate(BaseModel):
     # A channel URL or @handle; a name is searched with `GET /api/youtube/channels` instead.
     url: str
-    # Checked by the service (`check_rating`), whose refusal is the French message.
+    # The adding user's stars; checked by the service (`check_rating`), whose refusal is the
+    # French message.
     rating: int = 1
     categories: list[str] = []
 
@@ -37,13 +38,28 @@ class ChannelRead(BaseModel):
     url: str
     name: str
     yt_channel_id: str | None
+    # The reading user's own stars and cloches (`user_channels`), not columns of the channel.
     rating: int
     categories: Categories
     auto_metadata_enabled: bool
     auto_shorts_enabled: bool
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    @classmethod
+    def of(cls, channel, state) -> ChannelRead:
+        """A channel as one user sees it: its columns, plus that user's `state` (a
+        `UserChannel`)."""
+        return cls(
+            id=channel.id,
+            url=channel.url,
+            name=channel.name,
+            yt_channel_id=channel.yt_channel_id,
+            rating=state.rating,
+            categories=channel.category_labels,
+            auto_metadata_enabled=state.auto_metadata_enabled,
+            auto_shorts_enabled=state.auto_shorts_enabled,
+            created_at=channel.created_at,
+        )
 
 
 class ChannelListItemRead(ChannelRead):
@@ -83,7 +99,8 @@ BellSection = Literal["videos", "shorts"]
 
 
 class ChannelStateRead(BaseModel):
-    """The editable fields of a channel, as stored after an action."""
+    """The editable fields of a channel, as stored after an action; stars and cloches are the
+    user's."""
 
     id: int
     name: str

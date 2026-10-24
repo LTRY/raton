@@ -22,6 +22,7 @@ from back.services.playlists.imports import (
     PlaylistNotFoundError,
     parse_playlist_csv,
 )
+from tests.users import user_id
 
 CSV_SAMPLE = (
     "ID vidéo,Code temporel de création de la vidéo de la playlist\n"
@@ -62,7 +63,7 @@ def fake_import_video_metadata(
     source_section="videos",
     subtitle_languages=None,
     subtitle_source="auto",
-    is_new=False,
+    new_for=(),
 ):
     """Stands in for back.services.ingest.scanner.import_video_metadata in tests:
     same get-or-create-by-yt_video_id idempotency, no yt-dlp/network calls.
@@ -126,7 +127,10 @@ def test_run_playlist_url_import_job_continues_past_known_videos(monkeypatch):
     db = make_session()
     known = add_video(db, yt_video_id="vid1", title="Known video")
     playlist = Playlist(
-        title="My playlist", source="url", source_url="https://www.youtube.com/playlist?list=PL1"
+        user_id=user_id(db),
+        title="My playlist",
+        source="url",
+        source_url="https://www.youtube.com/playlist?list=PL1",
     )
     db.add(playlist)
     db.commit()
@@ -163,7 +167,10 @@ def test_run_playlist_url_import_job_continues_past_known_videos(monkeypatch):
 def test_run_playlist_url_import_job_skips_failing_video_without_aborting(monkeypatch):
     db = make_session()
     playlist = Playlist(
-        title="My playlist", source="url", source_url="https://www.youtube.com/playlist?list=PL1"
+        user_id=user_id(db),
+        title="My playlist",
+        source="url",
+        source_url="https://www.youtube.com/playlist?list=PL1",
     )
     db.add(playlist)
     db.commit()
@@ -202,7 +209,7 @@ def test_run_playlist_url_import_job_skips_failing_video_without_aborting(monkey
 
 def test_run_playlist_csv_import_job_sets_position_and_added_at_from_rows(monkeypatch):
     db = make_session()
-    playlist = Playlist(title="CSV playlist", source="csv")
+    playlist = Playlist(user_id=user_id(db), title="CSV playlist", source="csv")
     db.add(playlist)
     db.commit()
     job = log_job(db, "queued", "queued")
@@ -231,7 +238,7 @@ def test_run_playlist_csv_import_job_sets_position_and_added_at_from_rows(monkey
 
 def test_run_playlist_csv_import_job_skips_dead_row_and_logs_warning(monkeypatch):
     db = make_session()
-    playlist = Playlist(title="CSV playlist", source="csv")
+    playlist = Playlist(user_id=user_id(db), title="CSV playlist", source="csv")
     db.add(playlist)
     db.commit()
     job = log_job(db, "queued", "queued")
@@ -260,8 +267,8 @@ def test_run_playlist_csv_import_job_skips_dead_row_and_logs_warning(monkeypatch
 
 def test_same_video_reachable_via_two_playlists_creates_one_video_row(monkeypatch):
     db = make_session()
-    playlist_a = Playlist(title="A", source="manual")
-    playlist_b = Playlist(title="B", source="manual")
+    playlist_a = Playlist(user_id=user_id(db), title="A", source="manual")
+    playlist_b = Playlist(user_id=user_id(db), title="B", source="manual")
     db.add_all([playlist_a, playlist_b])
     db.commit()
     job_a = log_job(db, "queued", "queued")
@@ -298,7 +305,7 @@ def test_create_playlist_manual_creates_row_and_redirects(front_client):
 
 def test_delete_playlist_leaves_video_intact(front_client):
     db = make_session()
-    playlist = Playlist(title="P", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="P", source="manual")
     video = add_video(db)
     db.add(playlist)
     db.commit()
@@ -320,7 +327,7 @@ def test_delete_playlist_leaves_video_intact(front_client):
 def test_move_and_remove_playlist_items_reorder_positions(front_client):
     db = make_session()
     client = front_client(db)
-    playlist = Playlist(title="P", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="P", source="manual")
     v1 = add_video(db, "v1", "V1")
     v2 = add_video(db, "v2", "V2")
     v3 = add_video(db, "v3", "V3")
@@ -372,7 +379,7 @@ def test_add_video_to_playlist_existing_and_new_branches(front_client):
     db = make_session()
     client = front_client(db)
     video = add_video(db)
-    playlist = Playlist(title="Existing playlist", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="Existing playlist", source="manual")
     db.add(playlist)
     db.commit()
 
@@ -400,8 +407,8 @@ def test_add_video_to_playlist_existing_and_new_branches(front_client):
 def test_video_detail_playlist_form_lives_in_more_menu(front_client):
     db = make_session()
     video = add_video(db)
-    member = Playlist(title="Member playlist", source="manual")
-    other = Playlist(title="Other playlist", source="manual")
+    member = Playlist(user_id=user_id(db), title="Member playlist", source="manual")
+    other = Playlist(user_id=user_id(db), title="Other playlist", source="manual")
     db.add_all([member, other])
     db.flush()
     item = PlaylistItem(playlist_id=member.id, video_id=video.id, position=0)
@@ -517,7 +524,7 @@ def test_default_playlist_title_from_filename_strips_takeout_prefix():
 
 
 def make_playlist_with_videos(db, count=3):
-    playlist = Playlist(title="Mix", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="Mix", source="manual")
     db.add(playlist)
     db.commit()
     videos = [add_video(db, f"id{i}", f"Video {chr(ord('C') - i)}") for i in range(count)]
@@ -750,7 +757,9 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels(front_client)
     plain = add_video(db, "plain", "Plain")
     labelled = add_video(db, "labelled", "Labelled")
     labelled.category_labels = "science"
-    playlist = Playlist(title="Podcasts", source="manual", category_labels="podcasts")
+    playlist = Playlist(
+        user_id=user_id(db), title="Podcasts", source="manual", category_labels="podcasts"
+    )
     db.add(playlist)
     db.commit()
 
@@ -769,6 +778,7 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels(front_client)
 def test_url_import_gives_new_videos_the_playlist_labels(monkeypatch):
     db = make_session()
     playlist = Playlist(
+        user_id=user_id(db),
         title="Musique",
         source="url",
         source_url="https://www.youtube.com/playlist?list=PL1",
@@ -810,7 +820,10 @@ def test_duplicate_playlist_keeps_the_labels(front_client):
 def test_run_playlist_url_import_job_stops_at_rate_limit(monkeypatch):
     db = make_session()
     playlist = Playlist(
-        title="My playlist", source="url", source_url="https://www.youtube.com/playlist?list=PL1"
+        user_id=user_id(db),
+        title="My playlist",
+        source="url",
+        source_url="https://www.youtube.com/playlist?list=PL1",
     )
     db.add(playlist)
     db.commit()
@@ -851,7 +864,10 @@ def test_run_playlist_url_import_job_does_not_refetch_known_videos(monkeypatch):
     db = make_session()
     add_video(db, yt_video_id="vid1", title="Known video")
     playlist = Playlist(
-        title="My playlist", source="url", source_url="https://www.youtube.com/playlist?list=PL1"
+        user_id=user_id(db),
+        title="My playlist",
+        source="url",
+        source_url="https://www.youtube.com/playlist?list=PL1",
     )
     db.add(playlist)
     db.commit()

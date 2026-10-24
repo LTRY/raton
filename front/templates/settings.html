@@ -18,6 +18,7 @@
     <div class="settings-layout">
       <nav class="settings-nav" data-settings-nav aria-label="Sections des paramètres">
         <a href="#general" class="settings-nav-link">Général</a>
+        <a href="#utilisateurs" class="settings-nav-link">Utilisateurs</a>
         <a href="#library-stats" class="settings-nav-link">Bibliothèque</a>
         <a href="#llm-usage" class="settings-nav-link">Coûts LLM</a>
         <a href="#auto-scan" class="settings-nav-link">Suivi automatique</a>
@@ -41,6 +42,27 @@
             Quota global (Go)
             <input name="quota_gb" type="number" step="0.1" min="0.1" value="{{ quota_gb }}" required>
           </label>
+        </div>
+
+        {# Its fields belong to the forms after the settings form (`form=`): forms cannot nest. #}
+        <div class="settings-card" id="utilisateurs">
+          <h2 class="settings-card-title">Utilisateurs</h2>
+          <p class="settings-hint">Les fiches, leurs fichiers, transcripts et notes générées sont partagés. Vu, Écartée, notes en étoiles, commentaires, cloches, Nouveautés, playlists, discussions, historique, sous-bibliothèques et temps d’écran sont propres à chaque utilisateur. On change d’utilisateur depuis le bouton rond du tiroir « Discussions » de l’accueil.</p>
+          <ul class="settings-users">
+            {% for user in users.users %}
+            <li class="settings-user">
+              <label>
+                <span class="visually-hidden">Nom de {{ user.name }}</span>
+                <input name="name" value="{{ user.name }}" maxlength="40" required form="user-rename-{{ user.id }}">
+              </label>
+              {% if user.id == users.current_user_id %}<span class="settings-user-current">vous</span>{% endif %}
+              <button type="submit" class="settings-user-action" form="user-rename-{{ user.id }}">Renommer</button>
+              {% if users.users | length > 1 %}
+              <button type="submit" class="settings-user-action settings-user-delete" form="user-delete-{{ user.id }}">Supprimer</button>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
         </div>
 
         <div class="settings-card library-stats" id="library-stats">
@@ -294,5 +316,9 @@
       </div>
     </div>
   </form>
+  {% for user in users.users %}
+  <form id="user-rename-{{ user.id }}" action="/users/{{ user.id }}/rename" method="post" hidden></form>
+  <form id="user-delete-{{ user.id }}" action="/users/{{ user.id }}/delete" method="post" data-turbo-confirm="Supprimer {{ user.name }} et tout ce qui lui est propre (Vu, notes en étoiles, playlists, discussions) ?" hidden></form>
+  {% endfor %}
 </section>
 {% endblock %}

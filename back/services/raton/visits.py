@@ -1,4 +1,5 @@
-"""Raton's visits: when the person last came, what Raton already said, and the context of a page load."""
+"""Raton's visits: when the user last came, what Raton already said to them, and the context of a
+page load. Each user has their own visits (user settings) and their own day."""
 
 import json
 import random
@@ -10,13 +11,15 @@ from sqlalchemy.orm import Session, selectinload
 
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.user import UserChannel, UserVideo
 from back.models.video import Video
 from back.services.common.settings import (
     SCREEN_TIME_KINDS,
     get_screen_time_limits,
-    get_setting,
-    set_setting,
+    get_user_setting,
+    set_user_setting,
 )
+from back.services.common.user_state import channel_state_join
 from back.services.raton.picker import pick_next, render_line
 from back.services.raton.scenarios import RatonContext
 from back.services.videos.filters import followed_video_condition
@@ -52,29 +55,35 @@ def _parse_shown(value: str) -> list[str]:
     return [key for key in parsed if isinstance(key, str)] if isinstance(parsed, list) else []
 
 
-def record_visit(db: Session, now: datetime) -> tuple[datetime | None, list[str]]:
-    """Store this page load; return the previous *visit* (not the previous load) and the lines already shown in this visit."""
-    last_seen = _parse_datetime(get_setting(db, RATON_LAST_SEEN_KEY, ""))
+def record_visit(db: Session, user_id: int, now: datetime) -> tuple[datetime | None, list[str]]:
+    """Store this page load of the user; return their previous *visit* (not the previous load) and
+    the lines already shown in this visit."""
+    last_seen = _parse_datetime(get_user_setting(db, user_id, RATON_LAST_SEEN_KEY, ""))
     new_visit = last_seen is None or now - last_seen >= SESSION_GAP
     if new_visit:
-        set_setting(db, RATON_SESSION_PREVIOUS_KEY, last_seen.isoformat() if last_seen else "")
+        set_user_setting(
+            db, user_id, RATON_SESSION_PREVIOUS_KEY, last_seen.isoformat() if last_seen else ""
+        )
         shown: list[str] = []
-        set_setting(db, RATON_SHOWN_KEY, json.dumps(shown))
+        set_user_setting(db, user_id, RATON_SHOWN_KEY, json.dumps(shown))
     else:
-        shown = _parse_shown(get_setting(db, RATON_SHOWN_KEY, "[]"))
-    previous = _parse_datetime(get_setting(db, RATON_SESSION_PREVIOUS_KEY, ""))
-    set_setting(db, RATON_LAST_SEEN_KEY, now.isoformat())
+        shown = _parse_shown(get_user_setting(db, user_id, RATON_SHOWN_KEY, "[]"))
+    previous = _parse_datetime(get_user_setting(db, user_id, RATON_SESSION_PREVIOUS_KEY, ""))
+    set_user_setting(db, user_id, RATON_LAST_SEEN_KEY, now.isoformat())
     db.commit()
     return previous, shown
 
 
-def screen_time_today(db: Session, now: datetime) -> tuple[float, str, float | None, float]:
-    """(highest limit ratio, its kind, fewest minutes left over all kinds, total seconds played today)."""
+def screen_time_today(
+    db: Session, user_id: int, now: datetime
+) -> tuple[float, str, float | None, float]:
+    """(highest limit ratio, its kind, fewest minutes left over all kinds, total seconds played
+    today), over the user's playback."""
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     jobs = list(
         db.scalars(
             select(DownloadJob)
-            .where(DownloadJob.status == "played")
+            .where(DownloadJob.status == "played", DownloadJob.user_id == user_id)
             .options(selectinload(DownloadJob.video))
             # One day of margin: `playback_time_stats` does the exact local-day cut.
             .where(DownloadJob.created_at >= day_start.replace(tzinfo=None) - timedelta(days=1))
@@ -82,7 +91,7 @@ def screen_time_today(db: Session, now: datetime) -> tuple[float, str, float | N
         )
     )
     stats = playback_time_stats(jobs, now)["today"]
-    limits = get_screen_time_limits(db)
+    limits = get_screen_time_limits(db, user_id)
     best_ratio, best_kind = 0.0, "video"
     minutes_left: float | None = None
     total_seconds = 0.0
@@ -99,15 +108,21 @@ def screen_time_today(db: Session, now: datetime) -> tuple[float, str, float | N
     return best_ratio, best_kind, minutes_left, total_seconds
 
 
-def build_context(db: Session, now: datetime | None = None) -> RatonContext:
-    """Facts about the library and the day; no visit bookkeeping, so it is safe to call from a test page."""
+def build_context(db: Session, user_id: int, now: datetime | None = None) -> RatonContext:
+    """Facts about the user's library and day; no visit bookkeeping, so it is safe to call from a
+    test page."""
     now = now or datetime.now().astimezone()
-    ratio, _, minutes_left, played_seconds = screen_time_today(db, now)
+    ratio, _, minutes_left, played_seconds = screen_time_today(db, user_id, now)
     new_count = (
         db.scalar(
             select(func.count(Video.id))
             .join(Channel, Channel.id == Video.channel_id)
-            .where(Video.is_new.is_(True))
+            .join(
+                UserVideo,
+                (UserVideo.video_id == Video.id) & (UserVideo.user_id == user_id),
+            )
+            .outerjoin(UserChannel, channel_state_join(user_id))
+            .where(UserVideo.is_new.is_(True))
             .where(followed_video_condition())
         )
         or 0
@@ -122,14 +137,14 @@ def build_context(db: Session, now: datetime | None = None) -> RatonContext:
 
 
 def home_context(
-    db: Session, now: datetime | None = None, rng: random.Random | None = None
+    db: Session, user_id: int, now: datetime | None = None, rng: random.Random | None = None
 ) -> dict:
-    """Template context of the home hero: the line of this page load."""
-    ctx = build_context(db, now)
-    previous_visit, shown = record_visit(db, ctx.now)
+    """Template context of the home hero: the line of this page load of the user."""
+    ctx = build_context(db, user_id, now)
+    previous_visit, shown = record_visit(db, user_id, ctx.now)
     ctx = replace(ctx, previous_visit=previous_visit)
     scenario, rank, shown = pick_next(ctx, shown, rng)
-    set_setting(db, RATON_SHOWN_KEY, json.dumps(shown))
+    set_user_setting(db, user_id, RATON_SHOWN_KEY, json.dumps(shown))
     db.commit()
     return {
         "scenario": render_line(scenario, rank),

@@ -13,6 +13,7 @@ from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.llm_job import LlmJob
 from back.models.video import Video
 from back.services.common.job_log import log_job
+from back.services.common.users import default_user
 from back.services.jobs.backfills import run_channel_profile_backfill_job
 from back.services.library_chat.history import add_chat_exchange
 from back.services.library_chat.schema import LIBRARY_CHAT_TOOLS, MAX_TOOL_TURNS
@@ -29,6 +30,17 @@ from back.services.videos.documents import append_transcript_chat, write_generat
 PARTIAL_RESULT_INTERVAL_SECONDS = 0.4
 
 logger = logging.getLogger(__name__)
+
+
+def library_chat_user_id(db: Session, job: LlmJob) -> int:
+    """Who asked a library question: the job's user, else its discussion's (a job queued before
+    users existed), else the default user."""
+    if job.user_id is not None:
+        return job.user_id
+    conversation = (
+        db.get(LibraryChatConversation, job.conversation_id) if job.conversation_id else None
+    )
+    return conversation.user_id if conversation else default_user(db).id
 
 
 @logged_job("llm")
@@ -64,7 +76,10 @@ def run_llm_job(job_id: int) -> None:
                     db.commit()
 
                 toolbox = LibraryChatToolbox(
-                    db, on_progress=save_tool_calls, conversation_id=job.conversation_id
+                    db,
+                    library_chat_user_id(db, job),
+                    on_progress=save_tool_calls,
+                    conversation_id=job.conversation_id,
                 )
                 added_channel_ids = toolbox.added_channel_ids
                 completion = provider_instance.complete_with_tools(
@@ -138,12 +153,15 @@ def enqueue_llm_job(
     prompt: str,
     question: str | None = None,
     conversation_id: int | None = None,
+    user_id: int | None = None,
 ) -> LlmJob:
+    """`user_id` is who asks a chat question (the answer goes to their discussion)."""
     job = LlmJob(
         kind=kind,
         provider=provider,
         video_id=video_id,
         conversation_id=conversation_id,
+        user_id=user_id,
         prompt=prompt,
         question=question,
         status="queued",
@@ -170,15 +188,18 @@ def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | No
 
 
 def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None:
+    """Append the answer to the asking user's chat on the fiche."""
     if job.status != "done":
         return
-    append_transcript_chat(video, job.question or "", job.result or "")
+    user_id = job.user_id if job.user_id is not None else default_user(db).id
+    append_transcript_chat(video, user_id, job.question or "", job.result or "")
     log_job(
         db,
         "prompt",
         f"Prompt envoyé sur {video.title}: {(job.question or '')[:180]}",
         channel_id=video.channel_id,
         video_id=video.id,
+        user_id=user_id,
     )
     job.status = "applied"
     db.commit()
@@ -201,6 +222,11 @@ def apply_library_chat_result(db: Session, job: LlmJob) -> None:
         sources.get("video_ids", []),
         sources.get("channel_ids", []),
     )
-    log_job(db, "prompt", f"Question bibliothèque : {(job.question or '')[:180]}")
+    log_job(
+        db,
+        "prompt",
+        f"Question bibliothèque : {(job.question or '')[:180]}",
+        user_id=conversation.user_id,
+    )
     job.status = "applied"
     db.commit()

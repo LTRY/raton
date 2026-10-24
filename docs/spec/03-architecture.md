@@ -67,7 +67,9 @@ identifiants), `dashboard.py` (Nouveautes, Historique, temps d'ecran),
 (journal des jobs, page des logs, etat d'un job), `scan.py` (scan des chaines
 a la demande, son etat et son flux d'evenements), `stats.py` (`/stats`,
 `/rag`, dernier lot de notes automatiques), `settings.py` (reglages et
-categories), `raton.py` (la replique de Raton). `__init__.py` les assemble en
+categories), `raton.py` (la replique de Raton), `users.py` (les utilisateurs,
+et `current_user_id`, la dependance qui dit pour quel utilisateur agit une
+requete). `__init__.py` les assemble en
 un seul routeur, inclus par `back/main.py` ; chaque module a son tag OpenAPI,
 et le schema (`/docs` du back) decrit toute l'API. `cards.py` construit la
 carte d'une fiche commune a toutes les listes, `lookups.py` trouve
@@ -102,7 +104,10 @@ repondue avec le meme statut et le meme `detail`.
 ### `front/api.py` et `front/proxy.py`
 
 `api.py` : le client de l'API qu'utilisent les routes des pages ; un refus
-leve `ApiError` avec le message francais du back. `proxy.py` : le relais des
+leve `ApiError` avec le message francais du back. Chaque appel porte
+l'en-tete `X-Raton-User` tire du cookie `raton_user` de la requete de la page
+(`get_api`), pour que le back agisse pour le meme utilisateur que le
+navigateur. `proxy.py` : le relais des
 appels `/api/*` du navigateur vers le back (corps et reponses en flux,
 `Range` compris) ; il transmet les en-tetes `Host`, `Origin` et
 `Sec-Fetch-*` d'origine, si bien que la verification d'origine du back
@@ -121,7 +126,9 @@ JavaScript (elles appellent l'API puis redirigent) : `dashboard.py`
 (accueil, Nouveautes, Historique), `videos.py` (bibliotheque, page d'une
 chaine, fiche, import, raccourci iOS `/videos/share-import`), `channels.py`,
 `playlists.py`, `stats.py` (`/stats`, `/rag`), `settings.py` (`/settings`,
-`/logs`), `raton.py` (`/raton/variations`).
+`/logs`), `raton.py` (`/raton/variations`), `users.py` (changer
+d'utilisateur, en ajouter, renommer ou supprimer ; seul endroit qui pose le
+cookie `raton_user`).
 
 ### Mise en forme
 

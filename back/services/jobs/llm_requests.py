@@ -30,7 +30,7 @@ from back.services.llm.prompts import (
     build_library_chat_prompt,
     partial_generation_summary,
 )
-from back.services.videos.documents import get_transcript_paths, load_chat
+from back.services.videos.documents import get_transcript_paths, load_chat, transcript_file
 
 
 class LlmRequestError(ValueError):
@@ -69,9 +69,8 @@ def _question(question: str) -> str:
 def queue_notes_generation(db: Session, video: Video) -> LlmJob:
     """Notes + résumé of the fiche in one LLM call (`build_generation_prompt`)."""
     try:
-        transcript_path, _, _ = get_transcript_paths(video)
         prompt = build_generation_prompt(
-            transcript_path.read_text(encoding="utf-8", errors="replace")
+            transcript_file(video).read_text(encoding="utf-8", errors="replace")
         )
         return enqueue_llm_job(
             db,
@@ -84,11 +83,11 @@ def queue_notes_generation(db: Session, video: Video) -> LlmJob:
         raise LlmRequestError(f"Génération impossible : {exc}") from exc
 
 
-def queue_video_question(db: Session, video: Video, question: str) -> LlmJob:
-    """A question on the fiche's transcript, following its discussion so far."""
+def queue_video_question(db: Session, user_id: int, video: Video, question: str) -> LlmJob:
+    """A question of the user on the fiche's transcript, following their discussion so far."""
     question = _question(question)
     try:
-        transcript_path, chat_path, _ = get_transcript_paths(video)
+        transcript_path, chat_path, _ = get_transcript_paths(video, user_id)
         prompt = build_chat_prompt(
             transcript_path.read_text(encoding="utf-8", errors="replace"),
             load_chat(chat_path),
@@ -101,19 +100,23 @@ def queue_video_question(db: Session, video: Video, question: str) -> LlmJob:
             video_id=video.id,
             prompt=prompt.to_json(),
             question=question,
+            user_id=user_id,
         )
     except Exception as exc:
         raise LlmRequestError(f"Réponse impossible : {exc}") from exc
 
 
-def queue_library_question(db: Session, question: str, conversation_id: int | None) -> LlmJob:
-    """A question to the library chat, following the discussion `conversation_id`, or starting
-    a new one when it is None. Raises `ConversationNotFoundError` for an unknown discussion."""
+def queue_library_question(
+    db: Session, user_id: int, question: str, conversation_id: int | None
+) -> LlmJob:
+    """A question of the user to the library chat, following their discussion `conversation_id`,
+    or starting a new one when it is None. Raises `ConversationNotFoundError` for an unknown
+    discussion, or another user's."""
     question = _question(question)
     conversation = (
-        start_conversation(db, question)
+        start_conversation(db, user_id, question)
         if conversation_id is None
-        else get_conversation(db, conversation_id)
+        else get_conversation(db, user_id, conversation_id)
     )
     try:
         prompt = build_library_chat_prompt(chat_history(db, conversation.id), question)
@@ -125,6 +128,7 @@ def queue_library_question(db: Session, question: str, conversation_id: int | No
             prompt=prompt.to_json(),
             question=question,
             conversation_id=conversation.id,
+            user_id=user_id,
         )
     except Exception as exc:
         raise LlmRequestError(f"Réponse impossible : {exc}") from exc

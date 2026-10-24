@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from back.api.users import current_user_id
 from back.db.session import get_db
 from back.schemas.stats import (
     AutoNotesRunRead,
@@ -24,8 +25,10 @@ router = APIRouter(prefix="/api", tags=["Statistiques"])
 
 
 @router.get("/stats", response_model=LibraryCountsRead)
-def get_stats(db: Session = Depends(get_db)) -> LibraryCountsRead:
-    counts = library_counts(db)
+def get_stats(
+    db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> LibraryCountsRead:
+    counts = library_counts(db, user_id)
     return LibraryCountsRead(
         channels=counts["channel_count"],
         rated_channels=counts["rated_channel_count"],

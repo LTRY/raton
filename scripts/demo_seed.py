@@ -5,7 +5,8 @@ creates the tables and a handful of channels and videos, then does nothing on
 the following runs. No media files exist behind these rows, so players have
 nothing to play, but every list and detail page has something to show. A few fiches get a
 transcript (`DEMO_TRANSCRIPTS`), so the LLM features (notes, quiz, discussion) have something
-to work on when the instance has an API key.
+to work on when the instance has an API key. The stars, cloches, Vu and playback are the first
+user's; a second user (`DEMO_OTHER_USER`) starts with nothing, to show the switch of user.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -18,9 +19,13 @@ from back.core.config import get_settings
 from back.db.base import *  # noqa: F403  (registers every model on Base.metadata)
 from back.db.session import Base, SessionLocal, engine
 from back.models.channel import Channel
+from back.models.user import User, UserChannel, UserVideo
 from back.models.video import TranscriptStatus, Video
+from back.services.common.users import default_user
 from back.services.videos.playback import record_playback_activity
 from scripts.demo_transcripts import DEMO_TRANSCRIPTS
+
+DEMO_OTHER_USER = "Invité"
 
 # One long name, so the channel page header is shown wrapping onto two lines.
 DEMO_CHANNELS = [
@@ -63,16 +68,26 @@ def seed_demo(db: Session, media_root: Path) -> bool:
     if db.scalar(select(Channel.id).limit(1)) is not None:
         return False
     now = datetime.now(UTC)
+    user_id = default_user(db).id
+    db.add(User(name=DEMO_OTHER_USER))
     channels = []
     for name, yt_channel_id, bell in DEMO_CHANNELS:
         channel = Channel(
             url=f"https://www.youtube.com/channel/{yt_channel_id}",
             name=name,
             yt_channel_id=yt_channel_id,
-            auto_metadata_enabled=bell,
-            rating=3,
         )
         db.add(channel)
+        db.flush()
+        db.add(
+            UserChannel(
+                user_id=user_id,
+                channel_id=channel.id,
+                rating=3,
+                auto_metadata_enabled=bell,
+                auto_shorts_enabled=False,
+            )
+        )
         channels.append(channel)
     db.flush()
     played = []
@@ -89,9 +104,6 @@ def seed_demo(db: Session, media_root: Path) -> bool:
             downloaded_at=now - timedelta(days=index),
             duration_seconds=300 + index * 217,
             view_count=1_000 * (index + 1),
-            is_new=index < 3,
-            rating=rating,
-            list_state=list_state,
         )
         transcript = DEMO_TRANSCRIPTS.get(title)
         if transcript:
@@ -101,6 +113,16 @@ def seed_demo(db: Session, media_root: Path) -> bool:
             video.transcript_path = str(path)
             video.transcript_status = TranscriptStatus.downloaded
         db.add(video)
+        db.flush()
+        db.add(
+            UserVideo(
+                user_id=user_id,
+                video_id=video.id,
+                rating=rating,
+                list_state=list_state,
+                is_new=index < 3,
+            )
+        )
         if played_share is not None:
             played.append((video, played_share))
     db.commit()
@@ -108,7 +130,7 @@ def seed_demo(db: Session, media_root: Path) -> bool:
     for video, played_share in played:
         duration = float(video.duration_seconds)
         record_playback_activity(
-            db, video, "video", duration * played_share, duration, duration * played_share
+            db, user_id, video, "video", duration * played_share, duration, duration * played_share
         )
     return True
 

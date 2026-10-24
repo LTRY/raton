@@ -18,6 +18,7 @@ from back.models.video import Video
 from back.services.videos.library_view import LIBRARY_PAGE_SIZE
 from front.library import shorts_feature_flags
 from tests.site import site_client
+from tests.users import mine, user_id
 
 NOW = datetime(2026, 6, 1, tzinfo=UTC)
 
@@ -49,10 +50,9 @@ def add_video(db, channel, key, *, rating=0, is_new=False, short=False, age_days
         yt_video_id=key,
         title=f"Titre {key}",
         url=f"https://www.youtube.com/{'shorts/' if short else 'watch?v='}{key}",
-        rating=rating,
-        is_new=is_new,
         published_at=NOW - timedelta(days=age_days),
-        **({"folder_path": "/x", "video_path": "/x/video.mp4", "media_type": "video"} | extra),
+        **{"folder_path": "/x", "video_path": "/x/video.mp4", "media_type": "video"} | extra,
+        user_states=mine(rating=rating, is_new=is_new),
     )
     db.add(video)
     db.commit()
@@ -141,6 +141,7 @@ def test_cards_show_new_chip_and_progress_on_the_thumbnail_without_meta_line():
     db.add(
         DownloadJob(
             video_id=video.id,
+            user_id=user_id(db),
             status="played",
             message=json.dumps(
                 {

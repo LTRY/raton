@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from back.api.errors import error_responses
 from back.api.lookups import library_channel
+from back.api.users import current_user_id
 from back.db.session import get_db
 from back.models.channel import Channel
 from back.schemas.actions import JobQueuedRead
@@ -52,6 +53,7 @@ from back.services.channels.subscriptions import (
 from back.services.common.categories import parse_video_category_labels
 from back.services.common.ratings import InvalidRatingError, set_rating
 from back.services.common.search import normalized_search_query
+from back.services.common.user_state import channel_states
 from back.services.jobs.backfills import (
     run_channel_profile_backfill_job,
     run_channel_profile_refresh_job,
@@ -81,14 +83,16 @@ def list_channels(
     q: str | None = None,
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> ChannelPageRead:
     """Same sorts, Notées filter and search as `/channels`; unlike the page, every channel is
     listed unless `rated=true`."""
-    listed = channel_page(db, sort, rated, normalized_search_query(q), page)
+    listed = channel_page(db, user_id, sort, rated, normalized_search_query(q), page)
+    states = channel_states(db, user_id, [entry["channel"].id for entry in listed.entries])
     return ChannelPageRead(
         items=[
             ChannelListItemRead(
-                **ChannelRead.model_validate(entry["channel"]).model_dump(),
+                **ChannelRead.of(entry["channel"], states[entry["channel"].id]).model_dump(),
                 **channel_images(entry["channel"]),
                 metadata_fetched_at=entry["channel"].metadata_fetched_at,
                 video_count=entry["video_count"],
@@ -135,10 +139,14 @@ def list_channel_names(db: Session = Depends(get_db)) -> list[ChannelNameRead]:
 @router.get(
     "/channels/{channel_id}", response_model=ChannelDetailRead, responses=error_responses(404, 422)
 )
-def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetailRead:
+def get_channel(
+    channel_id: int, db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
+) -> ChannelDetailRead:
     channel = library_channel(db, channel_id)
     return ChannelDetailRead(
-        **ChannelRead.model_validate(channel).model_dump(),
+        **ChannelRead.of(
+            channel, channel_states(db, user_id, [channel.id])[channel.id]
+        ).model_dump(),
         description=channel.description,
         keywords=channel.keyword_list,
         **channel_images(channel),
@@ -155,11 +163,14 @@ def get_channel(channel_id: int, db: Session = Depends(get_db)) -> ChannelDetail
     responses=error_responses(400, 404, 409, 422),
 )
 def create_channel(
-    payload: ChannelCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
-) -> Channel:
+    payload: ChannelCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+) -> ChannelRead:
     try:
         channel = channel_manage.create_channel(
-            db, payload.url, rating=payload.rating, category_labels=payload.categories
+            db, user_id, payload.url, rating=payload.rating, category_labels=payload.categories
         )
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -168,7 +179,7 @@ def create_channel(
     except ChannelAlreadyInLibraryError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     background_tasks.add_task(run_channel_profile_backfill_job)
-    return channel
+    return ChannelRead.of(channel, channel_states(db, user_id, [channel.id])[channel.id])
 
 
 @router.delete("/channels/{channel_id}", status_code=204, responses=error_responses(404, 422))
@@ -177,14 +188,15 @@ def delete_channel(channel_id: int, db: Session = Depends(get_db)) -> None:
     channel_manage.delete_channel(db, channel)
 
 
-def channel_state(channel: Channel) -> ChannelStateRead:
+def channel_state(db: Session, user_id: int, channel: Channel) -> ChannelStateRead:
+    state = channel_states(db, user_id, [channel.id])[channel.id]
     return ChannelStateRead(
         id=channel.id,
         name=channel.name,
-        rating=channel.rating,
+        rating=state.rating,
         categories=parse_video_category_labels(channel.category_labels),
-        auto_metadata_enabled=channel.auto_metadata_enabled,
-        auto_shorts_enabled=channel.auto_shorts_enabled,
+        auto_metadata_enabled=state.auto_metadata_enabled,
+        auto_shorts_enabled=state.auto_shorts_enabled,
     )
 
 
@@ -194,15 +206,18 @@ def channel_state(channel: Channel) -> ChannelStateRead:
     responses=error_responses(400, 404, 422),
 )
 def update_rating(
-    channel_id: int, payload: RatingUpdate, db: Session = Depends(get_db)
+    channel_id: int,
+    payload: RatingUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> ChannelStateRead:
-    """0 to 5 stars; 400 with the service's message otherwise."""
+    """The user's 0 to 5 stars; 400 with the service's message otherwise."""
     channel = library_channel(db, channel_id)
     try:
-        set_rating(db, channel, payload.rating)
+        set_rating(db, user_id, channel, payload.rating)
     except InvalidRatingError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return channel_state(channel)
+    return channel_state(db, user_id, channel)
 
 
 @router.put(
@@ -211,11 +226,14 @@ def update_rating(
     responses=error_responses(404, 422),
 )
 def update_categories(
-    channel_id: int, payload: ChannelCategoriesUpdate, db: Session = Depends(get_db)
+    channel_id: int,
+    payload: ChannelCategoriesUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> ChannelStateRead:
     channel = library_channel(db, channel_id)
     set_channel_categories(db, channel, payload.categories)
-    return channel_state(channel)
+    return channel_state(db, user_id, channel)
 
 
 @router.put(
@@ -229,18 +247,18 @@ def update_bell(
     payload: ChannelBellUpdate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> ChannelBellRead:
-    """Set a cloche; turning it on syncs the existing catalogue in the background."""
+    """Set the user's cloche; turning it on syncs the existing catalogue in the background."""
     channel = library_channel(db, channel_id)
     job = None
-    if set_channel_bell(db, channel, section, payload.enabled):
+    if set_channel_bell(db, user_id, channel, section, payload.enabled):
         job = queue_channel_catalog_sync(db, channel, section)
-        # The existing catalogue is not news: mark_new stays off.
-        background_tasks.add_task(
-            run_channel_metadata_import_job, job.id, channel.id, 1, section, False
-        )
+        # The existing catalogue is not news: the job marks nothing Nouveau.
+        background_tasks.add_task(run_channel_metadata_import_job, job.id, channel.id, 1, section)
     return ChannelBellRead(
-        channel=channel_state(channel), job=JobQueuedRead.from_job(job) if job else None
+        channel=channel_state(db, user_id, channel),
+        job=JobQueuedRead.from_job(job) if job else None,
     )
 
 
@@ -314,8 +332,9 @@ def confirm_subscriptions_csv(
     payload: SubscriptionsConfirm,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
 ) -> SubscriptionsAddedRead:
-    added = add_subscriptions(db, payload.tokens)
+    added = add_subscriptions(db, user_id, payload.tokens)
     if added:
         background_tasks.add_task(run_channel_profile_backfill_job)
     return SubscriptionsAddedRead(added=added)

@@ -1,12 +1,21 @@
 """Which fiches a library list keeps: the filters in Python (`video_matches_filters`) and their SQL twin
-(`video_filters_condition`), kept in step by tests/test_videos_sql_filters.py."""
+(`video_filters_condition`), kept in step by tests/test_videos_sql_filters.py.
+
+The Écartée state and the stars are the user's own: the Python filter takes their state row, the
+SQL one reads the `UserVideo` row the query outer-joins (`video_state_join`)."""
 
 from sqlalchemy import String, and_, func, literal, or_, true
 
 from back.core.config import local_media_path
 from back.models.channel import Channel
+from back.models.user import UserVideo
 from back.models.video import Video
 from back.services.common.categories import parse_video_category_labels
+from back.services.common.user_state import (
+    channel_shorts_bell,
+    channel_videos_bell,
+    video_rating,
+)
 from back.services.videos.documents import NOTES_FILE
 
 
@@ -14,11 +23,11 @@ def video_category_labels(video: Video) -> list[str]:
     return parse_video_category_labels(getattr(video, "category_labels", None))
 
 
-def video_badges(video: Video) -> list[str]:
-    """What a fiche holds, in the order the badges show: new, audio, video, metadata,
-    transcript, notes, imported (manual import)."""
+def video_badges(video: Video, is_new: bool) -> list[str]:
+    """What a fiche holds, in the order the badges show: new (for the user), audio, video,
+    metadata, transcript, notes, imported (manual import)."""
     kinds = []
-    if video.is_new:
+    if is_new:
         kinds.append("new")
     if video.audio_path:
         kinds.append("audio")
@@ -54,6 +63,7 @@ def video_asset_kinds(video: Video) -> set[str]:
 
 def video_matches_filters(
     video: Video,
+    state: UserVideo,
     asset_filters: set[str],
     category_filters: set[str],
     excluded_asset_filters: set[str],
@@ -64,7 +74,7 @@ def video_matches_filters(
     hide_hidden: bool = False,
     uncategorized_only: bool = False,
 ) -> bool:
-    if hide_hidden and video.list_state == "hidden":
+    if hide_hidden and state.list_state == "hidden":
         return False
     video_assets = video_asset_kinds(video)
     video_categories = set(video_category_labels(video))
@@ -84,7 +94,7 @@ def video_matches_filters(
         category_filters = set()
     asset_conditions = [asset in video_assets for asset in asset_filters]
     if rated_only:
-        asset_conditions.append(video.rating > 0)
+        asset_conditions.append(state.rating > 0)
     category_conditions = [category in video_categories for category in category_filters]
     groups = []
     if asset_conditions:
@@ -166,10 +176,12 @@ def video_filters_condition(
     hide_hidden: bool = False,
     uncategorized_only: bool = False,
 ):
-    """SQL twin of `video_matches_filters`: keep the two in step (tests/test_videos_sql_filters.py)."""
+    """SQL twin of `video_matches_filters`: keep the two in step (tests/test_videos_sql_filters.py).
+
+    Needs `UserVideo` outer-joined with `video_state_join`."""
     conditions = []
     if hide_hidden:
-        conditions.append(or_(Video.list_state.is_(None), Video.list_state != "hidden"))
+        conditions.append(or_(UserVideo.list_state.is_(None), UserVideo.list_state != "hidden"))
     if uncategorized_only:
         conditions.append(video_uncategorized_condition())
     excluded_assets = _any_of(
@@ -194,7 +206,7 @@ def video_filters_condition(
         category_filters = set()
     asset_conditions = [video_asset_kind_condition(kind) for kind in sorted(asset_filters)]
     if rated_only:
-        asset_conditions.append(Video.rating > 0)
+        asset_conditions.append(video_rating > 0)
     category_conditions = [video_category_condition(label) for label in sorted(category_filters)]
     for group_conditions, mode in (
         (asset_conditions, asset_filter_mode),
@@ -218,13 +230,14 @@ def video_section_condition(section: str):
 
 
 def followed_video_condition():
-    """SQL condition: the video's kind (video or short) has its bell on for its channel.
+    """SQL condition: the video's kind (video or short) has the user's bell on for its channel.
 
-    Needs `Channel` joined on `Video.channel_id`. Shared by the Nouveautés page and Raton's
-    new-video count so both announce the same set.
+    Needs `Channel` joined on `Video.channel_id` and `UserChannel` outer-joined with
+    `channel_state_join`. Shared by the Nouveautés page and Raton's new-video count so both
+    announce the same set.
     """
     is_short = Video.url.contains("/shorts/")
     return or_(
-        and_(Channel.auto_metadata_enabled.is_(True), ~is_short),
-        and_(Channel.auto_shorts_enabled.is_(True), is_short),
+        and_(channel_videos_bell.is_(True), ~is_short),
+        and_(channel_shorts_bell.is_(True), is_short),
     )

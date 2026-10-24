@@ -400,10 +400,11 @@ def test_start_scheduler_queues_a_profile_backfill_at_startup(monkeypatch, tmp_p
 
 
 def test_toolbox_remembers_channels_it_added():
+    from back.services.common.users import default_user
     from back.services.library_chat.tools import LibraryChatToolbox
 
     db = make_session()
-    toolbox = LibraryChatToolbox(db)
+    toolbox = LibraryChatToolbox(db, default_user(db).id)
     toolbox.youtube_candidates = {
         "UCleo": {
             "url": "https://www.youtube.com/@leo",

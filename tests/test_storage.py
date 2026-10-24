@@ -26,6 +26,13 @@ from back.services.youtube import downloads as youtube_downloads
 from back.services.youtube import sponsor_segments
 from back.services.youtube.downloads import build_video_folder
 from back.services.youtube.yt import parse_yt_date
+from tests.users import (
+    add_user,
+    follow,
+    set_video_state,
+    stored_channel_state,
+    stored_video_state,
+)
 
 
 def make_session():
@@ -55,11 +62,12 @@ def add_video(
         folder_path=str(folder),
         video_path=str(folder / "video.mp4"),
         transcript_status=TranscriptStatus.missing,
-        rating=rating,
         file_size_bytes=size,
     )
     db.add(video)
     db.commit()
+    if rating:
+        set_video_state(db, video, rating=rating)
     return video
 
 
@@ -109,7 +117,8 @@ def test_manual_download_stages_files_before_final_folder(monkeypatch, tmp_path)
     assert video.channel is not None
     assert video.channel.name == "Manual channel"
     assert video.channel.url == "raton:channel:Manual%20channel"
-    assert video.channel.rating == 0
+    # A channel created from a video's info is nobody's: no user rated it.
+    assert stored_channel_state(db, video.channel) is None
     assert video.folder_path == str(final_folder)
     assert Path(video.video_path).is_file()
     assert final_folder.exists()
@@ -566,6 +575,30 @@ def test_import_video_metadata_writes_metadata_and_transcript_without_media(monk
     assert Path(video.metadata_path).is_file()
     assert Path(video.transcript_path).read_text(encoding="utf-8") == "Bonjour"
     assert video.file_size_bytes > 0
+
+
+def test_import_video_metadata_makes_the_new_fiche_news_for_the_given_users(monkeypatch, tmp_path):
+    db = make_session()
+    channel = Channel(url="https://example.test/channel", name="Suivie")
+    db.add(channel)
+    db.add(AppSetting(key="media_root", value=str(tmp_path)))
+    db.commit()
+    follower = add_user(db, "Abonné")
+    monkeypatch.setattr(
+        metadata_import,
+        "extract_video_info",
+        lambda url: {"id": "new123", "title": "Nouvelle", "webpage_url": url},
+    )
+    monkeypatch.setattr(metadata_import, "download_subtitles", lambda *args, **kwargs: None)
+    monkeypatch.setattr(metadata_import, "download_thumbnail", lambda *args, **kwargs: None)
+
+    video = metadata_import.import_video_metadata(
+        db, "https://example.test/video", channel.id, new_for=[follower.id]
+    )
+
+    assert stored_video_state(db, video, follower.id).is_new is True
+    # The default user does not follow the channel: nothing is news for them.
+    assert stored_video_state(db, video) is None
 
 
 def test_import_video_metadata_adopts_existing_folder_without_video_row(monkeypatch, tmp_path):
@@ -1167,10 +1200,11 @@ def test_scan_channel_section_shorts_stop_at_a_page_without_new_shorts(monkeypat
 
 def test_run_scan_stops_at_the_first_rate_limit(monkeypatch):
     db = make_session()
-    first = Channel(url="https://example.test/a", name="A", auto_metadata_enabled=True)
-    second = Channel(url="https://example.test/b", name="B", auto_metadata_enabled=True)
+    first = Channel(url="https://example.test/a", name="A")
+    second = Channel(url="https://example.test/b", name="B")
     db.add_all([first, second])
     db.commit()
+    follow(db, first, second)
     scanned = []
 
     def fake_scan(db, channel, **kwargs):
@@ -1255,21 +1289,20 @@ def test_import_video_metadata_keeps_going_when_a_subtitle_request_gets_429(monk
 def test_run_scan_visits_least_recently_scanned_channels_first_and_records_it(monkeypatch):
     db = make_session()
     now = datetime.now(UTC)
-    never = Channel(url="https://example.test/never", name="Never", auto_metadata_enabled=True)
+    never = Channel(url="https://example.test/never", name="Never")
     old = Channel(
         url="https://example.test/old",
         name="Old",
-        auto_metadata_enabled=True,
         last_scanned_at=now - timedelta(days=3),
     )
     recent = Channel(
         url="https://example.test/recent",
         name="Recent",
-        auto_metadata_enabled=True,
         last_scanned_at=now - timedelta(hours=1),
     )
     db.add_all([recent, old, never])
     db.commit()
+    follow(db, recent, old, never)
     order = []
     monkeypatch.setattr(
         scanner, "scan_channel", lambda db, channel, **kwargs: order.append(channel.name) or 0
@@ -1284,11 +1317,12 @@ def test_run_scan_visits_least_recently_scanned_channels_first_and_records_it(mo
 
 def test_run_scan_resumes_at_the_channel_a_rate_limit_stopped_on(monkeypatch):
     db = make_session()
-    first = Channel(url="https://example.test/a", name="A", auto_metadata_enabled=True)
-    second = Channel(url="https://example.test/b", name="B", auto_metadata_enabled=True)
-    third = Channel(url="https://example.test/c", name="C", auto_metadata_enabled=True)
+    first = Channel(url="https://example.test/a", name="A")
+    second = Channel(url="https://example.test/b", name="B")
+    third = Channel(url="https://example.test/c", name="C")
     db.add_all([first, second, third])
     db.commit()
+    follow(db, first, second, third)
     blocked = {"B"}
 
     def fake_scan(db, channel, **kwargs):
@@ -1312,11 +1346,9 @@ def test_run_scan_resumes_at_the_channel_a_rate_limit_stopped_on(monkeypatch):
 
 def test_run_scan_waits_long_between_channels_only_after_an_import(monkeypatch):
     db = make_session()
-    db.add_all(
-        Channel(url=f"https://example.test/{name}", name=name, auto_metadata_enabled=True)
-        for name in ("a", "b", "c")
-    )
+    db.add_all(Channel(url=f"https://example.test/{name}", name=name) for name in ("a", "b", "c"))
     db.commit()
+    follow(db, *db.query(Channel).all())
     imports = {"a": 2, "b": 0, "c": 0}
     monkeypatch.setattr(
         scanner, "scan_channel", lambda db, channel, **kwargs: imports[channel.name]
@@ -1334,8 +1366,9 @@ def test_run_scan_waits_long_between_channels_only_after_an_import(monkeypatch):
 
 def test_run_scan_emits_progress_events_ending_with_a_final_one(monkeypatch):
     db = make_session()
-    db.add(Channel(url="https://example.test/a", name="Alpha", auto_metadata_enabled=True))
+    db.add(Channel(url="https://example.test/a", name="Alpha"))
     db.commit()
+    follow(db, *db.query(Channel).all())
     monkeypatch.setattr(scanner, "scan_channel", lambda db, channel, **kwargs: 3)
 
     run_scan(db)

@@ -41,6 +41,10 @@ class LlmJob(Base):
         nullable=True,
         index=True,
     )
+    # Who asked: a chat answer is written to that user's discussion.
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", index=True)

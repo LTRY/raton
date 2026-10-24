@@ -35,13 +35,14 @@ def _queue_import(db: Session, playlist: Playlist) -> DownloadJob:
 
 
 def queue_playlist_url_import(
-    db: Session, url: str, title: str = ""
+    db: Session, user_id: int, url: str, title: str = ""
 ) -> tuple[Playlist, DownloadJob]:
     """Resolve the URL now (PlaylistNotFoundError), create the playlist, queue the import of its
     videos; run it with `run_playlist_url_import_job`. Without a title, YouTube's is used."""
     info = extract_playlist_info(url)
     playlist = create_playlist(
         db,
+        user_id,
         title.strip() or info["title"],
         source="url",
         source_url=info["url"],
@@ -51,13 +52,14 @@ def queue_playlist_url_import(
 
 
 def queue_playlist_csv_import(
-    db: Session, content: bytes, filename: str | None, title: str = ""
+    db: Session, user_id: int, content: bytes, filename: str | None, title: str = ""
 ) -> tuple[Playlist, DownloadJob, list[dict[str, Any]]]:
     """Read the CSV now (PlaylistCsvError), create the playlist, queue the import of its rows;
     run it with `run_playlist_csv_import_job`. Without a title, the file name gives one."""
     rows = parse_playlist_csv(content)
     playlist = create_playlist(
         db,
+        user_id,
         title.strip() or playlist_title_from_filename(filename or "Playlist importée"),
         source="csv",
     )

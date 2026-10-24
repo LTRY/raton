@@ -34,7 +34,8 @@ def search_rank(search_query: str, field_groups: list[list[str | None]]) -> int 
     return None
 
 
-def video_search_rank(video: Video, search_query: str) -> int | None:
+def video_search_rank(video: Video, search_query: str, comment: str | None = None) -> int | None:
+    """`comment` is the searching user's own comment on the fiche."""
     channel = video.channel
     return search_rank(
         search_query,
@@ -42,7 +43,7 @@ def video_search_rank(video: Video, search_query: str) -> int | None:
             [video.title],
             [channel.name if channel else None, video.category_labels],
             [
-                video.comment,
+                comment,
                 video.url,
                 video.yt_video_id,
                 channel.url if channel else None,

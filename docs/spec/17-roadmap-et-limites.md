@@ -8,7 +8,10 @@ title: "17 Roadmap et limites connues"
 - Pas d'authentification generale (voir [15 Securite](15-securite.md)).
 - Lecteur video natif uniquement ; seul le mini-lecteur audio persistant a une
   interface de controle propre (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)).
-- Pas de gestion fine multi-utilisateur.
+- Les utilisateurs ne sont pas des comptes : pas de mot de passe ni de droits,
+  tout le monde sur le LAN peut agir comme n'importe quel utilisateur (voir
+  [15 Securite](15-securite.md)).
+- Le serveur MCP agit toujours comme l'utilisateur par defaut.
 - Pas de file de jobs persistante externe : jobs dans la DB + background tasks.
 - Les telechargements longs dependent du processus web.
 - Les cartes de liste ne montrent pas de lien vers YouTube ; les URL YouTube

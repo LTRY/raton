@@ -1,4 +1,5 @@
-"""The library chat's discussions (`library_chat_conversations`) and their messages."""
+"""The library chat's discussions (`library_chat_conversations`) and their messages; each
+discussion belongs to one user, and only they can read, continue or delete it."""
 
 from datetime import UTC, datetime
 
@@ -33,16 +34,16 @@ def conversation_title(question: str) -> str:
     return title
 
 
-def get_conversation(db: Session, conversation_id: int) -> LibraryChatConversation:
+def get_conversation(db: Session, user_id: int, conversation_id: int) -> LibraryChatConversation:
     conversation = db.get(LibraryChatConversation, conversation_id)
-    if conversation is None:
+    if conversation is None or conversation.user_id != user_id:
         raise ConversationNotFoundError()
     return conversation
 
 
-def start_conversation(db: Session, question: str) -> LibraryChatConversation:
-    """A new discussion named after its first question; the caller commits."""
-    conversation = LibraryChatConversation(title=conversation_title(question))
+def start_conversation(db: Session, user_id: int, question: str) -> LibraryChatConversation:
+    """A new discussion of the user, named after its first question; the caller commits."""
+    conversation = LibraryChatConversation(user_id=user_id, title=conversation_title(question))
     db.add(conversation)
     db.flush()
     return conversation
@@ -52,13 +53,13 @@ def _has_messages():
     return exists().where(LibraryChatMessage.conversation_id == LibraryChatConversation.id)
 
 
-def list_conversations(db: Session) -> list[LibraryChatConversation]:
-    """The latest discussions, most recently answered first. A discussion whose first
+def list_conversations(db: Session, user_id: int) -> list[LibraryChatConversation]:
+    """The user's latest discussions, most recently answered first. A discussion whose first
     question never got an answer has no message and is not listed."""
     return list(
         db.scalars(
             select(LibraryChatConversation)
-            .where(_has_messages())
+            .where(LibraryChatConversation.user_id == user_id, _has_messages())
             .order_by(LibraryChatConversation.updated_at.desc(), LibraryChatConversation.id.desc())
             .limit(LISTED_CONVERSATIONS)
         )
@@ -146,6 +147,6 @@ def add_chat_exchange(
     conversation.updated_at = datetime.now(UTC)
 
 
-def delete_conversation(db: Session, conversation_id: int) -> None:
-    db.delete(get_conversation(db, conversation_id))
+def delete_conversation(db: Session, user_id: int, conversation_id: int) -> None:
+    db.delete(get_conversation(db, user_id, conversation_id))
     db.commit()

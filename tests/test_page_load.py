@@ -16,6 +16,7 @@ from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.video import Video
 from tests.site import site_client
+from tests.users import my_channel, user_id
 
 # Generous: the point is a constant, not the exact figure (a page with one statement per video blows past it).
 MAX_STATEMENTS = 60
@@ -68,6 +69,7 @@ def seed_playbacks(db, video_count: int) -> None:
         db.add(
             DownloadJob(
                 video_id=video.id,
+                user_id=user_id(db),
                 status="played",
                 message=message,
                 created_at=now - timedelta(hours=index),
@@ -91,7 +93,7 @@ def seed_followed_library(db, video_count: int) -> None:
         name="Chan",
         url="https://youtube.com/@chan",
         yt_channel_id="UC-chan",
-        auto_metadata_enabled=True,
+        user_states=my_channel(auto_metadata_enabled=True),
     )
     db.add(channel)
     db.flush()
@@ -148,7 +150,7 @@ def test_video_cards_do_not_read_metadata_files(db, monkeypatch, tmp_path, path)
 def seed_playlist(db, video_count: int) -> int:
     from back.models.playlist import Playlist, PlaylistItem
 
-    playlist = Playlist(title="Ma playlist", source="manual")
+    playlist = Playlist(user_id=user_id(db), title="Ma playlist", source="manual")
     db.add(playlist)
     db.flush()
     for index in range(video_count):
@@ -201,7 +203,7 @@ def test_playlists_page_cost_does_not_grow_with_the_playlists(db):
             folder_path=f"/media/cover{index}",
             thumbnail_path=f"/media/cover{index}/thumb.jpg",
         )
-        playlist = Playlist(title=f"Playlist {index}", source="manual")
+        playlist = Playlist(user_id=user_id(db), title=f"Playlist {index}", source="manual")
         db.add_all([video, playlist])
         db.flush()
         db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))

@@ -22,6 +22,7 @@ from back.models.video import Video
 from back.services.channels.lookup import find_channel
 from back.services.channels.manage import ChannelAlreadyInLibraryError, add_resolved_channel
 from back.services.common.search import channel_search_rank, fold_search_text, video_search_rank
+from back.services.common.user_state import channel_states, video_comments
 from back.services.library_chat.schema import (
     DEFAULT_HISTORY_DAYS,
     HISTORY_SCAN_LIMIT,
@@ -103,10 +104,13 @@ class LibraryChatToolbox:
     def __init__(
         self,
         db: Session,
+        user_id: int,
         on_progress: Callable[[list[dict]], None] | None = None,
         conversation_id: int | None = None,
     ) -> None:
+        """`user_id` is who asks: the stars, cloches, comments and history are theirs."""
         self.db = db
+        self.user_id = user_id
         self.conversation_id = conversation_id
         self.on_progress = on_progress
         self.steps: list[dict] = []
@@ -184,7 +188,14 @@ class LibraryChatToolbox:
         if not matches:
             self._summary = "Aucune chaîne trouvée."
             return f"Aucune chaîne ne correspond à « {query} »."
-        matches.sort(key=lambda match: (match[0], -match[1].rating, match[1].name.casefold()))
+        states = channel_states(self.db, self.user_id, [channel.id for _, channel in matches])
+        matches.sort(
+            key=lambda match: (
+                match[0],
+                -states[match[1].id].rating,
+                match[1].name.casefold(),
+            )
+        )
         best = matches[0][1].name
         if loose:
             self._summary = f"Chaîne la plus proche : {best}."
@@ -197,16 +208,17 @@ class LibraryChatToolbox:
         )
         lines = []
         for _, channel in matches[:MAX_CHANNEL_RESULTS]:
+            state = states[channel.id]
             parts = [f"{self._channel_reference(channel.id)} {channel.name}"]
             if channel.category_labels:
                 parts.append(f"labels : {channel.category_labels}")
-            parts.append(f"note {channel.rating}/5")
+            parts.append(f"note {state.rating}/5")
             parts.append(f"{video_counts.get(channel.id, 0)} vidéo(s)")
             followed = [
                 label
                 for label, enabled in (
-                    ("vidéos", channel.auto_metadata_enabled),
-                    ("shorts", channel.auto_shorts_enabled),
+                    ("vidéos", state.auto_metadata_enabled),
+                    ("shorts", state.auto_shorts_enabled),
                 )
                 if enabled
             ]
@@ -228,7 +240,12 @@ class LibraryChatToolbox:
         videos_query = self.db.query(Video).options(joinedload(Video.channel))
         if channel_id is not None:
             videos_query = videos_query.filter(Video.channel_id == int(channel_id))
-        matches, loose = _ranked(videos_query.all(), video_search_rank, query)
+        comments = video_comments(self.db, self.user_id)
+        matches, loose = _ranked(
+            videos_query.all(),
+            lambda video, words: video_search_rank(video, words, comments.get(video.id)),
+            query,
+        )
         if not matches:
             self._summary = "Aucune vidéo trouvée."
             return "Aucune vidéo ne correspond."
@@ -289,7 +306,9 @@ class LibraryChatToolbox:
         since = now - timedelta(days=days)
         jobs = [
             job
-            for job in dashboard_media_activity_logs(self.db, limit=HISTORY_SCAN_LIMIT)
+            for job in dashboard_media_activity_logs(
+                self.db, self.user_id, limit=HISTORY_SCAN_LIMIT
+            )
             if local_datetime(job.created_at, now.tzinfo) >= since
         ]
         video_ids = {job.video_id for job in jobs if job.video_id}
@@ -378,7 +397,9 @@ class LibraryChatToolbox:
             self._summary = "Ajout impossible : chaîne inconnue."
             return "Identifiant inconnu : appelle d'abord chercher_sur_youtube et reprends un de ses identifiants."
         try:
-            channel = add_resolved_channel(self.db, candidate["url"], candidate["name"], youtube_id)
+            channel = add_resolved_channel(
+                self.db, self.user_id, candidate["url"], candidate["name"], youtube_id
+            )
         except ChannelAlreadyInLibraryError as exc:
             existing = exc.existing
             self._summary = f"{existing.name} est déjà dans la bibliothèque."
