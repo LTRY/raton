@@ -7,6 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from back.models.channel import Channel
+from back.services.channels.manage import ADDED_CHANNEL_RATING
+from back.services.common.user_state import channel_state
 
 CHANNEL_ID_HEADER = "ID des chaînes"
 CHANNEL_URL_HEADER = "URL des chaînes"
@@ -96,8 +98,9 @@ def preview_subscriptions(db: Session, rows: list[dict[str, str]]) -> list[dict]
     return preview_rows
 
 
-def add_subscriptions(db: Session, tokens: list[str]) -> int:
-    """Add the channels of the confirmed preview rows not yet in the library; returns how many."""
+def add_subscriptions(db: Session, user_id: int, tokens: list[str]) -> int:
+    """Add the channels of the confirmed preview rows not yet in the library, rated
+    `ADDED_CHANNEL_RATING` by the importing user; returns how many."""
     ids, urls = _known_channels(db)
     added = 0
     for token in tokens:
@@ -105,7 +108,10 @@ def add_subscriptions(db: Session, tokens: list[str]) -> int:
         if row is None or row["channel_id"] in ids or row["url"] in urls:
             continue
         ids.add(row["channel_id"])
-        db.add(Channel(url=row["url"], name=row["name"], yt_channel_id=row["channel_id"], rating=1))
+        channel = Channel(url=row["url"], name=row["name"], yt_channel_id=row["channel_id"])
+        db.add(channel)
+        db.flush()
+        channel_state(db, user_id, channel.id).rating = ADDED_CHANNEL_RATING
         added += 1
     db.commit()
     return added

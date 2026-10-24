@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Integer, String, Text, func
+from sqlalchemy import DateTime, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from back.db.session import Base
@@ -9,21 +9,11 @@ from back.db.session import Base
 
 class Channel(Base):
     __tablename__ = "channels"
-    __table_args__ = (
-        CheckConstraint("rating >= 0 AND rating <= 5", name="ck_channels_rating_range"),
-    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     url: Mapped[str] = mapped_column(String(2048), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     yt_channel_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    auto_metadata_enabled: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
-    )
-    auto_shorts_enabled: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, index=True
-    )
-    rating: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     category_labels: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON list of the creator-declared tags; use `keyword_list` to read it.
@@ -49,6 +39,8 @@ class Channel(Base):
 
     videos = relationship("Video", back_populates="channel", cascade="all, delete-orphan")
     jobs = relationship("DownloadJob", back_populates="channel")
+    # Each user's stars and cloches (back/models/user.py).
+    user_states = relationship("UserChannel", cascade="all, delete-orphan")
 
     @property
     def keyword_list(self) -> list[str]:

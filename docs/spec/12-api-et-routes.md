@@ -167,6 +167,21 @@ Videos :
   `message`. Jamais de redirection. Sans authentification : reseau local /
   WireGuard uniquement.
 
+Utilisateurs (`front/routes/users.py`) — le front seul pose le cookie
+`raton_user`, qui dit pour qui agit ce navigateur (voir « Utilisateur d'une
+requete » plus bas) :
+
+- `POST /users/switch` `user_id` : agir comme cet utilisateur (pose le
+  cookie), puis redirige vers `/` avec « Bonjour <nom> ! » ; un utilisateur
+  inconnu redirige vers `/` avec un message d'erreur.
+- `POST /users` `name` : ajoute un utilisateur (`POST /api/users`) et agit
+  aussitot comme lui ; un nom vide, trop long ou deja pris redirige vers `/`
+  avec le message du back.
+- `POST /users/{id}/rename` `name`, `POST /users/{id}/delete` : formulaires de
+  la section Utilisateurs de `/settings`, redirigent vers `/settings` avec un
+  message. Supprimer l'utilisateur courant efface le cookie (retour a
+  l'utilisateur par defaut).
+
 Parametres et divers :
 
 - `GET /settings` : page parametres.
@@ -199,6 +214,32 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
 « 1,2 Go ») est l'affaire de chaque client.
 `tests/test_api_contract.py` verifie ces regles.
 
+Utilisateur d'une requete : chaque requete agit pour un utilisateur
+(`back/api/users.py:current_user_id`), celui que nomme l'en-tete
+`X-Raton-User` (son `id` ; le front l'envoie pour ses propres appels) ou, a
+defaut, le cookie `raton_user` (les appels du navigateur relayes par le
+front). Sans l'un ni l'autre, ou pour un utilisateur supprime : l'utilisateur
+par defaut, le plus ancien (le serveur MCP agit ainsi). Ce qui est propre a un
+utilisateur (voir [05 Modele de donnees](05-modele-de-donnees.md),
+« Utilisateurs ») est lu et ecrit pour lui : `rating`, `list_state`,
+`comment`, `is_new` et `watched_at` d'une fiche, `rating` et cloches d'une
+chaine, playlists, discussions, historique, positions de reprise, temps
+d'ecran, vues enregistrees, phrases de Raton. Le reste (fiches, fichiers,
+transcripts, notes, categories, reglages de la bibliotheque) est commun. Une
+playlist ou une discussion d'un autre utilisateur repond `404`, comme si elle
+n'existait pas.
+
+- `GET /api/users` : `{users: [{id, name}], current_user_id}`, les
+  utilisateurs du plus ancien au plus recent et celui de la requete.
+- `POST /api/users` `{name}` : `201` avec `{id, name}` ; `400` pour un nom
+  vide, de plus de 40 caracteres ou deja pris (sans tenir compte de la
+  casse). Un nouvel utilisateur n'a rien a lui : ni Vu, ni etoiles, ni cloche,
+  ni playlist.
+- `PUT /api/users/{id}` `{name}` : renomme, memes refus ; `404` si inconnu.
+- `DELETE /api/users/{id}` : `204` ; supprime ce qui lui est propre (ses
+  etats, reglages, playlists, discussions), jamais une fiche ; `409
+  Impossible de supprimer le dernier utilisateur.`
+
 - `GET /api/channels?sort=…&rated=true|false&q=…&page=N` : une page de 50
   chaines, memes tris (`activity` par defaut, `rating`, `alpha`, `added` ; un
   tri inconnu donne `activity`), meme recherche et meme filtre Notees que
@@ -208,7 +249,8 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   `channel_count` : chaines gardees par le filtre Notees, sans la recherche) ; chaque chaine `{id, url, name, yt_channel_id, rating,
   categories, auto_metadata_enabled, auto_shorts_enabled, created_at,
   avatar_url, banner_url, metadata_fetched_at, video_count, last_played_at}`
-  (`last_played_at` : derniere lecture d'une de ses fiches, `null` sinon). Le nombre de requetes ne depend pas du nombre de
+  (`rating` et cloches : ceux de l'utilisateur ; `last_played_at` : sa
+  derniere lecture d'une des fiches de la chaine, `null` sinon). Le nombre de requetes ne depend pas du nombre de
   chaines affichees.
 - `GET /api/channels/{id}` : la chaine plus son profil : `description`,
   `keywords` (liste), `avatar_url` et `banner_url` (`/api/channels/{id}/avatar`,
@@ -221,7 +263,8 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   subscriber_count, description, thumbnail_url, existing}` (`existing` :
   `{id, name}` de la chaine si elle est deja dans la bibliotheque) ; `502
   Recherche YouTube impossible : …` si YouTube echoue.
-- `POST /api/channels` `{url, rating, categories}` (`rating` facultatif, `1` ;
+- `POST /api/channels` `{url, rating, categories}` (`rating` facultatif, `1`,
+  la note de l'utilisateur qui ajoute ;
   `categories` facultatives) : `url` doit etre une URL ou un `@handle` (`422`
   sinon : un nom se cherche avec `GET /api/youtube/channels`) ; lance aussi
   le rattrapage du profil en arriere-plan ; `409` si la chaine est deja dans
@@ -239,7 +282,10 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   brutes (meme service `detail_view` ; la page `GET /videos/{id}` du front
   la lit) : les champs de
   `GET /api/videos`, plus `is_new`, `list_state` (choix enregistre, pas
-  l'etat deduit de la lecture), `comment`, `duration_seconds`, `watched_at`,
+  l'etat deduit de la lecture), `comment`, `duration_seconds`, `watched_at`
+  (ces cinq-la et `rating` sont ceux de l'utilisateur), `files_purged` (la
+  purge a retire les fichiers apres le premier Vu, de quiconque : la page le
+  dit),
   `media_urls` (`video`, `audio`, `thumbnail`, `subtitles` : la route qui sert
   le fichier, `null` si la fiche n'a pas ce fichier), `metadata` (champs de
   `metadata.json` : `description`, `tags`, `chapters` `{title,
@@ -249,7 +295,8 @@ octets, les couleurs en `#rrggbb` : la mise en forme (francais, `m:ss`,
   `chat_messages`), `sponsor_segments` (segments actifs), `skip_segments` et
   `sponsor_skip_enabled` (comme `GET /api/videos/{id}/sponsor-segments`),
   `resume_positions` (`{video|audio: {position_seconds, at_ms}}`),
-  `playlists` (`{playlist_id, title, item_id}`), `channel` (`{id, name}`),
+  `playlists` (`{playlist_id, title, item_id}`, celles de l'utilisateur qui
+  contiennent la fiche), `channel` (`{id, name}`),
   `badges` (ce que contient la fiche, dans l'ordre des badges : `new`,
   `audio`, `video`, `metadata`, `transcript`, `notes`, `imported`),
   `has_transcript` (un transcript est enregistre) et `transcript_lines` (le

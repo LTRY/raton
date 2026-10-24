@@ -21,11 +21,23 @@ Regles :
 - Un terme qui change de sens dans le code ou dans l'interface se corrige ici
   dans le meme changement.
 
+## Utilisateurs
+
+### Utilisateur
+
+Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Ecartee, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, visites de Raton. Pas de mot de passe : Raton reste sur un LAN de confiance.
+
+- **Code** : `users`, `user_videos`, `user_channels`, `user_settings` ; cookie `raton_user`, en-tete `X-Raton-User`
+- **A ne pas confondre avec** : Un compte (aucune authentification) ; l'utilisateur par defaut, le plus ancien, pour qui agit un client qui n'en nomme aucun (le serveur MCP).
+
+Specs : [05 Modele de donnees](05-modele-de-donnees.md),
+[11 Interface HTML](11-interface-html.md), [12 API et routes](12-api-et-routes.md).
+
 ## Contenu
 
 ### Fiche
 
-Une video YouTube dans Raton : ses metadonnees, et/ou son fichier video, et/ou son fichier audio. Une seule par `yt_video_id`.
+Une video YouTube dans Raton : ses metadonnees, et/ou son fichier video, et/ou son fichier audio. Une seule par `yt_video_id`, partagee par tous les utilisateurs.
 
 - **Code** : ligne de `videos`
 - **A ne pas confondre avec** : Les fichiers seuls : une fiche peut n'avoir que des metadonnees.
@@ -67,16 +79,16 @@ Etiquette libre posee sur une chaine, une playlist ou une fiche. Une fiche sans 
 
 ### Note (etoiles)
 
-Note de 0 a 5 donnee par la personne a une chaine ou une fiche.
+Note de 0 a 5 donnee par un utilisateur a une chaine ou une fiche ; chacun a la sienne.
 
-- **Code** : `rating`
+- **Code** : `user_videos.rating`, `user_channels.rating`
 - **A ne pas confondre avec** : Les *notes structurees* ci-dessous.
 
 ### Commentaire
 
-Texte libre de la personne sur une fiche.
+Texte libre d'un utilisateur sur une fiche ; chacun a le sien.
 
-- **Code** : `videos.comment`
+- **Code** : `user_videos.comment`
 - **A ne pas confondre avec** : La note en etoiles.
 
 ### Notes structurees
@@ -95,9 +107,9 @@ Resume court (3 lignes) genere avec les notes. Il n'existe pas de resume complet
 
 ### Playlist
 
-Liste ordonnee **locale** de fiches. Un import est un instantane, sans re-synchronisation.
+Liste ordonnee **locale** de fiches, propre a l'utilisateur qui l'a creee. Un import est un instantane, sans re-synchronisation.
 
-- **Code** : `playlists`
+- **Code** : `playlists` (`user_id`)
 - **A ne pas confondre avec** : Une playlist YouTube vivante. Supprimer une playlist ne supprime jamais les fiches.
 
 ### Ecoute libre
@@ -115,23 +127,23 @@ Specs : [05 Modele de donnees](05-modele-de-donnees.md),
 
 ### Cloche
 
-Interrupteur de suivi quotidien d'une chaine. Il y en a **deux, independantes**, desactivees par defaut. Une cloche active = le scan de 3h importe la section et le dashboard la liste.
+Interrupteur de suivi quotidien d'une chaine, propre a chaque utilisateur. Il y en a **deux, independantes**, desactivees par defaut. Une cloche active chez au moins un utilisateur = le scan de 3h importe la section ; les Nouveautes de cet utilisateur la listent.
 
-- **Code** : `auto_metadata_enabled` (videos), `auto_shorts_enabled` (shorts)
+- **Code** : `user_channels.auto_metadata_enabled` (videos), `user_channels.auto_shorts_enabled` (shorts)
 - **A ne pas confondre avec** : Un abonnement YouTube. Il n'y a pas d'autre interrupteur de suivi qu'une cloche.
 
 ### Suivie
 
-Une chaine est « suivie » si au moins une de ses cloches est active. Dans le code, « abonne » se dit `auto_metadata_enabled`.
+Une chaine est « suivie » par un utilisateur si au moins une de ses cloches a lui est active. Dans le code, « abonne » se dit `auto_metadata_enabled`.
 
 - **Code** : cloche active
 - **A ne pas confondre avec** : Toute chaine qui possede au moins une fiche : les imports de playlist en creent sans que la personne la suive.
 
 ### Nouveau / Nouveautes
 
-Une fiche decouverte par le scan quotidien **apres** l'activation de la cloche. Le label disparait a la premiere visite de `/videos/{id}`. La section « Nouveautes » du dashboard en est la pile, une par chaine suivie.
+Une fiche decouverte par le scan quotidien **apres** l'activation de la cloche ; elle est nouvelle pour chaque utilisateur dont la cloche de sa section est active, et pour eux seuls. Le label disparait a la premiere visite de `/videos/{id}` par cet utilisateur. La section « Nouveautes » du dashboard en est la pile, une par chaine qu'il suit.
 
-- **Code** : `is_new`, `/dashboard/nouveautes`
+- **Code** : `user_videos.is_new`, `/dashboard/nouveautes`
 - **A ne pas confondre avec** : Une fiche recente ou recemment importee : la synchronisation immediate a l'activation de la cloche et l'import manuel ne posent **jamais** `is_new`.
 
 ### Scan
@@ -186,21 +198,21 @@ Specs : [02 Fonctionnalites](02-fonctionnalites.md),
 
 ### Vu
 
-Une fiche est vue quand la lecture a atteint 90 % de la duree (`watched_at`, remis a `NULL` si un nouveau fichier video ou audio est telecharge) ou quand la personne la marque vue depuis une liste. `unwatched` force non-vu, `null` suit la detection automatique. Un seul mot, deux origines.
+Une fiche est vue par un utilisateur quand sa lecture a atteint 90 % de la duree (`user_videos.watched_at`) ou quand il la marque vue depuis une liste. `unwatched` force non-vu, `null` suit la detection automatique. Un seul mot, deux origines ; chaque utilisateur a son propre Vu. `videos.watched_at` est le premier Vu de quiconque (remis a `NULL` si un nouveau fichier video ou audio est telecharge) : il ne sert qu'a la purge.
 
-- **Code** : `watched_at` (automatique), `list_state = "watched"` (a la main)
+- **Code** : `user_videos.watched_at` (automatique), `user_videos.list_state = "watched"` (a la main), `videos.watched_at` (purge)
 - **A ne pas confondre avec** : « Lu », qui n'est pas employe. Un evenement de lecture du journal (`played`) s'affiche « Lecture ».
 
 ### Ecartee
 
-Fiche que la personne ne veut plus voir dans ses listes : grisee en plus, et masquable par le filtre « Masquer les ecartees ».
+Fiche qu'un utilisateur ne veut plus voir dans ses listes : grisee en plus, et masquable par le filtre « Masquer les ecartees ». Les autres utilisateurs la voient toujours.
 
-- **Code** : `list_state = "hidden"`
+- **Code** : `user_videos.list_state = "hidden"`
 - **A ne pas confondre avec** : Une fiche supprimee ou purgee. Le mot « cachee » n'est pas employe.
 
 ### Purge
 
-Suppression quotidienne (4h) des **fichiers media** d'une fiche vue depuis 7 jours, sauf note 4+. La fiche reste.
+Suppression quotidienne (4h) des **fichiers media** d'une fiche vue depuis 7 jours (premier Vu de quiconque), sauf si un utilisateur l'a notee 4+. Les fichiers sont partages : la purge vaut pour tous. La fiche reste.
 
 - **Code** : `purge_watched_media`, statut `purged`
 - **A ne pas confondre avec** : Une suppression de fiche, ou la suppression d'un seul fichier (video ou audio) a la demande.
@@ -247,9 +259,9 @@ Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page det
 
 ### Discussion
 
-Un fil de questions-reponses du chat, que le modele relit a chaque question. Le chat d'une fiche en a une seule (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰), rangees sous « Récents ».
+Un fil de questions-reponses du chat, que le modele relit a chaque question, propre a l'utilisateur qui l'a ouvert. Le chat d'une fiche en a une seule par utilisateur (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰), rangees sous « Récents ».
 
-- **Code** : `transcript.chat.json` (fiche), `library_chat_conversations` / `conversation_id` (bibliotheque)
+- **Code** : `transcript.chat.json` / `transcript.chat.<user_id>.json` (fiche), `library_chat_conversations` / `conversation_id` (bibliotheque)
 - **A ne pas confondre avec** : Le chat lui-meme (l'outil), ni l'onglet `Commentaire` d'une fiche.
 
 ### Chunk
@@ -301,9 +313,9 @@ Navigation des pages Bibliotheque (tiroir ouvert par le bouton ☰ a gauche du t
 
 ### Vue enregistree
 
-Combinaison de filtres et de tri de `/videos` sauvegardee par la personne.
+Combinaison de filtres et de tri de `/videos` sauvegardee par un utilisateur, pour lui seul.
 
-- **Code** : reglage `video_library_views` (`back/services/common/library_views.py`)
+- **Code** : reglage utilisateur `video_library_views` (`back/services/common/library_views.py`)
 - **A ne pas confondre avec** : Une playlist.
 
 ### Carte

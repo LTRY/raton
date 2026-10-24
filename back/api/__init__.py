@@ -18,6 +18,7 @@ from back.api import (
     scan,
     settings,
     stats,
+    users,
     videos,
 )
 
@@ -35,6 +36,7 @@ MODULES = (
     raton,
     media,
     dashboard,
+    users,
 )
 
 router = APIRouter()

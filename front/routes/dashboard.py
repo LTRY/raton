@@ -6,7 +6,7 @@ from front.cards import card_views, history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
 from front.library import library_view_links
 from front.library_chat import library_chat_widget_config
-from front.pages import current_request_path, page_href_builder
+from front.pages import current_request_path, message_context, page_href_builder
 from front.records import record
 from front.templating import templates
 
@@ -31,8 +31,10 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
         {
             "raton": {"scenario": record(api.post("/raton/visit"))},
             "chat_widget_config": library_chat_widget_config(
-                chat or api.get("/chat"), settings["llm_provider_label"]
+                chat or api.get("/chat"), settings["llm_provider_label"], api.get("/users")
             ),
+            # The toast of a user switch (front/routes/users.py).
+            **message_context(request),
         },
     )
 

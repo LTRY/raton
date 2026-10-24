@@ -20,7 +20,7 @@ from tests.site import site_client
 
 ROUTES = [route for module in api.MODULES for route in module.router.routes]
 # Helpers of back/api/lookups.py: each answers 404 when the record is missing.
-LOOKUPS_404 = {"fiche", "library_channel", "library_playlist", "playlist_item"}
+LOOKUPS_404 = {"fiche", "library_channel", "library_playlist", "playlist_item", "library_user"}
 # Helpers of back/api/media.py that raise for the route calling them.
 HELPER_CODES = {
     "channel_image_response": {404},

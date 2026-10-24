@@ -17,6 +17,7 @@ from back.services.common.durations import format_duration
 from back.services.common.library_views import VIDEO_ASSET_KINDS
 from back.services.common.search import normalized_search_query
 from back.services.common.settings import get_video_library_views
+from back.services.common.user_state import channel_states, video_states
 from back.services.videos.filters import video_filters_condition, video_section_condition
 from back.services.videos.library_query import (
     library_page,
@@ -115,14 +116,18 @@ class LibraryListing:
     publication_dates: list[datetime] | None
 
 
-def default_channel_section(channel: Channel | None) -> str:
-    """Section a channel page opens on when the URL names none."""
-    if channel and channel.auto_shorts_enabled and not channel.auto_metadata_enabled:
+def default_channel_section(db: Session, user_id: int, channel: Channel | None) -> str:
+    """Section a channel page opens on when the URL names none: shorts when the user only
+    follows its shorts."""
+    if channel is None:
+        return "videos"
+    state = channel_states(db, user_id, [channel.id])[channel.id]
+    if state.auto_shorts_enabled and not state.auto_metadata_enabled:
         return "shorts"
     return "videos"
 
 
-def library_listing(db: Session, filters: LibraryFilters) -> LibraryListing:
+def library_listing(db: Session, user_id: int, filters: LibraryFilters) -> LibraryListing:
     """The displayed page of fiches and the counts around it, all computed in SQL.
 
     The library holds thousands of fiches: only the displayed page is loaded
@@ -130,7 +135,11 @@ def library_listing(db: Session, filters: LibraryFilters) -> LibraryListing:
     """
     channel_id = filters.channel_id
     channel = db.get(Channel, channel_id) if channel_id else None
-    section = (filters.section or default_channel_section(channel)) if channel_id else "videos"
+    section = (
+        (filters.section or default_channel_section(db, user_id, channel))
+        if channel_id
+        else "videos"
+    )
     in_channel = Video.channel_id == channel_id if channel_id else true()
     in_section = video_section_condition(section) if channel_id else true()
     matches_filters = video_filters_condition(
@@ -146,6 +155,7 @@ def library_listing(db: Session, filters: LibraryFilters) -> LibraryListing:
     )
     videos, page, total_pages, count = library_page(
         db,
+        user_id,
         and_(in_channel, in_section, matches_filters),
         filters.sort,
         filters.search_query,
@@ -184,12 +194,16 @@ def downloaded_video_card(video: Video) -> dict:
     }
 
 
-def library_cards(db: Session, videos: list[Video]) -> list[dict]:
-    """One card per fiche, with its latest playback (one query for the whole page)."""
-    playback_by_video_id = latest_playback_by_video(db, [video.id for video in videos])
+def library_cards(db: Session, user_id: int, videos: list[Video]) -> list[dict]:
+    """One card per fiche, with the user's state and latest playback (one query each for the
+    whole page)."""
+    video_ids = [video.id for video in videos]
+    playback_by_video_id = latest_playback_by_video(db, user_id, video_ids)
+    states = video_states(db, user_id, video_ids)
     cards = [downloaded_video_card(video) for video in videos]
     for card in cards:
         card["playback"] = playback_by_video_id.get(card["video"].id)
+        card["state"] = states[card["video"].id]
     return cards
 
 
@@ -205,12 +219,14 @@ def saved_view_is_active(view: dict, filters: LibraryFilters) -> bool:
     )
 
 
-def library_saved_views(db: Session, filters: LibraryFilters | None = None) -> list[dict]:
-    """The vues enregistrees, each flagged `active` when it matches the current filters (never
-    without filters: a page other than the library list shows none of them)."""
+def library_saved_views(
+    db: Session, user_id: int, filters: LibraryFilters | None = None
+) -> list[dict]:
+    """The user's vues enregistrees, each flagged `active` when it matches the current filters
+    (never without filters: a page other than the library list shows none of them)."""
     return [
         {**view, "active": filters is not None and saved_view_is_active(view, filters)}
-        for view in get_video_library_views(db)
+        for view in get_video_library_views(db, user_id)
     ]
 
 

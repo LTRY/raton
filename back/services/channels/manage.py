@@ -1,5 +1,5 @@
-"""Adding and deleting a library channel, its categories and cloches, shared by the HTML pages
-and `/api`."""
+"""Adding and deleting a library channel, its categories (shared) and a user's cloches, shared by
+the HTML pages and `/api`."""
 
 import logging
 
@@ -12,9 +12,13 @@ from back.services.channels.profile import remove_channel_profile_files
 from back.services.common.categories import serialized_category_labels
 from back.services.common.ratings import check_rating
 from back.services.common.settings import add_video_category_labels, get_media_root
+from back.services.common.user_state import channel_state, channel_states
 from back.services.youtube.channel_info import extract_channel_info
 
 logger = logging.getLogger(__name__)
+# The stars of a channel for the user who adds it, unless they choose others: a channel nobody
+# rated has 0 and stays out of the Notées filter.
+ADDED_CHANNEL_RATING = 1
 
 
 class ChannelAlreadyInLibraryError(Exception):
@@ -24,9 +28,13 @@ class ChannelAlreadyInLibraryError(Exception):
 
 
 def create_channel(
-    db: Session, url: str, rating: int = 1, category_labels: list[str] | None = None
+    db: Session,
+    user_id: int,
+    url: str,
+    rating: int = ADDED_CHANNEL_RATING,
+    category_labels: list[str] | None = None,
 ) -> Channel:
-    """Resolve `url` on YouTube and add the channel.
+    """Resolve `url` on YouTube and add the channel, with the user's `rating`.
 
     Raises `ChannelNotFoundError` (from yt-dlp) or `ChannelAlreadyInLibraryError`; the same
     channel is matched by its YouTube id, whatever URL it was added with.
@@ -34,19 +42,27 @@ def create_channel(
     check_rating(rating)
     info = extract_channel_info(url)
     return add_resolved_channel(
-        db, info.get("url", url), info["name"], info["yt_channel_id"], rating, category_labels
+        db,
+        user_id,
+        info.get("url", url),
+        info["name"],
+        info["yt_channel_id"],
+        rating,
+        category_labels,
     )
 
 
 def add_resolved_channel(
     db: Session,
+    user_id: int,
     url: str,
     name: str,
     yt_channel_id: str,
-    rating: int = 1,
+    rating: int = ADDED_CHANNEL_RATING,
     category_labels: list[str] | None = None,
 ) -> Channel:
-    """Add a channel YouTube already described; raises `ChannelAlreadyInLibraryError`."""
+    """Add a channel YouTube already described, with the user's `rating`; raises
+    `ChannelAlreadyInLibraryError`."""
     existing = find_channel(db, url, yt_channel_id)
     if existing:
         raise ChannelAlreadyInLibraryError(existing)
@@ -54,12 +70,13 @@ def add_resolved_channel(
         url=url,
         name=name,
         yt_channel_id=yt_channel_id,
-        rating=rating,
         category_labels=serialized_category_labels(category_labels or []),
     )
     db.add(channel)
     if category_labels:
         add_video_category_labels(db, category_labels)
+    db.flush()
+    channel_state(db, user_id, channel.id).rating = rating
     db.commit()
     db.refresh(channel)
     return channel
@@ -92,20 +109,34 @@ def bell_section_label(section: str) -> str:
     return "shorts" if section == "shorts" else "vidéos"
 
 
-def set_channel_bell(db: Session, channel: Channel, section: str, enabled: bool) -> bool:
-    """Set the cloche of `section` ("videos" or "shorts"); returns whether it was just turned on.
+def _bell(section: str) -> str:
+    return "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
+
+
+def set_channel_bell(
+    db: Session, user_id: int, channel: Channel, section: str, enabled: bool
+) -> bool:
+    """Set the user's cloche of `section` ("videos" or "shorts"); returns whether it was just
+    turned on.
 
     A cloche turned on syncs the existing catalogue: the caller queues that import.
     """
-    bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
-    switched_on = enabled and not getattr(channel, bell)
-    setattr(channel, bell, enabled)
+    state = channel_state(db, user_id, channel.id)
+    switched_on = enabled and not getattr(state, _bell(section))
+    setattr(state, _bell(section), enabled)
     db.commit()
-    log_event(logger, "channel.bell", channel_id=channel.id, section=section, enabled=enabled)
+    log_event(
+        logger,
+        "channel.bell",
+        channel_id=channel.id,
+        user_id=user_id,
+        section=section,
+        enabled=enabled,
+    )
     return switched_on
 
 
-def toggle_channel_bell(db: Session, channel: Channel, section: str) -> bool:
-    """Switch the cloche of `section`; returns whether it is now on."""
-    bell = "auto_shorts_enabled" if section == "shorts" else "auto_metadata_enabled"
-    return set_channel_bell(db, channel, section, not getattr(channel, bell))
+def toggle_channel_bell(db: Session, user_id: int, channel: Channel, section: str) -> bool:
+    """Switch the user's cloche of `section`; returns whether it is now on."""
+    state = channel_states(db, user_id, [channel.id])[channel.id]
+    return set_channel_bell(db, user_id, channel, section, not getattr(state, _bell(section)))

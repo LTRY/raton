@@ -25,8 +25,12 @@ def log_job(
     message: str,
     channel_id: int | None = None,
     video_id: int | None = None,
+    user_id: int | None = None,
 ) -> DownloadJob:
-    job = DownloadJob(channel_id=channel_id, video_id=video_id, status=status, message=message)
+    """`user_id` names whose activity a `played` or `prompt` line is."""
+    job = DownloadJob(
+        channel_id=channel_id, video_id=video_id, user_id=user_id, status=status, message=message
+    )
     db.add(job)
     db.commit()
     # Mirror every `/logs` row into the journal; a playback row carries a JSON payload, not text.
@@ -38,6 +42,7 @@ def log_job(
         message="" if status == "played" else message,
         channel_id=channel_id,
         video_id=video_id,
+        user_id=user_id,
     )
     return job
 

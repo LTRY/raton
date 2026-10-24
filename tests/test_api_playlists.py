@@ -18,6 +18,7 @@ from back.models.video import Video
 from back.services.jobs import playlists as playlists_jobs
 from back.services.playlists import imports as playlists_imports
 from tests.site import site_client
+from tests.users import add_user, set_video_state, user_id
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -82,7 +83,10 @@ def add_videos(db, count, prefix="v"):
 
 def add_playlist(db, videos, **fields):
     playlist = Playlist(
-        title=fields.pop("title", "Écoute"), source=fields.pop("source", "manual"), **fields
+        user_id=user_id(db),
+        title=fields.pop("title", "Écoute"),
+        source=fields.pop("source", "manual"),
+        **fields,
     )
     db.add(playlist)
     db.flush()
@@ -95,8 +99,8 @@ def add_playlist(db, videos, **fields):
 def test_create_then_read_a_playlist(client, db):
     videos = add_videos(db, 2)
     videos[0].audio_path = "/media/v0/a.m4a"
-    videos[1].watched_at = NOW
     db.commit()
+    set_video_state(db, videos[1], watched_at=NOW)
 
     created = client.post("/api/playlists", json={"title": "  Écoute  "})
     playlist_id = created.json()["id"]
@@ -122,6 +126,24 @@ def test_create_then_read_a_playlist(client, db):
         "Chan",
     )
     assert (first["has_audio"], first["has_video"], first["seen"]) == (True, False, False)
+
+
+def test_a_playlist_is_its_user_s_own(client, db):
+    mine = add_playlist(db, add_videos(db, 1), title="La mienne")
+    other = add_user(db, "Invité")
+    as_other = {"X-Raton-User": str(other.id)}
+
+    created = client.post("/api/playlists", json={"title": "La leur"}, headers=as_other).json()
+    listed = [playlist["title"] for playlist in client.get("/api/playlists").json()]
+    listed_by_other = [
+        playlist["title"] for playlist in client.get("/api/playlists", headers=as_other).json()
+    ]
+
+    assert listed == ["La mienne"]
+    assert listed_by_other == ["La leur"]
+    # Another user's playlist is as unknown as a deleted one, to read or to edit.
+    assert client.get(f"/api/playlists/{created['id']}").status_code == 404
+    assert client.delete(f"/api/playlists/{mine.id}", headers=as_other).status_code == 404
 
 
 def test_create_refuses_a_blank_title(client, db):

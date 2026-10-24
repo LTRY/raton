@@ -18,7 +18,7 @@ from back.models.job import DownloadJob
 from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.library_chat_message import LibraryChatMessage
 from back.models.video import Video
-from back.services.common.settings import get_setting, set_setting
+from back.services.common.settings import get_user_setting, set_user_setting
 from back.services.raton.picker import (
     active_scenarios,
     all_variations,
@@ -48,6 +48,7 @@ from back.services.raton.visits import (
     screen_time_today,
 )
 from tests.site import site_client
+from tests.users import FIRST_USER_ID, mine, my_channel, user_id
 
 NOON = datetime(2026, 10, 10, 15, 0).astimezone()
 
@@ -260,33 +261,35 @@ def test_morning_needs_a_first_visit_of_the_day():
 
 def test_visit_session_survives_a_refresh(db):
     start = datetime(2026, 10, 10, 9, 0).astimezone()
-    assert record_visit(db, start - timedelta(days=20)) == (None, [])
-    previous, _ = record_visit(db, start)
+    assert record_visit(db, user_id(db), start - timedelta(days=20)) == (None, [])
+    previous, _ = record_visit(db, user_id(db), start)
     assert previous is not None and (start - previous).days == 20
     # A refresh minutes later still reports the same previous visit.
-    assert record_visit(db, start + timedelta(minutes=2))[0] == previous
+    assert record_visit(db, user_id(db), start + timedelta(minutes=2))[0] == previous
 
 
 def test_shown_lines_persist_within_a_visit_and_reset_on_a_new_one(db):
     start = datetime(2026, 10, 10, 9, 0).astimezone()
-    record_visit(db, start)
-    set_setting(db, RATON_SHOWN_KEY, json.dumps(["defaut:0"]))
+    record_visit(db, user_id(db), start)
+    set_user_setting(db, user_id(db), RATON_SHOWN_KEY, json.dumps(["defaut:0"]))
     db.commit()
     # Less than SESSION_GAP since the last load: still the same visit.
-    assert record_visit(db, start + timedelta(minutes=25))[1] == ["defaut:0"]
+    assert record_visit(db, user_id(db), start + timedelta(minutes=25))[1] == ["defaut:0"]
     # A long pause opens a new visit, which starts with nothing shown.
-    assert record_visit(db, start + timedelta(hours=3))[1] == []
-    assert get_setting(db, RATON_SHOWN_KEY, "") == "[]"
+    assert record_visit(db, user_id(db), start + timedelta(hours=3))[1] == []
+    assert get_user_setting(db, user_id(db), RATON_SHOWN_KEY, "") == "[]"
 
 
 def test_home_context_survives_reloads_with_a_single_line_pool(db):
     default_line = line_text(DEFAULT_SCENARIO, 0)
-    lines = [home_context(db, NOON)["scenario"]["line"] for _ in range(3)]
+    lines = [home_context(db, user_id(db), NOON)["scenario"]["line"] for _ in range(3)]
     assert lines == [default_line] * 3
 
 
 def test_home_page_is_only_raton_and_the_chat(db):
-    channel = Channel(name="A", url="https://youtube.com/@a", auto_metadata_enabled=True)
+    channel = Channel(
+        name="A", url="https://youtube.com/@a", user_states=my_channel(auto_metadata_enabled=True)
+    )
     db.add(channel)
     db.flush()
     db.add(
@@ -296,8 +299,8 @@ def test_home_page_is_only_raton_and_the_chat(db):
             url="https://youtube.com/watch?v=r1",
             folder_path="/m/r1",
             video_path="/m/r1/v.mp4",
-            is_new=True,
             channel_id=channel.id,
+            user_states=mine(is_new=True),
         )
     )
     db.commit()
@@ -314,8 +317,12 @@ def chat_config(html):
 
 
 def test_home_opens_on_raton_and_a_discussion_from_its_address(db):
-    older = LibraryChatConversation(title="Ancienne", updated_at=datetime(2026, 10, 1, tzinfo=UTC))
-    latest = LibraryChatConversation(title="Récente", updated_at=datetime(2026, 10, 20, tzinfo=UTC))
+    older = LibraryChatConversation(
+        user_id=user_id(db), title="Ancienne", updated_at=datetime(2026, 10, 1, tzinfo=UTC)
+    )
+    latest = LibraryChatConversation(
+        user_id=user_id(db), title="Récente", updated_at=datetime(2026, 10, 20, tzinfo=UTC)
+    )
     db.add_all([older, latest])
     db.flush()
     for conversation in (older, latest):
@@ -342,7 +349,9 @@ def test_home_opens_on_raton_and_a_discussion_from_its_address(db):
 
 
 def test_home_announces_new_videos_with_its_button(db):
-    channel = Channel(name="A", url="https://youtube.com/@a", auto_metadata_enabled=True)
+    channel = Channel(
+        name="A", url="https://youtube.com/@a", user_states=my_channel(auto_metadata_enabled=True)
+    )
     db.add(channel)
     db.flush()
     db.add(
@@ -351,12 +360,12 @@ def test_home_announces_new_videos_with_its_button(db):
             title="N1",
             url="https://youtube.com/watch?v=n1",
             folder_path="/m/n1",
-            is_new=True,
             channel_id=channel.id,
+            user_states=mine(is_new=True),
         )
     )
     db.commit()
-    page = home_context(db, NOON, FirstChoice())
+    page = home_context(db, user_id(db), NOON, FirstChoice())
     assert page["scenario"]["line"] == "Il y a du nouveau, Chef."
     assert page["scenario"]["cta_href"] == "/dashboard/nouveautes"
 
@@ -370,34 +379,38 @@ def played_job(seconds: float, at: datetime, label: str = "vidéo") -> DownloadJ
         "duration_seconds": 7200,
         "watched_seconds": seconds,
     }
-    return DownloadJob(status="played", message=json.dumps(payload), created_at=at)
+    return DownloadJob(
+        status="played", user_id=FIRST_USER_ID, message=json.dumps(payload), created_at=at
+    )
 
 
 def test_screen_time_closes_at_the_daily_limit(db):
-    set_setting(db, "screen_time_video_today_limit_minutes", "60")
+    set_user_setting(db, user_id(db), "screen_time_video_today_limit_minutes", "60")
     db.add(played_job(3600, NOON - timedelta(hours=1)))
     db.commit()
-    ratio, kind, minutes_left, played = screen_time_today(db, NOON)
+    ratio, kind, minutes_left, played = screen_time_today(db, user_id(db), NOON)
     assert (kind, round(ratio, 2), minutes_left, played) == ("video", 1.0, 0.0, 3600.0)
-    page = home_context(db, NOON)
+    page = home_context(db, user_id(db), NOON)
     assert page["scenario"]["id"] == "ecran_ferme"
     assert page["scenario"]["closing"] is True
     assert page["scenario"]["cta_href"] == "/dashboard/historique"
 
 
 def test_minutes_left_uses_the_closest_limit_not_the_busiest_kind(db):
-    set_setting(db, "screen_time_video_today_limit_minutes", "600")
-    set_setting(db, "screen_time_music_today_limit_minutes", "30")
+    set_user_setting(db, user_id(db), "screen_time_video_today_limit_minutes", "600")
+    set_user_setting(db, user_id(db), "screen_time_music_today_limit_minutes", "30")
     db.add(played_job(400 * 60, NOON - timedelta(hours=1)))
     db.add(played_job(15 * 60, NOON - timedelta(hours=2), label="audio"))
     db.commit()
-    ratio, kind, minutes_left, _ = screen_time_today(db, NOON)
+    ratio, kind, minutes_left, _ = screen_time_today(db, user_id(db), NOON)
     assert kind == "video"
     assert round(minutes_left) == 15
 
 
 def test_new_count_ignores_channels_without_a_bell(db):
-    followed = Channel(name="A", url="https://youtube.com/@a", auto_metadata_enabled=True)
+    followed = Channel(
+        name="A", url="https://youtube.com/@a", user_states=my_channel(auto_metadata_enabled=True)
+    )
     other = Channel(name="B", url="https://youtube.com/@b")
     db.add_all([followed, other])
     db.flush()
@@ -408,14 +421,14 @@ def test_new_count_ignores_channels_without_a_bell(db):
                 title=f"V{i}",
                 url=f"https://youtube.com/watch?v=v{i}",
                 folder_path=f"/m/v{i}",
-                is_new=True,
                 channel_id=channel.id,
+                user_states=mine(is_new=True),
             )
         )
     db.commit()
     from back.services.raton.visits import build_context
 
-    assert build_context(db, NOON).new_count == 1
+    assert build_context(db, user_id(db), NOON).new_count == 1
 
 
 def test_previous_visit_day_is_compared_in_the_current_timezone():
@@ -445,4 +458,4 @@ def test_variations_page_shows_everything_without_touching_the_visit(db):
     assert "raton-limit-bar" not in page.text
     # No line is a <h1>: the page's own title is the only one.
     assert page.text.count("<h1") == 1
-    assert get_setting(db, RATON_SHOWN_KEY, "") == ""
+    assert get_user_setting(db, user_id(db), RATON_SHOWN_KEY, "") == ""

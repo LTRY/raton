@@ -193,7 +193,7 @@ chaines) :
 
 Dans tous les cas, chaque video rencontree est importee via la meme fonction
 `import_video_metadata` que l'import de chaine (voir "Import metadata"
-ci-dessus), avec `is_new=False` (une playlist ne doit jamais alimenter la
+ci-dessus), sans `new_for` (une playlist ne doit jamais alimenter la
 section "Nouveautes" du dashboard, reservee au scan planifie de la cloche des
 chaines) — puis rattachee a la playlist via une ligne `playlist_items`
 (`position` = ordre de la playlist ou du CSV, `added_at` = timestamp du CSV

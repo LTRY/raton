@@ -13,6 +13,14 @@ from back.models.playlist import Playlist
 from back.models.video import Video
 from back.models.video_sponsor_segment import VideoSponsorSegment
 from back.services.videos.detail_view import VideoNotFoundError, open_video_detail
+from tests.users import (
+    VIDEO_STATE_FIELDS,
+    add_user,
+    pop_state,
+    set_video_state,
+    stored_video_state,
+    user_id,
+)
 
 
 @pytest.fixture
@@ -32,6 +40,7 @@ def add_video(db, tmp_path, metadata=None, **fields):
     if metadata is not None:
         (folder / "metadata.json").write_text(metadata, encoding="utf-8")
         fields["metadata_path"] = str(folder / "metadata.json")
+    state = pop_state(fields, VIDEO_STATE_FIELDS)
     video = Video(
         yt_video_id="v",
         title="Fiche",
@@ -41,6 +50,8 @@ def add_video(db, tmp_path, metadata=None, **fields):
     )
     db.add(video)
     db.commit()
+    if state:
+        set_video_state(db, video, **state)
     return video
 
 
@@ -63,12 +74,20 @@ def test_open_video_detail_returns_raw_values_and_takes_the_fiche_out_of_nouveau
             source="sponsorblock",
         )
     )
-    db.add_all([Playlist(title="B", source="manual"), Playlist(title="A", source="manual")])
+    db.add_all(
+        [
+            Playlist(user_id=user_id(db), title="B", source="manual"),
+            Playlist(user_id=user_id(db), title="A", source="manual"),
+            # Another user's playlist is not offered.
+            Playlist(user_id=add_user(db, "Invité").id, title="C", source="manual"),
+        ]
+    )
     db.commit()
 
-    detail = open_video_detail(db, video.id)
+    detail = open_video_detail(db, user_id(db), video.id)
 
-    assert detail.video.is_new is False
+    assert detail.state.is_new is False
+    assert stored_video_state(db, video).is_new is False
     assert detail.metadata == {
         "description": "Desc",
         "tags": ["a"],
@@ -90,7 +109,7 @@ def test_open_video_detail_returns_raw_values_and_takes_the_fiche_out_of_nouveau
 def test_open_video_detail_tolerates_an_unreadable_metadata_file(db, tmp_path):
     video = add_video(db, tmp_path, "{not json")
 
-    detail = open_video_detail(db, video.id)
+    detail = open_video_detail(db, user_id(db), video.id)
 
     assert detail.metadata["description"] is None
     assert detail.metadata["chapters"] == []
@@ -98,4 +117,4 @@ def test_open_video_detail_tolerates_an_unreadable_metadata_file(db, tmp_path):
 
 def test_open_video_detail_refuses_an_unknown_fiche(db):
     with pytest.raises(VideoNotFoundError, match="Vidéo introuvable"):
-        open_video_detail(db, 999)
+        open_video_detail(db, user_id(db), 999)

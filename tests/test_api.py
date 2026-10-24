@@ -17,6 +17,7 @@ from back.models.job import DownloadJob
 from back.models.playlist import Playlist, PlaylistItem
 from back.models.video import Video
 from back.models.video_sponsor_segment import VideoSponsorSegment
+from tests.users import add_user, set_video_state, stored_video_state, user_id
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
 
@@ -191,14 +192,17 @@ def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
         metadata_path=str(folder / "metadata.json"),
         transcript_path=str(folder / "transcript.txt"),
         audio_path=str(folder / "a.m4a"),
-        is_new=True,
     )
     db.add(video)
     db.flush()
-    playlist = Playlist(title="Écoute", source="manual")
-    db.add(playlist)
+    set_video_state(db, video, is_new=True)
+    playlist = Playlist(user_id=user_id(db), title="Écoute", source="manual")
+    theirs = Playlist(user_id=add_user(db, "Invité").id, title="La leur", source="manual")
+    db.add_all([playlist, theirs])
     db.flush()
     db.add(PlaylistItem(playlist_id=playlist.id, video_id=video.id, position=1))
+    # Another user's playlist holding the fiche is not listed.
+    db.add(PlaylistItem(playlist_id=theirs.id, video_id=video.id, position=1))
     db.add(
         VideoSponsorSegment(
             video_id=video.id,
@@ -257,10 +261,8 @@ def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
 def test_api_video_detail_leaves_the_fiche_in_nouveautes(db):
     add_videos(db, add_channel(db, "Chan"), 1, "v")
     video = db.query(Video).one()
-    video.is_new = True
-    db.commit()
+    set_video_state(db, video, is_new=True)
 
     TestClient(app).get(f"/api/videos/{video.id}")
 
-    db.refresh(video)
-    assert video.is_new is True
+    assert stored_video_state(db, video).is_new is True

@@ -7,6 +7,8 @@
     <meta name="theme-color" content="#fbf6ee" media="(max-width: 800px)">
     <meta name="turbo-prefetch" content="false">
     <meta name="turbo-refresh-scroll" content="preserve">
+    {# The user this browser acts as (front/routes/users.py): app.js keeps each user's resume positions apart. #}
+    <meta name="raton-user" content="{{ request.cookies.get('raton_user', '') if request is defined else '' }}">
     <title>Raton</title>
     <link rel="icon" type="image/png" href="/static/img/favicon.png">
     <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">

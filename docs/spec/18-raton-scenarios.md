@@ -65,16 +65,19 @@ Seuils : `LONG_ABSENCE_DAYS` et `CLOSING_RATIO` en tête de
 
 Données utilisées :
 
-- **Temps d'écran** : lectures `played` du jour (même calcul que Paramètres) et
-  limites journalières par type (`screen_time_<kind>_today_limit_minutes`). On
+Tout est celui de l'utilisateur courant (voir
+[12 API et routes](12-api-et-routes.md), « Utilisateur d'une requête ») :
+
+- **Temps d'écran** : ses lectures `played` du jour (même calcul que Paramètres) et
+  ses limites journalières par type (`screen_time_<kind>_today_limit_minutes`). On
   retient le type dont le ratio est le plus élevé (déclenchement de la fermeture).
-- **Nouveautés** : `videos.is_new` sur les chaînes dont la cloche du type (vidéos
-  ou shorts) est active, comme la page `/dashboard/nouveautes`
+- **Nouveautés** : ses fiches `user_videos.is_new` sur les chaînes dont sa cloche
+  du type (vidéos ou shorts) est active, comme la page `/dashboard/nouveautes`
   (`followed_video_condition`).
-- **Dernière visite** : réglages `raton_last_seen_at` et
+- **Dernière visite** : ses réglages `raton_last_seen_at` et
   `raton_session_previous_visit_at`. Un écart de 30 minutes entre deux chargements
   ouvre une nouvelle visite.
-- **Phrases déjà vues** : réglage `raton_visit_shown`, liste JSON de clés
+- **Phrases déjà vues** : son réglage `raton_visit_shown`, liste JSON de clés
   `<id du scénario>:<rang de la phrase>`, remise à vide à chaque nouvelle visite.
 
 ## Page de test des variations

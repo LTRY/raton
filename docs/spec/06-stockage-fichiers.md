@@ -63,7 +63,11 @@ Un dossier video peut contenir :
 - transcript : `transcript.txt` ;
 - notes structurees : `transcript.notes.txt` ;
 - resume court (3 lignes) : `transcript.summary_short.txt` ;
-- historique chat : `transcript.chat.json`.
+- historique chat, un par utilisateur : `transcript.chat.json` pour le premier
+  utilisateur (celui de la migration `0004_users`, `id` 1 : ses discussions
+  sont restees ou elles etaient), `transcript.chat.<user_id>.json` pour les
+  autres (`back/services/videos/documents.py:chat_file_name`). Les autres
+  fichiers du dossier sont partages.
 
 ## Staging
 
@@ -112,14 +116,18 @@ ne sont supprimes que par la retention ci-dessous ou a la main.
 ### Retention des medias vus (purge)
 
 Les fichiers audio/video du serveur sont soumis a une retention
-(`purge_watched_media`, `back/services/media/media_storage.py`) :
+(`purge_watched_media`, `back/services/media/media_storage.py`). Les fichiers
+sont partages par tous les utilisateurs : la purge vaut pour tous.
 
-- une video est « vue » quand la lecture atteint 90 % de la duree
-  (`videos.watched_at`, voir [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;
+- une video est « vue » pour la purge des que la lecture d'un utilisateur
+  quelconque atteint 90 % de la duree (`videos.watched_at`, le premier Vu, voir
+  [08 Medias et lecteurs](08-medias-et-lecteurs.md)) ;
 - 7 jours apres `watched_at`, les fichiers sont supprimes ;
-- `rating >= 4` archive la video : ses fichiers ne sont jamais supprimes. Une
-  baisse de note a 3 ou moins ne change pas `watched_at` ; si la date a plus de
-  7 jours, la purge a lieu au passage suivant ;
+- une note de 4 ou plus, donnee par **n'importe quel** utilisateur
+  (`user_videos.rating >= 4`), archive la video : ses fichiers ne sont jamais
+  supprimes. Une baisse de note a 3 ou moins ne change pas `watched_at` ; si
+  la date a plus de 7 jours et qu'aucun autre utilisateur ne la note 4+, la
+  purge a lieu au passage suivant ;
 - les deux formats (`video_path` et `audio_path`) sont supprimes ensemble, des
   que l'un des deux a atteint 90 % ; la verification `is_relative_to(folder)`
   s'applique a chaque suppression ;

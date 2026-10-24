@@ -306,7 +306,8 @@ poll) sont dans `back/services/jobs/llm_requests.py`.
 - des que le job est termine (`done`), applique le resultat une seule fois
   (ecrit `transcript.notes.txt`/`transcript.summary_short.txt`/
   `transcript.questions.txt` pour
-  `generate` ; ajoute question/reponse a `transcript.chat.json` pour `chat` —
+  `generate` ; ajoute question/reponse au fichier de discussion de
+  l'utilisateur qui a pose la question (`llm_jobs.user_id`) pour `chat` —
   voir sections Génération/Discussion ci-dessus), passe le job a
   `applied`, puis repond `status: "done"` avec `documents` (`generate` :
   transcript, notes, résumé court, questions et discussion, pour que la page
@@ -368,7 +369,11 @@ Elle affiche le widget de chat partage (voir
 [11 Interface HTML](11-interface-html.md)) titre `Discuter du contenu` :
 
 - historique des messages en bulles (`Vous` a droite, `Assistant` a
-  gauche) ;
+  gauche) ; chaque utilisateur a sa propre discussion sur une fiche (fichier
+  `transcript.chat.json` pour le premier utilisateur,
+  `transcript.chat.<user_id>.json` pour les autres, voir
+  [06 Stockage fichiers](06-stockage-fichiers.md)), les notes et le resume
+  restent communs ;
 - aucun message d'etat vide pour la portee video : tant qu'il n'y a pas de
   message, la zone d'historique est repliee et le champ de saisie remonte
   sous l'en-tete (la portee `library` garde le sien) ;
@@ -379,7 +384,7 @@ JavaScript)
 
 - refuse les questions vides (`400`) ;
 - lit `transcript.txt` ;
-- charge `transcript.chat.json` ;
+- charge le fichier de discussion de l'utilisateur ;
 - construit le `Prompt` (`prompts.py:build_chat_prompt`) : consignes dans
   `VIDEO_CHAT_SYSTEM`, puis le transcript balisé en tête du premier message
   `user`, les 10 derniers messages de la discussion en vrais tours
@@ -392,8 +397,8 @@ JavaScript)
 - planifie `back/services/jobs/llm_jobs.py:run_llm_job` via `BackgroundTasks` ; voir la section
   jobs LLM asynchrones ci-dessus pour la resolution.
 
-`DELETE /api/videos/{id}/chat` supprime `transcript.chat.json` si present
-(`204`).
+`DELETE /api/videos/{id}/chat` supprime le fichier de discussion de
+l'utilisateur si present (`204`) ; celles des autres restent.
 
 ## Chat cross-video (bibliotheque)
 
@@ -416,11 +421,12 @@ executes par `LibraryChatToolbox` (`back/services/library_chat/tools.py`) :
   des chaines — la meme que le champ de recherche de `/channels`
   (`back/services/common/search.py:channel_search_rank`). Sans requete, liste toutes
   les chaines (60 au plus), ce qui permet au modele de retenir lui-meme celles
-  qui correspondent a un theme. Chaque chaine est renvoyee avec ses labels, sa
-  note, son nombre de videos et l'etat de sa cloche ;
+  qui correspondent a un theme. Chaque chaine est renvoyee avec ses labels, la
+  note et les cloches de l'utilisateur qui pose la question, et son nombre de
+  videos ;
 - `chercher_videos(requete, chaine_id)` : meme recherche textuelle que
-  `/videos` (`video_search_rank` : titre, chaine, labels, commentaire,
-  URL), sur toutes les videos y compris celles sans
+  `/videos` (`video_search_rank` : titre, chaine, labels, commentaire de
+  l'utilisateur, URL), sur toutes les videos y compris celles sans
   notes structurees, restreinte a une chaine si `chaine_id` est fourni. Avec
   `chaine_id` seul, renvoie les videos les plus recentes de la chaine. 20
   resultats au plus ;
@@ -440,8 +446,9 @@ executes par `LibraryChatToolbox` (`back/services/library_chat/tools.py`) :
   plus proche occuperait toutes les places et masquerait les autres. Chaque
   chunk est renvoye avec sa video et sa chaine. Ne couvre que les videos indexees (voir
   [05 Modele de donnees](05-modele-de-donnees.md)) ;
-- `consulter_historique(jours, requete)` : historique de lecture (les
-  `download_jobs` `played`, voir [11 Interface HTML](11-interface-html.md)),
+- `consulter_historique(jours, requete)` : historique de lecture de
+  l'utilisateur qui pose la question (ses `download_jobs` `played`, voir
+  [11 Interface HTML](11-interface-html.md)),
   du plus recent au plus ancien, **une ligne par video** comme la page
   d'historique (`back/services/videos/playback.py:dashboard_media_activity_logs`). `jours`
   (30 par defaut) borne la fenetre, `requete` filtre sur le titre ou la
@@ -456,8 +463,8 @@ executes par `LibraryChatToolbox` (`back/services/library_chat/tools.py`) :
   candidate est renvoyee avec un identifiant `[youtube:ID]`, son handle, son
   nombre d'abonnes et le debut de sa description ; celles deja dans la
   bibliotheque sont signalees avec leur reference `[chaine:ID]` ;
-- `ajouter_chaine(youtube_id)` : cree la chaine (note 1, cloches eteintes,
-  comme l'ajout depuis `/channels`) a partir d'une candidate de
+- `ajouter_chaine(youtube_id)` : cree la chaine (note 1 pour l'utilisateur
+  qui pose la question, cloches eteintes, comme l'ajout depuis `/channels`) a partir d'une candidate de
   `chercher_sur_youtube`. Seul un identifiant renvoye par cette recherche
   **pendant le meme job** est accepte : le modele ne peut pas ajouter une
   chaine a partir d'un identifiant invente. Une chaine deja presente n'est pas
@@ -516,9 +523,13 @@ chaines d'abord (vers `/videos?channel_id={id}`), puis les videos (vers
 
 ### Discussions
 
-Le chat bibliotheque garde plusieurs discussions
+Le chat bibliotheque garde plusieurs discussions par utilisateur
 (`library_chat_conversations`, voir [05](05-modele-de-donnees.md)) : chaque
-question suit une discussion, et le modele ne relit que celle-ci. Une
+question suit une discussion, et le modele ne relit que celle-ci. Un
+utilisateur ne liste, ne rouvre, ne continue et ne supprime que les siennes ;
+celle d'un autre repond `404 Discussion introuvable.`, comme une discussion
+supprimee. Les outils voient la bibliotheque comme cet utilisateur (ses
+notes, ses cloches, son historique). Une
 question posee sans discussion en ouvre une nouvelle, nommee d'apres cette
 question (`conversation_title` : sur une ligne, 80 caracteres au plus). Une
 discussion dont la premiere question n'a jamais eu de reponse (job echoue)

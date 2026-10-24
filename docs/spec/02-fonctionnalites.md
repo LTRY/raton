@@ -8,13 +8,34 @@ title: "02 Fonctionnalites"
 La page `/` ne contient que la barre de chat de la bibliotheque, en bas de
 l'ecran.
 
+## Utilisateurs
+
+Plusieurs personnes peuvent utiliser la meme instance. Chacune choisit son
+utilisateur depuis le bouton rond en bas du tiroir « Discussions » de
+l'accueil (comme le bouton de compte d'une app de chat), ou en ajoute un ;
+on les renomme ou les supprime dans `/settings`. Pas de mot de passe (LAN de
+confiance, voir [15 Securite](15-securite.md)).
+
+- **Partage** : les chaines, les fiches, leurs fichiers media, transcripts,
+  notes structurees, resumes et questions, les categories, et les reglages de
+  la bibliotheque (dossier media, quota, categories sans barre de
+  progression, notes automatiques, segments sponsorises). Un fichier telecharge
+  par l'un sert a tous ; la purge vaut pour tous.
+- **Propre a chaque utilisateur** : Vu/Ecartee, notes en etoiles (chaines et
+  fiches), commentaires, Nouveau et cloches, playlists, discussions (chat de
+  fiche et chat bibliotheque), historique et positions de lecture, temps de
+  lecture et limites de temps d'ecran, vues enregistrees, phrases de Raton.
+
+Le detail est dans [05 Modele de donnees](05-modele-de-donnees.md),
+« Utilisateurs ».
+
 ## Bibliotheque : Nouveautes, Historique, Exploration
 
 L'onglet central **Bibliotheque** regroupe trois vues (l'import se fait depuis le bouton rond en haut a droite,
 voir [11 Interface HTML](11-interface-html.md)) :
 
 - **Nouveautes** (`/dashboard/nouveautes`) : une pile de videos recentes par
-  chaine suivie (au moins une des deux cloches active), pas seulement les fiches
+  chaine que l'utilisateur suit (au moins une de ses deux cloches active), pas seulement les fiches
   marquees `is_new` — une fiche deja visitee reste affichee tant qu'elle
   fait partie des plus recentes de sa chaine. Chaque cloche filtre son
   type : la pile ne montre les videos que si la cloche videos est active,
@@ -90,22 +111,25 @@ Contraintes :
 
 ### Cloches de suivi quotidien
 
-Chaque chaine a deux cloches independantes, desactivees par defaut : une pour
-les videos (`auto_metadata_enabled`) et une pour les shorts
-(`auto_shorts_enabled`). On peut suivre l'une, l'autre, ou les deux.
+Chaque chaine a, pour chaque utilisateur, deux cloches independantes,
+desactivees par defaut : une pour les videos (`auto_metadata_enabled`) et une
+pour les shorts (`auto_shorts_enabled`). On peut suivre l'une, l'autre, ou les
+deux ; les cloches d'un utilisateur ne changent rien pour les autres.
 
 - Activer une cloche declenche immediatement un import metadata en
   arriere-plan pour la chaine (page 1, section de cette cloche : videos ou
   shorts) afin de synchroniser le catalogue existant ; ces fiches ne sont pas
   marquees `is_new`.
 - Desactiver une cloche n'efface pas les fiches deja marquees `is_new`.
-- Tant qu'une cloche est active, le scan quotidien planifie importe aussi les
-  nouvelles fiches de sa section et les marque `is_new = true` (voir
-  [13 Jobs, logs et planification](13-jobs-logs-planification.md)).
+- Tant qu'une cloche est active chez au moins un utilisateur, le scan
+  quotidien planifie importe aussi les nouvelles fiches de sa section et les
+  marque `is_new = true` pour chaque utilisateur dont cette cloche est active
+  (voir [13 Jobs, logs et planification](13-jobs-logs-planification.md)).
 - Le label technique **Nouveau** est affiche sur une fiche tant que
-  `is_new = true`. Visiter la page detail de la video (`/videos/{id}`) retire
-  automatiquement ce label — la fiche reste neanmoins visible dans la pile de
-  sa chaine (section Nouveautes), seul le label disparait.
+  `is_new = true` pour l'utilisateur. Sa visite de la page detail de la video
+  (`/videos/{id}`) retire automatiquement ce label pour lui — la fiche reste
+  neanmoins visible dans la pile de sa chaine (section Nouveautes), seul le
+  label disparait.
 
 ## Playlists
 

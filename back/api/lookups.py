@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 
 from back.models.channel import Channel
 from back.models.playlist import Playlist, PlaylistItem
+from back.models.user import User
 from back.models.video import Video
 from back.services.channels.lookup import ChannelNotInLibraryError, find_library_channel
+from back.services.common.users import UserNotFoundError, find_user
 from back.services.playlists.editing import (
     PlaylistItemNotFoundError,
     PlaylistNotInLibraryError,
@@ -30,15 +32,22 @@ def library_channel(db: Session, channel_id: int) -> Channel:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-def library_playlist(db: Session, playlist_id: int) -> Playlist:
+def library_user(db: Session, user_id: int) -> User:
     try:
-        return find_playlist(db, playlist_id)
+        return find_user(db, user_id)
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+def library_playlist(db: Session, user_id: int, playlist_id: int) -> Playlist:
+    try:
+        return find_playlist(db, user_id, playlist_id)
     except PlaylistNotInLibraryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-def playlist_item(db: Session, playlist_id: int, item_id: int) -> PlaylistItem:
+def playlist_item(db: Session, user_id: int, playlist_id: int, item_id: int) -> PlaylistItem:
     try:
-        return find_playlist_item(db, playlist_id, item_id)
-    except PlaylistItemNotFoundError as exc:
+        return find_playlist_item(db, user_id, playlist_id, item_id)
+    except (PlaylistNotInLibraryError, PlaylistItemNotFoundError) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

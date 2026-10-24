@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from back.api.users import current_user_id
 from back.db.session import get_db
 from back.schemas.raton import RatonLineRead, RatonScenarioRead
 from back.services.raton.picker import all_variations
@@ -12,9 +13,10 @@ router = APIRouter(prefix="/api", tags=["Raton"])
 
 
 @router.post("/raton/visit", response_model=RatonLineRead)
-def visit(db: Session = Depends(get_db)) -> RatonLineRead:
-    """A visit of the home page: records it and draws the line to show (never twice in a row)."""
-    return RatonLineRead(**home_context(db)["scenario"])
+def visit(db: Session = Depends(get_db), user_id: int = Depends(current_user_id)) -> RatonLineRead:
+    """A visit of the user to the home page: records it and draws the line to show (never twice
+    in a row)."""
+    return RatonLineRead(**home_context(db, user_id)["scenario"])
 
 
 @router.get("/raton/variations", response_model=list[RatonScenarioRead])
