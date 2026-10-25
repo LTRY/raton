@@ -29,9 +29,13 @@
       <div class="youtube-search-text">
         <span class="youtube-search-title">{{ result.title }}</span>
         <span class="youtube-search-meta">
-          {{- [result.channel_name, result.views, "Short" if result.is_short else none] | select | join(" · ") -}}
+          {{- [result.channel_name, result.views, result.age, "Short" if result.is_short else none] | select | join(" · ") -}}
         </span>
       </div>
+      <div class="youtube-search-actions">
+      <a class="youtube-search-open" href="{{ result.url }}" target="_blank" rel="noopener noreferrer" aria-label="Ouvrir sur YouTube" title="Ouvrir sur YouTube">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+      </a>
       {% if result.existing %}
       <a class="csv-import-badge" href="/videos/{{ result.existing.id }}">Dans la bibliothèque</a>
       {% else %}
@@ -43,6 +47,7 @@
         <button type="submit">Ajouter</button>
       </form>
       {% endif %}
+      </div>
     </li>
     {% endfor %}
   </ul>

@@ -206,6 +206,8 @@ class YoutubeVideoRead(BaseModel):
     yt_channel_id: str | None
     duration_seconds: int | None
     view_count: int | None
+    # Approximate: computed from YouTube's relative "3 years ago".
+    published_at: datetime | None
     is_short: bool
     thumbnail_url: str
     # The library's fiche when it is already there.

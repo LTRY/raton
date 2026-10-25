@@ -4,7 +4,7 @@ from typing import Any
 
 from yt_dlp import YoutubeDL
 
-from back.services.youtube.yt import ytdlp_call
+from back.services.youtube.yt import parse_yt_date, ytdlp_call
 
 VIDEO_SEARCH_LIMIT = 20
 
@@ -21,7 +21,14 @@ def search_videos(query: str, limit: int = VIDEO_SEARCH_LIMIT) -> list[dict[str,
     value = " ".join(query.split())
     if not value:
         return []
-    opts = {"quiet": True, "skip_download": True, "extract_flat": True}
+    opts = {
+        "quiet": True,
+        "skip_download": True,
+        "extract_flat": True,
+        # Without it a search result has no date: YouTube only shows "3 years ago", which
+        # yt-dlp turns into an approximate timestamp on request.
+        "extractor_args": {"youtubetab": {"approximate_date": [""]}},
+    }
     with ytdlp_call("search_videos"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(f"ytsearch{limit}:{value}", download=False)
     results = []
@@ -40,6 +47,7 @@ def search_videos(query: str, limit: int = VIDEO_SEARCH_LIMIT) -> list[dict[str,
                 "yt_channel_id": entry.get("channel_id"),
                 "duration_seconds": int(entry["duration"]) if entry.get("duration") else None,
                 "view_count": entry.get("view_count"),
+                "published_at": parse_yt_date(entry.get("timestamp")),
                 "is_short": "/shorts/" in url,
                 "thumbnail_url": video_thumbnail_url(entry, yt_video_id),
             }

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -7,6 +9,7 @@ from back.db.session import Base
 from back.models.video import Video
 from back.services.videos import youtube_search
 from back.services.youtube import video_search
+from front.formatting import format_relative_age
 
 
 def make_session():
@@ -28,6 +31,7 @@ def youtube_result(yt_video_id="dQw4w9WgXcQ", title="Never Gonna Give You Up", *
         "yt_channel_id": "UCuAXFkgsw1L7xaCfnd5JJOw",
         "duration_seconds": 213,
         "view_count": 1_600_000_000,
+        "published_at": None,
         "is_short": False,
         "thumbnail_url": f"https://i.ytimg.com/vi/{yt_video_id}/hqdefault.jpg",
         **fields,
@@ -58,6 +62,7 @@ def test_search_videos_reads_the_youtube_search(monkeypatch):
                         "channel": "Rick Astley",
                         "channel_id": "UCuAXFkgsw1L7xaCfnd5JJOw",
                         "duration": 213.0,
+                        "timestamp": 1_700_000_000,
                         "view_count": 1600000000,
                         "thumbnails": [
                             {"url": "//i.ytimg.com/small.jpg"},
@@ -80,8 +85,12 @@ def test_search_videos_reads_the_youtube_search(monkeypatch):
 
     assert requested["url"] == "ytsearch5:rick astley"
     assert requested["opts"]["extract_flat"] is True
+    assert requested["opts"]["extractor_args"] == {"youtubetab": {"approximate_date": [""]}}
     assert results == [
-        youtube_result(thumbnail_url="https://i.ytimg.com/big.jpg"),
+        youtube_result(
+            thumbnail_url="https://i.ytimg.com/big.jpg",
+            published_at=datetime.fromtimestamp(1_700_000_000, tz=UTC),
+        ),
         {
             "yt_video_id": "abcdefghijk",
             "title": "Un short",
@@ -90,6 +99,7 @@ def test_search_videos_reads_the_youtube_search(monkeypatch):
             "yt_channel_id": None,
             "duration_seconds": None,
             "view_count": None,
+            "published_at": None,
             "is_short": True,
             "thumbnail_url": "https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg",
         },
@@ -135,7 +145,10 @@ def test_recherche_page_lists_youtube_videos_with_an_add_form(monkeypatch, front
     monkeypatch.setattr(
         youtube_search,
         "search_videos",
-        lambda query: [youtube_result(), youtube_result("known000001", "Déjà là", is_short=True)],
+        lambda query: [
+            youtube_result(published_at=datetime(2023, 1, 1, tzinfo=UTC)),
+            youtube_result("known000001", "Déjà là", is_short=True),
+        ],
     )
 
     page = front_client(db).get("/videos/recherche", params={"q": "rick", "message": "Ok"})
@@ -143,7 +156,9 @@ def test_recherche_page_lists_youtube_videos_with_an_add_form(monkeypatch, front
     assert page.status_code == 200
     html = page.text
     assert 'href="/videos/recherche" aria-current="page"' in html
-    assert "Rick Astley · 1 600 000 000 vues" in html
+    assert "Rick Astley · 1 600 000 000 vues · il\u00a0y\u00a0a\u00a0" in html
+    assert html.count('aria-label="Ouvrir sur YouTube"') == 2
+    assert 'href="https://www.youtube.com/watch?v=known000001" target="_blank"' in html
     assert '<span class="youtube-search-duration">3:33</span>' in html
     assert (
         '<input type="hidden" name="url" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">'
@@ -180,3 +195,12 @@ def test_recherche_page_reports_a_failed_youtube_search(monkeypatch, front_clien
     html = front_client(db).get("/videos/recherche", params={"q": "rick"}).text
 
     assert "Recherche YouTube impossible : réseau" in html
+
+
+def test_relative_age_reads_like_youtube():
+    now = datetime(2026, 10, 25, tzinfo=UTC)
+    assert format_relative_age(datetime(2026, 10, 25, tzinfo=UTC), now) == "aujourd’hui"
+    assert format_relative_age(datetime(2026, 10, 24, tzinfo=UTC), now) == "il y a 1 jour"
+    assert format_relative_age(datetime(2026, 10, 10, tzinfo=UTC), now) == "il y a 2 semaines"
+    assert format_relative_age(datetime(2026, 7, 25, tzinfo=UTC), now) == "il y a 3 mois"
+    assert format_relative_age(datetime(2023, 10, 25, tzinfo=UTC), now) == "il y a 3 ans"

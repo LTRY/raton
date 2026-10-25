@@ -756,9 +756,12 @@ de videos »), pas dans la bibliotheque.
   n'appelle pas YouTube et dit quoi taper ; le champ a le focus.
 - Resultats dans l'ordre de YouTube (20 au plus), une ligne par video
   (`.youtube-search-row`) : miniature 16:9 servie par YouTube avec la duree en
-  surimpression, titre (2 lignes au plus), chaine · vues · « Short ». La
+  surimpression, titre (2 lignes au plus), chaine · vues · anciennete · « Short ».
+  L'anciennete est relative (« il y a 3 ans », `format_relative_age`) et non au
+  format de date long : YouTube ne donne qu'une date approximative. La
   miniature ouvre la video sur YouTube (nouvel onglet), ou la fiche si elle est
-  deja dans la bibliotheque.
+  deja dans la bibliotheque. Un bouton rond ↗ (`.youtube-search-open`, 40 px)
+  devant l'action ouvre toujours la video sur YouTube, dans un nouvel onglet.
 - Action : **Ajouter** poste vers `POST /videos/download` avec
   `media_type=metadata` et `download_transcript=true` (comme l'import sans rien
   cocher : une fiche avec metadonnees et transcript, sans fichier media, qui se
@@ -769,7 +772,8 @@ de videos »), pas dans la bibliotheque.
   sa fiche.
 - Sans resultat : « Aucune vidéo trouvée sur YouTube pour « ... » » ; si
   YouTube echoue, le message `Recherche YouTube impossible : ...` de l'API.
-- Telephone (800px et moins) : miniature de 112px, l'action passe sous le texte.
+- Telephone (800px et moins) : miniature de 112px, le ↗ et l'action passent sous
+  le texte.
 
 ## Parametres : statistiques et temps de lecture
 

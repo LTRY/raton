@@ -1986,6 +1986,35 @@ button.secondary {
   margin: 0;
 }
 
+.youtube-search-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+/* The ↗ to the video on YouTube: a round 40px target, beside the action. */
+.youtube-search-open {
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  flex: none;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.youtube-search-open:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.youtube-search-open svg {
+  height: 18px;
+  width: 18px;
+}
+
 .youtube-search-thumb {
   aspect-ratio: 16 / 9;
   background: var(--color-surface-muted);
@@ -2043,8 +2072,7 @@ button.secondary {
   }
 
   /* The action drops under the text, in the text column. */
-  .youtube-search-row > form,
-  .youtube-search-row > .csv-import-badge {
+  .youtube-search-actions {
     grid-column: 2;
     justify-self: start;
   }

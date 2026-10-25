@@ -1,4 +1,5 @@
 import random
+from datetime import datetime
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -6,7 +7,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from front.api import Api, ApiError, get_api
 from front.cards import card_views
-from front.formatting import category_style_map, format_duration, format_views
+from front.formatting import (
+    category_style_map,
+    format_duration,
+    format_relative_age,
+    format_views,
+)
 from front.forms import form_text_value, submitted_categories
 from front.library import (
     VIDEO_ASSET_FILTER_OPTIONS,
@@ -136,8 +142,13 @@ def import_video_page(request: Request):
 def youtube_result_view(result: dict) -> dict:
     """A result of the Recherche section with its French duration and view count."""
     views = format_views(result["view_count"])
+    published_at = result["published_at"]
     return {
         **result,
+        # Non-breaking spaces: « il y a 3 jours » never wraps in the middle on a phone.
+        "age": format_relative_age(datetime.fromisoformat(published_at)).replace(" ", "\u00a0")
+        if published_at
+        else None,
         "duration": format_duration(result["duration_seconds"]),
         "views": f"{views} vue{'s' if result['view_count'] > 1 else ''}" if views else None,
     }
