@@ -5230,7 +5230,6 @@ def test_base_mini_player_is_one_link_to_the_audio_pane():
     for marker in (
         "data-mini-player-thumb",
         "data-mini-player-title",
-        "data-mini-player-channel",
         "data-mini-player-meta-time",
     ):
         assert marker in link

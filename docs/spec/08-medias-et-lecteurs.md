@@ -247,8 +247,11 @@ channel, src, thumb, resume-key, activity-url, detail-url) :
 - le lecteur de playlist en mode Audio, qui y charge toute sa file (voir
   « File d'une playlist » ci-dessous).
 
+La barre montre la pochette et le titre de la piste, sans le nom de la
+chaine (l'ecran verrouille, lui, l'affiche : voir « Ecran verrouille »).
+
 Sous 800 px le mini-lecteur est une seule rangee : la zone pochette + titre +
-« Chaine · 12:34 / 48:30 » (`a[data-mini-player-open]`) ouvre la page de la
+« 12:34 / 48:30 » (`a[data-mini-player-open]`) ouvre la page de la
 video **sur le volet Audio** (lien `/videos/{id}#audio` ; le carrousel honore
 `#audio`, et si la page est deja ouverte l'evenement
 `raton:show-audio-slide` fait defiler vers le volet Audio), puis

@@ -5908,7 +5908,7 @@ turbo-frame {
   white-space: nowrap;
 }
 
-.mini-player-channel {
+.mini-player-sub {
   color: var(--player-text-muted);
   font-size: 11px;
   overflow: hidden;
@@ -8681,7 +8681,7 @@ turbo-frame {
     font-size: 14px;
   }
 
-  .mini-player-channel {
+  .mini-player-sub {
     font-size: 12px;
   }
 

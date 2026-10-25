@@ -2871,7 +2871,6 @@ function initMiniPlayer() {
   const currentTimeEl = bar.querySelector("[data-mini-player-current]");
   const durationEl = bar.querySelector("[data-mini-player-duration]");
   const titleEl = bar.querySelector("[data-mini-player-title]");
-  const channelEl = bar.querySelector("[data-mini-player-channel]");
   const metaTimeEl = bar.querySelector("[data-mini-player-meta-time]");
   const openLink = bar.querySelector("[data-mini-player-open]");
   const thumbEl = bar.querySelector("[data-mini-player-thumb]");
@@ -2898,8 +2897,6 @@ function initMiniPlayer() {
   let watchedSeconds = 0;
   let lastTrackedTime = null;
   let seeking = false;
-  // The phone layout has no seek bar: its time text sits after the channel name.
-  let hasChannel = false;
   let detailPath = "";
   // Même rôle que dans bindResumableMedia : reprise à reposer tant que la
   // lecture n'a pas effectivement démarré au bon endroit.
@@ -2950,9 +2947,7 @@ function initMiniPlayer() {
   let lastMetaTime = "";
   function updateMetaTime() {
     if (!metaTimeEl) return;
-    const text =
-      (hasChannel ? " · " : "") +
-      `${formatMiniPlayerTime(audio.currentTime)} / ${formatMiniPlayerTime(audio.duration)}`;
+    const text = `${formatMiniPlayerTime(audio.currentTime)} / ${formatMiniPlayerTime(audio.duration)}`;
     // timeupdate fires several times a second but the text changes once a second.
     if (text === lastMetaTime) return;
     lastMetaTime = text;
@@ -3130,8 +3125,6 @@ function initMiniPlayer() {
     lastSavedAt = 0;
     if (titleEl) titleEl.textContent = track.title || "";
     updateOpenLink();
-    hasChannel = Boolean(track.channel);
-    if (channelEl) channelEl.textContent = track.channel || "";
     updateMetaTime();
     if (thumbEl) {
       if (track.thumb) {
