@@ -256,6 +256,12 @@ n'existait pas.
   `keywords` (liste), `avatar_url` et `banner_url` (`/api/channels/{id}/avatar`,
   `/api/channels/{id}/banner`, `null` sans image), `metadata_fetched_at`,
   `last_scanned_at`, `video_count`.
+- `GET /api/youtube/videos?q=<requete>` : les videos YouTube qui
+  correspondent a une requete (section Recherche de la Bibliotheque),
+  `{yt_video_id, title, url, channel_name, yt_channel_id, duration_seconds,
+  view_count, is_short, thumbnail_url, existing}` (`existing` : `{id, title}`
+  de la fiche si la video est deja dans la bibliotheque) ; liste vide pour une
+  requete vide ; `502 Recherche YouTube impossible : …` si YouTube echoue.
 - `GET /api/channels/names` : toutes les chaines `{id, name}` par nom (le
   selecteur de chaine de `/videos`).
 - `GET /api/youtube/channels?q=<nom>` : les chaines YouTube qui

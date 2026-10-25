@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from front.api import Api, ApiError, get_api
 from front.cards import card_views
-from front.formatting import category_style_map
+from front.formatting import category_style_map, format_duration, format_views
 from front.forms import form_text_value, submitted_categories
 from front.library import (
     VIDEO_ASSET_FILTER_OPTIONS,
@@ -131,6 +131,44 @@ def video_cards_fragment(
 def import_video_page(request: Request):
     """The import form is the sheet of the round button: forward to a page that shows it open."""
     return redirect(append_query("/videos", {**request.query_params, "import": "video"}))
+
+
+def youtube_result_view(result: dict) -> dict:
+    """A result of the Recherche section with its French duration and view count."""
+    views = format_views(result["view_count"])
+    return {
+        **result,
+        "duration": format_duration(result["duration_seconds"]),
+        "views": f"{views} vue{'s' if result['view_count'] > 1 else ''}" if views else None,
+    }
+
+
+@router.get("/videos/recherche", response_class=HTMLResponse)
+def youtube_search_page(request: Request, q: str = "", api: Api = Depends(get_api)):
+    """The Recherche section of the Bibliothèque: a search on YouTube itself, each video
+    added to the library as a fiche or linked to the fiche it already has."""
+    query = " ".join(q.split())
+    results, error = [], None
+    if query:
+        try:
+            results = [
+                youtube_result_view(result) for result in api.get("/youtube/videos", q=query)
+            ]
+        except ApiError as exc:
+            error = exc.detail
+    return templates.TemplateResponse(
+        request,
+        "youtube_search.html",
+        {
+            "search_query": query,
+            "results": results,
+            "error": error,
+            "library_views": library_view_links(record(api.get("/library/views")), request),
+            # The toast params are dropped so an addition does not replay the previous toast.
+            "return_path": current_request_path(request, exclude=("message", "level")),
+            **message_context(request),
+        },
+    )
 
 
 @router.get("/import/categories", response_class=HTMLResponse)

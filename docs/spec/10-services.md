@@ -72,8 +72,9 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 
 | Module | Responsabilité |
 |---|---|
-| `yt` | Appel yt-dlp journalisé, détection des erreurs 429 et des premières pas encore disponibles, métadonnées d'une vidéo |
+| `yt` | Appel yt-dlp journalisé, détection des erreurs 429 et des premières pas encore disponibles, métadonnées d'une vidéo ; échec d'une recherche YouTube (`YoutubeSearchError`) |
 | `channel_info` | Ce que yt-dlp dit d'une chaîne : résolution d'une URL ou d'un handle, profil, liste des vidéos |
+| `video_search` | Recherche de vidéos sur YouTube (`search_videos`), sans regarder la bibliothèque |
 | `downloads` | Téléchargement du média, des sous-titres et de la miniature, fichiers écrits à côté (`metadata.json`, transcript) |
 | `sponsorblock` | Appel à l'API SponsorBlock |
 | `subtitles` | Lecture d'un fichier `.vtt` en lignes de transcript horodatées (`read_transcript_lines`), partagée par l'écriture de `transcript.txt` et la page de la fiche |
@@ -148,6 +149,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
 | `nouveautes` | Les Nouveautés (`GET /api/nouveautes`) : une pile des fiches les plus récentes par chaîne suivie, paginée par chaîne |
+| `youtube_search` | La section Recherche (`GET /api/youtube/videos`) : vidéos trouvées sur YouTube, chacune avec sa fiche si la bibliothèque l'a déjà (`youtube_video_candidates`) |
 | `history` | L'Historique (`GET /api/historique`) : une ligne par média et par jour local (temps regardé additionné, Revu), et le temps de lecture de chaque jour de la page |
 
 ### `raton/`

@@ -189,3 +189,24 @@ class VideoDetailRead(VideoRead):
     # The transcript line by line with the time each one starts (from the `.vtt` subtitles),
     # empty without them.
     transcript_lines: list[TranscriptLineRead]
+
+
+class YoutubeVideoFicheRead(BaseModel):
+    id: int
+    title: str
+
+
+class YoutubeVideoRead(BaseModel):
+    """A YouTube video found by the Recherche section, not yet (or already) in the library."""
+
+    yt_video_id: str
+    title: str
+    url: str
+    channel_name: str | None
+    yt_channel_id: str | None
+    duration_seconds: int | None
+    view_count: int | None
+    is_short: bool
+    thumbnail_url: str
+    # The library's fiche when it is already there.
+    existing: YoutubeVideoFicheRead | None

@@ -29,9 +29,9 @@ confiance, voir [15 Securite](15-securite.md)).
 Le detail est dans [05 Modele de donnees](05-modele-de-donnees.md),
 « Utilisateurs ».
 
-## Bibliotheque : Nouveautes, Historique, Exploration
+## Bibliotheque : Nouveautes, Historique, Exploration, Recherche
 
-L'onglet central **Bibliotheque** regroupe trois vues (l'import se fait depuis le bouton rond en haut a droite,
+L'onglet central **Bibliotheque** regroupe quatre vues (l'import se fait depuis le bouton rond en haut a droite,
 voir [11 Interface HTML](11-interface-html.md)) :
 
 - **Nouveautes** (`/dashboard/nouveautes`) : une pile de videos recentes par
@@ -47,7 +47,11 @@ voir [11 Interface HTML](11-interface-html.md)) :
   deja Vu ; une ligne montre la progression de lecture tant que la video
   n'est pas vue, et une video Vu est grisee
   (regles dans [11 Interface HTML](11-interface-html.md)) ;
-- **Exploration** (`/videos`) : la liste complete de la bibliotheque.
+- **Exploration** (`/videos`) : la liste complete de la bibliotheque ;
+- **Recherche** (`/videos/recherche`) : une recherche sur YouTube lui-meme ;
+  chaque video trouvee s'ajoute a la bibliotheque comme fiche (metadonnees +
+  transcript, sans fichier media) d'un bouton, ou renvoie a sa fiche si elle y
+  est deja.
 
 Les statistiques de la bibliotheque (nombre de chaines, fiches, transcripts,
 stockage) et le temps de lecture par type de media sont dans `/settings`.
@@ -204,7 +208,7 @@ La page s'ouvre sur les shorts quand seule la cloche shorts de la chaine est
 active (un `section` explicite dans l'URL l'emporte).
 Les sous-bibliotheques configurables (`library_views`, reglables depuis
 `/settings`) sont des liens du menu de la Bibliotheque (tiroir ☰ sur telephone, colonne
-a gauche sur bureau, sur Nouveautes, Historique et Exploration), pas de la page
+a gauche sur bureau, sur Nouveautes, Historique, Exploration et Recherche), pas de la page
 d'une chaine.
 
 ## Detail video

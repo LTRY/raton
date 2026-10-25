@@ -306,7 +306,8 @@ Navigation principale :
 - Chaines `/channels`
 - Playlists `/playlists`
 - Bibliotheque : menu deroulant **Bibliotheque** avec Nouveautes `/dashboard/nouveautes`,
-  Historique `/dashboard/historique` et Exploration `/videos` (trois liens, ni
+  Historique `/dashboard/historique`, Exploration `/videos` et Recherche
+  `/videos/recherche` (quatre liens, ni
   sous-bibliotheques ni Indexation RAG ; l'import est dans la feuille d'import, voir plus bas).
   Le panneau passe au-dessus du contenu de la page (la barre du haut a un
   `z-index` superieur a celui des avatars et bannieres de chaine)
@@ -371,7 +372,8 @@ sous 800 px) : cinq onglets avec icone SVG seule (pas de libelle visible ; le no
 est dans `aria-label`) — Accueil `/`, Chaines `/channels`,
 **Bibliotheque** `/dashboard/nouveautes` (au centre), Playlists `/playlists`,
 Reglages `/settings`. Il n'y a pas d'onglet Recherche : le champ de recherche
-est dans Exploration. L'onglet Bibliotheque est actif sur `/videos*` et
+dans la bibliotheque est dans Exploration, la recherche sur YouTube est la
+section Recherche de la Bibliotheque. L'onglet Bibliotheque est actif sur `/videos*` et
 `/dashboard/*`. Chaque icone a
 sa propre animation (rebond, antenne qui se dessine, livre
 qui saute, lignes de playlist, curseurs qui glissent), jouee au clic
@@ -475,10 +477,11 @@ par `.chat-composer`.
   des graphiques, lecteur).
 - Test : `tests/test_glass_css.py`.
 
-Bibliotheque = trois vues reliees par le menu de la Bibliotheque (macro
+Bibliotheque = quatre vues reliees par le menu de la Bibliotheque (macro
 `library_menu` de `_macros.html`, voir « Bibliotheque : Nouveautes, Historique,
 Exploration ») : **Nouveautes** `/dashboard/nouveautes`, **Historique**
-`/dashboard/historique`, **Exploration** `/videos`.
+`/dashboard/historique`, **Exploration** `/videos`, **Recherche**
+`/videos/recherche`.
 - Toute date affichee dans l'interface utilise le format francais long
   `Lun. 20 juil. 2026` (jour abrege + point, jour, mois abrege + point,
   annee), et `Lun. 20 juil. 2026 14:32` quand une heure est jointe. Fonctions
@@ -596,23 +599,24 @@ Parametres.
 
 ## Bibliotheque : Nouveautes, Historique, Exploration
 
-Les trois vues partagent le titre `Bibliotheque` et le menu de la Bibliotheque.
+Les quatre vues (Nouveautes, Historique, Exploration, Recherche) partagent le
+titre `Bibliotheque` et le menu de la Bibliotheque.
 Il n'y a pas de pastilles de sections ni de vues sous le titre.
 
 **Titre** (macro `library_title`) : le nom de ce qui est affiche (Nouveautés,
-Historique, Exploration, ou le nom de la vue enregistree dont les filtres sont
+Historique, Exploration, Recherche, ou le nom de la vue enregistree dont les filtres sont
 ceux de `/videos`). Sur bureau, `Bibliothèque` suivi de ce nom dans une pastille
 teintee (`.library-current`) ; sur telephone, le nom seul en titre, sur la ligne
 du bouton ☰.
 
 **Menu de la Bibliotheque** (macro `library_menu` de `_macros.html`, branche par
 `initLibraryMenu` dans `static/js/app.js`). Il contient un lien par section avec
-son icone (**Nouveautés**, **Historique**, **Exploration**), puis, sous
+son icone (**Nouveautés**, **Historique**, **Exploration**, **Recherche**), puis, sous
 « Sous-bibliothèques », un lien par vue enregistree (reglees dans `/settings`)
 qui ouvre `/videos` avec ses filtres. Les vues viennent de `saved_views` de
-`GET /api/library` sur `/videos` et de `GET /api/library/views` sur Nouveautes
-et Historique. L'entree affichee est surlignee (`aria-current="page"`) : la vue
-enregistree dont les filtres sont ceux de `/videos`, sinon Exploration.
+`GET /api/library` sur `/videos` et de `GET /api/library/views` sur Nouveautes,
+Historique et Recherche. L'entree affichee est surlignee (`aria-current="page"`) : sur
+`/videos`, la vue enregistree dont les filtres sont ceux de la page, sinon Exploration.
 
 - Telephone (800px et moins) : un bouton ☰ rond, a gauche du titre, ouvre le
   menu en tiroir a gauche, le meme que celui des discussions du chat
@@ -740,6 +744,32 @@ defaut **amv**/**musique** — voir « Parametres » plus bas).
 
 **Exploration** (`/videos`) : la liste de la bibliotheque decrite plus bas
 (recherche, filtres, vues enregistrees).
+
+**Recherche** (`/videos/recherche?q=...`, `youtube_search.html`) : une
+recherche sur YouTube lui-meme (`GET /api/youtube/videos`, voir
+[07 YouTube et telechargements](07-youtube-et-telechargements.md), « Recherche
+de videos »), pas dans la bibliotheque.
+
+- Ligne du titre : le champ `.page-search` « Rechercher sur YouTube », un
+  formulaire `GET` (Entree lance la recherche, pas de recherche pendant la
+  frappe : chaque recherche est un appel a YouTube). Sans requete, la page
+  n'appelle pas YouTube et dit quoi taper ; le champ a le focus.
+- Resultats dans l'ordre de YouTube (20 au plus), une ligne par video
+  (`.youtube-search-row`) : miniature 16:9 servie par YouTube avec la duree en
+  surimpression, titre (2 lignes au plus), chaine · vues · « Short ». La
+  miniature ouvre la video sur YouTube (nouvel onglet), ou la fiche si elle est
+  deja dans la bibliotheque.
+- Action : **Ajouter** poste vers `POST /videos/download` avec
+  `media_type=metadata` et `download_transcript=true` (comme l'import sans rien
+  cocher : une fiche avec metadonnees et transcript, sans fichier media, qui se
+  telecharge ensuite depuis la fiche) et revient sur la meme recherche avec le
+  message du job (les parametres `message`/`level` du toast precedent sont
+  retires du `next`). Une video deja dans la bibliotheque (meme
+  `yt_video_id`) montre a la place le badge **Dans la bibliothèque**, lien vers
+  sa fiche.
+- Sans resultat : « Aucune vidéo trouvée sur YouTube pour « ... » » ; si
+  YouTube echoue, le message `Recherche YouTube impossible : ...` de l'API.
+- Telephone (800px et moins) : miniature de 112px, l'action passe sous le texte.
 
 ## Parametres : statistiques et temps de lecture
 

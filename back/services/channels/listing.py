@@ -13,6 +13,7 @@ from back.models.video import Video
 from back.services.common.search import channel_search_rank
 from back.services.common.user_state import channel_rating, channel_state_join
 from back.services.youtube.channel_info import search_channels
+from back.services.youtube.yt import YoutubeSearchError
 
 CHANNEL_SORTS = ("rating", "activity", "alpha", "added")
 DEFAULT_CHANNEL_SORT = "activity"
@@ -127,10 +128,6 @@ def channel_page(
         sort=sort,
         channel_count=db.scalar(count_query) or 0,
     )
-
-
-class YoutubeSearchError(ValueError):
-    pass
 
 
 def youtube_channel_candidates(db: Session, query: str) -> list[dict]:

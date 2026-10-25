@@ -57,8 +57,8 @@ d'origine, chronometrage). Aucune route : une route va dans le module
 ### `back/api/`
 
 L'API JSON sous `/api`, un module par sujet : `channels.py` (chaines,
-recherche YouTube, import CSV des abonnements), `videos.py` (fiches et leurs
-actions), `media.py` (vignettes, sous-titres, flux audio/video avec `Range`,
+recherche de chaines YouTube, import CSV des abonnements), `videos.py` (fiches
+et leurs actions, recherche de videos YouTube), `media.py` (vignettes, sous-titres, flux audio/video avec `Range`,
 avatars et bannieres, tous verifies sous le dossier de la fiche ou des
 chaines), `imports.py` (telechargement manuel, import de fichier, import du
 raccourci iOS), `library.py` (`GET /api/library` et les cartes par
