@@ -62,6 +62,51 @@
 
   const eligible = (row) => hasFile(row, mode);
 
+  // Audio mode plays through the persistent mini player (app.js): its queue
+  // goes on from page to page, and the bar shows the playlist's track. This
+  // page's <video> only serves Video mode.
+  const QUEUE_KEY = `playlist:${playlistId}`;
+  const mini = () => window.ratonMiniPlayer;
+  const miniAudio = () => mini()?.audioElement();
+  const viaMini = () => mode === "audio";
+  const ownsMini = () => Boolean(mini()) && mini().queueKey() === QUEUE_KEY;
+  // Position to start from when Audio mode was entered paused.
+  let pendingStartAt = 0;
+
+  function trackOf(row) {
+    const id = row.dataset.videoId;
+    return {
+      id,
+      title: row.dataset.title,
+      channel: row.dataset.channel,
+      src: `/api/videos/${id}/audio`,
+      thumb: row.dataset.thumb === "1" ? `/api/videos/${id}/thumbnail?w=320` : "",
+      // Free listening logs nothing: the mini player skips a track without URL.
+      activityUrl: isFree() ? "" : `/api/videos/${id}/activity`,
+      detailUrl: `/videos/${id}`,
+    };
+  }
+
+  function queueOptions() {
+    return { tracks: rows().filter((row) => hasFile(row, "audio")).map(trackOf), shuffle, loop };
+  }
+
+  // The rows changed (order, downloads, switches): the playing queue follows.
+  function syncQueue() {
+    if (ownsMini()) mini().updateQueue(QUEUE_KEY, queueOptions());
+  }
+
+  function startQueue(row, startAt = 0, autoplay = true) {
+    mini()?.playQueue({
+      key: QUEUE_KEY,
+      url: `/playlists/${playlistId}`,
+      ...queueOptions(),
+      startId: row.dataset.videoId,
+      startAt,
+      autoplay,
+    });
+  }
+
   function formatTime(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
     const total = Math.floor(seconds);
@@ -113,7 +158,7 @@
   }
 
   function updatePlayIcon() {
-    const playing = !media.paused && !media.ended;
+    const playing = viaMini() ? ownsMini() && !miniAudio().paused : !media.paused && !media.ended;
     // The icons are <svg>: SVGElement has no `hidden` property, so assigning
     // `.hidden` would never reach the attribute the CSS reads.
     iconPlay.toggleAttribute("hidden", playing);
@@ -152,8 +197,21 @@
     if (!row) {
       media.removeAttribute("src");
       media.load();
+      seek.value = "0";
+      window.ratonPaintSeekRange?.(seek, media);
+      timeCurrent.textContent = formatTime(0);
+      timeTotal.textContent = formatTime(0);
       setNowPlaying(null);
       refreshRows();
+      updatePlayIcon();
+      return;
+    }
+    if (viaMini()) {
+      setNowPlaying(row);
+      refreshRows();
+      // A paused pick still moves a queue that is already this playlist's.
+      if (autoplay || ownsMini()) startQueue(row, startAt || 0, autoplay);
+      else pendingStartAt = startAt || 0;
       updatePlayIcon();
       return;
     }
@@ -202,6 +260,10 @@
   }
 
   function goNext() {
+    if (viaMini() && ownsMini()) {
+      mini().next();
+      return;
+    }
     const next = pickNext();
     if (!next) {
       media.pause();
@@ -213,6 +275,10 @@
   }
 
   function goPrevious() {
+    if (viaMini() && ownsMini()) {
+      mini().previous();
+      return;
+    }
     if (media.currentTime > 3) {
       media.currentTime = 0;
       return;
@@ -266,12 +332,20 @@
     window.ratonPaintSeekRange?.(seek, media);
   }
 
-  media.addEventListener("timeupdate", () => {
-    if (!seeking && Number.isFinite(media.duration) && media.duration > 0) {
-      seek.value = String((media.currentTime / media.duration) * 100);
+  // Seek bar and times of the element playing: this page's <video>, or the
+  // mini player's <audio> in Audio mode.
+  function showProgress(element) {
+    if (!seeking && Number.isFinite(element.duration) && element.duration > 0) {
+      seek.value = String((element.currentTime / element.duration) * 100);
     }
-    paintSeek();
-    timeCurrent.textContent = formatTime(media.currentTime);
+    window.ratonPaintSeekRange?.(seek, element);
+    timeCurrent.textContent = formatTime(element.currentTime);
+    timeTotal.textContent = formatTime(element.duration);
+  }
+
+  media.addEventListener("timeupdate", () => {
+    if (viaMini()) return;
+    showProgress(media);
     const now = Date.now();
     if (lastTick !== null && !media.paused) watchedAccum += Math.min((now - lastTick) / 1000, 2);
     lastTick = now;
@@ -306,6 +380,16 @@
   let seeking = false;
   seek.addEventListener("input", () => {
     seeking = true;
+    if (viaMini()) {
+      const audio = miniAudio();
+      if (ownsMini() && Number.isFinite(audio.duration)) {
+        const seconds = (Number(seek.value) / 100) * audio.duration;
+        mini().seekTo(mini().currentId(), seconds);
+        timeCurrent.textContent = formatTime(seconds);
+      }
+      window.ratonPaintSeekRange?.(seek, audio);
+      return;
+    }
     if (Number.isFinite(media.duration)) {
       media.currentTime = (Number(seek.value) / 100) * media.duration;
       timeCurrent.textContent = formatTime(media.currentTime);
@@ -315,6 +399,16 @@
   seek.addEventListener("change", () => { seeking = false; });
 
   playPause.addEventListener("click", () => {
+    if (viaMini()) {
+      if (ownsMini()) {
+        mini().toggle(mini().currentId());
+        return;
+      }
+      const row = current && eligible(current) ? current : eligibleRows()[0];
+      if (row) startQueue(row, pendingStartAt);
+      pendingStartAt = 0;
+      return;
+    }
     if (!current) {
       const first = eligibleRows()[0];
       if (first) load(first, true);
@@ -344,24 +438,42 @@
     history = [];
     store.set(SHUFFLE_KEY, shuffle ? "1" : "0");
     syncToggles();
+    syncQueue();
   });
   loopButton.addEventListener("click", () => {
     loop = !loop;
     store.set(LOOP_KEY, loop ? "1" : "0");
     syncToggles();
+    syncQueue();
   });
 
   modeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.mode === mode) return;
-      const wasPlaying = !media.paused;
-      const position = media.currentTime;
+      // The track and position carry over from one player to the other.
+      const fromMini = viaMini() && ownsMini();
+      const playing = fromMini ? miniAudio() : media;
+      const wasPlaying = (fromMini || !viaMini()) && !playing.paused;
+      const position = fromMini || !viaMini() ? playing.currentTime : pendingStartAt;
       postActivity();
+      if (fromMini) {
+        if (wasPlaying) mini().toggle(mini().currentId());
+      } else if (!viaMini()) {
+        media.pause();
+        media.removeAttribute("src");
+        media.load();
+      }
+      pendingStartAt = 0;
       mode = button.dataset.mode;
       store.set(MODE_KEY, mode);
       applyMode();
       const keep = current && eligible(current) ? current : null;
-      if (keep) {
+      if (viaMini() && ownsMini() && !current) {
+        // Nothing new from Video mode: show where the mini player is.
+        current = null;
+        mirrorMini();
+        if (wasPlaying) mini().toggle(mini().currentId());
+      } else if (keep) {
         load(keep, wasPlaying, position);
       } else {
         const all = rows();
@@ -450,6 +562,7 @@
       const job = await window.ratonApi("POST", button.dataset.url);
       await window.ratonWaitForJob(job.status_url, { interval: 3000, failure: "Le téléchargement a échoué." });
       row.dataset[kind === "audio" ? "hasAudio" : "hasVideo"] = "1";
+      syncQueue();
     } catch (error) {
       nowSub.textContent = error.message;
     }
@@ -475,6 +588,7 @@
       input.value = next ? "0" : "1";
       freeForm.querySelector("[data-free-switch]").setAttribute("aria-checked", String(next));
       refreshRows();
+      syncQueue();
     });
   }
 
@@ -493,6 +607,7 @@
   function renumber() {
     refreshRows();
     if (current) setNowPlaying(current);
+    syncQueue();
   }
 
   async function saveOrder() {
@@ -628,10 +743,59 @@
     });
   }
 
+  // ---- Mini player (Audio mode) ----------------------------------------------------
+  // Mirrors the mini player while it plays this playlist: current row, seek
+  // bar, play/pause. Its <audio> outlives this page (Turbo permanent node), so
+  // the listeners go once the page has been swapped out.
+  function followMini() {
+    const audio = miniAudio();
+    if (!audio) return;
+    const events = ["play", "pause", "ended", "emptied", "timeupdate", "loadedmetadata", "progress", "raton:queue-change"];
+    const sync = () => {
+      if (!root.isConnected) {
+        events.forEach((name) => audio.removeEventListener(name, sync));
+        return;
+      }
+      if (viaMini()) mirrorMini();
+    };
+    events.forEach((name) => audio.addEventListener(name, sync));
+    sync();
+  }
+
+  function mirrorMini() {
+    const audio = miniAudio();
+    if (ownsMini()) {
+      const row = rows().find((candidate) => candidate.dataset.videoId === mini().currentId()) || null;
+      if (row && row !== current) {
+        current = row;
+        setNowPlaying(row);
+        refreshRows();
+      }
+      showProgress(audio);
+      // Same 90% rule as the server, so the ✓ shows without a reload.
+      if (current && !isFree() && !flag(current, "seen") && audio.duration > 0 && audio.currentTime / audio.duration >= 0.9) {
+        current.dataset.seen = "1";
+        refreshRows();
+      }
+    }
+    updatePlayIcon();
+  }
+
   // ---- Boot -----------------------------------------------------------------------
   applyMode();
   syncToggles();
-  const first = eligibleRows()[0] || null;
-  if (first) shuffleSeen.add(first);
-  load(first, false);
+  function boot() {
+    if (viaMini() && ownsMini()) {
+      // Back on the playlist that is playing: show its track, not the first one.
+      syncQueue();
+    } else {
+      const first = eligibleRows()[0] || null;
+      if (first) shuffleSeen.add(first);
+      load(first, false);
+    }
+    followMini();
+  }
+  // On a full page load app.js (the mini player) runs after this script.
+  if (window.ratonMiniPlayer) boot();
+  else document.addEventListener("DOMContentLoaded", boot, { once: true });
 })();

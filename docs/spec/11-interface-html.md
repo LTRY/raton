@@ -1077,8 +1077,11 @@ Deux colonnes : panneau lecteur a gauche, file de lecture a droite.
   « Ignorée » sur sa vignette et mention sous son titre). Commandes : aleatoire,
   precedent, lecture/pause, suivant, boucle (aleatoire et boucle portent
   `aria-pressed`). En mode Audio la piste est une pochette carree (la vignette
-  recadree) ; en mode Video, un `<video>` 16:9. Les deux modes partagent le meme
-  element media (`/api/videos/{id}/audio` ou `/api/videos/{id}/video`). La lecture
+  recadree) ; en mode Video, un `<video>` 16:9. En mode Audio la lecture passe
+  par le mini-lecteur persistant, qui affiche la piste de la playlist et
+  continue sur les autres pages (voir [08 Medias et lecteurs](08-medias-et-lecteurs.md),
+  « File d'une playlist ») ; le mode Video lit `/api/videos/{id}/video` dans la
+  page. La lecture
   journalise l'activite via `POST /api/videos/{id}/activity` (comme la page d'une
   video), sauf en **ecoute libre**.
 - **Infos et options** sous le lecteur : titre, labels de categories, source,

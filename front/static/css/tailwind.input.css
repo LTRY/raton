@@ -5908,7 +5908,7 @@ turbo-frame {
   white-space: nowrap;
 }
 
-.mini-player-channel {
+.mini-player-sub {
   color: var(--player-text-muted);
   font-size: 11px;
   overflow: hidden;
@@ -5940,6 +5940,11 @@ turbo-frame {
 
 .mini-player-transport button:hover {
   background: #392c20;
+}
+
+/* The previous/next track buttons only exist while a playlist queue plays. */
+.mini-player-transport button[hidden] {
+  display: none;
 }
 
 .mini-player-playpause {
@@ -8676,7 +8681,7 @@ turbo-frame {
     font-size: 14px;
   }
 
-  .mini-player-channel {
+  .mini-player-sub {
     font-size: 12px;
   }
 
@@ -8685,8 +8690,16 @@ turbo-frame {
   }
 
   .mini-player-progress,
-  .mini-player-transport button[data-mini-player-skip] {
+  .mini-player-transport button[data-mini-player-skip],
+  .mini-player-transport button[data-mini-player-track="previous"] {
     display: none;
+  }
+
+  /* A playlist queue keeps "next track" on the phone row. */
+  .mini-player-transport button[data-mini-player-track="next"]:not([hidden]) {
+    font-size: 16px;
+    height: 44px;
+    width: 44px;
   }
 
   .mini-player-transport button.mini-player-playpause {

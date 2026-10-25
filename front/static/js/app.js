@@ -2871,16 +2871,23 @@ function initMiniPlayer() {
   const currentTimeEl = bar.querySelector("[data-mini-player-current]");
   const durationEl = bar.querySelector("[data-mini-player-duration]");
   const titleEl = bar.querySelector("[data-mini-player-title]");
-  const channelEl = bar.querySelector("[data-mini-player-channel]");
   const metaTimeEl = bar.querySelector("[data-mini-player-meta-time]");
   const openLink = bar.querySelector("[data-mini-player-open]");
   const thumbEl = bar.querySelector("[data-mini-player-thumb]");
   const closeButton = bar.querySelector("[data-mini-player-close]");
+  const trackButtons = Array.from(bar.querySelectorAll("[data-mini-player-track]"));
   if (!audio || !playPauseButton || !seek) return;
 
   let currentTrack = null;
-  claimMediaSession(audio, () =>
-    currentTrack && { title: currentTrack.title, artist: currentTrack.channel, artwork: currentTrack.thumb }
+  // A playlist queue (see playQueue below), or null for a single track.
+  let queue = null;
+  // Read by claimMediaSession on every play: filled while a queue is loaded,
+  // so the lock screen shows previous/next instead of the ±30 s skips.
+  const sessionActions = {};
+  claimMediaSession(
+    audio,
+    () => currentTrack && { title: currentTrack.title, artist: currentTrack.channel, artwork: currentTrack.thumb },
+    sessionActions
   );
 
   const saveIntervalSeconds = 5;
@@ -2890,8 +2897,6 @@ function initMiniPlayer() {
   let watchedSeconds = 0;
   let lastTrackedTime = null;
   let seeking = false;
-  // The phone layout has no seek bar: its time text sits after the channel name.
-  let hasChannel = false;
   let detailPath = "";
   // Même rôle que dans bindResumableMedia : reprise à reposer tant que la
   // lecture n'a pas effectivement démarré au bon endroit.
@@ -2942,9 +2947,7 @@ function initMiniPlayer() {
   let lastMetaTime = "";
   function updateMetaTime() {
     if (!metaTimeEl) return;
-    const text =
-      (hasChannel ? " · " : "") +
-      `${formatMiniPlayerTime(audio.currentTime)} / ${formatMiniPlayerTime(audio.duration)}`;
+    const text = `${formatMiniPlayerTime(audio.currentTime)} / ${formatMiniPlayerTime(audio.duration)}`;
     // timeupdate fires several times a second but the text changes once a second.
     if (text === lastMetaTime) return;
     lastMetaTime = text;
@@ -3021,6 +3024,7 @@ function initMiniPlayer() {
     if (storageKey) resetStoredResume(storageKey);
     logActivity();
     updatePlayPauseUI();
+    if (queue) nextInQueue();
   });
 
   playPauseButton.addEventListener("click", () => {
@@ -3065,6 +3069,7 @@ function initMiniPlayer() {
   });
 
   closeButton?.addEventListener("click", () => {
+    setQueue(null);
     audio.pause();
     writePosition();
     logActivity();
@@ -3087,64 +3092,198 @@ function initMiniPlayer() {
     logActivity();
   });
 
+  // Loads `track` into the <audio>; `autoplay` false only shows it.
+  function loadTrack(track, autoplay = true) {
+    if (audio.dataset.trackId) {
+      writePosition();
+      logActivity();
+    }
+    audio.dataset.trackId = track.id;
+    currentTrack = track;
+    audio.dataset.resumeKey = track.resumeKey || "";
+    audio.dataset.resumeServerPosition = track.resumeServerPosition || "";
+    audio.dataset.resumeServerAt = track.resumeServerAt || "";
+    pendingResume = null;
+    audio.dataset.activityUrl = track.activityUrl || "";
+    audio.src = track.src;
+    // Le mini-lecteur se lance depuis n'importe quelle liste : les segments ne
+    // sont pas dans le DOM de la page courante, il faut les demander.
+    const sponsorSkip = bindSponsorSkip(audio, { visual: false });
+    sponsorSkip.setSegments([]);
+    fetch(`/api/videos/${track.id}/sponsor-segments`, { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!payload || !payload.skip_enabled) return;
+        // Une réponse lente ne doit pas armer les segments d'une piste que
+        // l'utilisateur a déjà quittée.
+        if (audio.dataset.trackId !== String(track.id)) return;
+        sponsorSkip.setSegments(payload.segments || []);
+      })
+      .catch(() => {});
+    watchedSeconds = 0;
+    lastTrackedTime = null;
+    lastSavedAt = 0;
+    if (titleEl) titleEl.textContent = track.title || "";
+    updateOpenLink();
+    updateMetaTime();
+    if (thumbEl) {
+      if (track.thumb) {
+        thumbEl.src = track.thumb;
+        thumbEl.hidden = false;
+      } else {
+        thumbEl.removeAttribute("src");
+        thumbEl.hidden = true;
+      }
+    }
+    bar.hidden = false;
+    document.body.classList.add("has-mini-player");
+    if (autoplay) audio.play().catch(() => {});
+    audio.dispatchEvent(new CustomEvent("raton:queue-change"));
+  }
+
+  function updateOpenLink() {
+    if (!openLink || !currentTrack) return;
+    if (queue) {
+      // A queued track opens the page that plays the queue (the playlist).
+      detailPath = queue.url;
+      openLink.setAttribute("href", queue.url);
+      return;
+    }
+    // A video with both formats opens on its video slide by default: the
+    // fragment makes the pager open on the audio one.
+    detailPath = (currentTrack.detailUrl || "").split("#")[0];
+    openLink.setAttribute("href", detailPath ? `${detailPath}#audio` : "#");
+  }
+
+  function setQueue(next) {
+    queue = next;
+    sessionActions.previous = queue ? previousInQueue : null;
+    sessionActions.next = queue ? nextInQueue : null;
+    trackButtons.forEach((button) => { button.hidden = !queue; });
+    bar.classList.toggle("has-queue", Boolean(queue));
+    updateOpenLink();
+    audio.dispatchEvent(new CustomEvent("raton:queue-change"));
+  }
+
+  // Same rules as the playlist page's own player: shuffle never replays a
+  // track before the others, loop starts over at the end.
+  function pickNextInQueue() {
+    const { tracks, shuffle, loop, seen } = queue;
+    if (!tracks.length) return null;
+    const currentId = audio.dataset.trackId;
+    if (shuffle) {
+      let pool = tracks.filter((track) => !seen.has(String(track.id)) && String(track.id) !== currentId);
+      if (!pool.length) {
+        if (!loop) return null;
+        queue.seen = new Set(currentId ? [currentId] : []);
+        pool = tracks.filter((track) => String(track.id) !== currentId);
+        if (!pool.length) pool = tracks;
+      }
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    const index = tracks.findIndex((track) => String(track.id) === currentId);
+    // The current track left the queue (removed, reordered away): restart at
+    // the position it had.
+    const from = index === -1 ? queue.index - 1 : index;
+    if (from + 1 < tracks.length) return tracks[from + 1];
+    return loop ? tracks[0] : null;
+  }
+
+  function playInQueue(track) {
+    queue.index = queue.tracks.indexOf(track);
+    queue.seen.add(String(track.id));
+    loadTrack(track);
+  }
+
+  function nextInQueue() {
+    if (!queue) return;
+    const next = pickNextInQueue();
+    if (!next) {
+      audio.pause();
+      return;
+    }
+    if (audio.dataset.trackId) queue.history.push(audio.dataset.trackId);
+    playInQueue(next);
+  }
+
+  function previousInQueue() {
+    if (!queue) return;
+    if (audio.currentTime > 3) {
+      audio.currentTime = 0;
+      return;
+    }
+    const byId = (id) => queue.tracks.find((track) => String(track.id) === id);
+    let previous = null;
+    if (queue.shuffle) {
+      while (queue.history.length && !previous) previous = byId(queue.history.pop()) || null;
+    } else {
+      const index = queue.tracks.findIndex((track) => String(track.id) === audio.dataset.trackId);
+      if (index > 0) previous = queue.tracks[index - 1];
+      else if (queue.loop) previous = queue.tracks[queue.tracks.length - 1];
+    }
+    if (previous) playInQueue(previous);
+    else audio.currentTime = 0;
+  }
+
+  trackButtons.forEach((button) => {
+    button.hidden = true;
+    button.addEventListener("click", () => {
+      if (button.dataset.miniPlayerTrack === "previous") previousInQueue();
+      else nextInQueue();
+    });
+  });
+
   window.ratonMiniPlayer = {
+    // A single track: it replaces any queue.
     load(track) {
+      if (queue) setQueue(null);
       if (audio.dataset.trackId === String(track.id)) {
         if (audio.paused) audio.play().catch(() => {});
         return;
       }
-      if (audio.dataset.trackId) {
-        writePosition();
-        logActivity();
-      }
-      audio.dataset.trackId = track.id;
-      currentTrack = track;
-      audio.dataset.resumeKey = track.resumeKey || "";
-      audio.dataset.resumeServerPosition = track.resumeServerPosition || "";
-      audio.dataset.resumeServerAt = track.resumeServerAt || "";
-      pendingResume = null;
-      audio.dataset.activityUrl = track.activityUrl || "";
-      audio.src = track.src;
-      // Le mini-lecteur se lance depuis n'importe quelle liste : les segments ne
-      // sont pas dans le DOM de la page courante, il faut les demander.
-      const sponsorSkip = bindSponsorSkip(audio, { visual: false });
-      sponsorSkip.setSegments([]);
-      fetch(`/api/videos/${track.id}/sponsor-segments`, { headers: { Accept: "application/json" } })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((payload) => {
-          if (!payload || !payload.skip_enabled) return;
-          // Une réponse lente ne doit pas armer les segments d'une piste que
-          // l'utilisateur a déjà quittée.
-          if (audio.dataset.trackId !== String(track.id)) return;
-          sponsorSkip.setSegments(payload.segments || []);
-        })
-        .catch(() => {});
-      watchedSeconds = 0;
-      lastTrackedTime = null;
-      lastSavedAt = 0;
-      if (titleEl) titleEl.textContent = track.title || "";
-      if (openLink) {
-        // A video with both formats opens on its video slide by default: the
-        // fragment makes the pager open on the audio one.
-        detailPath = (track.detailUrl || "").split("#")[0];
-        openLink.setAttribute("href", detailPath ? `${detailPath}#audio` : "#");
-      }
-      hasChannel = Boolean(track.channel);
-      if (channelEl) channelEl.textContent = track.channel || "";
-      updateMetaTime();
-      if (thumbEl) {
-        if (track.thumb) {
-          thumbEl.src = track.thumb;
-          thumbEl.hidden = false;
-        } else {
-          thumbEl.removeAttribute("src");
-          thumbEl.hidden = true;
-        }
-      }
-      bar.hidden = false;
-      document.body.classList.add("has-mini-player");
-      audio.play().catch(() => {});
+      loadTrack(track);
     },
+    // A whole list played in order (the playlist page in Audio mode): `key`
+    // names the list, `url` is the page the bar's link opens, `tracks` the
+    // playable tracks in order. Playback starts at `startId`, at `startAt`
+    // seconds, and goes on from page to page like a single track.
+    playQueue({ key, url, tracks, startId, startAt = 0, shuffle = false, loop = false, autoplay = true }) {
+      setQueue({ key, url, tracks, shuffle, loop, index: 0, history: [], seen: new Set() });
+      const start = tracks.find((track) => String(track.id) === String(startId)) || tracks[0];
+      if (!start) return;
+      queue.index = tracks.indexOf(start);
+      queue.seen.add(String(start.id));
+      if (audio.dataset.trackId === String(start.id)) {
+        updateOpenLink();
+        if (startAt) audio.currentTime = startAt;
+        if (autoplay && audio.paused) audio.play().catch(() => {});
+        return;
+      }
+      if (startAt) {
+        audio.addEventListener("loadedmetadata", () => { audio.currentTime = startAt; }, { once: true });
+      }
+      loadTrack(start, autoplay);
+    },
+    // The list changed under the queue (reorder, download, shuffle/loop
+    // switches): the track playing goes on.
+    updateQueue(key, changes) {
+      if (!queue || queue.key !== key) return;
+      Object.assign(queue, changes);
+      if (changes.shuffle !== undefined) {
+        queue.history = [];
+        queue.seen = new Set(audio.dataset.trackId ? [audio.dataset.trackId] : []);
+      }
+      const index = queue.tracks.findIndex((track) => String(track.id) === audio.dataset.trackId);
+      if (index !== -1) queue.index = index;
+    },
+    queueKey() {
+      return queue ? queue.key : null;
+    },
+    currentId() {
+      return audio.dataset.trackId || null;
+    },
+    next: nextInQueue,
+    previous: previousInQueue,
     isCurrent(id) {
       return audio.dataset.trackId === String(id);
     },
@@ -4252,9 +4391,27 @@ function initSpaceToggle() {
   });
 }
 
+// One player at a time: a media element that starts playing pauses every
+// other one (the mini player's <audio> outlives the page, so the playlist
+// player, a fiche's <video> or a short would otherwise play over it). Bound
+// once, like initSpaceToggle.
+function initSinglePlayback() {
+  if (window.__singlePlaybackBound) return;
+  window.__singlePlaybackBound = true;
+  // `play` does not bubble: listen in the capture phase.
+  document.addEventListener("play", (event) => {
+    const started = event.target;
+    if (!(started instanceof HTMLMediaElement)) return;
+    document.querySelectorAll("audio, video").forEach((media) => {
+      if (media !== started && !media.paused) media.pause();
+    });
+  }, true);
+}
+
 initToasts();
 initMiniPlayer();
 initSpaceToggle();
+initSinglePlayback();
 bindPlayTrackButtons();
 document.querySelectorAll("[data-media-pager]").forEach(bindMediaPager);
 
@@ -4425,7 +4582,6 @@ if (!window.__formatPopoverScrollBound) {
 // covers the viewport. Leaving fullscreen, the end of the short or the close
 // button tears the overlay down.
 function openShortPlayer(link) {
-  document.querySelector("[data-mini-player-audio]")?.pause();
   const videoId = link.dataset.shortVideoId;
   const overlay = document.createElement("div");
   overlay.className = "short-player";

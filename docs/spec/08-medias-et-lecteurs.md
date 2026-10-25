@@ -243,16 +243,46 @@ channel, src, thumb, resume-key, activity-url, detail-url) :
 - un bouton play en superposition sur la vignette de chaque carte
   audio-seule dans `video_card` (`front/templates/_macros.html`), utilise a la
   fois par `/videos`, la section Nouveautes du dashboard, et
-  `/dashboard/nouveautes` (`dashboard_new_videos.html`).
+  `/dashboard/nouveautes` (`dashboard_new_videos.html`) ;
+- le lecteur de playlist en mode Audio, qui y charge toute sa file (voir
+  « File d'une playlist » ci-dessous).
+
+La barre montre la pochette et le titre de la piste, sans le nom de la
+chaine (l'ecran verrouille, lui, l'affiche : voir « Ecran verrouille »).
 
 Sous 800 px le mini-lecteur est une seule rangee : la zone pochette + titre +
-« Chaine · 12:34 / 48:30 » (`a[data-mini-player-open]`) ouvre la page de la
+« 12:34 / 48:30 » (`a[data-mini-player-open]`) ouvre la page de la
 video **sur le volet Audio** (lien `/videos/{id}#audio` ; le carrousel honore
 `#audio`, et si la page est deja ouverte l'evenement
 `raton:show-audio-slide` fait defiler vers le volet Audio), puis
 lecture-pause (56 px) et fermer (44 px). La barre de temps et les sauts ±30 s
 y sont masques — le curseur du volet Audio les remplace. Au-dela de 800 px la
 barre de progression et les sauts ±30 s restent affiches.
+
+### File d'une playlist
+
+Le mini-lecteur joue soit une piste seule (`ratonMiniPlayer.load`), soit la
+file d'une playlist (`ratonMiniPlayer.playQueue`) : les videos de la playlist
+qui ont un fichier audio, dans l'ordre de la page, avec aleatoire et boucle.
+La file continue d'une page a l'autre comme une piste seule : a la fin d'une
+piste, la suivante demarre ; sans boucle, la lecture s'arrete apres la
+derniere. Les regles de piste precedente/suivante sont celles du lecteur de
+playlist (aleatoire sans repetition avant d'avoir tout joue, « precedent »
+apres 3 s revient au debut de la piste).
+
+Tant qu'une file est chargee :
+
+- la barre affiche deux boutons piste precedente / suivante (`⏮`/`⏭`,
+  `data-mini-player-track`) autour des sauts ±30 s ; sous 800 px seul `⏭`
+  reste, entre lecture-pause et fermer ;
+- l'ecran verrouille propose piste precedente/suivante au lieu des sauts ;
+- le lien de la barre ouvre la page de la playlist (et non la fiche) ;
+- une piste n'a pas de position de reprise : elle demarre a 0, comme dans le
+  lecteur de playlist ; l'activite est journalisee par piste
+  (`POST /api/videos/{id}/activity`), sauf pour une playlist en ecoute libre.
+
+Lancer une piste seule (bouton « Écouter », carte) ou fermer la barre vide la
+file.
 
 ### Barre espace : lecture / pause
 
@@ -271,6 +301,14 @@ lien, un `summary`, un controle a role ARIA activable ou sur un lecteur natif
 media a piloter, l'espace fait defiler la page comme d'habitude. Les
 combinaisons avec Alt, Ctrl, Cmd ou Maj et la repetition de touche sont
 ignorees.
+
+### Un seul lecteur a la fois
+
+Un media qui demarre met en pause tous les autres medias de la page
+(`initSinglePlayback`, `front/static/js/app.js`, lie une seule fois au
+document). Le mini-lecteur survit aux navigations : sans cette regle, lancer
+le lecteur de playlist, le `<video>` d'une fiche ou un short le laisserait
+jouer par-dessus, et inversement.
 
 ### Barre de progression commune
 
@@ -485,7 +523,8 @@ la vignette et une barre de position, avec lecture/pause et deplacement dans
 la piste. L'element qui demarre la lecture prend la session (titre, boutons) a
 celui qui l'avait.
 
-- Mini-lecteur persistant : la piste chargee ; sauts de ±30 s. Fermer le
+- Mini-lecteur persistant : la piste chargee ; sauts de ±30 s, ou piste
+  precedente/suivante quand il joue la file d'une playlist. Fermer le
   mini-lecteur vide la session.
 - Lecteurs de `/videos/{id}` (`<video>`, `<audio>` inline) : titre et chaine
   lus dans `data-media-title`/`data-media-artist`, vignette dans `poster` ou
@@ -529,12 +568,24 @@ Les lecteurs natifs exigent le support HTTP Range pour :
 ## Lecteur de playlist
 
 La page `/playlists/{id}` embarque son propre lecteur (voir
-[11 Interface HTML](11-interface-html.md), section "Playlists"), distinct du
-mini-lecteur persistant : un seul element `<video>` sert aux deux formats,
-masque en mode Audio. Il enchaine les videos de la file, ignore celles qui n'ont
-pas de fichier du format choisi, et ne repond pas au mini-lecteur (la lecture
-s'arrete quand on quitte la page). Il journalise l'activite comme la page d'une
-video, sauf pour une playlist en ecoute libre (`playlists.free_listening`).
+[11 Interface HTML](11-interface-html.md), section "Playlists"). Il enchaine
+les videos de la file et ignore celles qui n'ont pas de fichier du format
+choisi. Il journalise l'activite comme la page d'une video, sauf pour une
+playlist en ecoute libre (`playlists.free_listening`).
+
+- **Mode Audio** : la lecture passe par le mini-lecteur persistant, qui recoit
+  la file de la playlist (voir « File d'une playlist ») : la barre du bas
+  affiche la piste de la playlist et la lecture continue quand on quitte la
+  page. Les commandes de la page (lecture/pause, precedent/suivant, curseur,
+  clic sur une ligne) pilotent le mini-lecteur ; la page reflete sa piste, sa
+  position et son etat, et retrouve la piste en cours quand on y revient. Une
+  ligne reordonnee, un audio telecharge, aleatoire, boucle ou ecoute libre
+  mettent la file a jour sans couper la piste en cours.
+- **Mode Video** : un `<video>` de la page, masque en mode Audio ; la lecture
+  s'arrete quand on quitte la page.
+
+Passer d'un mode a l'autre garde la piste et la position ; le lecteur quitte
+est mis en pause.
 
 ## Plein ecran du lecteur de playlist
 
@@ -560,4 +611,5 @@ en plein ecran au lieu de sa page detail (`openShortPlayer`,
   fin du short, sur « Fermer » ou Echap ;
 - la video est un media reprenable (`data-resumable-media`) : position de
   reprise et activite (`POST /api/videos/{id}/activity`) comme sur la page
-  detail ; le mini-lecteur est mis en pause a l'ouverture.
+  detail ; le mini-lecteur est mis en pause quand le short demarre (« Un seul
+  lecteur a la fois »).
