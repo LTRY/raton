@@ -272,6 +272,14 @@ media a piloter, l'espace fait defiler la page comme d'habitude. Les
 combinaisons avec Alt, Ctrl, Cmd ou Maj et la repetition de touche sont
 ignorees.
 
+### Un seul lecteur a la fois
+
+Un media qui demarre met en pause tous les autres medias de la page
+(`initSinglePlayback`, `front/static/js/app.js`, lie une seule fois au
+document). Le mini-lecteur survit aux navigations : sans cette regle, lancer
+le lecteur de playlist, le `<video>` d'une fiche ou un short le laisserait
+jouer par-dessus, et inversement.
+
 ### Barre de progression commune
 
 Les trois barres (volet Audio de `/videos/{id}`, mini-lecteur, lecteur de
@@ -533,7 +541,8 @@ La page `/playlists/{id}` embarque son propre lecteur (voir
 mini-lecteur persistant : un seul element `<video>` sert aux deux formats,
 masque en mode Audio. Il enchaine les videos de la file, ignore celles qui n'ont
 pas de fichier du format choisi, et ne repond pas au mini-lecteur (la lecture
-s'arrete quand on quitte la page). Il journalise l'activite comme la page d'une
+s'arrete quand on quitte la page) ; comme tout lecteur, il met en pause le
+mini-lecteur quand il demarre (voir « Un seul lecteur a la fois »). Il journalise l'activite comme la page d'une
 video, sauf pour une playlist en ecoute libre (`playlists.free_listening`).
 
 ## Plein ecran du lecteur de playlist
@@ -560,4 +569,5 @@ en plein ecran au lieu de sa page detail (`openShortPlayer`,
   fin du short, sur « Fermer » ou Echap ;
 - la video est un media reprenable (`data-resumable-media`) : position de
   reprise et activite (`POST /api/videos/{id}/activity`) comme sur la page
-  detail ; le mini-lecteur est mis en pause a l'ouverture.
+  detail ; le mini-lecteur est mis en pause quand le short demarre (« Un seul
+  lecteur a la fois »).

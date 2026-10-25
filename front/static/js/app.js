@@ -4252,9 +4252,27 @@ function initSpaceToggle() {
   });
 }
 
+// One player at a time: a media element that starts playing pauses every
+// other one (the mini player's <audio> outlives the page, so the playlist
+// player, a fiche's <video> or a short would otherwise play over it). Bound
+// once, like initSpaceToggle.
+function initSinglePlayback() {
+  if (window.__singlePlaybackBound) return;
+  window.__singlePlaybackBound = true;
+  // `play` does not bubble: listen in the capture phase.
+  document.addEventListener("play", (event) => {
+    const started = event.target;
+    if (!(started instanceof HTMLMediaElement)) return;
+    document.querySelectorAll("audio, video").forEach((media) => {
+      if (media !== started && !media.paused) media.pause();
+    });
+  }, true);
+}
+
 initToasts();
 initMiniPlayer();
 initSpaceToggle();
+initSinglePlayback();
 bindPlayTrackButtons();
 document.querySelectorAll("[data-media-pager]").forEach(bindMediaPager);
 
@@ -4425,7 +4443,6 @@ if (!window.__formatPopoverScrollBound) {
 // covers the viewport. Leaving fullscreen, the end of the short or the close
 // button tears the overlay down.
 function openShortPlayer(link) {
-  document.querySelector("[data-mini-player-audio]")?.pause();
   const videoId = link.dataset.shortVideoId;
   const overlay = document.createElement("div");
   overlay.className = "short-player";
