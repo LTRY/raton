@@ -304,9 +304,17 @@ Liste des fiches, avec filtres, tri et recherche.
 - **Code** : `/videos`
 - **A ne pas confondre avec** : La bibliotheque *entiere* au sens du chat bibliotheque.
 
+### Recherche (section de la Bibliotheque)
+
+Section de la Bibliotheque qui cherche des videos sur YouTube lui-meme et ajoute
+celle qu'on choisit comme fiche (metadonnees + transcript).
+
+- **Code** : `/videos/recherche` (`youtube_search.html`), `GET /api/youtube/videos`, `back/services/videos/youtube_search.py`
+- **A ne pas confondre avec** : Le champ `q` de `/videos` et `/channels`, qui cherche dans la bibliotheque ; la recherche de chaines YouTube de `/channels`.
+
 ### Menu de la Bibliotheque
 
-Navigation des pages Bibliotheque (tiroir ouvert par le bouton ☰ a gauche du titre sur telephone, colonne a gauche sur bureau) : un lien par section (Nouveautes, Historique, Exploration) puis un par vue enregistree (« Sous-bibliothèques »).
+Navigation des pages Bibliotheque (tiroir ouvert par le bouton ☰ a gauche du titre sur telephone, colonne a gauche sur bureau) : un lien par section (Nouveautes, Historique, Exploration, Recherche) puis un par vue enregistree (« Sous-bibliothèques »).
 
 - **Code** : macro `library_menu` (`front/templates/_macros.html`), `initLibraryMenu` (`front/static/js/app.js`)
 - **A ne pas confondre avec** : Le tiroir « Discussions » du chat bibliotheque, dont il reprend le style, ni le menu Bibliotheque de la barre du haut (bureau).

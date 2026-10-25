@@ -35,6 +35,8 @@ from back.schemas.video import (
     VideoPage,
     VideoPlaylistRead,
     VideoRead,
+    YoutubeVideoFicheRead,
+    YoutubeVideoRead,
 )
 from back.services.common.categories import parse_video_category_labels
 from back.services.common.ratings import InvalidRatingError, set_rating
@@ -63,12 +65,14 @@ from back.services.videos.filters import video_badges
 from back.services.videos.library_query import library_page
 from back.services.videos.library_view import LIBRARY_PAGE_SIZE
 from back.services.videos.playback import InvalidPlaybackMediaError, record_playback_activity
+from back.services.videos.youtube_search import youtube_video_candidates
 from back.services.youtube.sponsor_segments import (
     SponsorSegmentsFetchError,
     active_sponsor_segments,
     normalize_skip_segments,
     refresh_sponsor_segments,
 )
+from back.services.youtube.yt import YoutubeSearchError
 
 router = APIRouter(prefix="/api", tags=["Fiches"])
 
@@ -91,6 +95,30 @@ def list_videos(
         total_pages=total_pages,
         total=total,
     )
+
+
+@router.get(
+    "/youtube/videos",
+    response_model=list[YoutubeVideoRead],
+    responses=error_responses(422, 502),
+)
+def search_youtube_videos(q: str = "", db: Session = Depends(get_db)) -> list[YoutubeVideoRead]:
+    """YouTube videos matching a query, for the Recherche section of the Bibliothèque."""
+    try:
+        candidates = youtube_video_candidates(db, q)
+    except YoutubeSearchError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return [
+        YoutubeVideoRead(
+            **{key: value for key, value in candidate.items() if key != "existing"},
+            existing=YoutubeVideoFicheRead(
+                id=candidate["existing"].id, title=candidate["existing"].title
+            )
+            if candidate["existing"]
+            else None,
+        )
+        for candidate in candidates
+    ]
 
 
 def video_detail_read(detail: VideoDetail) -> VideoDetailRead:

@@ -9,6 +9,10 @@ from back.core.logging import log_external
 logger = logging.getLogger(__name__)
 
 
+class YoutubeSearchError(ValueError):
+    """A YouTube search that failed; the message is the one shown to the user."""
+
+
 def ytdlp_call(op: str):
     # A 429 or a scheduled premiere is handled by the callers: a warning, not an error.
     return log_external(

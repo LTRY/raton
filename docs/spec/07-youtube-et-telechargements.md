@@ -51,6 +51,24 @@ de YouTube, chacune avec `yt_channel_id`, `name`, `handle`, `url`
 YouTube). Les entrees dont l'identifiant ne commence pas par `UC` (pas une
 chaine) sont ignorees.
 
+## Recherche de videos
+
+`back/services/youtube/video_search.py:search_videos(query, limit=20)` cherche
+des videos sur YouTube, sans cle d'API : `yt-dlp` (`extract_flat`) lit
+`ytsearch<limit>:<requete>` (la recherche YouTube filtree sur les videos), la
+requete aux espaces normalises. Les resultats sont renvoyes dans l'ordre de
+pertinence de YouTube, chacun avec `yt_video_id`, `title`, `url`
+(`https://www.youtube.com/watch?v=<id>`, meme pour un short), `channel_name`,
+`yt_channel_id`, `duration_seconds`, `view_count`, `published_at`
+(approximative : YouTube n'affiche dans ses resultats qu'un « il y a 3 ans »,
+que `yt-dlp` convertit en date quand on lui passe l'option `approximate_date`
+de l'extracteur `youtubetab`), `is_short` (l'entree pointe
+vers `/shorts/`) et `thumbnail_url` (la plus grande miniature listee, sinon
+`https://i.ytimg.com/vi/<id>/mqdefault.jpg`). Une entree dont l'identifiant ne
+fait pas 11 caracteres (chaine, playlist) est ignoree. Une requete vide ne
+lance aucun appel. C'est la section Recherche de la Bibliotheque
+([11 Interface HTML](11-interface-html.md)).
+
 Une meme chaine est joignable par plusieurs URL : la detection de doublon
 (`back/services/channels/lookup.py:find_channel`) compare donc d'abord
 `yt_channel_id`, puis l'URL.

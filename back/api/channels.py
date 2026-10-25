@@ -34,7 +34,6 @@ from back.schemas.channel import (
 )
 from back.services.channels import manage as channel_manage
 from back.services.channels.listing import (
-    YoutubeSearchError,
     channel_page,
     video_counts_by_channel,
     youtube_channel_candidates,
@@ -65,6 +64,7 @@ from back.services.jobs.download_requests import (
 from back.services.jobs.downloads import run_channel_metadata_import_job
 from back.services.videos.library_view import library_channels
 from back.services.youtube.channel_info import ChannelNotFoundError
+from back.services.youtube.yt import YoutubeSearchError
 
 router = APIRouter(prefix="/api", tags=["Chaînes"])
 

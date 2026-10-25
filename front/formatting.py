@@ -27,6 +27,23 @@ def format_french_date(value: datetime) -> str:
     return f"{FRENCH_WEEKDAYS[value.weekday()]}. {value.day:02d} {FRENCH_MONTHS_ABBR[value.month - 1]} {value.year}"
 
 
+def format_relative_age(value: datetime, now: datetime | None = None) -> str:
+    """« il y a 3 ans »: for a date that is only known roughly, as YouTube's search gives it."""
+    days = max(((now or datetime.now(value.tzinfo)) - value).days, 0)
+    if days == 0:
+        return "aujourd’hui"
+    for unit_days, singular, plural in (
+        (365, "an", "ans"),
+        (30, "mois", "mois"),
+        (7, "semaine", "semaines"),
+        (1, "jour", "jours"),
+    ):
+        if days >= unit_days:
+            count = days // unit_days
+            return f"il y a {count} {singular if count == 1 else plural}"
+    return "aujourd’hui"
+
+
 def format_french_datetime(value: datetime) -> str:
     return f"{format_french_date(value)} {value:%H:%M}"
 
