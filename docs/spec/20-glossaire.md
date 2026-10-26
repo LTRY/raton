@@ -141,7 +141,7 @@ Une chaine est « suivie » par un utilisateur si au moins une de ses cloches a 
 
 ### Nouveau / Nouveautes
 
-Une fiche decouverte par le scan quotidien **apres** l'activation de la cloche ; elle est nouvelle pour chaque utilisateur dont la cloche de sa section est active, et pour eux seuls. Le label disparait a la premiere visite de `/videos/{id}` par cet utilisateur. La section « Nouveautes » du dashboard en est la pile, une par chaine qu'il suit.
+Une fiche decouverte par le scan quotidien **apres** l'activation de la cloche ; elle est nouvelle pour chaque utilisateur dont la cloche de sa section est active, et pour eux seuls. Le label disparait a la premiere visite de `/videos/{id}` par cet utilisateur. La page « Nouveautes » est la liste d'Exploration restreinte aux fiches des chaines qu'il suit.
 
 - **Code** : `user_videos.is_new`, `/dashboard/nouveautes`
 - **A ne pas confondre avec** : Une fiche recente ou recemment importee : la synchronisation immediate a l'activation de la cloche et l'import manuel ne posent **jamais** `is_new`.

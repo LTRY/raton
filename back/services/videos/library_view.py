@@ -22,6 +22,7 @@ from back.services.common.settings import (
 )
 from back.services.common.user_state import channel_states, video_states
 from back.services.videos.filters import (
+    followed_video_condition,
     list_hide,
     video_filters_condition,
     video_section_condition,
@@ -58,6 +59,8 @@ class LibraryFilters:
     category_filter_mode: str = "or"
     search_query: str = ""
     page: int = 1
+    # The Nouveautés: only the fiches of the channels the user follows (their bells).
+    followed: bool = False
 
 
 def _labels(values) -> frozenset[str]:
@@ -91,13 +94,16 @@ def library_filters(
     category_filter_mode: str | None = None,
     search_query: str | None = None,
     page: int = 1,
+    followed: bool = False,
 ) -> LibraryFilters:
     """Filters from values as a client sent them: unknown file types, sorts, sections and modes
     fall back to their default, category labels are normalized, the search is trimmed."""
     return LibraryFilters(
         channel_id=channel_id,
         section=_section(section),
-        sort=sort if sort in LIBRARY_SORTS else ("published" if channel_id else "imported"),
+        sort=sort
+        if sort in LIBRARY_SORTS
+        else ("published" if channel_id or followed else "imported"),
         assets=frozenset(assets) & VIDEO_ASSET_KINDS,
         categories=_labels(categories),
         excluded_assets=frozenset(excluded_assets) & VIDEO_ASSET_KINDS,
@@ -109,6 +115,7 @@ def library_filters(
         category_filter_mode=category_filter_mode if category_filter_mode in FILTER_MODES else "or",
         search_query=normalized_search_query(search_query),
         page=max(page, 1),
+        followed=followed,
     )
 
 
@@ -166,7 +173,9 @@ def library_listing(db: Session, user_id: int, filters: LibraryFilters) -> Libra
     videos, page, total_pages, count = library_page(
         db,
         user_id,
-        and_(in_channel, in_section, matches_filters),
+        and_(in_channel, in_section, matches_filters, followed_video_condition())
+        if filters.followed
+        else and_(in_channel, in_section, matches_filters),
         filters.sort,
         filters.search_query,
         max(filters.page, 1),
@@ -218,7 +227,8 @@ def library_cards(db: Session, user_id: int, videos: list[Video]) -> list[dict]:
 
 
 def saved_view_is_active(view: dict, filters: LibraryFilters) -> bool:
-    return (
+    # The Nouveautés are not a vue enregistrée, whatever their filters.
+    return not filters.followed and (
         set(view.get("assets", [])) == filters.assets
         and set(view.get("categories", [])) == filters.categories
         and set(view.get("excluded_assets", [])) == filters.excluded_assets

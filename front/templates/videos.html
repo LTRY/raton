@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
 {% block content %}
+{# Also the Nouveautés page (`library_path`, `library_name`...): same list, same filters. #}
 {% set active_view = library_views|selectattr("active")|first %}
 <div class="library-layout">
-{{ macros.library_menu("" if active_view else "exploration", library_views) }}
+{{ macros.library_menu(library_menu_key|default("" if active_view else "exploration"), library_views) }}
 <section class="library-main">
   <div class="page-head">
-    {{ macros.library_title(active_view.name if active_view else "Exploration") }}
+    {{ macros.library_title(library_name|default(active_view.name if active_view else "Exploration")) }}
     {{ macros.list_hide_selector(hide_selector) }}
     {# Tied to the filters form below by `form=`: the field sits on the title row like on
        /channels and /playlists, but still submits and live-searches with the filters. #}
@@ -24,7 +25,7 @@
       <span>Filtres</span>
       {% if active_filter_pills %}<span class="adv-filters-count">{{ active_filter_pills|length }}</span>{% endif %}
     </summary>
-    <form class="filters-form" id="library-filters" action="/videos" method="get" data-auto-submit-filter data-live-search="library-results">
+    <form class="filters-form" id="library-filters" action="{{ library_path|default("/videos") }}" method="get" data-auto-submit-filter data-live-search="library-results">
       <input type="hidden" name="asset_filters" value="1">
       <input type="hidden" name="hide" value="{{ hide_selector.current }}">
       <div class="filters-main-row">
@@ -142,7 +143,7 @@
     {% if search_query %}
     <p class="empty-state">Aucun résultat pour « {{ search_query }} ».</p>
     {% else %}
-    <p class="empty-state">Aucune fiche dans la bibliothèque.</p>
+    <p class="empty-state">{{ empty_message|default("Aucune fiche dans la bibliothèque.") }}</p>
     {% endif %}
     {% endfor %}
   </div>

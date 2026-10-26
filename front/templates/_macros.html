@@ -369,33 +369,6 @@
 </article>
 {% endmacro %}
 
-{% macro video_stack_list(stacks, next_path, category_style_map) %}
-{% for stack in stacks %}
-{% set channel = stack.channel %}
-{% set cards = stack.items %}
-<section class="video-stack" data-video-stack>
-  <div class="video-stack-header">
-    <a class="video-stack-channel-link" href="/videos?channel_id={{ channel.id }}"><h3>{{ channel.name }}</h3></a>
-    {% if cards|length > 1 %}
-    <div class="video-stack-controls">
-      <button type="button" data-video-stack-previous aria-label="Vidéo précédente">‹</button>
-      <button type="button" data-video-stack-next aria-label="Vidéo suivante">›</button>
-    </div>
-    {% endif %}
-  </div>
-  <div class="video-stack-carousel" data-video-stack-carousel>
-    {% for card in cards %}
-    <div class="video-stack-slide">
-      {{ video_card(card, next_path, category_style_map) }}
-    </div>
-    {% endfor %}
-  </div>
-</section>
-{% else %}
-<p class="empty-state">Aucune nouveauté à consulter.</p>
-{% endfor %}
-{% endmacro %}
-
 {# `row` is a row of GET /api/historique: the API says how it is greyed out. #}
 {% macro media_row(row, category_style_map) %}
 {% set playback = row.playback %}

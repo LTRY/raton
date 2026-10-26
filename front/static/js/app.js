@@ -1318,35 +1318,6 @@ document.querySelectorAll("[data-screen-time-carousel]").forEach((carousel) => {
   updateControls();
 });
 
-document.querySelectorAll("[data-video-stack-carousel]").forEach((carousel) => {
-  // Counted live: a slide is removed when its fiche leaves the list (dropListedCard).
-  const slideCount = () => carousel.querySelectorAll(".video-stack-slide").length;
-  const container = carousel.closest(".video-stack");
-  const previous = container?.querySelector("[data-video-stack-previous]");
-  const next = container?.querySelector("[data-video-stack-next]");
-  let activeIndex = 0;
-
-  function updateControls() {
-    if (previous) previous.disabled = activeIndex === 0;
-    if (next) next.disabled = activeIndex === slideCount() - 1;
-  }
-
-  function goTo(index) {
-    activeIndex = Math.max(0, Math.min(index, slideCount() - 1));
-    carousel.scrollTo({ left: activeIndex * carousel.clientWidth, behavior: "smooth" });
-    updateControls();
-  }
-
-  previous?.addEventListener("click", () => goTo(activeIndex - 1));
-  next?.addEventListener("click", () => goTo(activeIndex + 1));
-  carousel.addEventListener("scroll", () => {
-    if (!carousel.clientWidth) return;
-    activeIndex = Math.max(0, Math.min(Math.round(carousel.scrollLeft / carousel.clientWidth), slideCount() - 1));
-    updateControls();
-  }, { passive: true });
-  updateControls();
-});
-
 function bindSettingsNav(nav) {
   const links = Array.from(nav.querySelectorAll(".settings-nav-link"));
   const sections = links
@@ -2645,16 +2616,12 @@ function paintListState(container, state) {
 
 // A list that leaves out the Vu and Indésirée fiches (its two-button selector) names those states
 // in `data-drop-states`: a card that takes one goes away at once, as it would on the next load;
-// an emptied carousel of the Nouveautés or day of the Historique goes with it.
+// an emptied day of the Historique goes with it.
 function dropListedCard(container, state) {
-  const card = container.closest(".video-stack-slide") || container.closest("article");
+  const card = container.closest("article");
   if (!card) return;
-  const stack = card.closest("[data-video-stack]");
   const day = card.closest(".dashboard-day-group");
   card.remove();
-  // Lets the carousel recount its slides and repaint its arrows.
-  stack?.querySelector("[data-video-stack-carousel]")?.dispatchEvent(new Event("scroll"));
-  if (stack && !stack.querySelector(".video-stack-slide")) stack.remove();
   if (day && !day.querySelector(".dashboard-media-row")) day.remove();
   const done = state === "hidden" ? "Fiche marquée indésirée" : "Fiche marquée vue";
   window.showToast?.(`${done} : « Tout voir » la remontre.`);

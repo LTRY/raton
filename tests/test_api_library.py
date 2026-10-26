@@ -14,7 +14,7 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.job import DownloadJob
-from back.models.user import UserSetting
+from back.models.user import UserChannel, UserSetting
 from back.models.video import Video
 from back.services.common.library_views import VIDEO_ASSET_KINDS
 from front.library import VIDEO_ASSET_FILTER_OPTIONS
@@ -128,6 +128,30 @@ def test_api_library_normalizes_filters_like_the_videos_page(db):
     assert payload["filters"]["asset_filter_mode"] == "or"
     assert payload["filters"]["q"] == "audio"
     assert [item["title"] for item in payload["items"]] == ["audio"]
+
+
+def test_api_library_followed_keeps_the_kinds_whose_bell_is_on(db):
+    videos_bell = add_channel(db, "Videos")
+    shorts_bell = add_channel(db, "Shorts")
+    silent = add_channel(db, "Silent")
+    db.add_all(
+        [
+            UserChannel(channel_id=videos_bell.id, user_id=user_id(db), auto_metadata_enabled=True),
+            UserChannel(channel_id=shorts_bell.id, user_id=user_id(db), auto_shorts_enabled=True),
+        ]
+    )
+    for prefix, channel in (("v", videos_bell), ("s", shorts_bell), ("n", silent)):
+        add_video(db, f"{prefix}-video", channel)
+        add_video(db, f"{prefix}-short", channel, short=True)
+    db.commit()
+
+    everything = TestClient(app).get("/api/library").json()
+    followed = TestClient(app).get("/api/library?followed=true").json()
+
+    assert everything["total"] == 6
+    assert sorted(item["title"] for item in followed["items"]) == ["s-short", "v-video"]
+    assert followed["filters"]["followed"] is True
+    assert followed["filters"]["sort"] == "published"
 
 
 def test_api_library_opens_a_channel_on_its_section(db):

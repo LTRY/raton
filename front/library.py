@@ -1,11 +1,16 @@
-"""The library page `/videos` (and a channel's page): from the URL to `GET /api/library`, and
-back to the links of the page (filter pills, saved views, "Tout effacer")."""
+"""The library list of `/videos` (Exploration, a channel's page) and of the Nouveautés: from the
+URL to `GET /api/library`, and back to the links of the page (filter pills, saved views, "Tout
+effacer")."""
 
 from urllib.parse import urlencode
 
 from fastapi import Request
 
-from front.formatting import format_periodicity_rate
+from front.api import Api
+from front.cards import card_views
+from front.formatting import category_style_map, format_periodicity_rate
+from front.pages import current_request_path, list_hide_selector, page_href_builder
+from front.records import record
 
 # Shorts mosaic: a big tile every SHORTS_FEATURE_RHYTHM tiles, never closer than SHORTS_FEATURE_MIN_GAP positions
 # (a big tile is 2x2, so two of them next to each other would swallow the mosaic).
@@ -32,10 +37,13 @@ def normalized_channel_id(channel_id: int | str | None) -> int | None:
     return int(channel_id)
 
 
-def selected_video_asset_filters(request: Request, channel_id: int | None) -> list[str]:
-    """The file types the URL asks for; until the form is submitted, the page's preset ones."""
+def selected_video_asset_filters(
+    request: Request, channel_id: int | None, followed: bool = False
+) -> list[str]:
+    """The file types the URL asks for; until the form is submitted, the page's preset ones
+    (every type on a channel page and in the Nouveautés, whose fiches are mostly metadata only)."""
     if request.query_params.get("asset_filters") != "1":
-        if channel_id:
+        if channel_id or followed:
             return sorted(DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS)
         return sorted(DEFAULT_VIDEO_ASSET_FILTERS)
     return request.query_params.getlist("asset")
@@ -53,14 +61,16 @@ def selected_video_filter_mode(request: Request, name: str) -> str:
     return "or"
 
 
-def library_query(request: Request, channel_id: int | None, page: int) -> dict:
+def library_query(
+    request: Request, channel_id: int | None, page: int, followed: bool = False
+) -> dict:
     """The `GET /api/library` parameters of this page's URL."""
     params = request.query_params
     query = {
         "channel_id": channel_id,
         "section": params.get("section"),
         "sort": params.get("sort"),
-        "asset": selected_video_asset_filters(request, channel_id),
+        "asset": selected_video_asset_filters(request, channel_id, followed),
         "category": params.getlist("category"),
         "exclude_asset": params.getlist("exclude_asset"),
         "exclude_category": params.getlist("exclude_category"),
@@ -70,6 +80,8 @@ def library_query(request: Request, channel_id: int | None, page: int) -> dict:
         "hide": params.get("hide"),
         "page": max(page, 1),
     }
+    if followed:
+        query["followed"] = "true"
     for flag, name in (
         ("rated", "rated"),
         ("uncategorized", "uncategorized"),
@@ -101,8 +113,9 @@ def video_filters_clear_href(request: Request) -> str:
 def video_active_filter_pills(request: Request, filters) -> list[dict]:
     pills = []
     assets = set(filters.assets)
-    # A channel page selects every file type by default: that is "no filter", so it shows no pill.
-    if filters.channel_id and assets == DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS:
+    # A channel page and the Nouveautés select every file type by default: that is "no filter",
+    # so they show no pill.
+    if (filters.channel_id or filters.followed) and assets == DEFAULT_CHANNEL_VIDEO_ASSET_FILTERS:
         assets = set()
     if filters.rated:
         pills.append(
@@ -184,6 +197,46 @@ def library_view_links(views, request: Request) -> list[dict]:
         {"name": view.name, "active": view.active, "href": video_library_view_path(view, request)}
         for view in views
     ]
+
+
+def library_list_context(request: Request, api: Api, library) -> dict:
+    """What `videos.html` (and `channel_videos.html`) read of a `GET /api/library` reply."""
+    filters = library.filters
+    styles = record(api.get("/categories"))
+    cards = card_views(library.items)
+    return {
+        "channels": record(api.get("/channels/names")),
+        "selected_channel_id": filters.channel_id,
+        "selected_channel_section": library.section,
+        "asset_filter_options": VIDEO_ASSET_FILTER_OPTIONS,
+        "selected_asset_filters": set(filters.assets),
+        "category_filter_options": styles,
+        "category_style_map": category_style_map(styles),
+        "library_views": library_view_links(library.saved_views, request),
+        "selected_category_filters": set(filters.categories),
+        "selected_excluded_asset_filters": set(filters.excluded_assets),
+        "selected_excluded_category_filters": set(filters.excluded_categories),
+        "selected_rated_only": filters.rated,
+        "hide_selector": list_hide_selector(request, filters.hide),
+        "selected_uncategorized_only": filters.uncategorized,
+        "selected_asset_filter_mode": filters.asset_filter_mode,
+        "selected_category_filter_mode": filters.category_filter_mode,
+        "selected_sort": filters.sort,
+        "search_query": filters.q,
+        "active_filter_pills": video_active_filter_pills(request, filters),
+        "category_filter_count": len(filters.categories)
+        + len(filters.excluded_categories)
+        + int(filters.uncategorized),
+        "filters_clear_href": video_filters_clear_href(request),
+        "current_videos_path": current_request_path(request),
+        "channel_page": library.page,
+        "page": library.page,
+        "total_pages": library.total_pages,
+        "page_href": page_href_builder(request),
+        "filtered_video_count": library.total,
+        "video_cards": cards,
+        "shorts_feature_flags": shorts_feature_flags(cards),
+    }
 
 
 def channel_periodicity(median_days: float | None) -> str | None:

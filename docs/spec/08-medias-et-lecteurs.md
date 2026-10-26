@@ -242,8 +242,7 @@ channel, src, thumb, resume-key, activity-url, detail-url) :
 - le bouton "Ecouter" sur `/videos/{id}` pour une video audio-seule ;
 - un bouton play en superposition sur la vignette de chaque carte
   audio-seule dans `video_card` (`front/templates/_macros.html`), utilise a la
-  fois par `/videos`, la section Nouveautes du dashboard, et
-  `/dashboard/nouveautes` (`dashboard_new_videos.html`) ;
+  fois par `/videos` et `/dashboard/nouveautes` (`videos.html`) ;
 - le lecteur de playlist en mode Audio, qui y charge toute sa file (voir
   « File d'une playlist » ci-dessous).
 

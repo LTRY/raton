@@ -2,16 +2,11 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from front.api import Api, ApiError, get_api
-from front.cards import card_views, history_days, local_today, screen_time_rings
+from front.cards import history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
-from front.library import library_view_links
+from front.library import library_list_context, library_query, library_view_links
 from front.library_chat import library_chat_widget_config
-from front.pages import (
-    current_request_path,
-    list_hide_selector,
-    message_context,
-    page_href_builder,
-)
+from front.pages import list_hide_selector, message_context, page_href_builder
 from front.records import record
 from front.templating import templates
 
@@ -46,24 +41,18 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
 
 @router.get("/dashboard/nouveautes", response_class=HTMLResponse)
 def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
-    nouveautes = record(
-        api.get("/nouveautes", page=max(page, 1), hide=request.query_params.get("hide"))
-    )
-    for stack in nouveautes.stacks:
-        card_views(stack.items)
-    styles = record(api.get("/categories"))
+    """The Nouveautés: Exploration's list and filters, on the fiches of the followed channels."""
+    library = record(api.get("/library", **library_query(request, None, page, followed=True)))
     return templates.TemplateResponse(
         request,
-        "dashboard_new_videos.html",
+        "videos.html",
         {
-            "video_stacks": nouveautes.stacks,
-            "library_views": library_view_links(record(api.get("/library/views")), request),
-            "current_new_videos_path": current_request_path(request),
-            "category_style_map": category_style_map(styles),
-            "hide_selector": list_hide_selector(request, nouveautes.hide),
-            "page": nouveautes.page,
-            "total_pages": nouveautes.total_pages,
-            "page_href": page_href_builder(request),
+            **library_list_context(request, api, library),
+            "library_path": "/dashboard/nouveautes",
+            "library_name": "Nouveautés",
+            "library_menu_key": "nouveautes",
+            "empty_message": "Aucune nouveauté : active la cloche d'une chaîne pour suivre ses fiches.",
+            **message_context(request),
         },
     )
 

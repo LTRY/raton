@@ -53,6 +53,7 @@ class LibraryFiltersRead(BaseModel):
     asset_filter_mode: str
     category_filter_mode: str
     q: str
+    followed: bool
 
 
 class SavedViewRead(BaseModel):

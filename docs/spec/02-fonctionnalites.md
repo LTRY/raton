@@ -34,13 +34,14 @@ Le detail est dans [05 Modele de donnees](05-modele-de-donnees.md),
 L'onglet central **Bibliotheque** regroupe quatre vues (l'import se fait depuis le bouton rond en haut a droite,
 voir [11 Interface HTML](11-interface-html.md)) :
 
-- **Nouveautes** (`/dashboard/nouveautes`) : une pile de videos recentes par
-  chaine que l'utilisateur suit (au moins une de ses deux cloches active), pas seulement les fiches
-  marquees `is_new` — une fiche deja visitee reste affichee tant qu'elle
-  fait partie des plus recentes de sa chaine. Chaque cloche filtre son
-  type : la pile ne montre les videos que si la cloche videos est active,
-  et les shorts que si la cloche shorts est active. Paginee par chaine (10
-  chaines par page) ;
+- **Nouveautes** (`/dashboard/nouveautes`) : la meme interface qu'Exploration
+  (recherche, filtres, tri, pagination par 50), limitee aux fiches des chaines
+  que l'utilisateur suit (au moins une de ses deux cloches active), pas
+  seulement les fiches marquees `is_new` — une fiche deja visitee reste
+  affichee. Chaque cloche filtre son type : les videos ne sont listees que si
+  la cloche videos est active, les shorts que si la cloche shorts est active.
+  Triee par publication recente, tous les types de fichier selectionnes
+  (les fiches suivies n'ont souvent que leurs metadonnees) ;
 - **Historique** (`/dashboard/historique`) : activite de lecture recente,
   groupee par journee, paginee ; une ligne par media et par jour, avec le temps
   regarde ce jour-la (chaque revisionnage compte) et « Revu » si la fiche etait
@@ -134,7 +135,7 @@ deux ; les cloches d'un utilisateur ne changent rien pour les autres.
 - Le label technique **Nouveau** est affiche sur une fiche tant que
   `is_new = true` pour l'utilisateur. Sa visite de la page detail de la video
   (`/videos/{id}`) retire automatiquement ce label pour lui — la fiche reste
-  neanmoins visible dans la pile de sa chaine (section Nouveautes), seul le
+  neanmoins visible dans les Nouveautes, seul le
   label disparait.
 
 ## Playlists

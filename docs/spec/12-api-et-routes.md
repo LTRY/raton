@@ -106,7 +106,7 @@ Videos :
 
 - `GET /` : accueil (barre de chat de la bibliotheque seule) ;
   `?discussion={id}` ouvre cette discussion du chat au lieu de Raton.
-- `GET /dashboard/nouveautes?page=N` : page complete, une pile de videos recentes par chaine suivie (cloche videos ou shorts active, chaque cloche ne listant que son type), paginee par chaine (10 chaines/page, `page`=chaines et non videos). `hide` : voir `GET /videos`.
+- `GET /dashboard/nouveautes?page=N` : page complete, la meme liste, les memes filtres et la meme recherche que `/videos` (`GET /api/library?followed=true`), limitee aux fiches des chaines suivies (cloche videos ou shorts active, chaque cloche ne listant que son type), triee par publication recente, tous les types de fichier selectionnes par defaut ; 50 fiches par page. Les parametres (dont `hide`) sont ceux de `/videos`.
 - `GET /dashboard/historique?page=N` : page complete paginee (50/page) de l'activite "Historique". `hide` : voir `GET /videos` (defaut `none` ici).
 - `GET /dashboard/reprises?page=N` : ancienne URL de la page ci-dessus, conservee en redirection 302 (temporaire, pour ne pas figer un 301 dans le cache des navigateurs) vers `/dashboard/historique`, `page` preservee.
 - `GET /stats` : page de graphiques (stockage et fiches par chaine, par format, par mois) ; voir [11 Interface HTML](11-interface-html.md).
@@ -320,7 +320,9 @@ n'existait pas.
   fiches par page. Memes noms de parametres que `/videos` : `channel_id`,
   `section`, `sort`, `asset`, `category`, `exclude_asset`,
   `exclude_category` (repetables), `rated`, `hide`, `uncategorized`,
-  `asset_filter_mode`, `category_filter_mode`, `q`, `page`. Memes regles de
+  `asset_filter_mode`, `category_filter_mode`, `q`, `page`, et `followed` (les
+  Nouveautes : seules les fiches des chaines suivies, tri par defaut
+  `published`, jamais une vue enregistree `active`). Memes regles de
   validation (`library_filters`) : un type de fichier, un tri, une section ou
   un mode inconnu est ignore ou remplace par son defaut, les categories sont
   normalisees ; `hide` absent ou inconnu vaut `watched_hidden` (ni vues ni
@@ -580,7 +582,9 @@ watched_at}`.
   `{channel: {id, name}, items}` avec les 10 fiches les plus recentes des
   types que suivent ses cloches, en cartes de `GET /api/library`. `hide`
   (defaut `watched_hidden`) comme `GET /api/library`, renvoye tel qu'applique :
-  une chaine sans fiche restante n'a pas de pile.
+  une chaine sans fiche restante n'a pas de pile. Les pages ne
+  l'utilisent plus (`/dashboard/nouveautes` lit `GET /api/library?followed=true`) ;
+  le serveur MCP l'expose encore.
 - `GET /api/historique?page=N` : une ligne par media et par jour local, la plus
   recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds}` ;
   chaque ligne `{job_id, created_at, day, video, channel, playback,

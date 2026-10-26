@@ -2672,7 +2672,7 @@ def make_new_video(db, channel, index, is_new=True):
     return video
 
 
-def test_dashboard_new_videos_page_paginates_by_channel_ten_at_a_time():
+def test_dashboard_new_videos_page_is_the_exploration_list_of_the_followed_channels():
     db = make_session()
     channels = [
         Channel(
@@ -2680,27 +2680,35 @@ def test_dashboard_new_videos_page_paginates_by_channel_ten_at_a_time():
             name=f"Chaîne {i:02d}",
             user_states=my_channel(auto_metadata_enabled=True),
         )
-        for i in range(15)
+        for i in range(3)
     ]
     db.add_all(channels)
-    for channel_index, channel in enumerate(channels):
-        make_new_video(db, channel, channel_index)
+    for index in range(12):
+        make_new_video(db, channels[index % 3], index)
+    metadata_only = make_new_video(db, channels[0], 99)
+    metadata_only.video_path = None
+    metadata_only.media_type = "metadata"
+    metadata_only.title = "Fiche sans fichier"
     db.commit()
 
-    page_one = site(db).get("/dashboard/nouveautes")
-    rendered_one = page_one.text
-    page_two = site(db).get("/dashboard/nouveautes?page=2")
-    rendered_two = page_two.text
+    rendered = site(db).get("/dashboard/nouveautes").text
 
-    assert rendered_one.count('class="video-stack"') == 10
-    assert "Chaîne 14" in rendered_one
-    assert "Chaîne 04" not in rendered_one
-    assert rendered_two.count('class="video-stack"') == 5
-    assert "Chaîne 04" in rendered_two
-    assert "Page 1 / 2" in rendered_one
+    # One flat list, no stack per channel; the search and the filters are Exploration's.
+    assert "video-stack" not in rendered
+    assert rendered.count('<article class="video-row') == 13
+    assert "Fiche sans fichier" in rendered
+    assert 'action="/dashboard/nouveautes"' in rendered
+    assert 'name="q"' in rendered
+    assert 'name="channel_id"' in rendered
+    assert "13 fiches" in rendered
+    # Every file type is selected by default: no active filter pill.
+    assert "active-filters-row" not in rendered
+
+    searched = site(db).get("/dashboard/nouveautes?q=sans+fichier").text
+    assert searched.count('<article class="video-row') == 1
 
 
-def test_dashboard_new_videos_page_stack_caps_at_ten_most_recent_videos():
+def test_dashboard_new_videos_page_lists_the_most_recent_fiches_first_and_paginates():
     db = make_session()
     channel = Channel(
         url="https://example.test/busy",
@@ -2708,18 +2716,20 @@ def test_dashboard_new_videos_page_stack_caps_at_ten_most_recent_videos():
         user_states=my_channel(auto_metadata_enabled=True),
     )
     db.add(channel)
-    for index in range(15):
-        make_new_video(db, channel, index)
+    for index in range(60):
+        make_new_video(db, channel, index).published_at = datetime(
+            2026, 7, 1, tzinfo=UTC
+        ) + timedelta(days=index)
     db.commit()
 
-    rendered = site(db).get("/dashboard/nouveautes").text
+    first = site(db).get("/dashboard/nouveautes").text
+    second = site(db).get("/dashboard/nouveautes?page=2").text
 
-    assert rendered.count('<article class="video-row') == 10
-    assert "Nouveauté 14" in rendered
-    assert "Nouveauté 4" not in rendered
-    assert "data-video-stack-carousel" in rendered
-    assert "data-video-stack-previous" in rendered
-    assert "1 / 10" not in rendered
+    assert first.index("Nouveauté 59") < first.index("Nouveauté 58")
+    assert "Nouveauté 10<" in first
+    assert "Nouveauté 9<" not in first
+    assert "Nouveauté 9<" in second
+    assert "Page 1 / 2" in first
 
 
 def test_dashboard_new_videos_page_still_shows_already_visited_videos():
@@ -2747,14 +2757,14 @@ def test_dashboard_new_videos_page_excludes_channels_without_the_bell():
     )
     not_followed = Channel(url="https://example.test/playlist-origin", name="Chaîne de playlist")
     db.add_all([followed, not_followed])
-    make_new_video(db, followed, 0)
-    make_new_video(db, not_followed, 0)
+    make_new_video(db, followed, 0).title = "Fiche suivie"
+    make_new_video(db, not_followed, 0).title = "Fiche de playlist"
     db.commit()
 
     rendered = site(db).get("/dashboard/nouveautes").text
 
-    assert "Chaîne suivie" in rendered
-    assert "Chaîne de playlist" not in rendered
+    assert "Fiche suivie" in rendered
+    assert "Fiche de playlist" not in rendered
 
 
 def test_dashboard_new_videos_page_lists_only_the_kinds_whose_bell_is_on():
@@ -2788,7 +2798,7 @@ def test_dashboard_new_videos_page_lists_only_the_kinds_whose_bell_is_on():
 
     for shown in ("V-video", "S-short", "B-video", "B-short"):
         assert shown in rendered
-    for hidden in ("V-short", "S-video", "N-video", "N-short", "Sans cloche"):
+    for hidden in ("V-short", "S-video", "N-video", "N-short"):
         assert hidden not in rendered
 
 
@@ -4959,13 +4969,13 @@ def test_dashboard_new_videos_page_hide_levels():
     assert "Nouveauté 0" in rendered
     assert "Nouveauté 1" not in rendered
     assert "Nouveauté 2" not in rendered
-    assert "Chaîne toute indésirée" not in rendered
+    assert "Nouveauté 3" not in rendered
     assert 'href="/dashboard/nouveautes?hide=none"' in rendered
     assert 'data-drop-states="watched hidden"' in rendered
     assert "Nouveauté 1" in everything
     assert "Nouveauté 2" in everything
-    assert "Chaîne toute indésirée" in everything
-    # Changing the choice drops the page number: the stacks are not the same any more.
+    assert "Nouveauté 3" in everything
+    # Changing the choice drops the page number: the rows are not the same any more.
     assert 'href="/dashboard/nouveautes?hide=watched_hidden"' in everything
 
 
