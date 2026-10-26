@@ -455,7 +455,7 @@ par `.chat-composer`.
 - **Cartes** : pas de `backdrop-filter` (le flou se paie par element). Les
   lignes d'historique (`.dashboard-media-row`) prennent un fond translucide, le
   liseré clair, le reflet interne et l'ombre chaude ; les paliers « vu » et
-  « ecartee » gardent leur fond plat. Les vignettes de la grille (conteneur
+  « indesiree » gardent leur fond plat. Les vignettes de la grille (conteneur
   d'au moins 461 px) ont un liseré et une ombre chaude.
 - **Panneaux et blocs de formulaire** (`.settings-card`, `.stats-card`,
   `.filters-form`, `.download-form`, `.filter-collapse`, `.log-list`,
@@ -722,7 +722,7 @@ est la macro `history_day_list` (`_macros.html`).
 Comme le bloc de journee porte deja la date, la ligne d'activite ne repete ni
 `Publie le` ni `Vu le` : elle garde le titre, les labels, la chaine, le temps
 regarde ce jour-la (et « Revu »), la progression, puis une derniere ligne avec
-le poids du fichier a gauche et les actions Vu/Ecartee + la notation a droite.
+le poids du fichier a gauche et les actions Vu/Indesiree + la notation a droite.
 
 ### Barre de progression de lecture
 
@@ -1268,7 +1268,7 @@ Contenu :
   un petit panneau « Publiée le <date> ». Il n'existe pas sur la page d'une
   chaine, qui garde sa ligne de date ;
 - les etoiles de notation sont calees contre le bord droit de la carte (6px),
-  sous le menu ⋮, apres Vu/Ecartee ;
+  sous le menu ⋮, apres Vu/Indesiree ;
 - sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
   `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis
@@ -1278,12 +1278,12 @@ Contenu :
   (`/videos`, detail d'une playlist, piles de Nouveautes) — titre limite a 2
   lignes, la chaine dessous, puis les actions dans la colonne
   de droite, sous le titre et la chaine (jamais en barre pleine largeur sous la
-  vignette) : Vu/Ecartee a gauche, la notation poussee a droite ; avec les vignettes masquees, la colonne de vignette disparait
+  vignette) : Vu/Indesiree a gauche, la notation poussee a droite ; avec les vignettes masquees, la colonne de vignette disparait
   (seule une carte "audio seule" garde la largeur de son bouton play) ;
 - sur ecran tactile (`hover: none` et `pointer: coarse`), les boutons
-  Vu/Ecartee ne sont affiches dans aucune liste, Historique compris : ils sont
+  Vu/Indesiree ne sont affiches dans aucune liste, Historique compris : ils sont
   remplaces par le glissement de la carte, vers la droite pour Vu, vers la
-  gauche pour Ecartee (le bloc reste dans le DOM, masque en CSS, car le
+  gauche pour Indesiree (le bloc reste dans le DOM, masque en CSS, car le
   glissement lit son etat). Le glissement peut commencer n'importe ou sur la
   carte, y compris sur un lien ou un bouton (vignette, titre, Audio/Video,
   etoiles) : un simple appui garde son effet normal, et le clic qui suivrait
@@ -1291,7 +1291,7 @@ Contenu :
   exclus ;
 - carte dans une pile de Nouveautes (`.video-stack`) : seules differences
   avec les autres listes, le nom de chaine n'est pas repete sous le titre (il
-  est deja dans l'en-tete de la pile) et les boutons Vu/Ecartee n'y sont
+  est deja dans l'en-tete de la pile) et les boutons Vu/Indesiree n'y sont
   affiches sur aucun ecran ;
 - aucune page ne doit defiler horizontalement sur mobile (verifie a 390px,
   largeur d'un iPhone) : les grilles qui contiennent un carrousel, un
@@ -1397,7 +1397,7 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   publication en petit dessous — ni chaine, ni vues. La duree est en bas a droite de la vignette, la progression
   de lecture est une barre de 4px collee au bord bas (plus de texte
   « position / duree »), la pastille « Nouveau » (fiche `is_new`) est en haut
-  a gauche. Au survol, la carte se souleve et les boutons Vu/Ecartee
+  a gauche. Au survol, la carte se souleve et les boutons Vu/Indesiree
   apparaissent en haut a droite. **Note** : au repos un petit point de la
   couleur du palier (`.rating-dot`, absent sans note) est en bas a gauche ; au
   survol il s'ouvre en cinq etoiles cliquables (memes formulaires
@@ -1408,7 +1408,7 @@ dont la largeur choisit la mise en page ; cartes = macro `video_card` en
   etoiles sont toujours affichees ;
 - **Videos, conteneur de moins de 461px (telephone)** : meme liste de lignes
   que partout (vignette pleine hauteur de 176px, titre sur 2 lignes, actions
-  sous le titre, glissement vu/ecartee), avec en plus la pastille « Nouveau » et
+  sous le titre, glissement vu/indesiree), avec en plus la pastille « Nouveau » et
   la barre de progression sur la vignette, la date de publication sous le
   titre et sans nom de chaine ;
 - **Shorts** (`.channel-video-grid-shorts`) : mosaique de tuiles portrait
@@ -1482,7 +1482,7 @@ mini-lecteur persistant sans quitter la page (voir
 [08 Medias et lecteurs](08-medias-et-lecteurs.md)) — meme comportement dans
 la page Nouveautes, qui reutilise la meme macro `video_card`.
 
-Chaque carte video expose aussi deux boutons **Vu** et **Écartée**, rendus par
+Chaque carte video expose aussi deux boutons **Vu** et **Indésirée**, rendus par
 la macro partagee `list_state_actions` (`_macros.html`). Elle est appelee
 depuis `video_card` (donc `/videos`,
 `/dashboard/nouveautes` et le detail d'une playlist) **et** depuis `media_row`
@@ -1501,24 +1501,24 @@ le texte, alors qu'une carte de liste baisse son `opacity` : la ligne
 d'historique est posee sur le fond deja creme d'un bloc de journee, ou un
 voile d'opacite rendait le titre illisible. Ce sont des pastilles
 sans libelle visible, portant une icone SVG inline en trait (`.list-state-icon`,
-14 px) : un œil pour **Vu**, le meme œil barre pour **Écartée** — la meme icone
-une fois rayee, qui dit visuellement que "ecartee" est un "vu" renforce. Les
+14 px) : un œil pour **Vu**, le meme œil barre pour **Indésirée** — la meme icone
+une fois rayee, qui dit visuellement que "indesiree" est un "vu" renforce. Les
 tracés utilisent `stroke="currentColor"`, donc l'icone se teinte avec le
 bouton quand il passe actif. Faute de libelle visible, chaque bouton porte un
 `aria-label` en plus du `title` (le `title` seul n'est accessible ni au
 tactile ni au lecteur d'ecran). Ils griment la ligne en
 deux paliers : **Vu** applique le grisage existant (`.video-row-watched`),
-**Écartée** une teinte de noir nettement plus forte (`.video-row-hidden`), avec
+**Indésirée** une teinte de noir nettement plus forte (`.video-row-hidden`), avec
 la vignette desaturee. Les deux ecrivent le `list_state` de l'utilisateur (`user_videos`, voir
 [05 Modele de donnees](05-modele-de-donnees.md)) via
 `PUT /api/videos/{id}/list-state` en `fetch`, sans rechargement : la ligne et les
 deux boutons sont repeints immediatement.
 
 Une carte de la liste ne change jamais de couleur au survol ni au toucher
-(souris, defilement ou tap) : seuls les etats Vu et Ecartee la grisent, sinon un
+(souris, defilement ou tap) : seuls les etats Vu et Indesiree la grisent, sinon un
 simple survol ferait croire que la video est vue.
 
-Une ligne vue ou ecartee n'affiche pas sa barre de progression. Le serveur omet
+Une ligne vue ou indesiree n'affiche pas sa barre de progression. Le serveur omet
 deja le markup au rendu ; quatre regles CSS (`.video-row-watched
 .video-row-progress` et `.video-row-hidden .video-row-progress` pour les
 cartes, leurs equivalents `.dashboard-media-row-* .video-card-progress` pour
@@ -1531,40 +1531,40 @@ barre avant le prochain rendu.
 Le grisage automatique existant (Vu a 90 % ou derniere lecture terminee) est conserve et
 sert d'etat par defaut. Le bouton **Vu** s'affiche donc deja allume sur une
 video terminee ; cliquer dessus ecrit `unwatched` et annule ce grisage.
-Cliquer **Écartée** sur une video deja ecartee la remet a l'etat automatique —
+Cliquer **Indésirée** sur une video deja indesiree la remet a l'etat automatique —
 la macro expose cet etat automatique dans `data-list-state-auto` pour que le
 client sache quoi repeindre sans recharger. Cliquer **Vu** sur une video
-ecartee la fait redescendre au palier "vu".
+indesiree la fait redescendre au palier "vu".
 
-#### Selecteur d'affichage : tout, sans les vus, sans les vus ni les ecartees
+#### Selecteur d'affichage : tout voir, ou masquer les deja vues et les indesirees
 
 `/videos`, la page d'une chaine, Nouveautes et Historique portent un
-**selecteur d'affichage** a trois icones (macro `list_hide_selector`,
+**selecteur d'affichage** a deux boutons-icones (macro `list_hide_selector`,
 `.list-hide-selector`, meme piste et meme pastille relevee que le segment
 Vidéos/Shorts d'une chaine) qui choisit ce que la liste retire, cote serveur
 (parametre `hide`) :
 
 | Icone | `hide` | Libelle (`title`/`aria-label`) | La liste retire |
 | --- | --- | --- | --- |
-| liste | `none` | Tout afficher | rien |
-| œil (celui de **Vu**) | `watched` | Masquer les vus | les fiches vues |
-| œil barre (celui d'**Écartée**) | `watched_hidden` | Masquer les vus et les écartées | les fiches vues et les ecartees |
+| liste | `none` | Tout voir | rien |
+| œil barre (celui d'**Indésirée**) | `watched_hidden` | Masquer les déjà vues et les indésirées | les fiches vues et les indesirees |
 
 Par defaut (`hide` absent ou inconnu), la Bibliotheque, une chaine et les
 Nouveautes sont sur `watched_hidden` ; l'Historique est sur `none`, car il
 n'aligne presque que des lectures terminees. Le defaut est decide par l'API,
-qui renvoie le niveau applique (`filters.hide`, `hide`). Chaque icone est un
+qui renvoie le choix applique (`filters.hide`, `hide`) ; une autre valeur (dont
+l'ancien niveau intermediaire `watched`) revient au defaut. Chaque bouton est un
 lien vers la meme page avec `hide` choisi, revenu a la premiere page (le nombre
 de lignes change) ; les formulaires de filtres de `/videos` et d'une chaine
 portent `hide` en champ cache pour le garder, et « Tout effacer » le garde
 aussi (c'est une facon d'afficher, pas un filtre).
 
-Vu et Ecartee sont ceux de l'utilisateur courant (`user_videos`) : une fiche
-qu'il a ecartee reste dans les listes des autres. « Vu » suit le glossaire :
+Vu et Indesiree sont ceux de l'utilisateur courant (`user_videos`) : une fiche
+qu'il a marquee indesiree reste dans les listes des autres. « Vu » suit le glossaire :
 `list_state = "watched"`, ou son `watched_at` pose par la regle des 90 % quand
 `list_state` est vide, hors categorie « sans barre de progression » — le meme
-Vu que le grisage automatique d'une carte. Une fiche ecartee n'est pas « vue » :
-sur `watched`, elle reste affichee, grisee au palier fort. Sur Historique, le
+Vu que le grisage automatique d'une carte. Sur « Tout voir », vues et
+indesirees restent affichees, grisees a leur palier. Sur Historique, le
 tri se fait en Python sur les lignes (media, jour) avant la pagination, avec
 deux requetes pour toutes les fiches de l'historique ; la ligne d'une fiche
 supprimee n'a plus d'etat et reste toujours.
@@ -1572,9 +1572,9 @@ supprimee n'a plus d'etat et reste toujours.
 Le conteneur de la liste nomme dans `data-drop-states` les etats qu'il retire
 (la `turbo-frame` des resultats sur `/videos` et une chaine,
 `.video-stack-list` sur Nouveautes, `.history-day-lists` sur Historique) :
-une carte marquee **Vu** ou **Écartée** qui prend l'un de ces etats est
+une carte marquee **Vu** ou **Indésirée** qui prend l'un de ces etats est
 retiree aussitot de la page au lieu d'etre grisee, avec un toast qui rappelle
-l'affichage « Tout » ; une pile de Nouveautes ou une journee d'Historique videe
+« Tout voir » ; une pile de Nouveautes ou une journee d'Historique videe
 disparait avec elle. Les compteurs (nombre de fiches, de medias d'une journee)
 ne se mettent a jour qu'au prochain rendu.
 

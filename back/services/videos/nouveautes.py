@@ -29,7 +29,7 @@ def nouveautes_stacks(
     its own kind: a fiche is listed only when the user's bell matching its kind (video or short)
     is on for its channel. Fiches imported through a playlist land on a channel with no bell and never
     feed this section (see docs/spec/07-youtube-et-telechargements.md). `hide` leaves out the
-    user's Vu and/or Écartée fiches (`LIST_HIDES`): a channel with none left has no stack.
+    user's Vu and Indésirée fiches (`LIST_HIDES`): a channel with none left has no stack.
     """
     recency = func.coalesce(Video.published_at, Video.downloaded_at, Video.created_at)
     followed_kind = and_(

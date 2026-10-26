@@ -94,9 +94,9 @@ def _day_entries(
 
 
 def _kept_entries(
-    db: Session, user_id: int, entries: list[_DayEntry], hide: str, no_progress_labels
+    db: Session, user_id: int, entries: list[_DayEntry], no_progress_labels
 ) -> list[_DayEntry]:
-    """The entries left once `hide` drops the user's Vu and/or Écartée fiches (`LIST_HIDES`),
+    """The entries left once `hide` drops the user's Vu and Indésirée fiches (`LIST_HIDES`),
     with two queries for every fiche of the history. A gone fiche has no state left: it stays."""
     video_ids = {entry.video_id for entry in entries if entry.video_id}
     states = video_states(db, user_id, video_ids)
@@ -112,9 +112,9 @@ def _kept_entries(
         if video is None:
             return True
         state = states[video.id]
-        if video_is_watched(video, state, no_progress_labels):
-            return False
-        return not (hide == "watched_hidden" and state.list_state == "hidden")
+        return state.list_state != "hidden" and not video_is_watched(
+            video, state, no_progress_labels
+        )
 
     return [entry for entry in entries if kept(entry)]
 
@@ -130,8 +130,8 @@ def history_page(
     now = now or datetime.now().astimezone()
     entries, all_seconds_by_day = _day_entries(db, user_id, now)
     no_progress_labels = set(get_no_progress_category_labels(db))
-    if hide != "none":
-        entries = _kept_entries(db, user_id, entries, hide, frozenset(no_progress_labels))
+    if hide == "watched_hidden":
+        entries = _kept_entries(db, user_id, entries, frozenset(no_progress_labels))
     total_pages = max(1, -(-len(entries) // page_size))
     page = min(max(page, 1), total_pages)
     page_entries = entries[(page - 1) * page_size : page * page_size]

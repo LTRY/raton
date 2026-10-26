@@ -21,7 +21,7 @@ class NouveautesRead(BaseModel):
     stacks: list[NouveautesStackRead]
     page: int
     total_pages: int
-    # What the stacks leave out, as applied: "none", "watched" or "watched_hidden".
+    # What the stacks leave out, as applied: "none" or "watched_hidden".
     hide: str
 
 
@@ -80,7 +80,7 @@ class HistoriqueRead(BaseModel):
     rows: list[HistoryRowRead]
     page: int
     total_pages: int
-    # What the rows leave out, as applied: "none", "watched" or "watched_hidden".
+    # What the rows leave out, as applied: "none" or "watched_hidden".
     hide: str
     # Reading time of each day on the page, every playback of the day counted.
     day_seconds: dict[date, float]

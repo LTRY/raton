@@ -1,7 +1,7 @@
 """Which fiches a library list keeps: the filters in Python (`video_matches_filters`) and their SQL twin
 (`video_filters_condition`), kept in step by tests/test_videos_sql_filters.py.
 
-The Écartée state and the stars are the user's own: the Python filter takes their state row, the
+The Indésirée state and the stars are the user's own: the Python filter takes their state row, the
 SQL one reads the `UserVideo` row the query outer-joins (`video_state_join`)."""
 
 from sqlalchemy import String, and_, func, literal, or_, true
@@ -18,9 +18,9 @@ from back.services.common.user_state import (
 )
 from back.services.videos.documents import NOTES_FILE
 
-# What a list leaves out, from the 3-icon selector (docs/spec/11-interface-html.md): nothing, the
-# Vu fiches, or the Vu and the Écartée ones.
-LIST_HIDES = ("none", "watched", "watched_hidden")
+# What a list leaves out, from its two-button selector (docs/spec/11-interface-html.md): nothing,
+# or the Vu and the Indésirée fiches.
+LIST_HIDES = ("none", "watched_hidden")
 
 
 def list_hide(value: str | None, default: str) -> str:
@@ -83,9 +83,9 @@ def video_matches_filters(
     uncategorized_only: bool = False,
     no_progress_labels: frozenset[str] = frozenset(),
 ) -> bool:
-    if hide != "none" and video_is_watched(video, state, no_progress_labels):
-        return False
-    if hide == "watched_hidden" and state.list_state == "hidden":
+    if hide == "watched_hidden" and (
+        state.list_state == "hidden" or video_is_watched(video, state, no_progress_labels)
+    ):
         return False
     video_assets = video_asset_kinds(video)
     video_categories = set(video_category_labels(video))
@@ -129,7 +129,7 @@ def video_matches_filters(
 
 def video_is_watched(video: Video, state: UserVideo, no_progress_labels: frozenset[str]) -> bool:
     """Vu for the user, as a list filters it: marked Vu by hand, or their `watched_at` set by the
-    90 % rule while not forced non-vu nor Écartée, outside a "no progress bar" category
+    90 % rule while not forced non-vu nor Indésirée, outside a "no progress bar" category
     (replayed, never done)."""
     if state.list_state == "watched":
         return True
@@ -149,14 +149,14 @@ def video_watched_condition(no_progress_labels: frozenset[str]):
 
 
 def video_list_hide_condition(hide: str, no_progress_labels: frozenset[str]):
-    """The fiches a list keeps for its `hide` level (`LIST_HIDES`); same joins as
+    """The fiches a list keeps for its `hide` choice (`LIST_HIDES`); same joins as
     `video_watched_condition`."""
-    conditions = []
-    if hide != "none":
-        conditions.append(~video_watched_condition(no_progress_labels))
-    if hide == "watched_hidden":
-        conditions.append(func.coalesce(UserVideo.list_state, "") != "hidden")
-    return and_(true(), *conditions)
+    if hide != "watched_hidden":
+        return true()
+    return and_(
+        ~video_watched_condition(no_progress_labels),
+        func.coalesce(UserVideo.list_state, "") != "hidden",
+    )
 
 
 def _present(column):

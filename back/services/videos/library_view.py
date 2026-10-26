@@ -51,7 +51,7 @@ class LibraryFilters:
     excluded_assets: frozenset[str] = field(default_factory=frozenset)
     excluded_categories: frozenset[str] = field(default_factory=frozenset)
     rated_only: bool = False
-    # What the list leaves out (`LIST_HIDES`): by default the Vu and the Écartée fiches.
+    # What the list leaves out (`LIST_HIDES`): by default the Vu and the Indésirée fiches.
     hide: str = LIBRARY_DEFAULT_HIDE
     uncategorized_only: bool = False
     asset_filter_mode: str = "or"

@@ -34,7 +34,7 @@ chaque spec.
 `scripts/screenshot.sh [chemin] [dossier]` sert a verifier une page a la main :
 il lance l'application sur une DB sqlite jetable remplie par
 `scripts/demo_seed.py` (trois chaines, une quinzaine de fiches variees : titres
-courts et longs, etoiles, Vu, Ecartee, lectures en cours pour la barre de
+courts et longs, etoiles, Vu, Indesiree, lectures en cours pour la barre de
 progression ; quelques transcripts ; aucun fichier media, donc Exploration ne les
 montre qu'une fois le filtre de type de fichier vide), prend une capture a 1280 px (`desktop.png`) et une
 a 390 px (`phone.png`) avec Playwright, affiche `scrollWidth` et `clientWidth`

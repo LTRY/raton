@@ -38,11 +38,10 @@ def current_request_path(request: Request, exclude: tuple[str, ...] = ()) -> str
     return path
 
 
-# The 3-icon selector of a list: what each choice leaves out (`hide`, decided by the API).
+# The two-button selector of a list: what each choice leaves out (`hide`, decided by the API).
 LIST_HIDE_OPTIONS = (
-    ("none", "Tout afficher"),
-    ("watched", "Masquer les vus"),
-    ("watched_hidden", "Masquer les vus et les écartées"),
+    ("none", "Tout voir"),
+    ("watched_hidden", "Masquer les déjà vues et les indésirées"),
 )
 
 
@@ -63,8 +62,8 @@ def list_hide_selector(request: Request, current: str) -> dict:
         }
         for value, label in LIST_HIDE_OPTIONS
     ]
-    drop_states = {"none": "", "watched": "watched", "watched_hidden": "watched hidden"}
-    return {"current": current, "options": options, "drop_states": drop_states.get(current, "")}
+    drop_states = "watched hidden" if current == "watched_hidden" else ""
+    return {"current": current, "options": options, "drop_states": drop_states}
 
 
 def page_href_builder(request: Request, exclude: tuple[str, ...] = ()):

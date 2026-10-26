@@ -77,7 +77,7 @@ def test_sql_filters_match_the_python_twin(db):
         dict(category_labels="podcast,musique", list_state="hidden"),
         dict(category_labels="", video_path=""),
         dict(category_labels="humour", rating=2, audio_path="/m/a.m4a", list_state="watched"),
-        # Vu by the user's 90 % rule: in a replay category, forced non-vu, Écartée, or plainly Vu.
+        # Vu by the user's 90 % rule: in a replay category, forced non-vu, Indésirée, or plainly Vu.
         dict(category_labels="musique", user_watched_at=True),
         dict(user_watched_at=True, list_state="unwatched"),
         dict(user_watched_at=True, list_state="hidden"),
@@ -126,7 +126,7 @@ def test_sql_filters_match_the_python_twin(db):
                 [set(), {"shorts"}],
                 [set(), {"podcast"}],
                 [False, True],
-                ["none", "watched", "watched_hidden"],
+                ["none", "watched_hidden"],
                 [False, True],
             )
         )

@@ -4853,7 +4853,7 @@ def test_set_video_list_state_rejects_unknown_value():
 
 
 def _list_state_videos(db):
-    """A plain fiche, one marked Vu, one Vu by the 90 % rule, one Écartée, on one channel."""
+    """A plain fiche, one marked Vu, one Vu by the 90 % rule, one Indésirée, on one channel."""
     kept = add_video(db)
     channel = kept.channel
     others = {}
@@ -4878,7 +4878,7 @@ def _list_state_videos(db):
     return kept, others
 
 
-def test_videos_page_hides_vu_and_ecartees_by_default():
+def test_videos_page_hides_vu_and_indesirees_by_default():
     db = make_session()
     kept, others = _list_state_videos(db)
 
@@ -4889,29 +4889,28 @@ def test_videos_page_hides_vu_and_ecartees_by_default():
         assert video.title not in rendered
     assert 'data-drop-states="watched hidden"' in rendered
     assert '<input type="hidden" name="hide" value="watched_hidden">' in rendered
-    assert 'aria-label="Masquer les vus et les écartées" aria-current="true"' in rendered
+    assert 'aria-label="Masquer les déjà vues et les indésirées" aria-current="true"' in rendered
+    assert rendered.count('class="list-hide-option') == 2
 
 
-def test_videos_page_hide_levels():
+def test_videos_page_tout_voir_shows_everything():
     db = make_session()
     kept, others = _list_state_videos(db)
 
-    without_vu = site(db).get("/videos?hide=watched").text
     everything = site(db).get("/videos?hide=none&page=1").text
+    # The former middle level ("sans les vus") is gone: an unknown value falls back to the default.
+    old_level = site(db).get("/videos?hide=watched").text
 
-    assert others["hidden"].title in without_vu
-    assert others["marked"].title not in without_vu
-    assert others["auto"].title not in without_vu
-    assert 'data-drop-states="watched"' in without_vu
     for video in (kept, *others.values()):
         assert video.title in everything
     assert 'class="video-row video-row-hidden"' in everything
     assert 'data-drop-states=""' in everything
     # Each choice keeps the other parameters but goes back to the first page.
-    assert 'href="/videos?hide=watched"' in everything
+    assert 'href="/videos?hide=watched_hidden"' in everything
+    assert others["hidden"].title not in old_level
 
 
-def test_vu_and_ecartee_are_each_users_own_in_the_hide_filter():
+def test_vu_and_indesiree_are_each_users_own_in_the_hide_filter():
     db = make_session()
     _kept, others = _list_state_videos(db)
     other_user = add_user(db, "Autre")
@@ -4938,13 +4937,13 @@ def test_channel_page_has_the_hide_selector():
 def test_dashboard_new_videos_page_hide_levels():
     db = make_session()
     channel = Channel(
-        url="https://example.test/ecartees",
-        name="Chaîne écartée",
+        url="https://example.test/indesirees",
+        name="Chaîne indésirée",
         user_states=my_channel(auto_metadata_enabled=True),
     )
     only_hidden = Channel(
         url="https://example.test/all-hidden",
-        name="Chaîne toute écartée",
+        name="Chaîne toute indésirée",
         user_states=my_channel(auto_metadata_enabled=True),
     )
     db.add_all([channel, only_hidden])
@@ -4955,19 +4954,17 @@ def test_dashboard_new_videos_page_hide_levels():
     db.commit()
 
     rendered = site(db).get("/dashboard/nouveautes").text
-    without_vu = site(db).get("/dashboard/nouveautes?hide=watched").text
     everything = site(db).get("/dashboard/nouveautes?hide=none&page=1").text
 
     assert "Nouveauté 0" in rendered
     assert "Nouveauté 1" not in rendered
     assert "Nouveauté 2" not in rendered
-    assert "Chaîne toute écartée" not in rendered
+    assert "Chaîne toute indésirée" not in rendered
     assert 'href="/dashboard/nouveautes?hide=none"' in rendered
     assert 'data-drop-states="watched hidden"' in rendered
-    assert "Nouveauté 1" in without_vu
-    assert "Nouveauté 2" not in without_vu
+    assert "Nouveauté 1" in everything
     assert "Nouveauté 2" in everything
-    assert "Chaîne toute écartée" in everything
+    assert "Chaîne toute indésirée" in everything
     # Changing the choice drops the page number: the stacks are not the same any more.
     assert 'href="/dashboard/nouveautes?hide=watched_hidden"' in everything
 
@@ -5014,12 +5011,12 @@ def test_dashboard_history_page_shows_everything_by_default():
     trimmed = site(db).get("/dashboard/historique?hide=watched_hidden").text
 
     assert rendered.count('<article class="dashboard-media-row') == 4
-    assert 'aria-label="Tout afficher" aria-current="true"' in rendered
+    assert 'aria-label="Tout voir" aria-current="true"' in rendered
     assert 'data-drop-states=""' in rendered
     assert "Lecture kept" in trimmed
     assert "Lecture hidden" not in trimmed
     assert "Lecture vu" not in trimmed
-    # A row whose fiche was deleted has no Vu/Écartée state left: it stays.
+    # A row whose fiche was deleted has no Vu/Indésirée state left: it stays.
     assert trimmed.count('<article class="dashboard-media-row') == 2
 
 
@@ -5081,10 +5078,10 @@ def test_list_state_buttons_are_icon_only_with_accessible_labels():
     rendered = site(db).get("/videos").text
 
     assert 'aria-label="Marquer comme vu"' in rendered
-    assert 'aria-label="Écarter cette vidéo"' in rendered
+    assert 'aria-label="Marquer cette vidéo indésirée"' in rendered
     assert "list-state-icon" in rendered
     assert ">Lu</button>" not in rendered
-    assert ">Écartée</button>" not in rendered
+    assert ">Indésirée</button>" not in rendered
 
 
 def add_playback_job(db, video, position=5, duration=600):
@@ -5119,7 +5116,7 @@ def test_resume_page_renders_list_state_buttons():
 
     assert f'data-list-state-toggle data-video-id="{video.id}"' in rendered
     assert 'aria-label="Marquer comme vu"' in rendered
-    assert 'aria-label="Écarter cette vidéo"' in rendered
+    assert 'aria-label="Marquer cette vidéo indésirée"' in rendered
 
 
 def test_resume_page_greys_hidden_video_more_strongly():

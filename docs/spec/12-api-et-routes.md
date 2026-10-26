@@ -117,7 +117,7 @@ Videos :
 - `GET /videos` : liste videos. Parametre `sort` : `imported`, `published`
   (defaut sur une chaine), `views` ou `rated` (note decroissante). Avec
   `channel_id` d'une chaine existante, rend `channel_videos.html` (page
-  d'une chaine) au lieu de `videos.html`. `hide` : `none`, `watched` ou
+  d'une chaine) au lieu de `videos.html`. `hide` : `none` ou
   `watched_hidden` (defaut), ce que la liste retire des fiches de
   l'utilisateur (selecteur d'affichage, [11 Interface HTML](11-interface-html.md)) ;
   l'ancien `hide_hidden` est ignore.
@@ -127,7 +127,7 @@ Videos :
 - `POST /videos/{id}/comment` : commentaire libre (texte, champ `comment`).
 - `POST /videos/{id}/rating` : note de 0 à 5, redirige (303) vers `next`.
   Repli sans JavaScript : les étoiles appellent `PUT /api/videos/{id}/rating`.
-  Les boutons **Vu** / **Écartée** appellent `PUT /api/videos/{id}/list-state`
+  Les boutons **Vu** / **Indésirée** appellent `PUT /api/videos/{id}/list-state`
   et la lecture est rapportee par `POST /api/videos/{id}/activity` : ni l'un ni
   l'autre n'a de route HTML.
 - `GET /videos/{id}` : detail video.
@@ -324,7 +324,7 @@ n'existait pas.
   validation (`library_filters`) : un type de fichier, un tri, une section ou
   un mode inconnu est ignore ou remplace par son defaut, les categories sont
   normalisees ; `hide` absent ou inconnu vaut `watched_hidden` (ni vues ni
-  ecartees). Seule difference : sans `asset`, aucun filtre de type de
+  indesirees). Seule difference : sans `asset`, aucun filtre de type de
   fichier (la page, elle, preselectionne Video et Audio, ou tous les types
   sur une chaine). Repond `{filters, channel, section, page, total_pages,
   total, counts, items, saved_views}` : `filters` les filtres reellement
@@ -540,7 +540,7 @@ watched_at}`.
   sort des Nouveautes (`GET /api/videos/{id}`, lui, ne change rien).
 - `PUT /api/videos/{id}/list-state` `{state}` : `watched`, `unwatched`,
   `hidden`, ou `clear` pour revenir a l'etat deduit de la lecture ; `400`
-  sinon. Appelee par les boutons **Vu** / **Écartée**.
+  sinon. Appelee par les boutons **Vu** / **Indésirée**.
 - `PUT /api/videos/{id}/categories` `{categories: [...]}` : remplace les
   categories de la fiche (normalisees, ajoutees a la liste des categories).
 - `PUT /api/videos/{id}/comment` `{comment}` : une chaine vide efface le

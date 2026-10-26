@@ -2624,7 +2624,7 @@ if (!window.__ratingFormsBound) {
   });
 }
 
-// Boutons « Vu » / « Écartée » des cartes vidéo. Écouteur délégué au document :
+// Boutons « Vu » / « Indésirée » des cartes vidéo. Écouteur délégué au document :
 // les listes sont remplacées par Turbo, il n'y a donc rien à relier après coup.
 function paintListState(container, state) {
   // Les classes de grisage different selon le contexte (carte de liste vs ligne
@@ -2643,7 +2643,7 @@ function paintListState(container, state) {
   });
 }
 
-// A list that leaves out the Vu and/or Écartée fiches (the 3-icon selector) names those states
+// A list that leaves out the Vu and Indésirée fiches (its two-button selector) names those states
 // in `data-drop-states`: a card that takes one goes away at once, as it would on the next load;
 // an emptied carousel of the Nouveautés or day of the Historique goes with it.
 function dropListedCard(container, state) {
@@ -2656,8 +2656,8 @@ function dropListedCard(container, state) {
   stack?.querySelector("[data-video-stack-carousel]")?.dispatchEvent(new Event("scroll"));
   if (stack && !stack.querySelector(".video-stack-slide")) stack.remove();
   if (day && !day.querySelector(".dashboard-media-row")) day.remove();
-  const done = state === "hidden" ? "Fiche écartée" : "Fiche marquée vue";
-  window.showToast?.(`${done} : l'affichage « Tout » la remontre.`);
+  const done = state === "hidden" ? "Fiche marquée indésirée" : "Fiche marquée vue";
+  window.showToast?.(`${done} : « Tout voir » la remontre.`);
 }
 
 async function submitListState(container, requested) {
@@ -2704,7 +2704,7 @@ document.addEventListener("click", (event) => {
   submitListState(container, requested);
 });
 
-// Left/right swipe on a video card (touch screens, where the "vu"/"écartée"
+// Left/right swipe on a video card (touch screens, where the "vu"/"indésirée"
 // buttons above are hidden): same toggle logic and same endpoint, through
 // submitListState. Délégué au document comme
 // le pull-to-refresh plus bas : les listes sont remplacées par Turbo, rien à

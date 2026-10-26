@@ -35,7 +35,7 @@ DEMO_CHANNELS = [
 ]
 
 # (title, rating, list_state, share of the video already played): enough variety for every
-# shape of card — one- and long multi-line titles, stars, Vu/Ecartee, a progress bar.
+# shape of card — one- and long multi-line titles, stars, Vu/Indesiree, a progress bar.
 DEMO_VIDEOS = [
     ("Introduction aux tests automatisés", 0, None, 0.35),
     ("Refactoriser sans peur", 4, None, None),

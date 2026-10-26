@@ -2465,8 +2465,8 @@ button.secondary {
   display: none;
 }
 
-/* Pas de boutons Vu/Ecartee dans les piles de Nouveautes. Le bloc reste dans
-   le DOM (seulement masque) : le glissement tactile vu/ecartee s'appuie
+/* Pas de boutons Vu/Indesiree dans les piles de Nouveautes. Le bloc reste dans
+   le DOM (seulement masque) : le glissement tactile vu/indesiree s'appuie
    dessus. */
 .video-stack .list-state-actions {
   display: none;
@@ -2567,7 +2567,7 @@ button.secondary {
   opacity: 0.68;
 }
 
-/* Une ligne vue ou écartée n'affiche plus sa progression. Le serveur omet deja
+/* Une ligne vue ou indésirée n'affiche plus sa progression. Le serveur omet deja
    le markup au rendu ; ces regles couvrent la bascule au clic, ou la ligne
    change de classe sans rechargement. */
 .dashboard-media-row-completed .video-card-progress,
@@ -3234,7 +3234,7 @@ button.secondary {
     width: auto;
   }
 
-  /* Library card: the stars sit at the card's right edge, after Vu/Ecartee. */
+  /* Library card: the stars sit at the card's right edge, after Vu/Indesiree. */
   .video-row:has(> .video-row-more) .video-row-rating {
     margin-left: auto;
   }
@@ -3307,7 +3307,7 @@ button.secondary {
   color: color-mix(in srgb, var(--color-text) 78%, var(--color-surface-muted));
 }
 
-/* Palier renforce (écartée) : plus efface encore que « vu », toujours lisible. */
+/* Palier renforce (indésirée) : plus efface encore que « vu », toujours lisible. */
 .dashboard-media-row.video-card.dashboard-media-row-hidden {
   background: color-mix(in srgb, var(--color-surface-muted) 70%, var(--color-border));
   color: var(--color-text-muted);
@@ -9623,7 +9623,7 @@ summary.channel-menu-item::-webkit-details-marker {
   color: var(--color-text);
 }
 
-/* The 3-icon selector of a list (Tout / sans les Vu / sans les Vu ni les Écartées): the same
+/* The two-button selector of a list (Tout voir / Masquer les déjà vues et les indésirées): the same
    track and raised thumb as the segmented control above. */
 .list-hide-selector {
   background: var(--color-surface-muted);
@@ -10704,7 +10704,7 @@ a.channel-explore-btn {
     margin-top: 20px;
   }
 
-  /* Row 1: segmented control + refresh; row 2: search and the 3-icon selector; row 3: sort and
+  /* Row 1: segmented control + refresh; row 2: search and the two-button selector; row 3: sort and
      filters side by side. */
   .channel-refresh-form {
     position: absolute;

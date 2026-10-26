@@ -32,7 +32,7 @@ class VideoNotFoundError(ValueError):
 @dataclass
 class VideoDetail:
     video: Video
-    # The user's own stars, comment, Vu/Écartée and Nouveau on the fiche.
+    # The user's own stars, comment, Vu/Indésirée and Nouveau on the fiche.
     state: UserVideo
     # `read_transcript_documents`: transcript, notes, summaries, questions, and the user's chat.
     documents: dict

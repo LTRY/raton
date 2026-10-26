@@ -21,7 +21,7 @@ confiance, voir [15 Securite](15-securite.md)).
   la bibliotheque (dossier media, quota, categories sans barre de
   progression, notes automatiques, segments sponsorises). Un fichier telecharge
   par l'un sert a tous ; la purge vaut pour tous.
-- **Propre a chaque utilisateur** : Vu/Ecartee, notes en etoiles (chaines et
+- **Propre a chaque utilisateur** : Vu/Indesiree, notes en etoiles (chaines et
   fiches), commentaires, Nouveau et cloches, playlists, discussions (chat de
   fiche et chat bibliotheque), historique et positions de lecture, temps de
   lecture et limites de temps d'ecran, vues enregistrees, phrases de Raton.
@@ -191,7 +191,7 @@ La page `/videos` permet :
 - filtrage par chaine ;
 - recherche par mots (insensible aux accents) ;
 - tri : import recent, publication recente, les plus vues ou les mieux notees ;
-- etat Vu/Ecartee par video, et vues sauvegardees ;
+- etat Vu/Indesiree par video, et vues sauvegardees ;
 - listing des fiches locales ;
 - explorer une chaine : sur la page d'une chaine, le bouton « Explorer la
   suite » importe depuis YouTube les fiches suivantes (par pages), sans

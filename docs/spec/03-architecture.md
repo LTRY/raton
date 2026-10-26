@@ -39,7 +39,7 @@ peuvent tourner dans deux conteneurs (voir
 rien de `back/`, `back/` rien de `front/`, `mcp_server/` ni l'un ni l'autre, et
 seuls `front/api.py`, `front/proxy.py` et `mcp_server/api.py` parlent HTTP.
 
-Ce qui decide d'un comportement (un filtre, un etat Vu/Ecartee deduit de la
+Ce qui decide d'un comportement (un filtre, un etat Vu/Indesiree deduit de la
 lecture, la categorie « sans barre de progression », la pagination, un tri)
 est calcule par le back et arrive tout fait dans la reponse de l'API ; le
 front ne fait que le mettre en forme (dates et durees en francais, couleurs,
@@ -168,7 +168,7 @@ Macro Jinja partagee `media_row(row, category_style_map)` : rend une ligne "Hist
 
 La ligne affiche le titre, les labels techniques et categories, la chaine, la
 progression de lecture, puis une derniere ligne qui porte le poids du fichier
-a gauche et les actions Vu/Ecartee + la notation a droite. Elle ne repete ni la
+a gauche et les actions Vu/Indesiree + la notation a droite. Elle ne repete ni la
 date de publication ni la date de lecture : le bloc de journee qui la contient
 donne deja le jour (voir [02 Fonctionnalites](02-fonctionnalites.md)).
 

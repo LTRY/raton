@@ -88,6 +88,6 @@ class Video(Base):
     playlist_items = relationship(
         "PlaylistItem", back_populates="video", cascade="all, delete-orphan"
     )
-    # Each user's stars, Vu/Écartée, comment and Nouveau (back/models/user.py); the ORM cascade
+    # Each user's stars, Vu/Indésirée, comment and Nouveau (back/models/user.py); the ORM cascade
     # also cleans them up on sqlite, whose foreign keys are not enforced.
     user_states = relationship("UserVideo", cascade="all, delete-orphan")

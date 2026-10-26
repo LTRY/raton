@@ -14,7 +14,7 @@ Regles :
 
 - Employer ces termes tels quels dans l'interface, les specs, les noms de
   variables, les messages de PR et les conversations. Pas de synonyme
-  (« abonne », « follow », « watched » pour « vu », « cachee » pour « ecartee », « cache media » pour « stockage media », « lu » pour « vu », « en base » ou « la base » pour « dans la DB »...).
+  (« abonne », « follow », « watched » pour « vu », « cachee » ou « ecartee » pour « indesiree », « cache media » pour « stockage media », « lu » pour « vu », « en base » ou « la base » pour « dans la DB »...).
 - Ne lister ici que ce qui est ambigu ou propre a Raton. Le detail
   (colonnes, regles) reste dans la spec qui possede le sujet : le lien est
   donne a chaque entree, cette page ne le recopie pas.
@@ -25,7 +25,7 @@ Regles :
 
 ### Utilisateur
 
-Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Ecartee, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, visites de Raton. Pas de mot de passe : Raton reste sur un LAN de confiance.
+Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Indesiree, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, visites de Raton. Pas de mot de passe : Raton reste sur un LAN de confiance.
 
 - **Code** : `users`, `user_videos`, `user_channels`, `user_settings` ; cookie `raton_user`, en-tete `X-Raton-User`
 - **A ne pas confondre avec** : Un compte (aucune authentification) ; l'utilisateur par defaut, le plus ancien, pour qui agit un client qui n'en nomme aucun (le serveur MCP).
@@ -203,12 +203,12 @@ Une fiche est vue par un utilisateur quand sa lecture a atteint 90 % de la duree
 - **Code** : `user_videos.watched_at` (automatique), `user_videos.list_state = "watched"` (a la main), `videos.watched_at` (purge)
 - **A ne pas confondre avec** : « Lu », qui n'est pas employe. Un evenement de lecture du journal (`played`) s'affiche « Lecture ».
 
-### Ecartee
+### Indesiree
 
-Fiche qu'un utilisateur ne veut plus voir dans ses listes : grisee au palier fort, et retiree de ses listes par le selecteur d'affichage sur « sans les vus ni les ecartees » (le defaut, sauf sur l'Historique). Les autres utilisateurs la voient toujours ; sa page `/videos/{id}` reste ouverte.
+Fiche qu'un utilisateur ne veut plus voir dans ses listes : grisee au palier fort, et retiree de ses listes par le selecteur d'affichage sur « Masquer les déjà vues et les indésirées » (le defaut, sauf sur l'Historique). Les autres utilisateurs la voient toujours ; sa page `/videos/{id}` reste ouverte.
 
 - **Code** : `user_videos.list_state = "hidden"`
-- **A ne pas confondre avec** : Une fiche supprimee ou purgee. Le mot « cachee » n'est pas employe.
+- **A ne pas confondre avec** : Une fiche supprimee ou purgee. Les mots « cachee » et « ecartee » (l'ancien nom) ne sont pas employes.
 
 ### Purge
 
@@ -328,9 +328,9 @@ Combinaison de filtres et de tri de `/videos` sauvegardee par un utilisateur, po
 
 ### Selecteur d'affichage
 
-Les trois icones d'une liste (Bibliotheque, page d'une chaine, Nouveautes, Historique) qui choisissent ce qu'elle retire des fiches de l'utilisateur : rien (« Tout afficher »), les fiches vues, ou les vues et les ecartees.
+Les deux boutons d'une liste (Bibliotheque, page d'une chaine, Nouveautes, Historique) qui choisissent ce qu'elle retire des fiches de l'utilisateur : rien (« Tout voir »), ou les fiches deja vues et les indesirees (« Masquer les déjà vues et les indésirées »).
 
-- **Code** : parametre `hide` (`none`, `watched`, `watched_hidden`), `LIST_HIDES` (`back/services/videos/filters.py`), macro `list_hide_selector`
+- **Code** : parametre `hide` (`none`, `watched_hidden`), `LIST_HIDES` (`back/services/videos/filters.py`), macro `list_hide_selector`
 - **A ne pas confondre avec** : Un filtre de `/videos` : « Tout effacer » ne le remet pas a zero, et il n'entre pas dans une vue enregistree.
 
 ### Carte
