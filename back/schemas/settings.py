@@ -1,4 +1,9 @@
-from pydantic import BaseModel
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, field_validator
+
+from back.services.common.curfew import normalize_curfew_time
 
 
 class CategoryStyleRead(BaseModel):
@@ -10,6 +15,27 @@ class CategoryStyleRead(BaseModel):
 class SponsorCategoryRead(BaseModel):
     value: str
     label: str
+
+
+class CurfewRead(BaseModel):
+    """The couvre-feu: `HH:MM` hours in Europe/Paris, from `start` to `end`, possibly across
+    midnight."""
+
+    enabled: bool
+    start: str
+    end: str
+    # Enabled and now in the range: the API only answers the routes it leaves open.
+    active: bool
+    ends_at: datetime | None
+
+
+class RatonLanguageRead(BaseModel):
+    """How Raton speaks to the user in the chat."""
+
+    # "vous" or "tu".
+    address: str
+    # The name Raton calls the user by; empty for none.
+    nickname: str
 
 
 class SettingsRead(BaseModel):
@@ -30,6 +56,8 @@ class SettingsRead(BaseModel):
     # Minutes allowed per kind (`video`, `short`, `podcast`, `music`) and period (`today`,
     # `week`, `month`; the week and month ones are the day's, scaled).
     screen_time_limits: dict[str, dict[str, int]]
+    curfew: CurfewRead
+    raton_language: RatonLanguageRead
     # Who answers the LLM requests, such as "Claude API (claude-haiku-4-5)"; set by the
     # environment, so not in `SettingsUpdate`.
     llm_provider_label: str
@@ -58,3 +86,13 @@ class SettingsUpdate(BaseModel):
     sponsor_segment_categories: list[str] | None = None
     sponsor_skip_enabled: bool | None = None
     screen_time_today_minutes: ScreenTimeMinutesUpdate | None = None
+    curfew_enabled: bool | None = None
+    curfew_start: str | None = None
+    curfew_end: str | None = None
+    raton_address: Literal["vous", "tu"] | None = None
+    raton_nickname: str | None = None
+
+    @field_validator("curfew_start", "curfew_end")
+    @classmethod
+    def curfew_time(cls, value: str | None) -> str | None:
+        return None if value is None else normalize_curfew_time(value)

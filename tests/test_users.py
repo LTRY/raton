@@ -1,5 +1,7 @@
 """Users: `/api/users`, the user a request acts for, and the user menu of the front."""
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -14,6 +16,7 @@ from back.models.library_chat_conversation import LibraryChatConversation
 from back.models.playlist import Playlist
 from back.models.user import User, UserVideo
 from back.models.video import Video
+from back.services.jobs.llm_requests import queue_library_question
 from tests.site import site_client
 from tests.users import add_user, set_video_state, user_id
 
@@ -109,19 +112,62 @@ def test_deleting_a_user_deletes_what_was_theirs_and_keeps_the_fiches(api, db):
     )
 
 
-def test_the_home_drawer_shows_the_user_button_and_menu(db):
+def test_the_home_drawer_user_button_opens_the_user_page(db):
     user_id(db)
     add_user(db, "Invité")
 
     page = site_client().get("/").text
 
-    assert 'class="chat-user-button" aria-label="Utilisateur : Moi" title="Moi">M</summary>' in page
+    assert 'class="chat-user-button" href="/user" aria-label="Paramètres de Moi"' in page
+    # The button sits in the drawer's bottom row, next to "Nouvelle discussion".
+    foot = page[page.index('class="chat-drawer-foot"') :]
+    assert foot.index("chat-user-button") < foot.index("Nouvelle discussion")
+
+
+def test_the_user_page_switches_renames_and_sets_ratons_language(db):
+    user_id(db)
+    add_user(db, "Invité")
+    site = site_client()
+
+    page = site.get("/user").text
     assert page.count('action="/users/switch"') == 2
     assert 'aria-current="true" disabled' in page
     assert 'class="chat-user-add" method="post" action="/users"' in page
-    # The button sits in the drawer's bottom row, next to "Nouvelle discussion".
-    foot = page[page.index('class="chat-drawer-foot"') :]
-    assert foot.index("chat-user-menu") < foot.index("Nouvelle discussion")
+    assert f'action="/users/{user_id(db)}/rename"' in page
+
+    renamed = site.post(
+        f"/users/{user_id(db)}/rename",
+        data={"name": "Léa", "next": "/user"},
+        follow_redirects=False,
+    )
+    assert renamed.headers["location"].startswith("/user?")
+    saved = site.post(
+        "/user", data={"raton_address": "tu", "raton_nickname": " Chef "}, follow_redirects=False
+    )
+    assert saved.headers["location"].startswith("/user?")
+    page = site.get("/user").text
+    assert "<h1>Léa</h1>" in page
+    assert 'value="tu" checked' in page
+    assert 'value="Chef"' in page
+
+
+def test_ratons_language_is_each_users_own_and_reaches_the_library_chat(db):
+    other = add_user(db, "Invité")
+    api = TestClient(app)
+
+    api.put("/api/settings", json={"raton_address": "tu", "raton_nickname": "Chef"})
+
+    assert api.get("/api/settings").json()["raton_language"] == {
+        "address": "tu",
+        "nickname": "Chef",
+    }
+    theirs = api.get("/api/settings", headers={"X-Raton-User": str(other.id)}).json()
+    assert theirs["raton_language"] == {"address": "vous", "nickname": ""}
+    assert api.put("/api/settings", json={"raton_nickname": "x" * 41}).status_code == 400
+    assert api.put("/api/settings", json={"raton_address": "toi"}).status_code == 422
+
+    job = queue_library_question(db, user_id(db), "Quoi de neuf ?", None)
+    assert "Tutoie l'utilisateur. Appelle-le « Chef »" in json.loads(job.prompt)["system"]
 
 
 def test_switching_user_sets_the_cookie_and_every_page_then_acts_for_them(db):

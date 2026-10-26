@@ -73,6 +73,7 @@ def get_historique(
                     id=video.id,
                     title=video.title,
                     rating=state.rating,
+                    comment=state.comment,
                     file_size_bytes=video.file_size_bytes,
                     list_state=state.list_state,
                     categories=video.category_labels,

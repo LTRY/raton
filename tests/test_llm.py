@@ -222,10 +222,17 @@ def test_chat_keeps_only_the_last_ten_turns():
 def test_library_chat_instructions_live_in_the_system_prompt_only():
     prompt = build_library_chat_prompt([], "Ma question ?")
 
-    assert prompt.system == LIBRARY_CHAT_SYSTEM
+    assert prompt.system == LIBRARY_CHAT_SYSTEM.format(address_rule="Vouvoie l'utilisateur.")
     assert "[[chaine:12|Nom de la chaîne]]" in LIBRARY_CHAT_SYSTEM
     assert "HISTORIQUE" not in LIBRARY_CHAT_SYSTEM and "QUESTION:" not in LIBRARY_CHAT_SYSTEM
     assert "bibliothèque" not in prompt.messages[0]["content"]
+
+
+def test_library_chat_speaks_to_the_user_as_they_chose():
+    prompt = build_library_chat_prompt([], "Q", address="tu", nickname="Chef")
+
+    assert "Tutoie l'utilisateur. Appelle-le « Chef »" in prompt.system
+    assert "Vouvoie" not in prompt.system
 
 
 def test_video_chat_opens_with_the_transcript_then_real_turns():

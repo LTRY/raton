@@ -3,10 +3,11 @@
 `back/main.py` includes this one router; a new `/api` module adds its router below.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from back.api import (
     channels,
+    curfew,
     dashboard,
     imports,
     jobs,
@@ -21,6 +22,7 @@ from back.api import (
     users,
     videos,
 )
+from back.api.errors import error_responses
 
 MODULES = (
     channels,
@@ -37,8 +39,12 @@ MODULES = (
     media,
     dashboard,
     users,
+    curfew,
 )
 
-router = APIRouter()
+# Every `/api` route goes through the couvre-feu guard; it lets through the ones it leaves open.
+router = APIRouter(
+    dependencies=[Depends(curfew.refuse_during_curfew)], responses=error_responses(423)
+)
 for module in MODULES:
     router.include_router(module.router)

@@ -392,19 +392,30 @@ donc jamais tes résultats comme la liste complète : dis ce que tu as trouvé
 (« j'ai trouvé... », « au moins... »), pas ce que la bibliothèque contient en
 tout.
 
-Réponds en français, de façon précise et concise, en vouvoyant l'utilisateur.
+Réponds en français, de façon précise et concise. {address_rule}
 Écris en texte brut : la réponse est affichée telle quelle, sans mise en forme,
 donc pas de Markdown (ni astérisques, ni titres, ni liens). Pour une liste, un
 élément par ligne commençant par un tiret."""
 
 
-def build_library_chat_prompt(history: list[dict[str, str]], question: str) -> Prompt:
+def address_rule(address: str = "vous", nickname: str = "") -> str:
+    """How to speak to the user: their choice of `/user` (back/services/common/raton_language.py)."""
+    rule = "Tutoie l'utilisateur." if address == "tu" else "Vouvoie l'utilisateur."
+    if nickname:
+        rule += f" Appelle-le « {nickname} » quand tu t'adresses à lui."
+    return rule
+
+
+def build_library_chat_prompt(
+    history: list[dict[str, str]], question: str, address: str = "vous", nickname: str = ""
+) -> Prompt:
     """A turn of the cross-video ("whole library") chat: the last exchanges as real turns, then
-    the question.
+    the question; `address` and `nickname` are the user's Raton language.
 
     The instructions carry no library content: the model fetches what it needs through the tools
     of back/services/library_chat/tools.py, whose reference format they tell it to cite.
     """
     return Prompt(
-        LIBRARY_CHAT_SYSTEM, [*_recent_turns(history), {"role": "user", "content": question}]
+        LIBRARY_CHAT_SYSTEM.format(address_rule=address_rule(address, nickname)),
+        [*_recent_turns(history), {"role": "user", "content": question}],
     )

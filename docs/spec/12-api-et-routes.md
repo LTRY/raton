@@ -174,14 +174,20 @@ Utilisateurs (`front/routes/users.py`) — le front seul pose le cookie
 `raton_user`, qui dit pour qui agit ce navigateur (voir « Utilisateur d'une
 requete » plus bas) :
 
+- `GET /user` : la page de l'utilisateur courant (nom, changement
+  d'utilisateur, langage de Raton, couvre-feu), ouverte aussi pendant son
+  couvre-feu ; `POST /user` `raton_address`, `raton_nickname`,
+  `curfew_enabled`, `curfew_start`, `curfew_end` : `PUT /api/settings`, puis
+  redirige vers `/user` avec « Paramètres enregistrés. » ou le message du back.
 - `POST /users/switch` `user_id` : agir comme cet utilisateur (pose le
   cookie), puis redirige vers `/` avec « Bonjour <nom> ! » ; un utilisateur
   inconnu redirige vers `/` avec un message d'erreur.
 - `POST /users` `name` : ajoute un utilisateur (`POST /api/users`) et agit
   aussitot comme lui ; un nom vide, trop long ou deja pris redirige vers `/`
   avec le message du back.
-- `POST /users/{id}/rename` `name`, `POST /users/{id}/delete` : formulaires de
-  la section Utilisateurs de `/settings`, redirigent vers `/settings` avec un
+- `POST /users/{id}/rename` `name` `next`, `POST /users/{id}/delete` :
+  formulaires de la section Utilisateurs de `/settings` (et « Nom » de `/user`
+  pour le renommage), redirigent vers `next` (par defaut `/settings`) avec un
   message. Supprimer l'utilisateur courant efface le cookie (retour a
   l'utilisateur par defaut).
 
@@ -204,7 +210,9 @@ ne sort pas de l'API).
 
 Erreurs : toute erreur de `/api` repond `{"detail": "<message en francais>"}`
 (`ErrorRead`, `back/api/errors.py`). Un refus metier porte le message du
-service (`400`, `404`, `409`, `502`) ; une requete invalide repond `422` avec
+service (`400`, `404`, `409`, `502`) ; pendant le couvre-feu de l'utilisateur, toute route
+qu'il ne laisse pas ouverte repond `423` (dependance `refuse_during_curfew` du
+routeur `/api`, voir [02 Fonctionnalites](02-fonctionnalites.md)) ; une requete invalide repond `422` avec
 un `detail` lisible (`Requête invalide : state : champ obligatoire.`) et
 `errors`, la liste `{field, message}` des champs en cause (les routes du
 front gardent la reponse `422` par defaut de FastAPI). Chaque route declare
@@ -387,13 +395,20 @@ n'existait pas.
   `no_progress_category_labels`, `auto_notes_enabled`,
   `auto_notes_excluded_category_labels`, `sponsor_segment_categories`,
   `sponsor_skip_enabled`, `screen_time_limits` en minutes par type et par
-  periode), plus `sponsor_segment_category_choices` (`{value, label}` de
+  periode, `curfew` `{enabled, start, end, active, ends_at}`, `raton_language`
+  `{address, nickname}` : `vous` ou `tu`, surnom ou vide), plus `sponsor_segment_category_choices` (`{value, label}` de
   chaque categorie SponsorBlock) et `llm_provider_label` (qui repond aux
   demandes au LLM, fixe par l'environnement).
 - `PUT /api/settings` : memes champs (sauf les deux derniers), chacun
   facultatif ; `screen_time_today_minutes` `{video, short, podcast, music}`
-  fixe les limites du jour. Les listes sont normalisees ; une liste vide de
+  fixe les limites du jour ; `curfew_enabled`, `curfew_start` et `curfew_end`
+  (`HH:MM`, `422` sinon) reglent le couvre-feu de l'utilisateur ;
+  `raton_address` (`vous`|`tu`, `422` sinon) et `raton_nickname` (40
+  caracteres au plus, `400` sinon) son langage de Raton. Les listes sont normalisees ; une liste vide de
   categories ou de vues enregistrees ramene les valeurs par defaut.
+- `GET /api/curfew` : le couvre-feu de l'utilisateur `{enabled, start, end, active, ends_at}`
+  (`ends_at` : fin du couvre-feu en cours, `null` hors couvre-feu) ; toujours
+  ouvert.
 - `GET /api/categories` : les categories et leurs couleurs `{label, color}`,
   dans leur ordre, sans lire les autres reglages : ce qu'il faut a une page
   pour colorer ses labels.
@@ -592,7 +607,7 @@ watched_at}`.
   etant le jour local sous lequel elle se range, `job_id`/`created_at`/`playback`
   le dernier rapport de lecture du media ce jour-la, `watched_seconds` la somme
   de tous ses rapports du jour, `rewatch` vrai quand la fiche etait deja Vu
-  avant ce jour, `video` `{id, title, rating, file_size_bytes,
+  avant ce jour, `video` `{id, title, rating, comment, file_size_bytes,
   list_state, categories, badges}` (`null` si la fiche a ete supprimee) et
   `playback` `{action, media_label, title, position_seconds,
   duration_seconds, watched_seconds, progress_percent, is_completed}`.

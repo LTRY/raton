@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+{# The current user's own page, opened by the round button of the home drawer (front/routes/users.py). #}
+<section class="settings-page user-page">
+  <div class="settings-head user-head">
+    <span class="chat-user-avatar user-head-avatar" aria-hidden="true">{{ users.current.initial }}</span>
+    <h1>{{ users.current.name }}</h1>
+  </div>
+
+  {% if curfew_mode %}
+  <p class="user-curfew-note">Couvre-feu jusqu’à {{ curfew.end }} : tes paramètres se modifient après. Tu peux toujours changer d’utilisateur.</p>
+  {% else %}
+  <div class="settings-card" id="name">
+    <h2 class="settings-card-title">Nom</h2>
+    <form class="user-rename" action="/users/{{ users.current.id }}/rename" method="post">
+      <input type="hidden" name="next" value="/user">
+      <label><span class="visually-hidden">Nom</span><input name="name" value="{{ users.current.name }}" maxlength="40" required autocomplete="off"></label>
+      <button type="submit" class="secondary">Renommer</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="settings-card" id="switch">
+    <h2 class="settings-card-title">Changer d’utilisateur</h2>
+    <p class="settings-hint">Vu, notes en étoiles, commentaires, cloches, playlists, discussions, historique et paramètres de cette page sont propres à chaque utilisateur. Supprimer un utilisateur se fait dans <a href="/settings#utilisateurs">Paramètres</a>.</p>
+    <ul class="chat-user-list">
+      {% for user in users.users %}
+      <li>
+        <form method="post" action="/users/switch">
+          <input type="hidden" name="user_id" value="{{ user.id }}">
+          <button type="submit" class="chat-user-choice"{% if user.current %} aria-current="true" disabled{% endif %}>
+            <span class="chat-user-avatar" aria-hidden="true">{{ user.initial }}</span>
+            <span class="chat-user-name">{{ user.name }}</span>
+            {% if user.current %}<svg class="chat-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>{% endif %}
+          </button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% if not curfew_mode %}
+    <form class="chat-user-add" method="post" action="/users">
+      <input type="text" name="name" maxlength="40" placeholder="Nouvel utilisateur" aria-label="Nom du nouvel utilisateur" autocomplete="off" required>
+      <button type="submit">Ajouter</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not curfew_mode %}
+  <form class="settings-form user-form" action="/user" method="post">
+    <div class="settings-card" id="raton-language">
+      <h2 class="settings-card-title">Raton et toi</h2>
+      <p class="settings-hint">La façon dont Raton te parle dans le chat de l’accueil.</p>
+      <div class="settings-checkbox-list" role="radiogroup" aria-label="Tutoiement ou vouvoiement">
+        <label class="settings-checkbox-option">
+          <input type="radio" name="raton_address" value="vous"{% if raton_language.address == 'vous' %} checked{% endif %}>
+          <span>Il te vouvoie</span>
+        </label>
+        <label class="settings-checkbox-option">
+          <input type="radio" name="raton_address" value="tu"{% if raton_language.address == 'tu' %} checked{% endif %}>
+          <span>Il te tutoie</span>
+        </label>
+      </div>
+      <label class="user-nickname">Comment il t’appelle <input name="raton_nickname" value="{{ raton_language.nickname }}" maxlength="40" placeholder="Rien de particulier" autocomplete="off"></label>
+    </div>
+
+    <div class="settings-card" id="curfew">
+      <div class="settings-curfew">
+        <h2 class="settings-card-title">Couvre-feu</h2>
+        <p class="settings-hint">Pendant ces heures, Raton te ferme ses portes : plus de lecture, de recherche ni de réglages. Seuls l’accueil (Raton et ses discussions) et l’historique restent ouverts, pour écrire un commentaire sous les vidéos. Il ne se désactive pas pendant qu’il est en cours.</p>
+        <div class="settings-checkbox-list">
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="curfew_enabled"{% if curfew.enabled %} checked{% endif %}>
+            <span>Activer le couvre-feu</span>
+          </label>
+        </div>
+        <div class="settings-curfew-hours">
+          <label>De <input name="curfew_start" type="time" value="{{ curfew.start }}" required></label>
+          <label>à <input name="curfew_end" type="time" value="{{ curfew.end }}" required></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-actions lg">
+      <span>Les changements s’appliquent à l’enregistrement.</span>
+      <button type="submit">Enregistrer</button>
+    </div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

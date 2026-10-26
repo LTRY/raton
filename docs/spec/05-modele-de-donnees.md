@@ -442,6 +442,11 @@ connues :
   `video`/`short`/`podcast`/`music` — seule la limite journaliere est
   configurable ; les limites "semaine" et "mois" affichees au dashboard sont
   derivees automatiquement (x7 et x30) a partir de cette limite journaliere ;
+- `curfew_enabled` (`true`/`false`, `false` par defaut), `curfew_start`,
+  `curfew_end` (`HH:MM`, `22:00` et `10:00` par defaut) : son couvre-feu, voir
+  [02 Fonctionnalites](02-fonctionnalites.md) ;
+- `raton_address` (`vous` par defaut, ou `tu`) et `raton_nickname` (surnom,
+  vide par defaut) : son langage de Raton dans le chat bibliotheque ;
 - `raton_last_seen_at`, `raton_session_previous_visit_at` et
   `raton_visit_shown` : ses dernieres visites et les phrases deja affichees
   dans la visite en cours (liste JSON), utilisees par les scenarios de

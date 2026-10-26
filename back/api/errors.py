@@ -88,6 +88,7 @@ _DESCRIPTIONS = {
     409: "Conflit avec l'état actuel",
     416: "Plage `Range` invalide",
     422: "Requête invalide",
+    423: "Couvre-feu en cours",
     502: "Service externe en échec",
 }
 

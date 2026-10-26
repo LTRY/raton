@@ -720,6 +720,52 @@ Comme le bloc de journee porte deja la date, la ligne d'activite ne repete ni
 regarde ce jour-la (et « Revu »), la progression, puis une derniere ligne avec
 le poids du fichier a gauche et les actions Vu/Indesiree + la notation a droite.
 
+### Paramètres de l'utilisateur
+
+`/user` (`user_settings.html`, `front/routes/users.py`) : l'en-tete porte la
+pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
+`/settings` sur une colonne de 720 px au plus :
+
+- « Nom » : champ et « Renommer » (`POST /users/{id}/rename`, `next=/user`) ;
+- « Changer d'utilisateur » : rappel de ce qui est propre a chacun (lien vers
+  `/settings#utilisateurs` pour supprimer), une ligne par utilisateur
+  (pastille, nom, coche sur le courant, desactive ; `POST /users/switch`
+  recharge l'accueil pour lui avec « Bonjour <nom> ! »), puis « Nouvel
+  utilisateur » et « Ajouter » (`POST /users`) ;
+- un formulaire (`POST /user`, barre « Enregistrer ») : « Raton et toi »
+  (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
+  t'appelle ») et « Couvre-feu » (interrupteur, heures de debut et de fin en
+  `input type="time"`).
+
+Pendant le couvre-feu, la page reste ouverte mais ne garde que « Changer
+d'utilisateur » (sans l'ajout) et la note « Couvre-feu jusqu'à 10:00 : tes
+paramètres se modifient après ».
+
+### Couvre-feu
+
+Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) :
+
+- une page dont un appel a l'API repond `423` rend `curfew.html` en `423`
+  (gestionnaire `ApiError` de `front/main.py`) : la scene de Raton
+  (`curfew_banner`, `bonnet_nuit.webp`), le message du back et les boutons
+  « Écrire dans l'historique » et « Discuter avec Raton » ;
+- l'accueil `/` lit `GET /api/curfew` et reste la page habituelle (Raton, chat
+  bibliotheque, tiroir « Discussions ») ; seul le bouton de la replique de
+  Raton devient « Écrire dans l'historique », son lien habituel etant ferme ;
+- `/dashboard/historique` lit `GET /api/curfew` : en couvre-feu, la scene de
+  Raton « Couvre-feu jusqu'à 10:00 » remplace le titre, le menu de la
+  Bibliotheque et le temps de lecture, et chaque ligne (`media_row` avec `curfew_return_to`)
+  perd ses liens, sa progression, Vu/Indesiree et la notation au profit du
+  formulaire du commentaire (`POST /videos/{id}/comment`, retour sur la meme
+  page) ;
+- `/user` reste ouverte (voir « Paramètres de l'utilisateur ») ;
+- ces quatre pages passent `curfew_mode` a `base.html` : la navigation ne garde
+  que l'accueil (« Raton ») et l'Historique (barre du haut : lien
+  « Historique » ; barre d'onglets mobile : onglets Accueil et Historique), sans
+  feuille d'import, mini-lecteur ni Raton d'exploration.
+
+La carte « Couvre-feu » est sur `/user` (ancre `#curfew`).
+
 ### Barre de progression de lecture
 
 Une carte video (macro `video_card`) ou une ligne `Historique` (`media_row`)
@@ -914,15 +960,10 @@ attribut `data-chat-config` :
     le bouton pilule « Nouvelle discussion », qui place aussi le curseur dans
     le champ. Les discussions listees sont celles de l'utilisateur courant.
   - Le bouton rond (`.chat-user-button`, initiale du nom de l'utilisateur
-    courant ; sur le modele du bouton de compte d'une app de chat) ouvre au
-    dessus de lui un panneau (`<details>`, sans JavaScript) : « Utilisateurs »,
-    une ligne par utilisateur (pastille de l'initiale, nom, coche sur le
-    courant, desactive), puis un champ « Nouvel utilisateur » et « Ajouter »,
-    et le lien « Renommer ou supprimer… » vers `/settings#utilisateurs`.
-    Choisir un utilisateur (`POST /users/switch`) ou en ajouter un
-    (`POST /users`) recharge l'accueil pour lui, avec la notification
-    « Bonjour <nom> ! » (voir [12 API et routes](12-api-et-routes.md)). Les
-    donnees viennent de `GET /api/users` (`userMenu` de la config du widget).
+    courant ; sur le modele du bouton de compte d'une app de chat) est un
+    lien vers la page de l'utilisateur `/user` (voir « Paramètres de
+    l'utilisateur »). Son initiale vient de `GET /api/users` (`userMenu` de
+    la config du widget).
   - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
     Raton (les deux derniers y font apparaitre le champ vide, pas « Raton ») : rien d'affiche, `conversationId` a `null`, et la question
     suivante ouvre une discussion (voir
@@ -1725,7 +1766,8 @@ Permet de modifier :
 
 - les utilisateurs (carte « Utilisateurs », ancre `#utilisateurs`, juste
   apres « General ») : rappel de ce qui est partage et de ce qui est propre a
-  chacun, puis une ligne par utilisateur (son nom dans un champ, « vous » sur
+  chacun (et renvoi vers la page de l'utilisateur, ouverte par le bouton rond
+  du tiroir de l'accueil), puis une ligne par utilisateur (son nom dans un champ, « vous » sur
   l'utilisateur courant, « Renommer », et « Supprimer » avec confirmation
   quand il en reste plusieurs). Ses champs appartiennent a des formulaires
   places apres celui des parametres (`form=`), les formulaires ne

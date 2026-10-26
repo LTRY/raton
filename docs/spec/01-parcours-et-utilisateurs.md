@@ -19,12 +19,20 @@ d'avant les utilisateurs appartiennent au premier, « Moi ».
 
 1. Sur l'accueil `/`, l'utilisateur ouvre le tiroir « Discussions » (☰).
 2. En bas a gauche, le bouton rond porte l'initiale de l'utilisateur courant ;
-   il ouvre la liste des utilisateurs.
+   il ouvre sa page `/user` (« Paramètres de l'utilisateur »), qui liste les
+   utilisateurs sous « Changer d'utilisateur ».
 3. Choisir un nom recharge l'accueil pour lui : ses discussions, sa phrase de
    Raton, et sur les autres pages ses Nouveautes, son historique, ses notes et
    ses playlists. Le choix est garde par le navigateur.
 4. « Nouvel utilisateur » + « Ajouter » cree un utilisateur et le choisit.
-5. Renommer ou supprimer : section « Utilisateurs » de `/settings`.
+5. Se renommer : carte « Nom » de `/user` ; renommer ou supprimer n'importe
+   quel utilisateur : section « Utilisateurs » de `/settings`.
+
+### Paramètres de l'utilisateur
+
+La page `/user` porte ce qui est propre a l'utilisateur courant : son nom, le
+changement d'utilisateur, la facon dont Raton lui parle dans le chat
+bibliotheque (tutoiement ou vouvoiement, surnom) et son couvre-feu.
 
 ## Parcours principaux
 

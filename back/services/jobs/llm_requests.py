@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from back.models.llm_job import LlmJob
 from back.models.video import Video
+from back.services.common.raton_language import read_raton_language
 from back.services.common.settings import get_llm_provider_name
 from back.services.jobs.llm_jobs import (
     apply_generation_result,
@@ -119,7 +120,10 @@ def queue_library_question(
         else get_conversation(db, user_id, conversation_id)
     )
     try:
-        prompt = build_library_chat_prompt(chat_history(db, conversation.id), question)
+        language = read_raton_language(db, user_id)
+        prompt = build_library_chat_prompt(
+            chat_history(db, conversation.id), question, language.address, language.nickname
+        )
         return enqueue_llm_job(
             db,
             kind="library_chat",

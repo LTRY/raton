@@ -45,6 +45,8 @@ class HistoryVideoRead(BaseModel):
     id: int
     title: str
     rating: int
+    # Shown and edited on the Historique during the couvre-feu.
+    comment: str | None
     file_size_bytes: int
     list_state: str | None
     categories: Categories
