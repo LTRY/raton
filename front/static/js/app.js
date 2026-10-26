@@ -2091,9 +2091,11 @@ function initChatWidget(root) {
     scope.conversations = chat.conversations;
   }
 
-  // Back to Raton: nothing on screen, the next question opens a new discussion.
-  function startConversation({ push = true } = {}) {
+  // Back to Raton: nothing on screen. With `compose` the empty composer is shown (the
+  // "Nouvelle discussion" buttons); without it, Raton's screen has no composer at all.
+  function startConversation({ push = true, compose = false } = {}) {
     if (busy) return;
+    root.dataset.chatComposing = compose ? "true" : "false";
     const scope = scopeConfig();
     scope.conversationId = null;
     scope.messages = [];
@@ -2133,6 +2135,7 @@ function initChatWidget(root) {
     if (conversation.id === scope.conversationId) {
       scope.conversationId = null;
       scope.messages = [];
+      root.dataset.chatComposing = "false";
       syncUrl(null, { replace: true });
     }
     renderMessages();
@@ -2145,7 +2148,7 @@ function initChatWidget(root) {
     root.querySelector("[data-chat-drawer-close]")?.addEventListener("click", () => closeDrawer({ restoreFocus: true }));
     root.querySelector("[data-chat-home]")?.addEventListener("click", () => startConversation());
     root.querySelector("[data-chat-drawer-new]")?.addEventListener("click", () => {
-      startConversation();
+      startConversation({ compose: true });
       focusInputAtEnd();
     });
     drawer.addEventListener("keydown", (event) => {
@@ -2158,7 +2161,10 @@ function initChatWidget(root) {
       else startConversation({ push: false });
     });
   }
-  newButton?.addEventListener("click", () => startConversation());
+  newButton?.addEventListener("click", () => {
+    startConversation({ compose: true });
+    focusInputAtEnd();
+  });
 
   function renderMessages() {
     if (!messagesEl) return;
