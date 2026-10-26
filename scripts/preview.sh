@@ -72,7 +72,7 @@ cmd_up() {
   mode="$(python3 "$REPO/scripts/preview_db.py" "$src/alembic/versions" "$db_revision")"
   copy="raton_pr_$pr"
   # The previous deploy's api holds connections to the copy: stop it before dropping the copy.
-  compose "$pr" stop api >/dev/null 2>&1 || true
+  compose "$pr" stop preview-api >/dev/null 2>&1 || true
   db_psql dropdb -U raton --if-exists --force "$copy"
   if [ "$mode" = copy ]; then
     echo "preview $pr : la PR a des migrations à jouer, copie de la DB dans $copy..."

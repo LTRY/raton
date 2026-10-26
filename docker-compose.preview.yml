@@ -7,7 +7,10 @@
 # Postgres password and the Anthropic key of the real stack's .env (read by compose from the repo
 # root). See docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 services:
-  api:
+  # Not named `api`: this service joins the real stack's network (to reach raton-db), where Compose
+  # would give it the alias `api` and the real front's `http://api:8001` would resolve to the
+  # preview's back half of the time (writes on the read-only media mount fail in prod).
+  preview-api:
     build:
       context: ${PREVIEW_SRC:?set by scripts/preview.sh}
       target: back
@@ -37,7 +40,7 @@ services:
       target: front
     image: raton-preview:pr-${PREVIEW_PR}
     depends_on:
-      - api
+      - preview-api
     # scripts/preview.sh finds the previews, the commit and the DB each one runs, through these labels.
     labels:
       raton.preview.pr: "${PREVIEW_PR}"
@@ -47,7 +50,7 @@ services:
       # Same interface as the real stack (APP_BIND in .env): loopback unless opened to the LAN.
       - "${APP_BIND:-127.0.0.1}:${PREVIEW_PORT:?set by scripts/preview.sh}:8000"
     environment:
-      RATON_API_URL: http://api:8001
+      RATON_API_URL: http://preview-api:8001
 
 networks:
   real:

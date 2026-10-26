@@ -331,6 +331,11 @@ le merge ne deploie rien.
   preview passe donc « en retard » jusqu'au prochain **Redeployer**, et le
   `GH_TOKEN` doit pouvoir ecrire sur le depot ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
   `retire-stale` retire celles qu'un deploiement rendrait perimees (voir « DB » ci-dessous).
+- **Service du back** : `preview-api`, jamais `api`. Il rejoint le reseau de la pile
+  reelle (pour atteindre `raton-db`), ou Compose l'aliase par son nom de
+  service : un `api` de preview recevrait une partie des appels du front reel
+  (`http://api:8001`), dont les ecritures echouent sur le montage media en
+  lecture seule (`tests/test_preview_compose.py`).
 - **Port** : `9000 + N` (PR 31 : `9031`), sur l'interface d'`APP_BIND`.
 - **DB** : la preview tourne sur le serveur Postgres de la pile reelle
   (`raton-db`, qui doit tourner : sinon `up` refuse), sur son reseau Docker.
