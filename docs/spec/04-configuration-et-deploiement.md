@@ -431,8 +431,10 @@ l'utilisateur — (1) la traiter quand meme dans cette session, sur la meme PR,
 ou (2) la traiter dans une session separee, et dans ce cas il fournit un prompt
 autonome, pret a copier-coller dans une nouvelle session (objectif, fichiers
 concernes, contexte, critere de fin). Juste apres l'ouverture de la PR, l'agent
-renomme la session avec le titre de la PR (`set_session_title`, serveur MCP
-claude-code-remote ; sessions cloud uniquement).
+renomme la session avec le numero de la PR suivi de son titre, par exemple
+`#80 [BACK] Fix ...` (le numero n'est que dans le nom de la session, jamais dans
+le titre de la PR ; `set_session_title`, serveur MCP claude-code-remote ;
+sessions cloud uniquement).
 
 ## Regle post-modification
 
