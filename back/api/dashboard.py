@@ -21,9 +21,9 @@ from back.schemas.dashboard import (
 )
 from back.schemas.library import LibraryChannelRead
 from back.services.common.settings import get_screen_time_limits
-from back.services.videos.filters import video_badges
-from back.services.videos.history import history_page
-from back.services.videos.nouveautes import nouveautes_stacks
+from back.services.videos.filters import list_hide, video_badges
+from back.services.videos.history import HISTORY_DEFAULT_HIDE, history_page
+from back.services.videos.nouveautes import NOUVEAUTES_DEFAULT_HIDE, nouveautes_stacks
 from back.services.videos.playback import playback_time_stats, recent_played_jobs
 
 router = APIRouter(prefix="/api", tags=["Tableau de bord"])
@@ -32,10 +32,12 @@ router = APIRouter(prefix="/api", tags=["Tableau de bord"])
 @router.get("/nouveautes", response_model=NouveautesRead, responses=error_responses(422))
 def get_nouveautes(
     page: int = Query(1, ge=1),
+    hide: str | None = None,
     db: Session = Depends(get_db),
     user_id: int = Depends(current_user_id),
 ) -> NouveautesRead:
-    stacks, page, total_pages = nouveautes_stacks(db, user_id, page)
+    hide = list_hide(hide, NOUVEAUTES_DEFAULT_HIDE)
+    stacks, page, total_pages = nouveautes_stacks(db, user_id, page, hide=hide)
     return NouveautesRead(
         stacks=[
             NouveautesStackRead(
@@ -46,16 +48,19 @@ def get_nouveautes(
         ],
         page=page,
         total_pages=total_pages,
+        hide=hide,
     )
 
 
 @router.get("/historique", response_model=HistoriqueRead, responses=error_responses(422))
 def get_historique(
     page: int = Query(1, ge=1),
+    hide: str | None = None,
     db: Session = Depends(get_db),
     user_id: int = Depends(current_user_id),
 ) -> HistoriqueRead:
-    history = history_page(db, user_id, page)
+    hide = list_hide(hide, HISTORY_DEFAULT_HIDE)
+    history = history_page(db, user_id, page, hide=hide)
     rows = []
     for row in history.rows:
         video, channel, state = row.job.video, row.job.channel, row.state
@@ -89,6 +94,7 @@ def get_historique(
         page=history.page,
         total_pages=history.total_pages,
         day_seconds=history.seconds_by_day,
+        hide=hide,
     )
 
 

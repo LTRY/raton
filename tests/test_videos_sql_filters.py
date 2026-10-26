@@ -77,21 +77,33 @@ def test_sql_filters_match_the_python_twin(db):
         dict(category_labels="podcast,musique", list_state="hidden"),
         dict(category_labels="", video_path=""),
         dict(category_labels="humour", rating=2, audio_path="/m/a.m4a", list_state="watched"),
+        # Vu by the user's 90 % rule: in a replay category, forced non-vu, Écartée, or plainly Vu.
+        dict(category_labels="musique", user_watched_at=True),
+        dict(user_watched_at=True, list_state="unwatched"),
+        dict(user_watched_at=True, list_state="hidden"),
+        dict(category_labels="humour", user_watched_at=True),
+        dict(user_watched_at=True),
+        # Vu by someone else only: not Vu for this user.
+        dict(watched_at=datetime(2026, 1, 1, tzinfo=UTC)),
     ]
     for index, fields in enumerate(variants):
+        user_watched = fields.pop("user_watched_at", False)
         # Video 7 has no labels of its own and inherits the channel's, as `ensure_video_channel` persists it.
-        add_video(db, f"v{index}", channel if index % 2 == 0 else None, **fields)
+        video = add_video(db, f"v{index}", channel if index % 2 == 0 else None, **fields)
+        if user_watched:
+            set_video_state(db, video, watched_at=datetime(2026, 1, 1, tzinfo=UTC))
     db.commit()
     kinds = ["audio", "shorts", "transcript"]
     labels = ["musique", "live"]
     modes = ["or", "and", "not"]
+    no_progress = frozenset({"musique"})
 
     def sql_ids(args):
         statement = (
             select(Video)
             .outerjoin(Channel, Video.channel_id == Channel.id)
             .outerjoin(UserVideo, video_state_join(user_id(db)))
-            .where(video_filters_condition(*args))
+            .where(video_filters_condition(*args, no_progress_labels=no_progress))
         )
         return {video.id for video in db.scalars(statement)}
 
@@ -114,7 +126,7 @@ def test_sql_filters_match_the_python_twin(db):
                 [set(), {"shorts"}],
                 [set(), {"podcast"}],
                 [False, True],
-                [False, True],
+                ["none", "watched", "watched_hidden"],
                 [False, True],
             )
         )
@@ -137,8 +149,9 @@ def test_sql_filters_match_the_python_twin(db):
                 video,
                 states[video.id],
                 *args[:7],
-                hide_hidden=args[7],
+                hide=args[7],
                 uncategorized_only=args[8],
+                no_progress_labels=no_progress,
             )
         }
         assert ids_before == expected == sql_ids(args), args

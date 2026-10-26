@@ -6,8 +6,9 @@
 <section class="library-main">
   <div class="page-head">
     {{ macros.library_title("Nouveautés") }}
+    {{ macros.list_hide_selector(hide_selector) }}
   </div>
-  <div class="video-stack-list">
+  <div class="video-stack-list" data-drop-states="{{ hide_selector.drop_states }}">
     {{ macros.video_stack_list(video_stacks, current_new_videos_path, category_style_map) }}
   </div>
   {{ macros.pagination(page|default(1), total_pages|default(1), page_href) }}

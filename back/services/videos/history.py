@@ -9,12 +9,14 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, load_only, selectinload
 
 from back.models.job import DownloadJob
 from back.models.user import UserVideo
+from back.models.video import Video
 from back.services.common.settings import get_no_progress_category_labels
 from back.services.common.user_state import video_states
+from back.services.videos.filters import video_is_watched
 from back.services.videos.list_state import card_list_states, video_auto_list_state
 from back.services.videos.playback import (
     local_datetime,
@@ -23,6 +25,8 @@ from back.services.videos.playback import (
 )
 
 HISTORY_PAGE_SIZE = 50
+# The Historique is mostly finished playbacks: hiding the Vu by default would empty it.
+HISTORY_DEFAULT_HIDE = "none"
 
 
 @dataclass
@@ -55,6 +59,7 @@ class HistoryPage:
 class _DayEntry:
     job_id: int
     day: date
+    video_id: int | None
     watched_seconds: float = 0.0
 
 
@@ -83,9 +88,35 @@ def _day_entries(
         key = (playback_media_key(job, playback), day)
         entry = entries.get(key)
         if entry is None:
-            entry = entries[key] = _DayEntry(job_id=job.id, day=day)
+            entry = entries[key] = _DayEntry(job_id=job.id, day=day, video_id=job.video_id)
         entry.watched_seconds += watched
     return list(entries.values()), seconds_by_day
+
+
+def _kept_entries(
+    db: Session, user_id: int, entries: list[_DayEntry], hide: str, no_progress_labels
+) -> list[_DayEntry]:
+    """The entries left once `hide` drops the user's Vu and/or Écartée fiches (`LIST_HIDES`),
+    with two queries for every fiche of the history. A gone fiche has no state left: it stays."""
+    video_ids = {entry.video_id for entry in entries if entry.video_id}
+    states = video_states(db, user_id, video_ids)
+    videos = {
+        video.id: video
+        for video in db.scalars(
+            select(Video).where(Video.id.in_(video_ids)).options(load_only(Video.category_labels))
+        )
+    }
+
+    def kept(entry: _DayEntry) -> bool:
+        video = videos.get(entry.video_id)
+        if video is None:
+            return True
+        state = states[video.id]
+        if video_is_watched(video, state, no_progress_labels):
+            return False
+        return not (hide == "watched_hidden" and state.list_state == "hidden")
+
+    return [entry for entry in entries if kept(entry)]
 
 
 def history_page(
@@ -94,9 +125,13 @@ def history_page(
     page: int = 1,
     now: datetime | None = None,
     page_size: int = HISTORY_PAGE_SIZE,
+    hide: str = HISTORY_DEFAULT_HIDE,
 ) -> HistoryPage:
     now = now or datetime.now().astimezone()
     entries, all_seconds_by_day = _day_entries(db, user_id, now)
+    no_progress_labels = set(get_no_progress_category_labels(db))
+    if hide != "none":
+        entries = _kept_entries(db, user_id, entries, hide, frozenset(no_progress_labels))
     total_pages = max(1, -(-len(entries) // page_size))
     page = min(max(page, 1), total_pages)
     page_entries = entries[(page - 1) * page_size : page * page_size]
@@ -109,7 +144,6 @@ def history_page(
             .options(selectinload(DownloadJob.video), selectinload(DownloadJob.channel))
         )
     }
-    no_progress_labels = set(get_no_progress_category_labels(db))
     states = video_states(db, user_id, [job.video_id for job in loaded.values() if job.video_id])
     rows = []
     for entry in page_entries:

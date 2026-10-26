@@ -6,7 +6,12 @@ from front.cards import card_views, history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
 from front.library import library_view_links
 from front.library_chat import library_chat_widget_config
-from front.pages import current_request_path, message_context, page_href_builder
+from front.pages import (
+    current_request_path,
+    list_hide_selector,
+    message_context,
+    page_href_builder,
+)
 from front.records import record
 from front.templating import templates
 
@@ -41,7 +46,9 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
 
 @router.get("/dashboard/nouveautes", response_class=HTMLResponse)
 def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
-    nouveautes = record(api.get("/nouveautes", page=max(page, 1)))
+    nouveautes = record(
+        api.get("/nouveautes", page=max(page, 1), hide=request.query_params.get("hide"))
+    )
     for stack in nouveautes.stacks:
         card_views(stack.items)
     styles = record(api.get("/categories"))
@@ -53,6 +60,7 @@ def dashboard_new_videos_page(request: Request, page: int = 1, api: Api = Depend
             "library_views": library_view_links(record(api.get("/library/views")), request),
             "current_new_videos_path": current_request_path(request),
             "category_style_map": category_style_map(styles),
+            "hide_selector": list_hide_selector(request, nouveautes.hide),
             "page": nouveautes.page,
             "total_pages": nouveautes.total_pages,
             "page_href": page_href_builder(request),
@@ -73,7 +81,9 @@ def dashboard_resume_page_redirect(request: Request):
 
 @router.get("/dashboard/historique", response_class=HTMLResponse)
 def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(get_api)):
-    history = record(api.get("/historique", page=max(page, 1)))
+    history = record(
+        api.get("/historique", page=max(page, 1), hide=request.query_params.get("hide"))
+    )
     styles = record(api.get("/categories"))
     return templates.TemplateResponse(
         request,
@@ -83,6 +93,7 @@ def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(g
             "library_views": library_view_links(record(api.get("/library/views")), request),
             "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
             "category_style_map": category_style_map(styles),
+            "hide_selector": list_hide_selector(request, history.hide),
             "page": history.page,
             "total_pages": history.total_pages,
             "page_href": page_href_builder(request),
