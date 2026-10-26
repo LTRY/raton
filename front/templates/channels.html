@@ -124,30 +124,34 @@
       <div class="channel-card-banner channel-banner-fallback" aria-hidden="true"></div>
       {% endif %}
       <div class="channel-card-body">
-        {% if channel.avatar_url %}
-        <img class="channel-avatar channel-card-avatar" src="{{ channel.avatar_url }}?v={{ asset_version }}" alt="" loading="lazy">
-        {% else %}
-        <span class="channel-avatar channel-card-avatar channel-avatar-initial" aria-hidden="true">{{ channel.name[:1]|upper }}</span>
-        {% endif %}
-        <a class="channel-card-name" href="/videos?channel_id={{ channel.id }}">{{ channel.name }}</a>
-        {% set selected_categories = channel.categories %}
-        {% if selected_categories %}
-        <span class="category-labels" aria-label="Catégories">
-          {% for category in selected_categories %}
-          {% set category_style = (category_style_map|default({})).get(category) %}
-          <span class="category-label" {% if category_style %}style="{{ video_category_css_style(category_style) }}"{% endif %}>{{ category }}</span>
-          {% endfor %}
-        </span>
-        {% endif %}
-        <p class="channel-card-meta">
-          {% if entry.video_count is defined %}<span>{{ entry.video_count }} fiche{{ "s" if entry.video_count != 1 else "" }}</span>{% endif %}
-          {% if entry.last_played_at is defined %}
-          <span>
-            Dernière activité :
-            {% if entry.last_played_at %}{{ format_french_datetime(entry.last_played_at) }}{% else %}aucune lecture{% endif %}
+        <div class="channel-card-identity">
+          {% if channel.avatar_url %}
+          <img class="channel-avatar channel-card-avatar" src="{{ channel.avatar_url }}?v={{ asset_version }}" alt="" loading="lazy">
+          {% else %}
+          <span class="channel-avatar channel-card-avatar channel-avatar-initial" aria-hidden="true">{{ channel.name[:1]|upper }}</span>
+          {% endif %}
+          {% set selected_categories = channel.categories %}
+          {% if selected_categories %}
+          <span class="category-labels" aria-label="Catégories">
+            {% for category in selected_categories %}
+            {% set category_style = (category_style_map|default({})).get(category) %}
+            <span class="category-label" {% if category_style %}style="{{ video_category_css_style(category_style) }}"{% endif %}>{{ category }}</span>
+            {% endfor %}
           </span>
           {% endif %}
+        </div>
+        <div class="channel-card-title">
+          <a class="channel-card-name" href="/videos?channel_id={{ channel.id }}">{{ channel.name }}</a>
+          {% if entry.video_count is defined %}<span class="channel-card-count" title="{{ entry.video_count }} fiche{{ 's' if entry.video_count != 1 else '' }}">{{ entry.video_count }}</span>{% endif %}
+        </div>
+        {% if entry.last_played_at is defined %}
+        <p class="channel-card-meta">
+          <span>
+            Dernière activité :
+            {% if entry.last_played_at %}{{ format_french_date(entry.last_played_at) }}{% else %}aucune lecture{% endif %}
+          </span>
         </p>
+        {% endif %}
       </div>
       <div class="channel-card-actions">
         <div class="channel-card-bells">

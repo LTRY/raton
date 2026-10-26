@@ -57,7 +57,7 @@ def test_channels_page_cards_show_the_fiche_count_and_both_bells():
     finally:
         app.dependency_overrides.clear()
     assert '<article class="channel-card">' in html
-    assert "1 fiche<" in html
+    assert ">1</span>" in html and "channel-card-count" in html
     assert html.count(f'action="/channels/{channel.id}/auto-metadata"') == 2
     assert html.count("data-bell-form") == 2
     assert 'class="channel-bell-btn"' in html

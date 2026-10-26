@@ -1029,8 +1029,10 @@ Contenu :
   telephone) ; chaque carte montre une bande de banniere de 84 px (la banniere
   de la chaine, ou le meme degrade de repli que la page de la chaine), l'avatar
   de 64 px qui la chevauche (ou, sans avatar, une pastille avec l'initiale du
-  nom), le nom (lien vers la bibliotheque filtree), les categories, puis une
-  ligne « N fiches » + « Derniere activite : date » ; la carte monte de 4 px au
+  nom) avec les categories a sa droite, sous la banniere, puis le nom (lien
+  vers la bibliotheque filtree) suivi du nombre de fiches en pastille (comme
+  le compteur du titre de la page), puis « Derniere activite : date » (date
+  seule, sans l'heure) ; la carte monte de 4 px au
   survol (coupe avec `prefers-reduced-motion`). Un pied de carte separe par un
   filet porte les deux cloches et les cinq etoiles de la note. Le nombre de
   fiches est calcule pour les chaines de la page courante seulement

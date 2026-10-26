@@ -3622,7 +3622,8 @@ def test_channels_page_shows_last_played_activity_without_video_title():
     rendered = site(db).get("/channels").text
 
     assert "Dernière activité" in rendered
-    assert "Jeu. 02 juil. 2026 14:30" in rendered
+    assert "Jeu. 02 juil. 2026" in rendered
+    assert "14:30" not in rendered
     assert "Titre privé" not in rendered
 
 
