@@ -759,7 +759,7 @@ Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) 
 - `/dashboard/historique` lit `GET /api/curfew` : en couvre-feu, la scene de
   Raton « Couvre-feu jusqu'à 10:00 » remplace le titre, le menu de la
   Bibliotheque et le temps de lecture, et chaque ligne (`media_row` avec `curfew_return_to`)
-  perd ses liens, sa progression, Vu/Ecartee et la notation au profit du
+  perd ses liens, sa progression, Vu/Indesiree et la notation au profit du
   formulaire du commentaire (`POST /videos/{id}/comment`, retour sur la meme
   page) ;
 - `/user` reste ouverte (voir « Paramètres de l'utilisateur ») ;
