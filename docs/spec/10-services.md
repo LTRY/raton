@@ -148,7 +148,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |
 | `stats` | Compteurs de la bibliothèque pour `/settings` et `GET /api/stats` |
 | `charts` | Données de la page `/stats` et de `GET /api/stats/charts` (`library_stats` : graphiques, parts par type et par format, purges, jauge du quota) |
-| `nouveautes` | Les Nouveautés (`GET /api/nouveautes`) : une pile des fiches les plus récentes par chaîne suivie, paginée par chaîne |
+| `nouveautes` | Les Nouveautés (`GET /api/nouveautes`) : une pile des fiches les plus récentes par chaîne suivie, paginée par chaîne (l'API et le serveur MCP ; la page lit `GET /api/library?followed=true`) |
 | `youtube_search` | La section Recherche (`GET /api/youtube/videos`) : vidéos trouvées sur YouTube, chacune avec sa fiche si la bibliothèque l'a déjà (`youtube_video_candidates`) |
 | `history` | L'Historique (`GET /api/historique`) : une ligne par média et par jour local (temps regardé additionné, Revu), et le temps de lecture de chaque jour de la page |
 

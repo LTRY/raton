@@ -8,10 +8,10 @@ from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from back.models.channel import Channel
-from back.models.user import UserVideo
+from back.models.user import UserChannel, UserVideo
 from back.models.video import Video
 from back.services.common.search import video_search_rank
-from back.services.common.user_state import video_rating, video_state_join
+from back.services.common.user_state import channel_state_join, video_rating, video_state_join
 from back.services.videos.filters import video_asset_kind_condition, video_section_condition
 
 
@@ -42,12 +42,14 @@ def library_page(
     """One page of the fiches matching `where`: (videos, page, total_pages, matching count).
 
     `where` may read `Channel`, which is outer-joined (a fiche inherits its channel's labels),
-    and `UserVideo`, the user's own state, outer-joined too.
+    and `UserVideo` and `UserChannel`, the user's own state of the fiche and of its channel,
+    outer-joined too.
     """
     with_channel = Video.channel_id == Channel.id
     listed = (
         select(Video, UserVideo.comment)
         .outerjoin(Channel, with_channel)
+        .outerjoin(UserChannel, channel_state_join(user_id))
         .outerjoin(UserVideo, video_state_join(user_id))
         .where(where)
         .options(selectinload(Video.channel))
@@ -72,6 +74,7 @@ def library_page(
     count = db.scalar(
         select(func.count(Video.id))
         .outerjoin(Channel, with_channel)
+        .outerjoin(UserChannel, channel_state_join(user_id))
         .outerjoin(UserVideo, video_state_join(user_id))
         .where(where)
     )

@@ -142,7 +142,6 @@ haut au minimum, vers 44 px quand la place le permet.
 - Les pastilles de filtre (`.chip3`, « ★ Notees »,
   « Sans categorie ») et les boutons pastilles (« + Categories »,
   `button.category-label`) passent a 32 px de haut, texte 12 px.
-- Les fleches d'une pile de Nouveautes passent a 40 x 36 px.
 - Les etoiles de notation, le menu ⋮ des cartes et le ✕ d'une categorie dans
   les Parametres gardent leur dessin : un `::after` invisible agrandit leur
   zone de toucher, surtout en hauteur (11 px de chaque cote) et a peine en
@@ -276,8 +275,8 @@ meta, survoler une carte video sur le dashboard declenchait un GET reel sur
 `/videos/{id}`, qui effacait `is_new` (voir "Cloche de suivi quotidien" dans
 [02 Fonctionnalites](02-fonctionnalites.md)) sans navigation reelle — le
 label **Nouveau** disparaissait au simple survol (la fiche, elle, reste
-affichee dans sa pile tant qu'il y a des videos a montrer — voir
-"Nouveautes par chaine" plus bas). Verifie present dans le bundle vendorise
+affichee dans les Nouveautes — voir
+"Nouveautes" plus bas). Verifie present dans le bundle vendorise
 (`mouseenter`/`prefetch`/en-tete `Sec-Purpose`).
 
 La page d'une chaine (`channel_videos.html`) declare
@@ -656,27 +655,24 @@ des que le fichier est depose (`XMLHttpRequest`, barre de progression) vers
 d'echec le message d'erreur remplace l'indication de la zone. Le fichier n'a ni
 transcript ni metadonnees YouTube.
 
-**Nouveautes** (`/dashboard/nouveautes`, `dashboard_new_videos.html`) : une
-pile (`.video-stack`) par chaine suivie (cloche videos `auto_metadata_enabled`
-ou cloche shorts `auto_shorts_enabled` active) — pas seulement les
-fiches marquees `is_new` : une fiche deja visitee (label **Nouveau**
-efface) reste affichee tant qu'elle fait partie des videos les plus
-recentes de sa chaine. Chaque cloche filtre son type : les videos ne sont
-listees que si la cloche videos est active, les shorts que si la cloche
-shorts est active. Le filtre sur les cloches preserve l'exclusion des
-videos importees via playlist (chaine auto-creee sans cloche — voir
-[07 YouTube et telechargements](07-youtube-et-telechargements.md)). Chaque
-pile montre jusqu'a `NOUVEAUTES_STACK_SIZE` (10) videos triees par date de
-sortie, navigables une a la fois via des fleches precedent/suivant
-(`.video-stack-carousel`, scroll-snap), sans compteur de position ("1 / 10")
-entre les fleches ; une fleche desactivee (debut ou fin de la pile) n'est
-qu'un contour clair, sans fond, pour ne pas se lire comme un bouton actif ; chaque video reutilise la meme carte
-(macro `video_card`, même vignette pleine hauteur, même note, sans
-labels) que la page `/videos`. Les piles sont
-paginees par chaine (`NOUVEAUTES_CHANNEL_PAGE_SIZE` = 10 chaines par
-page, triees par recence de leur derniere video, `macros.pagination`) ; elles sont accolees,
-sans espace vertical : `.video-stack-list` porte le cadre et chaque pile
-n'est separee de la precedente que par un filet.
+**Nouveautes** (`/dashboard/nouveautes`, `videos.html`) : la page
+d'Exploration, avec le meme gabarit, le meme champ de recherche, les memes
+filtres (chaine, tri, types de fichier, notees, categories), le meme
+selecteur d'affichage (`hide`, defaut « Masquer les deja vues et les indesirees »), la meme
+liste de cartes (macro `video_card`) et la meme pagination (50 fiches par
+page). Seules differences : le formulaire envoie vers `/dashboard/nouveautes`,
+la liste ne contient que les fiches des chaines suivies (cloche videos
+`auto_metadata_enabled` ou cloche shorts `auto_shorts_enabled` active, chaque
+cloche ne listant que son type ; la chaine auto-creee d'un import de playlist,
+sans cloche, en est exclue — voir
+[07 YouTube et telechargements](07-youtube-et-telechargements.md)), le tri
+par defaut est « Publication recente » et tous les types de fichier sont
+selectionnes (sans pastille de filtre actif), car une fiche suivie n'a souvent
+que ses metadonnees. Pas seulement les fiches `is_new` : une fiche deja
+visitee (label **Nouveau** efface) reste listee. La page appelle
+`GET /api/library?followed=true` (`library_list_context`, `front/library.py`,
+partage avec `/videos`) ; aucune entree de « Sous-bibliotheques » n'y est
+surlignee.
 
 **Historique** (`/dashboard/historique`, `dashboard_history.html`) : activite
 de lecture recente, une ligne par media et par journee, paginee (50 lignes par
@@ -1265,7 +1261,7 @@ Contenu :
 - barre de progression de lecture sur le bord bas de la vignette
   (`.video-row-progress`, 4px, sans texte : la position et la duree sont dans
   son `aria-label`), comme sur la page d'une chaine ;
-- sous le titre, seulement la chaine (sauf dans une pile de Nouveautes) : la
+- sous le titre, seulement la chaine : la
   date de publication est dans le menu ⋮ de la carte ;
 - menu ⋮ discret (`details.video-row-more`, `data-pop` : un clic dehors ou
   Echap le ferme) dans le coin haut droit de la carte ; il ouvre a sa gauche
@@ -1273,13 +1269,12 @@ Contenu :
   chaine, qui garde sa ligne de date ;
 - les etoiles de notation sont calees contre le bord droit de la carte (6px),
   sous le menu ⋮, apres Vu/Indesiree ;
-- sur mobile (moins de 800px), les listes de cartes (`.video-row-list`,
-  `.video-stack-list`) occupent toute la largeur de l'ecran : elles sortent
+- sur mobile (moins de 800px), les listes de cartes (`.video-row-list`) occupent toute la largeur de l'ecran : elles sortent
   des marges de page et perdent leur cadre lateral et leurs coins arrondis
   (marges negatives uniquement, jamais de `width: 100vw` : une largeur fixe
   elargit toute la page du dashboard sous Safari iOS) ;
 - carte en conteneur etroit : meme disposition dans toutes les listes
-  (`/videos`, detail d'une playlist, piles de Nouveautes) — titre limite a 2
+  (`/videos`, `/dashboard/nouveautes`, detail d'une playlist) — titre limite a 2
   lignes, la chaine dessous, puis les actions dans la colonne
   de droite, sous le titre et la chaine (jamais en barre pleine largeur sous la
   vignette) : Vu/Indesiree a gauche, la notation poussee a droite ; avec les vignettes masquees, la colonne de vignette disparait
@@ -1293,10 +1288,6 @@ Contenu :
   etoiles) : un simple appui garde son effet normal, et le clic qui suivrait
   un glissement confirme est annule. Seuls les champs de formulaire en sont
   exclus ;
-- carte dans une pile de Nouveautes (`.video-stack`) : seules differences
-  avec les autres listes, le nom de chaine n'est pas repete sous le titre (il
-  est deja dans l'en-tete de la pile) et les boutons Vu/Indesiree n'y sont
-  affiches sur aucun ecran ;
 - aucune page ne doit defiler horizontalement sur mobile (verifie a 390px,
   largeur d'un iPhone) : les grilles qui contiennent un carrousel, un
   `select` ou un titre long declarent une colonne `minmax(0, 1fr)` (grille
@@ -1574,12 +1565,11 @@ deux requetes pour toutes les fiches de l'historique ; la ligne d'une fiche
 supprimee n'a plus d'etat et reste toujours.
 
 Le conteneur de la liste nomme dans `data-drop-states` les etats qu'il retire
-(la `turbo-frame` des resultats sur `/videos` et une chaine,
-`.video-stack-list` sur Nouveautes, `.history-day-lists` sur Historique) :
+(la `turbo-frame` des resultats sur `/videos`, une chaine et
+Nouveautes, `.history-day-lists` sur Historique) :
 une carte marquee **Vu** ou **Indésirée** qui prend l'un de ces etats est
 retiree aussitot de la page au lieu d'etre grisee, avec un toast qui rappelle
-« Tout voir » ; une pile de Nouveautes ou une journee d'Historique videe
-disparait avec elle. Les compteurs (nombre de fiches, de medias d'une journee)
+« Tout voir » ; une journee d'Historique videe disparait avec elle. Les compteurs (nombre de fiches, de medias d'une journee)
 ne se mettent a jour qu'au prochain rendu.
 
 Le facet **Categories** (sur `/videos` comme sur la page d'une chaine) porte

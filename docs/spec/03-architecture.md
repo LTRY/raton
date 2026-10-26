@@ -149,7 +149,7 @@ Macro Jinja partagee `video_card(card, next_path, category_style_map,
 channel_mode=False, feature=False, index=0, short_tile=False)` : rend une carte de fiche, a partir d'une carte de l'API (`LibraryVideoRead` : l'etat de grisage, l'etat deduit de la lecture et la categorie « sans barre de progression » sont donnes par l'API) — vignette
 pleine hauteur, titre, meta, progression de lecture, notation, sans labels
 techniques ni categories. Utilisee par `videos.html`, `channel_videos.html`,
-`dashboard.html` (section Nouveautes) et `dashboard_new_videos.html` pour
+`dashboard.html` pour
 garantir un rendu identique. `channel_mode` est reserve a la page d'une chaine
 (`channel_videos.html`) : pastille « Nouveau », progression sur la vignette,
 point de note, pas de ligne chaine/date ; `feature` marque les grandes
@@ -157,11 +157,6 @@ tuiles de la mosaique des shorts et `index` echelonne l'animation d'entree.
 Macro `numbered_pagination(current_page, total_pages, page_href)` :
 pagination numerotee de la page d'une chaine (la pagination « Precedent /
 Suivant » reste celle des autres pages).
-
-Macro Jinja partagee `video_stack_list(stacks, next_path, category_style_map)` : rend la section Nouveautes — une pile
-(`.video-stack`) par chaine, chacune enveloppant ses cartes `video_card`
-dans un carrousel navigable aux fleches (`.video-stack-carousel`). Utilisee
-par `dashboard.html` et `dashboard_new_videos.html`.
 
 Macro Jinja partagee `media_row(row, category_style_map)` : rend une ligne "Historique"
 (une ligne de `GET /api/historique`). Utilisee par `dashboard.html` et `dashboard_history.html`.

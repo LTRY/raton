@@ -2427,124 +2427,6 @@ button.secondary {
   border-radius: 0;
 }
 
-/* Les piles sont accolees (aucun espace vertical) : la liste porte le cadre,
-   chaque pile n'est separee de la precedente que par un filet. */
-.video-stack-list {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  display: grid;
-  gap: 0;
-  overflow: hidden;
-  /* Colonne explicite plutot que laisser la grille implicite dimensionner
-     sa colonne "auto" sur le contenu : `.video-stack-carousel` plus bas
-     porte `container-type: inline-size`, et un item en containment ne doit
-     jamais se retrouver dans une colonne dont la taille depend de son
-     propre contenu (cycle que le containment casse a 0px). */
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.video-stack {
-  border-top: 1px solid var(--color-border);
-  margin: 0;
-  overflow: hidden;
-  /* Largeur explicite plutot que de compter sur le stretch implicite de
-     grille : `.video-stack-carousel` plus bas etablit un contexte de
-     containment (`container-type: inline-size`), ce qui pousse certains
-     moteurs a retomber sur une taille "fit-content" (et donc centree) pour
-     cet item de grille au lieu de l'etirer sur toute la colonne. */
-  width: 100%;
-}
-
-.video-stack:first-child {
-  border-top: 0;
-}
-
-/* L'en-tete de pile porte deja le nom de la chaine. */
-.video-stack .video-meta-channel {
-  display: none;
-}
-
-/* Pas de boutons Vu/Indesiree dans les piles de Nouveautes. Le bloc reste dans
-   le DOM (seulement masque) : le glissement tactile vu/indesiree s'appuie
-   dessus. */
-.video-stack .list-state-actions {
-  display: none;
-}
-
-.video-stack-list > .empty-state {
-  border: 0;
-  border-radius: 0;
-}
-
-.video-stack-header {
-  align-items: center;
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  gap: 8px;
-  justify-content: space-between;
-  padding: 8px 12px;
-}
-
-.video-stack-channel-link {
-  color: inherit;
-  min-width: 0;
-  text-decoration: none;
-}
-
-.video-stack-channel-link h3 {
-  font-size: 14px;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-stack-controls {
-  align-items: center;
-  display: flex;
-  flex-shrink: 0;
-  gap: 6px;
-}
-
-.video-stack-controls button {
-  line-height: 1;
-  min-width: 28px;
-  padding: 3px 8px;
-}
-
-/* At either end of the stack: a flat outline, not a faded copy of the active
-   arrow that still reads as tappable. */
-.video-stack-controls button:disabled {
-  background: transparent;
-  border-color: var(--color-border);
-  color: var(--color-text-faint);
-  cursor: default;
-  opacity: 1;
-}
-
-.video-stack-carousel {
-  container-name: video-row-list;
-  container-type: inline-size;
-  display: flex;
-  overflow-x: auto;
-  scroll-behavior: smooth;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  touch-action: pan-y;
-  width: 100%;
-}
-
-.video-stack-carousel::-webkit-scrollbar {
-  display: none;
-}
-
-.video-stack-slide {
-  box-sizing: border-box;
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-}
-
 .video-row {
   align-items: center;
   border-bottom: 1px solid var(--color-border);
@@ -3193,8 +3075,8 @@ button.secondary {
 }
 
 @container video-row-list (max-width: 460px) {
-  /* Same narrow layout for every card list (library, playlist, Nouveautes
-     stacks): the thumbnail spans the whole card height, and the actions sit
+  /* Same narrow layout for every card list (library, playlist,
+     Nouveautes): the thumbnail spans the whole card height, and the actions sit
      in the right-hand column under the title and date. */
   .video-row {
     column-gap: 10px;
@@ -9009,8 +8891,7 @@ turbo-frame {
      lateral. Marges negatives uniquement, jamais de `width: 100vw` : une
      largeur fixe remonte comme taille minimale jusqu'a la grille du
      dashboard et elargit toute la page sous Safari iOS. */
-  .video-row-list,
-  .video-stack-list {
+  .video-row-list {
     border-left: 0;
     border-radius: 0;
     border-right: 0;
@@ -12546,16 +12427,6 @@ body::before {
     font-size: 12px;
     min-height: 32px;
     padding: 4px 11px;
-  }
-
-  .video-stack-controls {
-    gap: 8px;
-  }
-
-  .video-stack-controls button {
-    font-size: 18px;
-    min-height: 36px;
-    min-width: 40px;
   }
 
   .rating-star,

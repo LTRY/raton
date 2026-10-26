@@ -15,22 +15,17 @@ from front.formatting import (
 )
 from front.forms import form_text_value, submitted_categories
 from front.library import (
-    VIDEO_ASSET_FILTER_OPTIONS,
     channel_periodicity,
+    library_list_context,
     library_query,
     library_view_links,
     normalized_channel_id,
-    shorts_feature_flags,
-    video_active_filter_pills,
-    video_filters_clear_href,
 )
 from front.pages import (
     append_query,
     current_request_path,
     internal_return_path,
-    list_hide_selector,
     message_context,
-    page_href_builder,
     redirect,
 )
 from front.records import record
@@ -65,50 +60,17 @@ def videos_page(
     """The library, or a channel's page when `channel_id` names one."""
     selected_channel_id = normalized_channel_id(channel_id)
     library = record(api.get("/library", **library_query(request, selected_channel_id, page)))
-    filters = library.filters
-    styles = record(api.get("/categories"))
     channel = record(api.get(f"/channels/{library.channel.id}")) if library.channel else None
-    cards = card_views(library.items)
     return templates.TemplateResponse(
         request,
         "channel_videos.html" if channel else "videos.html",
         {
-            "channels": record(api.get("/channels/names")),
+            **library_list_context(request, api, library),
             "selected_channel": channel,
-            "selected_channel_id": filters.channel_id,
-            "selected_channel_section": library.section,
-            "asset_filter_options": VIDEO_ASSET_FILTER_OPTIONS,
-            "selected_asset_filters": set(filters.assets),
-            "category_filter_options": styles,
-            "category_style_map": category_style_map(styles),
-            "library_views": library_view_links(library.saved_views, request),
-            "selected_category_filters": set(filters.categories),
-            "selected_excluded_asset_filters": set(filters.excluded_assets),
-            "selected_excluded_category_filters": set(filters.excluded_categories),
-            "selected_rated_only": filters.rated,
-            "hide_selector": list_hide_selector(request, filters.hide),
-            "selected_uncategorized_only": filters.uncategorized,
-            "selected_asset_filter_mode": filters.asset_filter_mode,
-            "selected_category_filter_mode": filters.category_filter_mode,
-            "selected_sort": filters.sort,
-            "search_query": filters.q,
-            "active_filter_pills": video_active_filter_pills(request, filters),
-            "category_filter_count": len(filters.categories)
-            + len(filters.excluded_categories)
-            + int(filters.uncategorized),
-            "filters_clear_href": video_filters_clear_href(request),
-            "current_videos_path": current_request_path(request),
-            "channel_page": library.page,
             "channel_page_size": library.explore_page_size,
-            "page": library.page,
-            "total_pages": library.total_pages,
-            "page_href": page_href_builder(request),
-            "filtered_video_count": library.total,
             **vars(library.counts),
             "next_import_page": library.explore_next_page,
             "channel_periodicity": channel_periodicity(library.publication_interval_days),
-            "video_cards": cards,
-            "shorts_feature_flags": shorts_feature_flags(cards),
             **message_context(request),
         },
     )

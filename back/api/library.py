@@ -43,6 +43,7 @@ def filters_read(filters: LibraryFilters) -> LibraryFiltersRead:
         asset_filter_mode=filters.asset_filter_mode,
         category_filter_mode=filters.category_filter_mode,
         q=filters.search_query,
+        followed=filters.followed,
     )
 
 
@@ -75,6 +76,7 @@ def get_library(
     asset_filter_mode: str | None = None,
     category_filter_mode: str | None = None,
     q: str | None = None,
+    followed: bool = False,
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
     user_id: int = Depends(current_user_id),
@@ -95,6 +97,7 @@ def get_library(
         category_filter_mode=category_filter_mode,
         search_query=q,
         page=page,
+        followed=followed,
     )
     listing = library_listing(db, user_id, filters)
     if channel_id is not None and listing.channel is None:

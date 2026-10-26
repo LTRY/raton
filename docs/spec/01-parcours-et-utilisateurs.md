@@ -111,7 +111,7 @@ Le detail technique (flux, `Range`, mini-lecteur) est dans
 
 1. L'utilisateur active la cloche videos et/ou shorts d'une chaine.
 2. Chaque nuit, l'application importe les nouvelles fiches de ces chaines.
-3. `Bibliotheque > Nouveautes` affiche une pile par chaine suivie.
+3. `Bibliotheque > Nouveautes` affiche les fiches des chaines suivies, avec la recherche et les filtres d'Exploration.
 4. Ouvrir la fiche d'une video nouvelle la retire des nouveautes marquees.
 
 ### Noter et trier une video
