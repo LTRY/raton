@@ -8,7 +8,7 @@
   </div>
 
   {% if curfew_mode %}
-  <p class="user-curfew-note">Couvre-feu jusqu’à {{ curfew.end }} : tes paramètres se modifient après. Tu peux toujours changer d’utilisateur.</p>
+  <p class="user-curfew-note">Couvre-feu jusqu’à {{ curfew.end }} : tu peux le désactiver ci-dessous ou changer d’utilisateur ; le reste de tes paramètres se modifie après.</p>
   {% else %}
   <div class="settings-card" id="name">
     <h2 class="settings-card-title">Nom</h2>
@@ -45,8 +45,8 @@
     {% endif %}
   </div>
 
-  {% if not curfew_mode %}
   <form class="settings-form user-form" action="/user" method="post">
+    {% if not curfew_mode %}
     <div class="settings-card" id="raton-language">
       <h2 class="settings-card-title">Raton et toi</h2>
       <p class="settings-hint">La façon dont Raton te parle dans le chat de l’accueil.</p>
@@ -62,11 +62,12 @@
       </div>
       <label class="user-nickname">Comment il t’appelle <input name="raton_nickname" value="{{ raton_language.nickname }}" maxlength="40" placeholder="Rien de particulier" autocomplete="off"></label>
     </div>
+    {% endif %}
 
     <div class="settings-card" id="curfew">
       <div class="settings-curfew">
         <h2 class="settings-card-title">Couvre-feu</h2>
-        <p class="settings-hint">Pendant ces heures, Raton te ferme ses portes : plus de lecture, de recherche ni de réglages. Seuls l’accueil (Raton et ses discussions) et l’historique restent ouverts, pour écrire un commentaire sous les vidéos. Il ne se désactive pas pendant qu’il est en cours.</p>
+        <p class="settings-hint">Pendant ces heures, Raton te ferme ses portes : plus de lecture, de recherche ni de réglages. Seuls l’accueil (Raton et ses discussions) et l’historique restent ouverts, pour écrire un commentaire sous les vidéos. Tu peux le désactiver à tout moment, même pendant qu’il est en cours.</p>
         <div class="settings-checkbox-list">
           <label class="settings-checkbox-option">
             <input type="checkbox" name="curfew_enabled"{% if curfew.enabled %} checked{% endif %}>
@@ -85,6 +86,5 @@
       <button type="submit">Enregistrer</button>
     </div>
   </form>
-  {% endif %}
 </section>
 {% endblock %}

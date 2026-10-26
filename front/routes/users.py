@@ -35,8 +35,8 @@ def _users(api: Api) -> dict[int, str]:
 
 @router.get("/user", response_class=HTMLResponse)
 def user_page(request: Request, api: Api = Depends(get_api)):
-    """Open during the couvre-feu (its API calls are): the forms that would write are then
-    replaced by the couvre-feu's end, and only the user switch stays."""
+    """Open during the couvre-feu (its API calls are): the name, the user addition and Raton's
+    language are then hidden, and the couvre-feu card stays so that it can be switched off."""
     settings = api.get("/settings")
     curfew = record(settings["curfew"])
     return templates.TemplateResponse(
@@ -54,8 +54,8 @@ def user_page(request: Request, api: Api = Depends(get_api)):
 
 @router.post("/user")
 def user_form(
-    raton_address: str = Form("vous"),
-    raton_nickname: str = Form(""),
+    raton_address: str | None = Form(None),
+    raton_nickname: str | None = Form(None),
     curfew_enabled: str = Form(default=""),
     curfew_start: str = Form("22:00"),
     curfew_end: str = Form("10:00"),
@@ -65,8 +65,12 @@ def user_form(
         api.put(
             "/settings",
             {
+                # During the couvre-feu the form only holds the couvre-feu card: the language
+                # fields are absent and stay as they are.
                 "raton_address": raton_address,
-                "raton_nickname": form_text_value(raton_nickname),
+                "raton_nickname": None
+                if raton_nickname is None
+                else form_text_value(raton_nickname),
                 # Unchecked checkbox: the browser sends nothing, so an empty value means "off".
                 "curfew_enabled": bool(form_text_value(curfew_enabled)),
                 "curfew_start": curfew_start,

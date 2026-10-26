@@ -738,8 +738,10 @@ pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
   `input type="time"`).
 
 Pendant le couvre-feu, la page reste ouverte mais ne garde que « Changer
-d'utilisateur » (sans l'ajout) et la note « Couvre-feu jusqu'à 10:00 : tes
-paramètres se modifient après ».
+d'utilisateur » (sans l'ajout), la carte « Couvre-feu » (pour le desactiver ;
+`POST /user` n'envoie alors ni le tutoiement ni le surnom, qui restent
+inchanges) et la note « Couvre-feu jusqu'à 10:00 : tu peux le désactiver
+ci-dessous ou changer d'utilisateur ».
 
 ### Couvre-feu
 

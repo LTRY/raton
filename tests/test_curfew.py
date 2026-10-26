@@ -129,7 +129,6 @@ def test_curfew_closes_the_api_but_the_home_the_historique_and_the_commentaire(d
     assert refused.status_code == 423
     assert "Couvre-feu" in refused.json()["detail"]
     assert client.get(f"/api/videos/{video.id}/video").status_code == 423
-    assert client.put("/api/settings", json={"curfew_enabled": False}).status_code == 423
 
     assert client.get("/api/curfew").json()["active"] is True
     # The home page: Raton, the library chat and its discussions, the user menu.
@@ -175,6 +174,21 @@ def test_curfew_pages_show_the_couvre_feu_and_the_historique_writes_commentaires
     assert video_state(db, user_id(db), video.id).comment == "Idée du soir"
 
 
+def test_curfew_can_be_switched_off_from_the_user_page_while_it_is_on(db, front_client):
+    start_curfew_now(db)
+    site = front_client(db)
+
+    page = site.get("/user")
+    assert page.status_code == 200
+    assert 'id="curfew"' in page.text
+    assert 'name="raton_address"' not in page.text
+
+    saved = site.post("/user", data={"curfew_start": "22:00", "curfew_end": "10:00"})
+    assert saved.status_code == 200
+    assert site.get("/api/curfew").json()["enabled"] is False
+    assert site.get("/channels").status_code == 200
+
+
 def test_historique_is_the_normal_page_outside_the_curfew(db, front_client):
     video = add_played_video(db)
     history = front_client(db).get("/dashboard/historique").text
@@ -193,7 +207,9 @@ def test_curfew_is_each_users_own(db):
     assert read_curfew(db, other.id).enabled is False
 
 
-def test_the_user_page_stays_open_during_the_curfew_for_the_user_switch(db, front_client):
+def test_the_user_page_stays_open_during_the_curfew_for_the_switch_and_the_curfew_card(
+    db, front_client
+):
     add_user(db, "Camille")
     start_curfew_now(db)
 
@@ -201,5 +217,4 @@ def test_the_user_page_stays_open_during_the_curfew_for_the_user_switch(db, fron
 
     assert page.status_code == 200
     assert page.text.count('action="/users/switch"') == 2
-    assert 'action="/user"' not in page.text
     assert "/rename" not in page.text
