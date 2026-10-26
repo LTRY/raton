@@ -4882,12 +4882,43 @@ body.hide-thumbnails .pld-thumb img {
   padding: 0 16px 14px;
 }
 
+/* The avatar overlaps the banner by half its height; the category labels sit beside it, in the
+   part below the banner. */
+.channel-card-identity {
+  align-items: flex-end;
+  display: flex;
+  gap: 10px;
+  margin-top: -32px;
+}
+
+.channel-card-identity .category-labels {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
 .channel-card-body .channel-card-avatar {
   border: 3px solid var(--color-surface);
   box-sizing: border-box;
+  flex: none;
   height: 64px;
-  margin-top: -32px;
   width: 64px;
+}
+
+.channel-card-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.channel-card-count {
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
 }
 
 .channel-card-body .channel-avatar-initial {
@@ -4897,6 +4928,8 @@ body.hide-thumbnails .pld-thumb img {
 
 .channel-card-name {
   color: var(--color-text);
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.28;
