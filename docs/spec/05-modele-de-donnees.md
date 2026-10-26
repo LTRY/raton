@@ -70,7 +70,7 @@ Champs :
 - `duration_seconds` : duree recopiee de `metadata.json` (entier, nullable), posee au meme moment que `view_count` (une ancienne migration). Sert a la duree affichee sur les cartes : `metadata.json` est le dump complet de yt-dlp (~140 Ko) et n'est pas relu pour chaque carte d'une liste. Un fichier lisible sans duree donne 0 (non affichee), un fichier illisible laisse `NULL` ;
 - `created_at`, `updated_at`.
 
-La note en etoiles, l'etat Vu/Ecartee, le commentaire et le label Nouveau
+La note en etoiles, l'etat Vu/Indesiree, le commentaire et le label Nouveau
 d'une fiche sont propres a chaque utilisateur : ils sont dans `user_videos`
 (voir « Utilisateurs »). `Video.user_states` les regroupe, cascade
 delete-orphan.
@@ -404,8 +404,10 @@ deux en `ON DELETE CASCADE`.
   `null` = aucun forcage, la carte suit la detection automatique (derniere
   lecture terminee de cet utilisateur) ; `watched` = marquee vue a la main ;
   `unwatched` = forcee non-vue, ce qui annule la detection automatique ;
-  `hidden` = ecartee, soit un grisage renforce plus le filtre "Masquer les
-  ecartees" de `/videos`. Un `watched` pose a la main est respecte meme sur une
+  `hidden` = indesiree : un grisage renforce, et la fiche est retiree des listes
+  de cet utilisateur (Bibliotheque, page d'une chaine, Nouveautes, Historique)
+  quand leur selecteur d'affichage est sur « Masquer les déjà vues et les indésirées »
+  (`hide=watched_hidden`, voir [11 Interface HTML](11-interface-html.md)). Un `watched` pose a la main est respecte meme sur une
   categorie replay, alors que la detection automatique y reste neutralisee ;
 - `comment` : commentaire libre, optionnel ;
 - `is_new` : label `Nouveau`, pose uniquement par le scan planifie du suivi
@@ -461,7 +463,7 @@ suivantes se nomment `NNNN_short_slug`.
 
 `0004_users` cree les tables des utilisateurs et un premier utilisateur,
 « Moi », a qui elle donne tout ce qui etait personnel : les notes en etoiles,
-etats Vu/Ecartee, commentaires et labels Nouveau des fiches, les notes et
+etats Vu/Indesiree, commentaires et labels Nouveau des fiches, les notes et
 cloches des chaines, les reglages devenus personnels, les playlists, les
 discussions et les lignes d'activite `played`/`prompt`. Elle retire ensuite
 ces colonnes de `videos` et `channels`. Son `downgrade()` remet l'etat du plus

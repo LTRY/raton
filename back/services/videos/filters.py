@@ -1,7 +1,7 @@
 """Which fiches a library list keeps: the filters in Python (`video_matches_filters`) and their SQL twin
 (`video_filters_condition`), kept in step by tests/test_videos_sql_filters.py.
 
-The Écartée state and the stars are the user's own: the Python filter takes their state row, the
+The Indésirée state and the stars are the user's own: the Python filter takes their state row, the
 SQL one reads the `UserVideo` row the query outer-joins (`video_state_join`)."""
 
 from sqlalchemy import String, and_, func, literal, or_, true
@@ -17,6 +17,14 @@ from back.services.common.user_state import (
     video_rating,
 )
 from back.services.videos.documents import NOTES_FILE
+
+# What a list leaves out, from its two-button selector (docs/spec/11-interface-html.md): nothing,
+# or the Vu and the Indésirée fiches.
+LIST_HIDES = ("none", "watched_hidden")
+
+
+def list_hide(value: str | None, default: str) -> str:
+    return value if value in LIST_HIDES else default
 
 
 def video_category_labels(video: Video) -> list[str]:
@@ -71,10 +79,13 @@ def video_matches_filters(
     rated_only: bool,
     asset_filter_mode: str,
     category_filter_mode: str,
-    hide_hidden: bool = False,
+    hide: str = "none",
     uncategorized_only: bool = False,
+    no_progress_labels: frozenset[str] = frozenset(),
 ) -> bool:
-    if hide_hidden and state.list_state == "hidden":
+    if hide == "watched_hidden" and (
+        state.list_state == "hidden" or video_is_watched(video, state, no_progress_labels)
+    ):
         return False
     video_assets = video_asset_kinds(video)
     video_categories = set(video_category_labels(video))
@@ -114,6 +125,38 @@ def video_matches_filters(
     if not groups:
         return True
     return all(groups)
+
+
+def video_is_watched(video: Video, state: UserVideo, no_progress_labels: frozenset[str]) -> bool:
+    """Vu for the user, as a list filters it: marked Vu by hand, or their `watched_at` set by the
+    90 % rule while not forced non-vu nor Indésirée, outside a "no progress bar" category
+    (replayed, never done)."""
+    if state.list_state == "watched":
+        return True
+    if state.list_state is not None or state.watched_at is None:
+        return False
+    return not no_progress_labels.intersection(video_category_labels(video))
+
+
+def video_watched_condition(no_progress_labels: frozenset[str]):
+    """SQL twin of `video_is_watched`; never NULL, so it can be negated. Needs `UserVideo`
+    (`video_state_join`) and `Channel` outer-joined (see `video_category_condition`)."""
+    auto = and_(UserVideo.list_state.is_(None), UserVideo.watched_at.is_not(None))
+    replay = _any_of([video_category_condition(label) for label in sorted(no_progress_labels)])
+    if replay is not None:
+        auto = and_(auto, ~replay)
+    return or_(func.coalesce(UserVideo.list_state, "") == "watched", auto)
+
+
+def video_list_hide_condition(hide: str, no_progress_labels: frozenset[str]):
+    """The fiches a list keeps for its `hide` choice (`LIST_HIDES`); same joins as
+    `video_watched_condition`."""
+    if hide != "watched_hidden":
+        return true()
+    return and_(
+        ~video_watched_condition(no_progress_labels),
+        func.coalesce(UserVideo.list_state, "") != "hidden",
+    )
 
 
 def _present(column):
@@ -173,15 +216,14 @@ def video_filters_condition(
     rated_only: bool,
     asset_filter_mode: str,
     category_filter_mode: str,
-    hide_hidden: bool = False,
+    hide: str = "none",
     uncategorized_only: bool = False,
+    no_progress_labels: frozenset[str] = frozenset(),
 ):
     """SQL twin of `video_matches_filters`: keep the two in step (tests/test_videos_sql_filters.py).
 
     Needs `UserVideo` outer-joined with `video_state_join`."""
-    conditions = []
-    if hide_hidden:
-        conditions.append(or_(UserVideo.list_state.is_(None), UserVideo.list_state != "hidden"))
+    conditions = [video_list_hide_condition(hide, no_progress_labels)]
     if uncategorized_only:
         conditions.append(video_uncategorized_condition())
     excluded_assets = _any_of(

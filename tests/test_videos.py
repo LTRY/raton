@@ -56,6 +56,7 @@ from front.records import record
 from front.routes import videos as front_videos_routes
 from tests.site import site_client
 from tests.users import (
+    add_user,
     mine,
     my_channel,
     set_channel_state,
@@ -4851,63 +4852,172 @@ def test_set_video_list_state_rejects_unknown_value():
         videos_editing.set_video_list_state(db, user_id(db), video, "bogus")
 
 
-def test_videos_page_hide_hidden_excludes_only_hidden_videos():
-    db = make_session()
+def _list_state_videos(db):
+    """A plain fiche, one marked Vu, one Vu by the 90 % rule, one Indésirée, on one channel."""
     kept = add_video(db)
     channel = kept.channel
-    hidden = Video(
-        channel=channel,
-        yt_video_id="hidden123",
-        title="Vidéo écartée",
-        url="https://youtube.com/watch?v=hidden123",
-        media_type="video",
-        folder_path="/media/hidden",
-        video_path="/media/hidden/video.mp4",
-        transcript_status=TranscriptStatus.missing,
-        user_states=mine(list_state="hidden"),
-    )
-    marked_watched = Video(
-        channel=channel,
-        yt_video_id="watched123",
-        title="Vidéo marquée lue",
-        url="https://youtube.com/watch?v=watched123",
-        media_type="video",
-        folder_path="/media/watched",
-        video_path="/media/watched/video.mp4",
-        transcript_status=TranscriptStatus.missing,
-        user_states=mine(list_state="watched"),
-    )
-    db.add_all([hidden, marked_watched])
+    others = {}
+    for key, fields in (
+        ("marked", dict(list_state="watched")),
+        ("auto", dict(watched_at=datetime(2026, 7, 1, tzinfo=UTC))),
+        ("hidden", dict(list_state="hidden")),
+    ):
+        others[key] = Video(
+            channel=channel,
+            yt_video_id=f"state-{key}",
+            title=f"Fiche état {key}",
+            url=f"https://youtube.com/watch?v=state-{key}",
+            media_type="video",
+            folder_path=f"/media/state-{key}",
+            video_path=f"/media/state-{key}/video.mp4",
+            transcript_status=TranscriptStatus.missing,
+            user_states=mine(**fields),
+        )
+    db.add_all(others.values())
     db.commit()
-
-    rendered = site(db).get("/videos?hide_hidden=1").text
-
-    assert kept.title in rendered
-    assert marked_watched.title in rendered
-    assert hidden.title not in rendered
-    assert 'name="hide_hidden" type="checkbox" value="1" checked' in rendered
+    return kept, others
 
 
-def test_videos_page_without_hide_hidden_keeps_hidden_videos():
+def test_videos_page_hides_vu_and_indesirees_by_default():
     db = make_session()
-    add_video(db)
-    hidden = Video(
-        yt_video_id="hidden456",
-        title="Vidéo écartée visible",
-        url="https://youtube.com/watch?v=hidden456",
-        media_type="video",
-        folder_path="/media/hidden456",
-        video_path="/media/hidden456/video.mp4",
-        transcript_status=TranscriptStatus.missing,
-        user_states=mine(list_state="hidden"),
-    )
-    db.add(hidden)
-    db.commit()
+    kept, others = _list_state_videos(db)
 
     rendered = site(db).get("/videos").text
 
-    assert hidden.title in rendered
-    assert 'class="video-row video-row-hidden"' in rendered
+    assert kept.title in rendered
+    for video in others.values():
+        assert video.title not in rendered
+    assert 'data-drop-states="watched hidden"' in rendered
+    assert '<input type="hidden" name="hide" value="watched_hidden">' in rendered
+    assert 'aria-label="Masquer les déjà vues et les indésirées" aria-current="true"' in rendered
+    assert rendered.count('class="list-hide-option') == 2
+
+
+def test_videos_page_tout_voir_shows_everything():
+    db = make_session()
+    kept, others = _list_state_videos(db)
+
+    everything = site(db).get("/videos?hide=none&page=1").text
+    # The former middle level ("sans les vus") is gone: an unknown value falls back to the default.
+    old_level = site(db).get("/videos?hide=watched").text
+
+    for video in (kept, *others.values()):
+        assert video.title in everything
+    assert 'class="video-row video-row-hidden"' in everything
+    assert 'data-drop-states=""' in everything
+    # Each choice keeps the other parameters but goes back to the first page.
+    assert 'href="/videos?hide=watched_hidden"' in everything
+    assert others["hidden"].title not in old_level
+
+
+def test_vu_and_indesiree_are_each_users_own_in_the_hide_filter():
+    db = make_session()
+    _kept, others = _list_state_videos(db)
+    other_user = add_user(db, "Autre")
+
+    client = site(db)
+    client.cookies.set("raton_user", str(other_user.id))
+    rendered = client.get("/videos").text
+
+    for video in others.values():
+        assert video.title in rendered
+
+
+def test_channel_page_has_the_hide_selector():
+    db = make_session()
+    kept, others = _list_state_videos(db)
+
+    rendered = site(db).get(f"/videos?channel_id={kept.channel.id}").text
+
+    assert 'class="list-hide-selector"' in rendered
+    assert others["hidden"].title not in rendered
+    assert f'href="/videos?channel_id={kept.channel.id}&amp;hide=none"' in rendered
+
+
+def test_dashboard_new_videos_page_hide_levels():
+    db = make_session()
+    channel = Channel(
+        url="https://example.test/indesirees",
+        name="Chaîne indésirée",
+        user_states=my_channel(auto_metadata_enabled=True),
+    )
+    only_hidden = Channel(
+        url="https://example.test/all-hidden",
+        name="Chaîne toute indésirée",
+        user_states=my_channel(auto_metadata_enabled=True),
+    )
+    db.add_all([channel, only_hidden])
+    make_new_video(db, channel, 0)
+    make_new_video(db, channel, 1).user_states[0].list_state = "hidden"
+    make_new_video(db, channel, 2).user_states[0].list_state = "watched"
+    make_new_video(db, only_hidden, 3).user_states[0].list_state = "hidden"
+    db.commit()
+
+    rendered = site(db).get("/dashboard/nouveautes").text
+    everything = site(db).get("/dashboard/nouveautes?hide=none&page=1").text
+
+    assert "Nouveauté 0" in rendered
+    assert "Nouveauté 1" not in rendered
+    assert "Nouveauté 2" not in rendered
+    assert "Chaîne toute indésirée" not in rendered
+    assert 'href="/dashboard/nouveautes?hide=none"' in rendered
+    assert 'data-drop-states="watched hidden"' in rendered
+    assert "Nouveauté 1" in everything
+    assert "Nouveauté 2" in everything
+    assert "Chaîne toute indésirée" in everything
+    # Changing the choice drops the page number: the stacks are not the same any more.
+    assert 'href="/dashboard/nouveautes?hide=watched_hidden"' in everything
+
+
+def test_dashboard_history_page_shows_everything_by_default():
+    db = make_session()
+    channel = Channel(url="https://example.test/history-hidden", name="Chaîne historique")
+    db.add(channel)
+    videos = []
+    for key, fields in (
+        ("kept", {}),
+        ("hidden", dict(list_state="hidden")),
+        ("vu", dict(list_state="watched")),
+    ):
+        videos.append(
+            Video(
+                channel=channel,
+                yt_video_id=f"history-{key}",
+                title=f"Lecture {key}",
+                url=f"https://www.youtube.com/watch?v=history-{key}",
+                media_type="video",
+                folder_path=f"/media/history-{key}",
+                video_path=f"/media/history-{key}/video.mp4",
+                transcript_status=TranscriptStatus.missing,
+                user_states=mine(**fields),
+            )
+        )
+    db.add_all(videos)
+    db.commit()
+    for index, video in enumerate((*videos, None)):
+        db.add(
+            DownloadJob(
+                status="played",
+                user_id=user_id(db),
+                message=f"Lecture vidéo pendant 0:04 à 0:04: Fiche supprimée {index}",
+                video=video,
+                channel=channel,
+                created_at=datetime(2026, 7, 1, tzinfo=UTC) + timedelta(minutes=index),
+            )
+        )
+    db.commit()
+
+    rendered = site(db).get("/dashboard/historique").text
+    trimmed = site(db).get("/dashboard/historique?hide=watched_hidden").text
+
+    assert rendered.count('<article class="dashboard-media-row') == 4
+    assert 'aria-label="Tout voir" aria-current="true"' in rendered
+    assert 'data-drop-states=""' in rendered
+    assert "Lecture kept" in trimmed
+    assert "Lecture hidden" not in trimmed
+    assert "Lecture vu" not in trimmed
+    # A row whose fiche was deleted has no Vu/Indésirée state left: it stays.
+    assert trimmed.count('<article class="dashboard-media-row') == 2
 
 
 def test_video_card_renders_list_state_buttons():
@@ -4916,7 +5026,7 @@ def test_video_card_renders_list_state_buttons():
     set_video_state(db, video, list_state="watched")
     db.commit()
 
-    rendered = site(db).get("/videos").text
+    rendered = site(db).get("/videos?hide=none").text
 
     assert f'data-list-state-toggle data-video-id="{video.id}"' in rendered
     assert 'data-list-state-target="watched"' in rendered
@@ -4956,7 +5066,7 @@ def test_video_card_exposes_auto_list_state_for_unhiding():
     )
     db.commit()
 
-    rendered = site(db).get("/videos").text
+    rendered = site(db).get("/videos?hide=none").text
 
     assert 'data-list-state="hidden" data-list-state-auto="watched"' in rendered
 
@@ -4968,10 +5078,10 @@ def test_list_state_buttons_are_icon_only_with_accessible_labels():
     rendered = site(db).get("/videos").text
 
     assert 'aria-label="Marquer comme vu"' in rendered
-    assert 'aria-label="Écarter cette vidéo"' in rendered
+    assert 'aria-label="Marquer cette vidéo indésirée"' in rendered
     assert "list-state-icon" in rendered
     assert ">Lu</button>" not in rendered
-    assert ">Écartée</button>" not in rendered
+    assert ">Indésirée</button>" not in rendered
 
 
 def add_playback_job(db, video, position=5, duration=600):
@@ -5006,7 +5116,7 @@ def test_resume_page_renders_list_state_buttons():
 
     assert f'data-list-state-toggle data-video-id="{video.id}"' in rendered
     assert 'aria-label="Marquer comme vu"' in rendered
-    assert 'aria-label="Écarter cette vidéo"' in rendered
+    assert 'aria-label="Marquer cette vidéo indésirée"' in rendered
 
 
 def test_resume_page_greys_hidden_video_more_strongly():

@@ -1,4 +1,4 @@
-"""Changes a person makes to a fiche: categories (shared), and their own comment and Vu/Écartée
+"""Changes a person makes to a fiche: categories (shared), and their own comment and Vu/Indésirée
 state."""
 
 from sqlalchemy.orm import Session
@@ -31,7 +31,7 @@ def set_video_comment(db: Session, user_id: int, video: Video, comment: str) -> 
 
 
 def set_video_list_state(db: Session, user_id: int, video: Video, state: str) -> None:
-    """Force the Vu/Écartée state; "clear" goes back to the state deduced from playback."""
+    """Force the Vu/Indésirée state; "clear" goes back to the state deduced from playback."""
     if state != "clear" and state not in VIDEO_LIST_STATES:
         raise ValueError("État de liste inconnu.")
     video_state(db, user_id, video.id).list_state = None if state == "clear" else state

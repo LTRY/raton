@@ -45,7 +45,7 @@ d'avant les utilisateurs appartiennent au premier, « Moi ».
 ### Parcourir la bibliotheque
 
 1. L'utilisateur ouvre `/videos` : la liste des videos deja dans la DB, avec
-   filtres, tri, recherche par mots et etat Vu/Ecartee.
+   filtres, tri, recherche par mots et etat Vu/Indesiree.
 2. Choisir une chaine ouvre sa page dediee (`/videos?channel_id=...`).
 3. Sur la page d'une chaine, « Explorer la suite » importe depuis YouTube les
    fiches suivantes (par pages), sans telecharger les medias.

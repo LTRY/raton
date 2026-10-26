@@ -26,7 +26,7 @@ que des paquets situés plus haut dans ce tableau.
 | `channels/` | Les chaînes : ajout, suppression, liste, profil, import des abonnements | `common`, `youtube` |
 | `ingest/` | Ingestion : tout ce qui fait entrer une fiche ou un fichier dans la bibliothèque | `common`, `media`, `youtube` |
 | `playlists/` | Playlists : aperçu et import, édition d'une playlist et de ses éléments | `common`, `ingest`, `youtube` |
-| `videos/` | Les fiches : filtres, Vu/Écartée, lecture, statistiques, modifications, documents, données des pages bibliothèque et fiche | `common`, `media`, `youtube` |
+| `videos/` | Les fiches : filtres, Vu/Indésirée, lecture, statistiques, modifications, documents, données des pages bibliothèque et fiche | `common`, `media`, `youtube` |
 | `raton/` | La mascotte de l'accueil : scénarios, choix de la réplique, visites | `common`, `videos` |
 | `rag/` | Notes structurées et recherche sémantique, page `/rag` | `common`, `llm`, `videos` |
 | `library_chat/` | Chat bibliothèque : outils du modèle et discussions enregistrées | `channels`, `common`, `rag`, `videos`, `youtube` |
@@ -140,9 +140,9 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `filters` | Filtres de la bibliothèque, en Python et en SQL, dont le filtre des Nouveautés ; ce que contient une fiche (`video_badges`) |
 | `library_query` | Liste paginée de `/videos`, de la page d'une chaîne et de `GET /api/videos`, calculée en SQL |
 | `library_view` | Ce que montre la bibliothèque pour un jeu de filtres (`LibraryFilters`, construit et validé par `library_filters`), sans HTTP : chaîne et section, page de fiches, compteurs, cartes, vues enregistrées actives ; sert `/videos` et `GET /api/library` |
-| `list_state` | État Vu/Écartée d'une carte : choix enregistré, sinon déduit de la lecture ; catégories sans barre de progression (`card_list_states`) |
+| `list_state` | État Vu/Indésirée d'une carte : choix enregistré, sinon déduit de la lecture ; catégories sans barre de progression (`card_list_states`) |
 | `playback` | Activité de lecture : enregistrement (et passage en Vu à 90 %, type `video` ou `audio` seulement), positions, temps d'écran, historique |
-| `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Écartée |
+| `editing` | Modifications d'une fiche : catégories, commentaire, titre, Vu/Indésirée |
 | `documents` | Fichiers écrits à côté d'une fiche : `metadata.json`, et à côté du transcript les notes, résumés, questions, discussion par vidéo |
 | `detail_view` | Ce que montre la page d'une fiche (`/videos/{id}` et `GET /api/videos/{id}`), sans HTTP et en valeurs brutes : documents, transcript horodaté, métadonnées, segments sponsors, positions de reprise ; lecture seule (`video_detail`), sauf l'ouverture de la page (`open_video_detail`) qui sort la fiche des Nouveautés |
 | `download_options` | Validation des options d'un téléchargement manuel (formats, sous-titres, qualité) |

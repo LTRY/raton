@@ -1,7 +1,7 @@
 """The users of Raton and what each one keeps for themselves.
 
 The fiches, their files, transcripts and generated notes are shared; a user's own view of them
-(Vu/Écartée, stars, comment, Nouveautés, cloches...) lives in the per-user rows below. A missing
+(Vu/Indésirée, stars, comment, Nouveautés, cloches...) lives in the per-user rows below. A missing
 row means the defaults (see docs/spec/05-modele-de-donnees.md, « Utilisateurs »).
 """
 

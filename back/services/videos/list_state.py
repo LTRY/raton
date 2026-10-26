@@ -1,4 +1,4 @@
-"""Vu/Écartée state of a fiche card for one user: their stored choice, else the one deduced
+"""Vu/Indésirée state of a fiche card for one user: their stored choice, else the one deduced
 from their playback."""
 
 from back.models.user import UserVideo
