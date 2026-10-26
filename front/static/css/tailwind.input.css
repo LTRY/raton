@@ -7182,6 +7182,12 @@ turbo-frame {
   display: none;
 }
 
+/* Raton's screen of a bar with discussions (the home) has no composer: it appears with
+   "Nouvelle discussion" (`data-chat-composing`) or once a discussion is open. */
+.chat-bar[data-chat-empty="true"][data-chat-navigable="true"]:not([data-chat-composing="true"]) .chat-form {
+  display: none;
+}
+
 .chat-bar .discussion-header {
   justify-content: flex-end;
 }

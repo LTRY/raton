@@ -895,7 +895,11 @@ attribut `data-chat-config` :
   (`conversationsUrl`, attribut `data-chat-navigable="true"`) garde son
   en-tete, reduit au bouton menu ; sur l'accueil il est pose en haut a gauche
   de la page (`position: absolute` dans `.dashboard-home`), pas au-dessus du
-  champ.
+  champ. Sur l'ecran de Raton d'une telle portee (l'accueil), le champ n'est
+  pas rendu non plus : il apparait (`data-chat-composing="true"`) avec
+  « Nouvelle discussion » (tiroir ou crayon), ou des qu'une discussion est
+  ouverte ; « Raton » et la suppression de la discussion ouverte le
+  referment.
 - Discussions (portee avec `conversationsUrl`, donc `library`), sur le modele
   du menu lateral d'une app de chat : l'en-tete est une ligne (`.chat-nav`)
   avec le bouton menu (☰) a gauche, le titre de la discussion ouverte au
@@ -924,7 +928,7 @@ attribut `data-chat-config` :
     « Bonjour <nom> ! » (voir [12 API et routes](12-api-et-routes.md)). Les
     donnees viennent de `GET /api/users` (`userMenu` de la config du widget).
   - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
-    Raton : rien d'affiche, `conversationId` a `null`, et la question
+    Raton (les deux derniers y font apparaitre le champ vide, pas « Raton ») : rien d'affiche, `conversationId` a `null`, et la question
     suivante ouvre une discussion (voir
     [09](09-transcript-et-discussion-llm.md)), dont le `conversation_id`
     renvoye par `POST /api/chat` est garde pour la question suivante.
