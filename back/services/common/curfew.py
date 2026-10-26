@@ -24,11 +24,12 @@ CURFEW_TIMEZONE = ZoneInfo("Europe/Paris")
 
 # (method, route path) still answered during the couvre-feu: the state itself so a client can say
 # why; the home page (Raton, the library chat and its discussions, the user menu); the Historique
-# and the commentaire it writes.
+# and the commentaire it writes, and the settings, so the user can switch their couvre-feu off.
 OPEN_ROUTES = frozenset(
     {
         ("GET", "/api/curfew"),
         ("GET", "/api/settings"),
+        ("PUT", "/api/settings"),
         ("GET", "/api/users"),
         ("POST", "/api/raton/visit"),
         ("GET", "/api/chat"),

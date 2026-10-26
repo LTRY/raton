@@ -83,7 +83,8 @@ peut passer minuit ; un debut egal a la fin ne ferme jamais). C'est un reglage
 active. Pendant son couvre-feu :
 
 - l'API lui refuse toutes ses routes en `423` (« Couvre-feu jusqu'à 10:00 :
-  ... »), sauf celles de l'accueil (`GET /api/settings`, `GET /api/users`,
+  ... »), sauf celles de l'accueil (`GET /api/settings`, `PUT /api/settings` pour pouvoir
+  desactiver son couvre-feu, `GET /api/users`,
   `POST /api/raton/visit`, le chat bibliotheque et ses discussions
   `/api/chat...`, `GET /api/llm-jobs/{id}`), de l'Historique
   (`GET /api/historique`, `GET /api/categories`,
@@ -99,9 +100,9 @@ active. Pendant son couvre-feu :
   sans lien ni action, chacune avec le champ du commentaire de la fiche et le
   bouton « Enregistrer le commentaire ».
 
-Le couvre-feu ne se desactive pas pendant qu'il est en cours (`/user` reste
-ouverte mais n'affiche plus ses formulaires) ; changer d'utilisateur depuis
-`/user` reste possible, sans mot de
+Le couvre-feu se desactive a tout moment, meme en cours : `/user` reste ouverte
+et n'y garde que la carte « Couvre-feu » (interrupteur, heures, « Enregistrer »)
+; changer d'utilisateur depuis `/user` reste possible, sans mot de
 passe comme le reste des utilisateurs. Les jobs planifies (scan, purge, notes automatiques) tournent dans le
 back sans passer par l'API : ils continuent.
 

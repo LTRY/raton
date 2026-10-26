@@ -6,7 +6,12 @@ from front.cards import history_days, local_today, screen_time_rings
 from front.formatting import category_style_map
 from front.library import library_list_context, library_query, library_view_links
 from front.library_chat import library_chat_widget_config
-from front.pages import list_hide_selector, message_context, page_href_builder
+from front.pages import (
+    current_request_path,
+    list_hide_selector,
+    message_context,
+    page_href_builder,
+)
 from front.records import record
 from front.templating import templates
 

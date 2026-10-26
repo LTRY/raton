@@ -399,7 +399,7 @@ n'existait pas.
   `{address, nickname}` : `vous` ou `tu`, surnom ou vide), plus `sponsor_segment_category_choices` (`{value, label}` de
   chaque categorie SponsorBlock) et `llm_provider_label` (qui repond aux
   demandes au LLM, fixe par l'environnement).
-- `PUT /api/settings` : memes champs (sauf les deux derniers), chacun
+- `PUT /api/settings` (ouverte pendant le couvre-feu, pour le desactiver) : memes champs (sauf les deux derniers), chacun
   facultatif ; `screen_time_today_minutes` `{video, short, podcast, music}`
   fixe les limites du jour ; `curfew_enabled`, `curfew_start` et `curfew_end`
   (`HH:MM`, `422` sinon) reglent le couvre-feu de l'utilisateur ;
