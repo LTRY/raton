@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
 from front.api import Api, get_api
-from front.cards import screen_time_rings
 from front.forms import form_list_values, form_text_value, split_labels
 from front.logs import LOG_FILTER_LABELS, log_days, normalize_log_filter
 from front.pages import page_href_builder, redirect
@@ -52,7 +51,6 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
             "used_bytes": counts["used_bytes"],
             "quota_bytes": counts["quota_bytes"],
             "storage_percent": counts["storage_percent"],
-            "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
             "media_root": settings["media_root"],
             "quota_gb": round(settings["global_quota_bytes"] / 1024 / 1024 / 1024, 2),
             "llm_usage": record(api.get("/llm/usage")),

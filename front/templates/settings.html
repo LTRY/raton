@@ -26,7 +26,6 @@
         <a href="#no-progress" class="settings-nav-link">Barre de progression</a>
         <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
         <a href="#libraries" class="settings-nav-link">Sous-bibliothèques</a>
-        <a href="#playback-time" class="settings-nav-link">Temps de lecture</a>
         <a href="#screen-time" class="settings-nav-link">Temps d’écran</a>
         <a href="#rag" class="settings-nav-link">Indexation RAG</a>
         <a href="#raton" class="settings-nav-link">Raton</a>
@@ -276,11 +275,6 @@
             <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
             <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
           </div>
-        </div>
-
-        <div class="settings-card" id="playback-time">
-          <h2 class="settings-card-title">Temps de lecture</h2>
-          {{ macros.playback_time_cards(playback_time_stats) }}
         </div>
 
         <div class="settings-card" id="screen-time">

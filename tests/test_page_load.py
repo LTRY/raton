@@ -79,7 +79,7 @@ def seed_playbacks(db, video_count: int) -> None:
     db.commit()
 
 
-@pytest.mark.parametrize("path", ["/settings", "/dashboard/historique"])
+@pytest.mark.parametrize("path", ["/dashboard/historique"])
 def test_playback_time_stats_cost_does_not_grow_with_played_videos(db, path):
     seed_playbacks(db, 150)
     db.statements.clear()
