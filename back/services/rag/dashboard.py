@@ -99,6 +99,12 @@ BUCKETS = (
         "neutral",
         "Un label de catégorie exclu dans les réglages (cuisine, musique…).",
     ),
+    (
+        "channel_off",
+        "Chaîne non indexée",
+        "neutral",
+        "Le réglage « Indexée par le RAG » de la chaîne est désactivé.",
+    ),
     ("failed", "Abandonnées", "error", f"{MAX_FAILURES_PER_VIDEO} échecs : on n'insiste plus."),
 )
 
@@ -134,6 +140,7 @@ def _classify_library(db: Session) -> dict:
             Video.channel_id,
             Channel.name,
             Channel.category_labels,
+            Channel.rag_indexed,
         )
         .outerjoin(Channel, Channel.id == Video.channel_id)
         .order_by(*candidate_order())
@@ -149,6 +156,7 @@ def _classify_library(db: Session) -> dict:
         _channel_id,
         channel_name,
         channel_labels,
+        channel_indexed,
     ) in rows:
         if video_id in indexed:
             bucket = "indexed"
@@ -160,6 +168,7 @@ def _classify_library(db: Session) -> dict:
                 excluded,
                 in_flight,
                 failures,
+                channel_indexed is not False,
             )
             if bucket is None:
                 bucket = "waiting" if transcript_path else "no_transcript"

@@ -3,10 +3,13 @@ the HTML pages and `/api`."""
 
 import logging
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from back.core.logging import log_event
 from back.models.channel import Channel
+from back.models.video import Video
+from back.models.video_note_chunk import VideoNoteChunk
 from back.services.channels.lookup import find_channel
 from back.services.channels.profile import remove_channel_profile_files
 from back.services.common.categories import serialized_category_labels
@@ -98,6 +101,19 @@ def set_channel_categories(db: Session, channel: Channel, labels: list[str]) -> 
         for video in channel.videos:
             if not video.category_labels:
                 video.category_labels = category_labels
+    db.commit()
+
+
+def set_channel_rag_indexed(db: Session, channel: Channel, enabled: bool) -> None:
+    """Turn the RAG indexing of the channel's fiches on or off.
+
+    Off deletes their chunks so the search no longer finds them; on lets the nightly backfill
+    index them again from their notes.
+    """
+    channel.rag_indexed = enabled
+    if not enabled:
+        video_ids = select(Video.id).where(Video.channel_id == channel.id)
+        db.execute(delete(VideoNoteChunk).where(VideoNoteChunk.video_id.in_(video_ids)))
     db.commit()
 
 

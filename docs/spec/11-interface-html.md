@@ -545,7 +545,7 @@ l'ordre :
   videos du lot en cours chez Anthropic, videos en attente apres lui avec le
   nombre de nuits et le cout estime pour tout vider ;
 - l'etape de chaque video : une seule case parmi indexee, dans le lot en cours,
-  en attente, sans transcript, short, label exclu, abandonnee (3 echecs).
+  en attente, sans transcript, short, label exclu, chaine non indexee, abandonnee (3 echecs).
   La classification reutilise `auto_notes.skip_reason`, donc le "prochain lot"
   est exactement celui que soumettrait le passage ; seuls des faits de base de
   donnees sont lus (jamais de fichier) : "en attente" est un maximum, la taille
@@ -1384,7 +1384,9 @@ recherche sans resultat garde le texte « Aucun resultat pour « q ». ».
   basse sur telephone) contient, dans l'ordre : les statistiques (videos
   telechargees, shorts telecharges, fiches, periodicite — "~3,5/sem" ou
   "~1,3/mois", `Pas assez de donnees` sinon), les labels de categories de la
-  chaine (formulaire existant, deplie), « Rafraichir le profil » (`POST
+  chaine (formulaire existant, deplie), l'interrupteur « Indexée par le RAG »
+  (`role="switch"`, `aria-checked`, pastille a droite ; `POST
+  /channels/{id}/rag-indexing`), « Rafraichir le profil » (`POST
   /channels/{id}/refresh-profile`) et « Supprimer la chaine » (avertissement
   detaille puis confirmation, comme avant) ;
 - la description tronquee a 2 lignes avec "Voir plus"/"Voir moins" (case a

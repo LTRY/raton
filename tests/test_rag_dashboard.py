@@ -116,6 +116,9 @@ def test_every_video_lands_in_exactly_one_bucket(db):
     add_video(db, "label", channel, labels="musique")
     add_video(db, "notranscript", channel, transcript=False)
     add_video(db, "waiting", channel)
+    not_indexed = add_channel(db, "Off")
+    not_indexed.rag_indexed = False
+    add_video(db, "channel-off", not_indexed)
     db.commit()
 
     data = rag_dashboard_data(db, NOW)
@@ -127,9 +130,10 @@ def test_every_video_lands_in_exactly_one_bucket(db):
         "no_transcript": 1,
         "short": 1,
         "label": 1,
+        "channel_off": 1,
         "failed": 1,
     }
-    assert sum(bucket["count"] for bucket in data["buckets"]) == data["total_videos"] == 7
+    assert sum(bucket["count"] for bucket in data["buckets"]) == data["total_videos"] == 8
 
 
 def test_channel_labels_apply_when_the_video_has_none(db):

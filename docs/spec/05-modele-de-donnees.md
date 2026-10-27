@@ -15,6 +15,9 @@ Champs :
 - `yt_channel_id` : identifiant YouTube si disponible ;
 - `category_labels` : categories associees a la chaine, appliquees aux
   nouvelles videos importees qui n'ont pas encore de categorie ;
+- `rag_indexed` : booleen, vrai par defaut (partage entre utilisateurs). Faux =
+  les fiches de la chaine ne sont pas indexees par le RAG : ni lot de notes
+  automatiques, ni chunks (voir [19](19-indexation-et-recherche-notes.md)) ;
 - `description` : texte de presentation de la chaine (nullable) ;
 - `keywords` : liste JSON de mots-cles declares par la chaine (nullable), lue via
   la propriete `Channel.keyword_list` (liste vide si absente ou invalide) ;

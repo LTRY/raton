@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import Boolean, DateTime, String, Text, func, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from back.db.session import Base
@@ -15,6 +15,11 @@ class Channel(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     yt_channel_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     category_labels: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # False keeps the channel's fiches out of the RAG index (no notes batch, no chunks); shared by
+    # every user, like the channel's labels.
+    rag_indexed: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # JSON list of the creator-declared tags; use `keyword_list` to read it.
     keywords: Mapped[str | None] = mapped_column(Text, nullable=True)

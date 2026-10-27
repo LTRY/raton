@@ -23,6 +23,7 @@ from back.schemas.channel import (
     ChannelNameRead,
     ChannelPageRead,
     ChannelProfileRefreshRead,
+    ChannelRagIndexedUpdate,
     ChannelRead,
     ChannelStateRead,
     RatingUpdate,
@@ -195,6 +196,7 @@ def channel_state(db: Session, user_id: int, channel: Channel) -> ChannelStateRe
         name=channel.name,
         rating=state.rating,
         categories=parse_video_category_labels(channel.category_labels),
+        rag_indexed=channel.rag_indexed,
         auto_metadata_enabled=state.auto_metadata_enabled,
         auto_shorts_enabled=state.auto_shorts_enabled,
     )
@@ -233,6 +235,23 @@ def update_categories(
 ) -> ChannelStateRead:
     channel = library_channel(db, channel_id)
     set_channel_categories(db, channel, payload.categories)
+    return channel_state(db, user_id, channel)
+
+
+@router.put(
+    "/channels/{channel_id}/rag-indexing",
+    response_model=ChannelStateRead,
+    responses=error_responses(404, 422),
+)
+def update_rag_indexing(
+    channel_id: int,
+    payload: ChannelRagIndexedUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(current_user_id),
+) -> ChannelStateRead:
+    """Turn the RAG indexing of the channel's fiches on or off; off removes their chunks."""
+    channel = library_channel(db, channel_id)
+    channel_manage.set_channel_rag_indexed(db, channel, payload.enabled)
     return channel_state(db, user_id, channel)
 
 

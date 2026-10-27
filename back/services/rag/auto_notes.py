@@ -134,6 +134,7 @@ def skip_reason(
     excluded: set[str],
     in_flight: set[int],
     failures: dict[int, int],
+    channel_indexed: bool = True,
 ) -> str | None:
     """Why a video is left out of the batches (database facts only), or None when it can be taken.
 
@@ -147,13 +148,15 @@ def skip_reason(
         return "short"
     if labels & excluded:
         return "label"
+    if not channel_indexed:
+        return "channel_off"
     return None
 
 
 def eligible_videos(db: Session, limit: int) -> list[Video]:
     """Up to `limit` videos to take notes on, most recent first.
 
-    Eligible: a readable transcript, no notes yet, not a short, no excluded label, not already in a
+    Eligible: a readable transcript, no notes yet, not a short, no excluded label, a channel indexed by the RAG, not already in a
     batch, and fewer than MAX_FAILURES_PER_VIDEO failed attempts.
     """
     excluded = set(get_auto_notes_excluded_category_labels(db))
@@ -171,7 +174,8 @@ def eligible_videos(db: Session, limit: int) -> list[Video]:
             break
         channel_labels = video.channel.category_labels if video.channel else None
         labels = effective_labels(video.category_labels, channel_labels)
-        if skip_reason(video.id, video.url, labels, excluded, in_flight, failures):
+        channel_indexed = video.channel.rag_indexed if video.channel else True
+        if skip_reason(video.id, video.url, labels, excluded, in_flight, failures, channel_indexed):
             continue
         try:
             if (

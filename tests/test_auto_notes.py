@@ -183,6 +183,10 @@ def test_eligible_videos_applies_every_rule(db):
     add_video(db, "has-notes", channel=plain, notes="## Faits\n- x")
     add_video(db, "tiny", channel=plain, transcript="trop court")
     add_video(db, "no-transcript", channel=plain, transcript=None)
+    off = Channel(name="Off", url="https://youtube.com/@o", yt_channel_id="UC3", rag_indexed=False)
+    db.add(off)
+    db.commit()
+    add_video(db, "channel-not-indexed", channel=off)
 
     keys = {video.yt_video_id for video in eligible_videos(db, 100)}
 

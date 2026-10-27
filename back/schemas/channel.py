@@ -41,6 +41,7 @@ class ChannelRead(BaseModel):
     # The reading user's own stars and cloches (`user_channels`), not columns of the channel.
     rating: int
     categories: Categories
+    rag_indexed: bool
     auto_metadata_enabled: bool
     auto_shorts_enabled: bool
     created_at: datetime
@@ -56,6 +57,7 @@ class ChannelRead(BaseModel):
             yt_channel_id=channel.yt_channel_id,
             rating=state.rating,
             categories=channel.category_labels,
+            rag_indexed=channel.rag_indexed,
             auto_metadata_enabled=state.auto_metadata_enabled,
             auto_shorts_enabled=state.auto_shorts_enabled,
             created_at=channel.created_at,
@@ -106,12 +108,17 @@ class ChannelStateRead(BaseModel):
     name: str
     rating: int
     categories: list[str]
+    rag_indexed: bool
     auto_metadata_enabled: bool
     auto_shorts_enabled: bool
 
 
 class ChannelCategoriesUpdate(BaseModel):
     categories: list[str]
+
+
+class ChannelRagIndexedUpdate(BaseModel):
+    enabled: bool
 
 
 class ChannelBellUpdate(BaseModel):

@@ -44,6 +44,8 @@ Chaines :
   Repli sans JavaScript : les étoiles appellent `PUT /api/channels/{id}/rating`
   sans rechargement de page.
 - `POST /channels/{id}/categories` : modifier les categories de la chaine.
+- `POST /channels/{id}/rag-indexing` : bascule l'indexation RAG de la chaine
+  (`PUT /api/channels/{id}/rag-indexing`), puis revient avec un `message`.
 - `POST /channels/{id}/auto-metadata` : bascule une cloche de suivi quotidien
   selon le champ de formulaire `section` — `videos` (defaut,
   `auto_metadata_enabled`) ou `shorts` (`auto_shorts_enabled`) ; l'activation
@@ -433,6 +435,9 @@ la suppression sont plus haut.
 
 - `PUT /api/channels/{id}/categories` `{categories: [...]}` : remplace les
   categories de la chaine (normalisees).
+- `PUT /api/channels/{id}/rag-indexing` `{enabled}` : regle l'indexation RAG
+  des fiches de la chaine (idempotent). Desactiver supprime leurs chunks.
+  Repond la chaine (`rag_indexed` y figure aussi).
 - `PUT /api/channels/{id}/bells/{videos|shorts}` `{enabled}` : regle une
   cloche (idempotent, contrairement au formulaire qui bascule). Repond
   `{channel, job}` : `job` est l'import du catalogue existant lance quand la

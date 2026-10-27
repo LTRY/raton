@@ -82,6 +82,10 @@
                 <button type="submit">Enregistrer les labels</button>
               </form>
             </details>
+            <form action="/channels/{{ channel.id }}/rag-indexing" method="post">
+              <input type="hidden" name="next" value="{{ current_videos_path }}">
+              <button class="channel-menu-item" type="submit" role="switch" aria-checked="{{ 'true' if channel.rag_indexed else 'false' }}" title="Les notes des fiches de la chaîne sont-elles cherchables par le RAG ?">Indexée par le RAG <span class="channel-menu-switch-track" aria-hidden="true"></span></button>
+            </form>
             <form action="/channels/{{ channel.id }}/refresh-profile" method="post">
               <input type="hidden" name="next" value="{{ current_videos_path }}">
               <button class="channel-menu-item" type="submit" aria-label="Rafraîchir le profil de {{ channel.name }}" title="Rafraîchir l'avatar, la bannière, la description et les mots-clés">Rafraîchir le profil <span class="channel-menu-hint">avatar, bannière…</span></button>

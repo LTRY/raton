@@ -207,6 +207,25 @@ def update_channel_categories_form(
     return redirect(internal_return_path(return_to, "/channels"))
 
 
+@router.post("/channels/{channel_id}/rag-indexing")
+def toggle_channel_rag_indexing_form(
+    channel_id: int,
+    return_to: str = Form("/channels", alias="next"),
+    api: Api = Depends(get_api),
+):
+    """Toggles the RAG indexing of the channel's fiches; turning it off removes their chunks."""
+    channel = api.get(f"/channels/{channel_id}")
+    enabled = not channel["rag_indexed"]
+    api.put(f"/channels/{channel_id}/rag-indexing", {"enabled": enabled})
+    if enabled:
+        message = f"Indexation RAG activée pour {channel['name']} : ses notes seront réindexées."
+    else:
+        message = f"Indexation RAG désactivée pour {channel['name']} : ses notes sont retirées de l'index."
+    return redirect(
+        append_query(internal_return_path(return_to, "/channels"), {"message": message})
+    )
+
+
 @router.post("/channels/{channel_id}/auto-metadata")
 def toggle_channel_auto_metadata_form(
     channel_id: int,

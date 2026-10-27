@@ -56,6 +56,18 @@ def test_index_video_notes_creates_one_chunk_per_non_empty_section(monkeypatch):
     assert chunks[0].embedding == [0.1, 0.2, 0.3]
 
 
+def test_index_video_notes_skips_a_channel_not_indexed(monkeypatch):
+    db = make_session()
+    monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.1] for _ in texts])
+    video = add_video(db)
+    video.channel.rag_indexed = False
+    db.commit()
+
+    rag_indexing.index_video_notes(db, video.id, "## Faits\n- Fait 1")
+
+    assert chunks_for(db, video.id) == []
+
+
 def test_index_video_notes_replaces_existing_chunks_on_regeneration(monkeypatch):
     db = make_session()
     monkeypatch.setattr(rag_indexing, "embed_texts", lambda texts: [[0.0, 0.0, 0.0] for _ in texts])

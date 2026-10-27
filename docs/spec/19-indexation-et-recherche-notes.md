@@ -106,6 +106,15 @@ au modèle, qui l'explique ; le reste de l'app n'est pas affecté.
 cet etat lisible : etape de chaque video, contenu du prochain lot, lot en
 cours, activite, cout et echecs. Il ne lit que la DB ; il ne declenche rien.
 
+### Chaînes non indexées
+
+Le réglage `channels.rag_indexed` (interrupteur « Indexée par le RAG » du menu
+de la chaîne) retire les fiches d'une chaîne de l'index : le lot automatique les
+ignore, `index_video_notes` et `backfill_note_chunks` n'écrivent aucun chunk, et
+désactiver le réglage supprime les chunks déjà écrits. Le réactiver ne
+réindexe rien tout de suite : `backfill_note_chunks` reconstruit les chunks
+depuis les fichiers de notes au prochain passage.
+
 ### Réindexation
 
 Changer ce qui est embeddé rend les anciens vecteurs incomparables. La règle :

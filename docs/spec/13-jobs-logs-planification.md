@@ -374,7 +374,10 @@ plus de 36 h est abandonne et ses videos reessayees.
   nuit suivante (puis le passage reprend) ; sans cle Anthropic, ou desactive,
   le passage ne fait rien. Rien n'est jamais regenere ni retire de l'index :
   une video qui a deja des notes est ignoree, et un label exclu ajoute apres
-  coup ne supprime pas ses chunks.
+  coup ne supprime pas ses chunks. Une chaine dont « Indexée par le RAG » est
+  desactive est ignoree par le passage et par `backfill_note_chunks` ; la
+  desactiver supprime les chunks de ses fiches (contrairement a un label
+  exclu), la reactiver laisse le rattrapage les reconstruire.
 - **Rattrapage** : meme principe que le scan, une cle `auto_notes_last_run_at`
   de plus de 24 h (ou absente) ajoute un job unique `auto_notes_sweep_catchup`
   au demarrage. A chaque passage, `backfill_note_chunks` et

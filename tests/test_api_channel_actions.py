@@ -12,6 +12,8 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.job import DownloadJob
+from back.models.video import Video
+from back.models.video_note_chunk import VideoNoteChunk
 from tests.users import add_user
 
 CSV_HEADER = "ID des chaînes,URL des chaînes,Titres des chaînes\n"
@@ -70,6 +72,25 @@ def test_categories_are_stored_normalized(client, channel):
 
     assert response.status_code == 200
     assert response.json()["categories"] == ["science"]
+
+
+def test_rag_indexing_off_removes_the_chunks_and_on_keeps_the_switch(client, db, channel):
+    video = Video(
+        channel_id=channel.id, yt_video_id="v1", title="V", url="https://y/v1", folder_path="/m/v1"
+    )
+    db.add(video)
+    db.commit()
+    db.add(VideoNoteChunk(video_id=video.id, section="Faits", content="x", embedding=[0.1]))
+    db.commit()
+
+    default = client.get(f"/api/channels/{channel.id}")
+    off = client.put(f"/api/channels/{channel.id}/rag-indexing", json={"enabled": False})
+
+    assert default.json()["rag_indexed"] is True
+    assert off.json()["rag_indexed"] is False
+    assert db.query(VideoNoteChunk).count() == 0
+    on = client.put(f"/api/channels/{channel.id}/rag-indexing", json={"enabled": True})
+    assert on.json()["rag_indexed"] is True
 
 
 def test_turning_a_bell_on_syncs_the_catalogue_once(client, db, channel, tasks):
@@ -178,6 +199,7 @@ def test_subscriptions_csv_preview_refuses_another_file(client, db):
     ("method", "path", "body"),
     [
         ("put", "/api/channels/999/categories", {"categories": []}),
+        ("put", "/api/channels/999/rag-indexing", {"enabled": True}),
         ("put", "/api/channels/999/bells/videos", {"enabled": True}),
         ("post", "/api/channels/999/import-metadata", None),
         ("post", "/api/channels/999/refresh-profile", None),

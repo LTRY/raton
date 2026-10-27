@@ -8,10 +8,11 @@ than going through the LlmJob queued/running/done lifecycle used for text genera
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from back.core.config import get_settings, local_media_path
+from back.models.channel import Channel
 from back.models.video import Video
 from back.models.video_note_chunk import VideoNoteChunk
 from back.services.llm.prompts import split_notes_sections
@@ -36,16 +37,24 @@ def read_summary_short(transcript_path: str) -> str | None:
     return text.strip() or None
 
 
+def in_indexed_channel():
+    """Filter: the video has no channel, or its channel is indexed by the RAG."""
+    return or_(
+        Video.channel_id.is_(None),
+        Video.channel_id.not_in(select(Channel.id).where(Channel.rag_indexed.is_(False))),
+    )
+
+
 def index_video_notes(
     db: Session, video_id: int, notes_text: str, summary_short: str | None = None
 ) -> None:
     """Replace a video's chunks: one per notes section, plus one for its short résumé when it has one.
 
     The résumé gives the gist of the video, which the notes (atomic facts) do not. Commits the
-    caller's session.
+    caller's session. A video of a channel that is not indexed by the RAG is left out.
     """
     video = db.get(Video, video_id)
-    if video is None:
+    if video is None or (video.channel is not None and not video.channel.rag_indexed):
         return
     channel_name = video.channel.name if video.channel is not None else None
     sections = split_notes_sections(notes_text)
@@ -84,7 +93,9 @@ def backfill_note_chunks(db: Session) -> int:
     indexed_ids = select(VideoNoteChunk.video_id).distinct()
     candidates = db.execute(
         select(Video.id, Video.transcript_path).where(
-            Video.transcript_path.is_not(None), Video.id.not_in(indexed_ids)
+            Video.transcript_path.is_not(None),
+            Video.id.not_in(indexed_ids),
+            in_indexed_channel(),
         )
     ).all()
     indexed = 0

@@ -271,6 +271,13 @@ Morceau de notes ou de resume indexe avec son embedding pour la recherche semant
 - **Code** : `video_note_chunks`
 - **A ne pas confondre avec** : Une portion de fichier media.
 
+### Indexee par le RAG
+
+Reglage d'une chaine (interrupteur de son menu) : vrai, les chunks de ses fiches alimentent la recherche semantique ; faux, ses fiches en sont exclues et leurs chunks supprimes.
+
+- **Code** : `channels.rag_indexed`
+- **A ne pas confondre avec** : Un label de categorie exclu des notes automatiques, qui ne retire aucun chunk deja ecrit.
+
 ### Lot nocturne
 
 Generation automatique des notes structurees a 5h : au plus 100 fiches, collectees au passage suivant.
