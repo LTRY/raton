@@ -445,6 +445,9 @@ connues :
 - `curfew_enabled` (`true`/`false`, `false` par defaut), `curfew_start`,
   `curfew_end` (`HH:MM`, `22:00` et `10:00` par defaut) : son couvre-feu, voir
   [02 Fonctionnalites](02-fonctionnalites.md) ;
+- `curfew_skip_until` (date et heure ISO avec fuseau, absent ou vide sans
+  report) : fin du report « pas ce soir » du couvre-feu, voir
+  [02 Fonctionnalites](02-fonctionnalites.md) ;
 - `raton_address` (`vous` par defaut, ou `tu`) et `raton_nickname` (surnom,
   vide par defaut) : son langage de Raton dans le chat bibliotheque ;
 - `raton_last_seen_at`, `raton_session_previous_visit_at` et

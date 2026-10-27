@@ -86,5 +86,16 @@
       <button type="submit">Enregistrer</button>
     </div>
   </form>
+
+  {% if curfew.enabled %}
+  <div class="settings-card" id="curfew-tonight">
+    {% if curfew.skipped_until %}
+    <p class="settings-hint">Couvre-feu désactivé jusqu’au {{ format_french_datetime(curfew.skipped_until) }}.</p>
+    <form action="/user/curfew/resume" method="post"><button type="submit" class="secondary">Rétablir le couvre-feu</button></form>
+    {% else %}
+    <form action="/user/curfew/skip" method="post"><button type="submit" class="secondary">Désactiver le couvre-feu pour ce soir</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
 </section>
 {% endblock %}

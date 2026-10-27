@@ -766,7 +766,11 @@ Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) 
   « Historique » ; barre d'onglets mobile : onglets Accueil et Historique), sans
   feuille d'import, mini-lecteur ni Raton d'exploration.
 
-La carte « Couvre-feu » est sur `/user` (ancre `#curfew`).
+La carte « Couvre-feu » est sur `/user` (ancre `#curfew`). Quand le couvre-feu est
+active, une carte dessous (`#curfew-tonight`, hors du formulaire) porte le bouton
+« Désactiver le couvre-feu pour ce soir » (`POST /user/curfew/skip`), ou, une
+fois reporte, « Couvre-feu désactivé jusqu'au <date> » et « Rétablir le
+couvre-feu » (`POST /user/curfew/resume`).
 
 ### Barre de progression de lecture
 

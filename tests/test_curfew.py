@@ -13,7 +13,7 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.video import Video
-from back.services.common.curfew import CURFEW_TIMEZONE, read_curfew
+from back.services.common.curfew import CURFEW_TIMEZONE, read_curfew, skip_curfew_tonight
 from back.services.common.settings import save_settings
 from back.services.common.user_state import video_state
 from back.services.videos import playback
@@ -117,6 +117,7 @@ def test_settings_store_the_curfew(db):
         "end": "11:00",
         "active": None,
         "ends_at": None,
+        "skipped_until": None,
     }
 
 
@@ -187,6 +188,80 @@ def test_curfew_can_be_switched_off_from_the_user_page_while_it_is_on(db, front_
     assert saved.status_code == 200
     assert site.get("/api/curfew").json()["enabled"] is False
     assert site.get("/channels").status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("now", "until"),
+    [
+        # Evening before the range: tonight's couvre-feu, ending tomorrow morning.
+        (paris(20), paris(10) + timedelta(days=1)),
+        (paris(23), paris(10) + timedelta(days=1)),
+        # After midnight: the one in progress.
+        (paris(3), paris(10)),
+        # Morning after it ended: the next one.
+        (paris(15), paris(10) + timedelta(days=1)),
+    ],
+)
+def test_skipping_the_curfew_lasts_until_the_end_of_the_current_or_next_one(db, now, until):
+    save_settings(db, user_id(db), curfew_enabled=True, curfew_start="22:00", curfew_end="10:00")
+
+    skip_curfew_tonight(db, user_id(db), now)
+
+    assert read_curfew(db, user_id(db), now).skipped_until == until
+    assert read_curfew(db, user_id(db), until - timedelta(minutes=1)).active is False
+    assert read_curfew(db, user_id(db), until - timedelta(minutes=1)).skipped_until == until
+    # The night after, it applies again.
+    after = read_curfew(db, user_id(db), until + timedelta(hours=13))
+    assert after.skipped_until is None
+    assert after.active is True
+
+
+def test_skipping_a_daytime_curfew_targets_its_next_run(db):
+    save_settings(db, user_id(db), curfew_enabled=True, curfew_start="13:00", curfew_end="15:00")
+
+    skip_curfew_tonight(db, user_id(db), paris(16))
+
+    assert read_curfew(db, user_id(db), paris(16)).skipped_until == paris(15) + timedelta(days=1)
+
+
+def test_the_curfew_can_be_skipped_and_restored_through_the_api_while_it_is_on(db):
+    start_curfew_now(db)
+    client = TestClient(app)
+    assert client.get("/api/library").status_code == 423
+
+    skipped = client.post("/api/curfew/skip")
+    assert skipped.status_code == 200
+    assert skipped.json()["active"] is False
+    assert skipped.json()["enabled"] is True
+    assert skipped.json()["skipped_until"] is not None
+    assert client.get("/api/library").status_code == 200
+
+    restored = client.delete("/api/curfew/skip")
+    assert restored.json()["skipped_until"] is None
+    assert client.get("/api/library").status_code == 423
+
+
+def test_skipping_a_curfew_that_is_off_is_refused(db):
+    response = TestClient(app).post("/api/curfew/skip")
+
+    assert response.status_code == 400
+    assert "rien à reporter" in response.json()["detail"]
+
+
+def test_the_user_page_skips_and_restores_the_curfew_for_tonight(db, front_client):
+    start_curfew_now(db)
+    site = front_client(db)
+    assert "Désactiver le couvre-feu pour ce soir" in site.get("/user").text
+
+    skipped = site.post("/user/curfew/skip")
+    assert skipped.status_code == 200
+    assert site.get("/channels").status_code == 200
+    page = site.get("/user").text
+    assert "Rétablir le couvre-feu" in page
+    assert "Désactiver le couvre-feu pour ce soir" not in page
+
+    site.post("/user/curfew/resume")
+    assert site.get("/channels").status_code == 423
 
 
 def test_historique_is_the_normal_page_outside_the_curfew(db, front_client):
