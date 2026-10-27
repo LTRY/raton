@@ -99,6 +99,8 @@ déjà vues ni aux dates de visite. Un lien y mène depuis Paramètres (carte
 | `enchainement` | 3 lectures d'affilée sans pause | « Une dernière vidéo ? Tu dis ça depuis tout à l'heure. » | à dessiner : bras croisés |
 | `prise_tiree` | Clic sur une lecture après la fermeture | « J'ai tiré la prise. Je suis désolé. Presque. » | à dessiner : débranche une prise |
 | `telephone` | Limite dépassée, 2e passage du jour | « Juste balance ton téléphone. » | à dessiner : patte vers l'écran |
+| `ecran_ferme_musique` | 100 % de la limite du jour du type Musique | « Les oreilles ont assez travaillé. Casque posé, Chef. » · « Merci, merci. Fin du concert pour aujourd'hui. » | à dessiner : casque au cou · salut devant un rideau de scène |
+| `ecran_ferme_shorts` | 100 % de la limite du jour du type Shorts | « Ton pouce a fait des kilomètres. Je le mets au repos. » · « 30 secondes par vidéo, ça fait vite beaucoup. » | à dessiner : pouce bandé · chronomètre à la main |
 | `savais_tu` | Fiche liée aux notes ou à une vidéo récente | « Savais-tu que… » + lien vers la vidéo | `journal.webp` |
 | `binge` | Hier : plus de 2 h ou plus de 5 fiches | Commentaire au cas par cas | `cinema.webp` |
 | `tache_inachevee` | Tâche ou conversation inachevée | « Bonjour chef, on n'a pas fini. On y retourne ? » | à dessiner : tape du pied |
@@ -110,6 +112,10 @@ déjà vues ni aux dates de visite. Un lien y mène depuis Paramètres (carte
 
 `meteo` demande une source externe alors que l'application est pensée pour un
 réseau local : à trancher avant tout développement.
+
+`ecran_ferme_musique` et `ecran_ferme_shorts` demandent de distinguer le type de
+contenu qui a atteint sa limite : aujourd'hui `ecran_ferme` n'a qu'une phrase et un
+dessin pour tous les types (`rideau.webp`).
 
 ## Dessins
 
