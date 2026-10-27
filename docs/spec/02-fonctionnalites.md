@@ -206,8 +206,8 @@ Fonctionnalites :
   playlist, plus un `playlists.csv` global non exploite ici) ;
 - ajouter une video a une playlist (existante ou creee a la volee) depuis la
   page detail de la video — seul moyen d'ajout manuel ;
-- donner des categories a une playlist : les videos qui n'ont aucun label les
-  recoivent, comme celles d'une chaine (voir
+- donner des categories a une playlist : les videos de la playlist les recoivent
+  en plus de leurs propres labels (voir
   [05 Modele de donnees](05-modele-de-donnees.md)) ;
 - supprimer une playlist ne supprime jamais les videos qu'elle contenait,
   seulement le rattachement.

@@ -72,7 +72,7 @@ Video courte verticale, listee dans l'onglet shorts de la chaine.
 
 ### Categorie
 
-Etiquette libre posee sur une chaine, une playlist ou une fiche. Une fiche sans categorie recoit celles de sa chaine ou de sa playlist ; la copie est ensuite ecrite sur la fiche.
+Etiquette libre posee sur une chaine, une playlist ou une fiche. Une fiche sans categorie recoit celles de sa chaine ; une playlist ajoute les siennes a celles de ses fiches. La copie est ensuite ecrite sur la fiche.
 
 - **Code** : `category_labels`
 - **A ne pas confondre avec** : Un tag YouTube.

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from back.models.playlist import Playlist, PlaylistItem
 from back.models.video import Video
-from back.services.common.categories import serialized_category_labels
+from back.services.common.categories import parse_video_category_labels, serialized_category_labels
 from back.services.common.settings import add_video_category_labels
 
 PLAYLIST_TITLE_MAX_LENGTH = 500
@@ -57,19 +57,23 @@ def next_item_position(db: Session, playlist_id: int) -> int:
 
 
 def inherit_playlist_labels(playlist: Playlist, video: Video) -> bool:
-    """Give a video the playlist's labels when it has none of its own, like a channel's labels.
+    """Add the playlist's labels to a video, keeping the ones it already has; True if it changed.
 
-    The caller commits. A video that already has labels (its own, or a channel's copied earlier) keeps them,
-    so the first source wins and a later playlist never overrides a label the user may have set by hand.
+    The caller commits. Labels accumulate: a video keeps its own (or its channel's) and gains the
+    playlist's, so adding a label to a playlist never removes one the user set by hand.
     """
-    if playlist.category_labels and not video.category_labels:
-        video.category_labels = playlist.category_labels
-        return True
-    return False
+    merged = serialized_category_labels(
+        parse_video_category_labels(video.category_labels)
+        + parse_video_category_labels(playlist.category_labels)
+    )
+    if merged == video.category_labels:
+        return False
+    video.category_labels = merged
+    return True
 
 
 def apply_playlist_labels(db: Session, playlist: Playlist) -> int:
-    """Copy the playlist's labels to its videos that have none; returns how many were labelled."""
+    """Add the playlist's labels to its videos; returns how many videos changed."""
     if not playlist.category_labels:
         return 0
     videos = db.scalars(
@@ -189,7 +193,7 @@ def rename_playlist(db: Session, playlist: Playlist, title: str) -> None:
 
 
 def set_playlist_categories(db: Session, playlist: Playlist, labels: list[str]) -> int:
-    """Store the playlist's labels and copy them to its videos without any; returns how many."""
+    """Store the playlist's labels and add them to its videos; returns how many videos changed."""
     playlist.category_labels = serialized_category_labels(labels)
     add_video_category_labels(db, labels)
     labelled = apply_playlist_labels(db, playlist)

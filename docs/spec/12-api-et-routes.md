@@ -478,7 +478,7 @@ created_at}`.
 - `PUT /api/playlists/{id}/title` `{title}`, `PUT .../free-listening`
   `{enabled}` : repondent la playlist.
 - `PUT /api/playlists/{id}/categories` `{categories}` : remplace les labels
-  et les copie sur ses fiches qui n'en ont aucun ; repond `{playlist,
+  et les ajoute a ceux de ses fiches ; repond `{playlist,
   labelled_count}`.
 - `PUT /api/playlists/{id}/order` `{item_ids}` : tous les elements, dans le
   nouvel ordre ; `409` si la playlist a change entre-temps. `POST

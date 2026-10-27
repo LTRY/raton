@@ -108,11 +108,10 @@ Champs :
   (seul le fichier `playlists.csv` global du Takeout l'a, non utilise par
   l'import CSV de Raton qui traite un fichier a la fois) ;
 - `category_labels` : categories de la playlist, modifiables depuis le menu
-  **Gérer** de la page detail. Elles se transmettent aux videos comme celles
-  d'une chaine : une video qui n'a aucun label recoit ceux de la playlist
-  quand on les enregistre et quand la video est ajoutee a la playlist (import
-  URL/CSV compris) ; une video qui a deja des labels (les siens, ou ceux de sa
-  chaine) les garde, donc la premiere source gagne. La copie est ecrite sur la
+  **Gérer** de la page detail. Elles s'ajoutent a celles des videos : quand on
+  les enregistre et quand une video est ajoutee a la playlist (import URL/CSV
+  compris), la video garde ses labels (les siens, ou ceux de sa chaine) et
+  recoit en plus ceux de la playlist, sans doublon. La copie est ecrite sur la
   video : retirer un label de la playlist ne le retire pas des videos. Une
   duplication de playlist reprend ses labels ;
 - `free_listening` : booleen, faux par defaut. Vrai = « ecoute libre » : le

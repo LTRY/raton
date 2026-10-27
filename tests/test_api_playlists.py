@@ -186,7 +186,9 @@ def test_edit_title_categories_and_free_listening(client, db):
     assert renamed.json()["title"] == "Chill"
     assert blank.status_code == 400
     assert labels.json()["playlist"]["categories"] == ["jazz"]
-    assert labels.json()["labelled_count"] == 1
+    assert labels.json()["labelled_count"] == 2
+    db.refresh(videos[1])
+    assert videos[1].category_labels == "déjà,jazz"
     assert free.json()["free_listening"] is True
 
 

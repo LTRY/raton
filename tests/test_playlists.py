@@ -713,7 +713,7 @@ def test_preview_playlist_rejects_unreadable_url(monkeypatch):
 # --- playlist labels, inherited by the videos like a channel's ------------
 
 
-def test_saving_playlist_labels_labels_only_videos_without_any(front_client):
+def test_saving_playlist_labels_adds_to_the_labels_of_videos(front_client):
     db = make_session()
     playlist, videos = make_playlist_with_videos(db, count=3)
     videos[0].category_labels = "histoire"
@@ -727,8 +727,12 @@ def test_saving_playlist_labels_labels_only_videos_without_any(front_client):
 
     assert db.get(Playlist, playlist.id).category_labels == "musique,chill"
     labels = {video.title: video.category_labels for video in db.scalars(select(Video))}
-    # Videos without labels get the playlist's; one that has its own keeps it.
-    assert labels == {"Video C": "histoire", "Video B": "musique,chill", "Video A": "musique,chill"}
+    # Every video gets the playlist's labels; the one that had its own keeps them.
+    assert labels == {
+        "Video C": "histoire,musique,chill",
+        "Video B": "musique,chill",
+        "Video A": "musique,chill",
+    }
 
 
 def test_clearing_playlist_labels_leaves_the_videos_labels_alone(front_client):
@@ -752,7 +756,7 @@ def test_clearing_playlist_labels_leaves_the_videos_labels_alone(front_client):
     assert db.get(Video, videos[0].id).category_labels == "musique"
 
 
-def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels(front_client):
+def test_adding_a_video_to_a_labelled_playlist_adds_the_labels_to_its_own(front_client):
     db = make_session()
     plain = add_video(db, "plain", "Plain")
     labelled = add_video(db, "labelled", "Labelled")
@@ -772,7 +776,7 @@ def test_adding_a_video_to_a_labelled_playlist_gives_it_the_labels(front_client)
         )
 
     assert db.get(Video, plain.id).category_labels == "podcasts"
-    assert db.get(Video, labelled.id).category_labels == "science"
+    assert db.get(Video, labelled.id).category_labels == "science,podcasts"
 
 
 def test_url_import_gives_new_videos_the_playlist_labels(monkeypatch):
