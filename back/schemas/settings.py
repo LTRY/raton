@@ -24,9 +24,12 @@ class CurfewRead(BaseModel):
     enabled: bool
     start: str
     end: str
-    # Enabled and now in the range: the API only answers the routes it leaves open.
+    # Enabled, now in the range and not skipped for tonight: the API only answers the routes it
+    # leaves open.
     active: bool
     ends_at: datetime | None
+    # End of the "pas ce soir" skip in force, `null` when none is.
+    skipped_until: datetime | None
 
 
 class RatonLanguageRead(BaseModel):

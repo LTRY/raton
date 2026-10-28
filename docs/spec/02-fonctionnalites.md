@@ -100,6 +100,12 @@ active. Pendant son couvre-feu :
   sans lien ni action, chacune avec le champ du commentaire de la fiche et le
   bouton « Enregistrer le commentaire ».
 
+Le bouton « Désactiver le couvre-feu pour ce soir » de la carte (visible quand
+le couvre-feu est active) le reporte d'une nuit : il reste desactive jusqu'a la
+fin du couvre-feu en cours ou, hors couvre-feu, du prochain, sans toucher aux
+reglages (`POST /api/curfew/skip`, reglage `curfew_skip_until`). Une fois
+reporte, le bouton devient « Rétablir le couvre-feu ».
+
 Le couvre-feu se desactive a tout moment, meme en cours : `/user` reste ouverte
 et n'y garde que la carte « Couvre-feu » (interrupteur, heures, « Enregistrer »)
 ; changer d'utilisateur depuis `/user` reste possible, sans mot de

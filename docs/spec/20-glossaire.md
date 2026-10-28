@@ -287,7 +287,7 @@ Specs : [09 Transcript et discussion LLM](09-transcript-et-discussion-llm.md),
 
 Plage horaire quotidienne (`22:00` → `10:00` par defaut), propre a chaque utilisateur et activee par un interrupteur de sa page `/user`, pendant laquelle Raton lui est ferme : seuls l'accueil (Raton, chat bibliotheque et discussions) et l'Historique restent ouverts, pour discuter et ecrire le commentaire des fiches.
 
-- **Code** : `back/services/common/curfew.py`, reglages `curfew_enabled`, `curfew_start`, `curfew_end`, `GET /api/curfew`, reponse `423`
+- **Code** : `back/services/common/curfew.py`, reglages `curfew_enabled`, `curfew_start`, `curfew_end`, `curfew_skip_until` (report « pas ce soir »), `GET /api/curfew`, `POST /api/curfew/skip`, reponse `423`
 - **A ne pas confondre avec** : La limite de temps d'ecran, qui ne ferme rien (Raton le dit seulement, scenario `ecran_ferme`).
 
 ### Langage de Raton

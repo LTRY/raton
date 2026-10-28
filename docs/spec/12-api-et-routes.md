@@ -179,6 +179,9 @@ requete » plus bas) :
   couvre-feu ; `POST /user` `raton_address`, `raton_nickname`,
   `curfew_enabled`, `curfew_start`, `curfew_end` : `PUT /api/settings`, puis
   redirige vers `/user` avec « Paramètres enregistrés. » ou le message du back.
+- `POST /user/curfew/skip`, `POST /user/curfew/resume` : « Désactiver le
+  couvre-feu pour ce soir » et « Rétablir le couvre-feu » de `/user`
+  (`POST`/`DELETE /api/curfew/skip`) ;
 - `POST /users/switch` `user_id` : agir comme cet utilisateur (pose le
   cookie), puis redirige vers `/` avec « Bonjour <nom> ! » ; un utilisateur
   inconnu redirige vers `/` avec un message d'erreur.
@@ -395,7 +398,7 @@ n'existait pas.
   `no_progress_category_labels`, `auto_notes_enabled`,
   `auto_notes_excluded_category_labels`, `sponsor_segment_categories`,
   `sponsor_skip_enabled`, `screen_time_limits` en minutes par type et par
-  periode, `curfew` `{enabled, start, end, active, ends_at}`, `raton_language`
+  periode, `curfew` `{enabled, start, end, active, ends_at, skipped_until}`, `raton_language`
   `{address, nickname}` : `vous` ou `tu`, surnom ou vide), plus `sponsor_segment_category_choices` (`{value, label}` de
   chaque categorie SponsorBlock) et `llm_provider_label` (qui repond aux
   demandes au LLM, fixe par l'environnement).
@@ -406,9 +409,15 @@ n'existait pas.
   `raton_address` (`vous`|`tu`, `422` sinon) et `raton_nickname` (40
   caracteres au plus, `400` sinon) son langage de Raton. Les listes sont normalisees ; une liste vide de
   categories ou de vues enregistrees ramene les valeurs par defaut.
-- `GET /api/curfew` : le couvre-feu de l'utilisateur `{enabled, start, end, active, ends_at}`
-  (`ends_at` : fin du couvre-feu en cours, `null` hors couvre-feu) ; toujours
-  ouvert.
+- `GET /api/curfew` : le couvre-feu de l'utilisateur
+  `{enabled, start, end, active, ends_at, skipped_until}` (`ends_at` : fin du
+  couvre-feu en cours, `null` hors couvre-feu ; `skipped_until` : fin du report
+  « pas ce soir » en vigueur, `null` sinon) ; toujours ouvert.
+- `POST /api/curfew/skip` : desactive le couvre-feu pour ce soir, jusqu'a la fin
+  du couvre-feu en cours ou, hors couvre-feu, du prochain (les reglages ne
+  bougent pas) ; `400` si le couvre-feu n'est pas active ou si sa plage est vide ;
+  renvoie le meme corps que `GET /api/curfew`. `DELETE /api/curfew/skip` annule
+  le report. Ouvertes pendant le couvre-feu, comme `PUT /api/settings`.
 - `GET /api/categories` : les categories et leurs couleurs `{label, color}`,
   dans leur ordre, sans lire les autres reglages : ce qu'il faut a une page
   pour colorer ses labels.

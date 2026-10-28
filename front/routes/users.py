@@ -84,6 +84,23 @@ def user_form(
     return redirect(append_query("/user", {"message": "Paramètres enregistrés."}))
 
 
+@router.post("/user/curfew/skip")
+def skip_curfew(api: Api = Depends(get_api)):
+    """Switch the couvre-feu off for tonight."""
+    try:
+        api.post("/curfew/skip")
+    except ApiError as exc:
+        return redirect(append_query("/user", {"level": "error", "message": exc.detail}))
+    return redirect(append_query("/user", {"message": "Couvre-feu désactivé pour ce soir."}))
+
+
+@router.post("/user/curfew/resume")
+def resume_curfew(api: Api = Depends(get_api)):
+    """Cancel tonight's skip."""
+    api.delete("/curfew/skip")
+    return redirect(append_query("/user", {"message": "Couvre-feu rétabli."}))
+
+
 @router.post("/users/switch")
 def switch_user(user_id: int = Form(...), api: Api = Depends(get_api)):
     """Act as another user; the home page then shows their discussions and Raton's line."""
