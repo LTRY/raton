@@ -270,7 +270,11 @@ a jour : le commit dont l'image `raton-api` a ete construite (label
 `raton.git-sha`, pose par `make up` via l'argument de build `GIT_SHA`, lu par
 `docker inspect`) compare au `origin/main` recupere par `git fetch` (au plus
 toutes les 30 s). Le texte est « A jour avec origin/main », « En retard de N
-commits » (en rouge, a redeployer), ou « Version deployee inconnue » quand
+commits » (en rouge, a redeployer : la carte affiche alors une **alerte** « La
+production est en retard » qui explique qu'un merge ne deploie rien et liste les
+15 commits les plus recents manquants, `git log <deploye>..origin/main`, chacun
+avec son sha court, ses etiquettes `[TAG]` en pastilles, son titre et son
+numero de PR), ou « Version deployee inconnue » quand
 l'image n'a pas le label (deploiement anterieur, ou `docker compose up` sans
 `make up`) ; elle reste vraie meme si le depot a ete avance sans redeployer. Un script qui ne peut pas demarrer (par exemple
 non executable) termine le travail en echec et l'ecrit dans le journal ; les
@@ -331,8 +335,19 @@ le merge ne deploie rien.
   et les boutons **Deployer**/**Redeployer**, **Ouvrir**, **Rebase** (PR du depot
   ouvertes) et **Retirer**. En
   haut de la page : **Rafraichir** et la carte **Production** (« Deploiement de
-  main » ci-dessus). Les
-  previews dont la PR est fermee restent listees pour etre retirees, et
+  main » ci-dessus). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
+  quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
+  preview), **Preview deployee** (preview construite ou en construction) et
+  **Merger** (les 5 dernieres PR mergees, en lecture seule). Glisser une
+  tuile sur une colonne (ou le menu **Deplacer** de la tuile, sans JavaScript :
+  formulaire `POST /prs/<N>/move`, champ `to`) agit sur la PR avec `gh` :
+  vers **Draft**, `gh pr ready --undo` ; vers **PR a traiter**, sortie du draft
+  et retrait de la preview s'il y en a une ; vers **Preview deployee**, sortie
+  du draft puis `up` ; vers **Merger**, apres confirmation, `gh pr merge
+  --squash` puis `sweep` (une PR en draft ne se merge pas, une PR de fork n'a ni
+  preview ni deplacement). Un echec de `gh` s'affiche une fois en bandeau ; le
+  `GH_TOKEN` doit pouvoir ecrire sur les PR. Les
+  previews dont la PR est fermee restent listees sous le tableau pour etre retirees, et
   **Retirer les previews des PR fermees** les supprime toutes. La sortie de
   chaque action est dans `.local/previews/logs/pr-<N>.log` (lien **Journal**).
   Un script de preview ou de deploiement tourne dans le conteneur, qui

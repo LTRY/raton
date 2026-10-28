@@ -187,3 +187,157 @@ def test_the_page_asks_for_the_token_only_when_one_is_set():
     assert authorized(basic("ops:secret"), "secret")
     assert authorized(basic(":secret"), "secret")
     assert authorized(basic("ops:se:cret"), "se:cret")
+
+
+def column(page: str, key: str) -> str:
+    """The HTML of one board column."""
+    start = page.index(f'data-col="{key}"')
+    ends = [i for i in (page.find("<section", start), page.find("</div><script>", start)) if i > 0]
+    return page[start : min(ends)]
+
+
+def test_board_sorts_prs_into_draft_todo_and_preview_columns():
+    draft = {**OPEN_PR, "number": 40, "title": "Brouillon", "isDraft": True}
+    ready = {**OPEN_PR, "number": 41, "title": "Prête", "isDraft": False}
+    deployed = {**OPEN_PR, "number": 42, "title": "Déployée", "isDraft": False}
+    previews = {42: Preview(42, 9042, "a" * 40, "running", "copy")}
+    merged = [{"number": 7, "title": "Déjà mergée", "url": "https://x/7"}]
+
+    page = render_page("nas:8999", [draft, ready, deployed], previews, {}, None, merged=merged)
+
+    assert "Brouillon" in column(page, "draft")
+    assert "Prête" in column(page, "todo")
+    assert "Déployée" in column(page, "preview")
+    assert "Déjà mergée" in column(page, "merged")
+    assert 'draggable="true"' not in column(page, "merged")  # a merged PR does not move
+
+
+def test_a_building_preview_already_sits_in_the_preview_column():
+    page = render_page("h", [OPEN_PR], {}, {31: Job("up", 0.0, pr=31)}, None)
+
+    assert "Une PR &lt;ouverte&gt;" in column(page, "preview")
+
+
+def test_cards_offer_a_no_javascript_move_to_the_other_columns():
+    page = render_page("h", [{**OPEN_PR, "isDraft": True}], {}, {}, None)
+
+    assert page.count('action="/prs/31/move"') == 3  # every column but the current one
+    assert 'name="to" value="draft"' not in column(page, "draft")
+    assert "confirm(&#39;Merger la PR ?&#39;)" in page  # merging asks first
+    fork = render_page("h", [{**OPEN_PR, "isCrossRepository": True}], {}, {}, None)
+    assert "/prs/31/move" not in fork  # a fork is read-only: no move, no drag
+
+
+def test_orphan_previews_stay_outside_the_board():
+    page = render_page("h", [], {5: Preview(5, 9005, "c" * 40, "running", "shared")}, {}, None)
+
+    assert "Previews de PR fermées" in page
+    assert "/prs/5/move" not in page
+
+
+def test_moving_to_draft_marks_the_pr_as_draft(monkeypatch):
+    from ops import jobs
+
+    calls = []
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": False}], None))
+    monkeypatch.setattr(jobs, "run_gh", lambda args: calls.append(args))
+
+    assert jobs.move_pr(31, "draft") is None
+    assert calls == [["pr", "ready", "31", "--undo"]]
+
+
+def test_moving_a_draft_to_preview_readies_it_then_builds_the_preview(monkeypatch):
+    from ops import jobs
+
+    calls, started = [], []
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": True}], None))
+    monkeypatch.setattr(jobs, "run_gh", lambda args: calls.append(args))
+    monkeypatch.setattr(jobs, "start_job", lambda pr, action: started.append((pr, action)))
+
+    assert jobs.move_pr(31, "preview") is None
+    assert calls == [["pr", "ready", "31"]]
+    assert started == [(31, "up")]
+
+
+def test_moving_back_to_todo_removes_the_preview(monkeypatch):
+    from ops import jobs
+
+    started = []
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": False}], None))
+    monkeypatch.setattr(
+        jobs, "list_previews", lambda: ({31: Preview(31, 9031, "a" * 40, "running")}, None)
+    )
+    monkeypatch.setattr(jobs, "start_job", lambda pr, action: started.append((pr, action)))
+
+    assert jobs.move_pr(31, "todo") is None
+    assert started == [(31, "down")]
+
+
+def test_a_draft_or_a_fork_cannot_be_merged_nor_previewed(monkeypatch):
+    from ops import jobs
+
+    monkeypatch.setattr(jobs, "run_gh", lambda args: pytest_fail())
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": True}], None))
+    assert "draft" in jobs.move_pr(31, "merged")
+    monkeypatch.setattr(
+        jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isCrossRepository": True}], None)
+    )
+    assert "Fork" in jobs.move_pr(31, "preview")
+    assert "inconnue" in jobs.move_pr(31, "elsewhere")
+
+
+def pytest_fail():
+    raise AssertionError("gh must not be called")
+
+
+def test_merging_squashes_the_pr_then_sweeps_the_previews(monkeypatch):
+    from ops import jobs
+
+    calls, swept = [], []
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": False}], None))
+    monkeypatch.setattr(jobs, "run_gh", lambda args: calls.append(args))
+    monkeypatch.setattr(jobs, "start_sweep", lambda: swept.append(True))
+
+    assert jobs.move_pr(31, "merged") is None
+    assert calls == [["pr", "merge", "31", "--squash"]]
+    assert swept == [True]
+
+
+def test_a_failed_gh_call_is_reported_and_nothing_follows(monkeypatch):
+    from ops import jobs
+
+    monkeypatch.setattr(jobs, "fetch_open_prs", lambda: ([{**OPEN_PR, "isDraft": False}], None))
+    monkeypatch.setattr(jobs, "run_gh", lambda args: "gh pr merge a échoué : conflits")
+    monkeypatch.setattr(jobs, "start_sweep", lambda: pytest_fail())
+
+    assert jobs.move_pr(31, "merged") == "gh pr merge a échoué : conflits"
+
+
+def test_stale_production_alert_lists_the_missing_commits_with_their_titles():
+    pending = [
+        ("abc1234", "[FRONT][BACK] Stats: link <channels> (#80)"),
+        ("def5678", "Plain title"),
+    ]
+    page = render_page(
+        "h",
+        [],
+        {},
+        {},
+        None,
+        prod_version=("En retard de 2 commits", "stale"),
+        pending_commits=pending,
+    )
+
+    assert "La production est en retard" in page
+    assert 'class="sha">abc1234' in page
+    assert '<span class="tag">FRONT</span><span class="tag">BACK</span>' in page
+    assert "Stats: link &lt;channels&gt;" in page
+    assert '<span class="pr-ref">#80</span>' in page
+    assert "Plain title" in page
+
+
+def test_up_to_date_production_shows_no_alert():
+    page = render_page("h", [], {}, {}, None, prod_version=("À jour", "ok"), pending_commits=[])
+
+    assert 'class="alert"' not in page
+    assert "À jour" in page

@@ -5,6 +5,7 @@ library only. Spec: ops/docs/outil-ops.md, section "Previews des PR".
 """
 
 import html
+import re
 from urllib.parse import urlsplit
 
 from ops import review as ops_review
@@ -82,13 +83,15 @@ def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[
 
 STYLE = """
 :root { color-scheme: light dark; --bg: #f7f7f5; --card: #fff; --text: #1d1d1f; --muted: #6b6b70;
-  --line: #e2e2e0; --ok: #1f7a3a; --busy: #8a5a00; --error: #b3261e; --accent: #2457c5; }
+  --line: #e2e2e0; --ok: #1f7a3a; --busy: #8a5a00; --error: #b3261e; --accent: #2457c5;
+  --col: #eeeeea; --warn-bg: #fff4e5; --warn-line: #e8b04a; --chip: #e6ecfa; }
 @media (prefers-color-scheme: dark) { :root { --bg: #161618; --card: #1f1f22; --text: #ececee;
-  --muted: #9a9aa0; --line: #2e2e33; --ok: #5cc27a; --busy: #e0a83a; --error: #f07b72; --accent: #7aa2ff; } }
+  --muted: #9a9aa0; --line: #2e2e33; --ok: #5cc27a; --busy: #e0a83a; --error: #f07b72; --accent: #7aa2ff;
+  --col: #1a1a1d; --warn-bg: #2a2114; --warn-line: #8a5a00; --chip: #25324f; } }
 html, body { overflow-x: clip; }
 body { margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-main { max-width: 820px; margin: 0 auto; padding: 20px 16px 40px; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; }
 .top { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-start;
   justify-content: space-between; }
 .top > div { min-width: 0; }
@@ -115,6 +118,33 @@ button.primary, .open { background: var(--accent); border-color: var(--accent); 
 button:disabled { opacity: .5; cursor: default; }
 .log { font-size: 13px; color: var(--muted); }
 .reviews { margin: 6px 0 0; padding-left: 18px; }
+.alert { flex-basis: 100%; background: var(--warn-bg); border: 1px solid var(--warn-line);
+  border-left-width: 5px; border-radius: 10px; padding: 10px 12px; }
+.alert p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.commits { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.commits li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 0; }
+.sha { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip); color: var(--accent);
+  border-radius: 6px; padding: 1px 6px; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .03em; background: var(--accent); color: #fff;
+  border-radius: 999px; padding: 1px 8px; }
+.ctitle { font-weight: 600; flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.pr-ref { color: var(--muted); font-size: 12px; }
+.board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; align-items: start;
+  overflow-x: auto; margin-bottom: 18px; padding-bottom: 6px; }
+.col { background: var(--col); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
+  min-width: 0; min-height: 110px; }
+.col.over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.col h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.col .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+.count { font-size: 12px; font-weight: 600; background: var(--chip); border-radius: 999px; padding: 0 8px; }
+.card { display: block; cursor: grab; margin-bottom: 8px; }
+.card.dragging { opacity: .4; }
+.card .actions { margin-top: 8px; }
+.card.done { cursor: default; opacity: .8; }
+.move summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.move .actions { margin-top: 6px; }
+@media (max-width: 760px) { .board { grid-template-columns: repeat(4, 78vw); } }
 footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   color: var(--muted); font-size: 13px; }
 """
@@ -123,8 +153,45 @@ footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items
 DB_LABELS = {"shared": "DB réelle", "copy": "copie de la DB"}
 
 
+BOARD_COLUMNS = (
+    ("draft", "Draft", "Pas prête : déposer ici met la PR en draft."),
+    ("todo", "PR à traiter", "Prête pour relecture, sans preview."),
+    ("preview", "Preview déployée", "Déposer ici construit la preview de la PR."),
+    ("merged", "Merger", "Déposer ici merge la PR (squash)."),
+)
+
+
+def column_of(pr: dict, preview: Preview | None, job: Job | None) -> str:
+    """The board column a PR sits in: its draft state, then whether it has a preview."""
+    if pr.get("isDraft"):
+        return "draft"
+    building = job is not None and job.action == "up" and job.returncode is None
+    return "preview" if preview is not None or building else "todo"
+
+
+def render_move(number: int, current: str) -> str:
+    """No-JavaScript way to move a card: one button per other column."""
+    buttons = []
+    for key, name, _ in BOARD_COLUMNS:
+        if key == current:
+            continue
+        confirm = ""
+        if key == "merged":
+            confirm = ' onsubmit="return confirm(&#39;Merger la PR ?&#39;)"'
+        buttons.append(
+            f'<form method="post" action="/prs/{number}/move"{confirm}>'
+            f'<input type="hidden" name="to" value="{key}"><button>{html.escape(name)}</button></form>'
+        )
+    return f'<details class="move"><summary>Déplacer</summary><div class="actions">{"".join(buttons)}</div></details>'
+
+
 def render_row(
-    host: str | None, number: int, pr: dict, preview: Preview | None, job: Job | None
+    host: str | None,
+    number: int,
+    pr: dict,
+    preview: Preview | None,
+    job: Job | None,
+    column: str | None = None,
 ) -> str:
     label, css = preview_status(pr, preview, job)
     busy = css == "busy"
@@ -167,20 +234,124 @@ def render_row(
     port = f" · port {preview.port}" if preview is not None else ""
     if preview is not None and preview.db in DB_LABELS:
         port += f" · {DB_LABELS[preview.db]}"
+    if column is not None and not pr.get("isCrossRepository"):
+        actions.append(render_move(number, column))
+    card = (
+        f'<div class="pr card" draggable="true" data-pr="{number}">'
+        if column is not None and not pr.get("isCrossRepository")
+        else '<div class="pr">'
+    )
     return (
-        f'<div class="pr"><div class="info"><div class="title">{title}</div>'
+        f'{card}<div class="info"><div class="title">{title}</div>'
         f'<div class="meta">{" · ".join(meta)}{port}</div>'
         f'<div class="status {css}">{html.escape(label)}</div></div>'
         f'<div class="actions">{"".join(actions)}</div></div>'
     )
 
 
+def render_merged(pr: dict) -> str:
+    title = html.escape(pr.get("title") or "")
+    if pr.get("url"):
+        title = f'<a href="{html.escape(pr["url"])}">{title}</a>'
+    return (
+        f'<div class="pr card done"><div class="info"><div class="title">{title}</div>'
+        f'<div class="meta">#{pr["number"]} · mergée</div></div></div>'
+    )
+
+
+# Drag and drop of a card onto a column posts the same form as the "Déplacer" buttons.
+BOARD_SCRIPT = """
+(function () {
+  var dragged = null;
+  document.querySelectorAll('.card[draggable]').forEach(function (card) {
+    card.addEventListener('dragstart', function (e) {
+      dragged = card; card.classList.add('dragging'); e.dataTransfer.setData('text/plain', card.dataset.pr);
+    });
+    card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
+  });
+  document.querySelectorAll('.col').forEach(function (col) {
+    col.addEventListener('dragover', function (e) { if (dragged) { e.preventDefault(); col.classList.add('over'); } });
+    col.addEventListener('dragleave', function () { col.classList.remove('over'); });
+    col.addEventListener('drop', function (e) {
+      e.preventDefault(); col.classList.remove('over');
+      if (!dragged || dragged.closest('.col') === col) return;
+      if (col.dataset.col === 'merged' && !confirm('Merger la PR ?')) return;
+      fetch('/prs/' + dragged.dataset.pr + '/move', {method: 'POST', body: new URLSearchParams({to: col.dataset.col})})
+        .then(function () { location.reload(); });
+    });
+  });
+})();
+"""
+
+
+def render_board(
+    host: str | None,
+    prs: list[dict],
+    previews: dict[int, Preview],
+    job_by_pr: dict[int, Job],
+    merged: list[dict],
+) -> str:
+    cards: dict[str, list[str]] = {key: [] for key, _, _ in BOARD_COLUMNS}
+    for pr in prs:
+        number = pr["number"]
+        preview, job = previews.get(number), job_by_pr.get(number)
+        column = column_of(pr, preview, job)
+        cards[column].append(render_row(host, number, pr, preview, job, column))
+    cards["merged"] = [render_merged(pr) for pr in merged]
+    columns = "".join(
+        f'<section class="col" data-col="{key}"><h2>{html.escape(name)}'
+        f'<span class="count">{len(cards[key])}</span></h2>'
+        f'<p class="hint">{html.escape(hint)}</p>{"".join(cards[key])}</section>'
+        for key, name, hint in BOARD_COLUMNS
+    )
+    return f'<div class="board">{columns}</div><script>{BOARD_SCRIPT}</script>'
+
+
+TITLE_TAGS = re.compile(r"((?:\[[A-Za-z]+\])+)\s*(.*?)(?:\s*\(#(\d+)\))?")
+
+
+def render_commit(sha: str, title: str) -> str:
+    """One commit of the alert: short sha, leading [TAG] chips, title, trailing (#N) reference."""
+    match = TITLE_TAGS.fullmatch(title)
+    tags, text, ref = match.groups() if match else ("", title, None)
+    chips = "".join(
+        f'<span class="tag">{html.escape(t)}</span>' for t in re.findall(r"\[(.*?)\]", tags)
+    )
+    ref_html = f'<span class="pr-ref">#{ref}</span>' if ref else ""
+    return (
+        f'<li><code class="sha">{html.escape(sha)}</code>{chips}'
+        f'<span class="ctitle">{html.escape(text)}</span>{ref_html}</li>'
+    )
+
+
+def render_behind_alert(
+    version: tuple[str, str], pending: list[tuple[str, str]] | None, deploy_branch: str
+) -> str:
+    """The alert shown when the deployed version trails origin/<branch>: why, and what is missing."""
+    if version[1] != "stale":
+        return ""
+    commits = "".join(render_commit(sha, title) for sha, title in pending or [])
+    listing = f'<ul class="commits">{commits}</ul>' if commits else ""
+    return (
+        '<div class="alert"><p><strong>La production est en retard.</strong> '
+        f"Ce qui est mergé sur {html.escape(deploy_branch)} n'est pas encore en ligne "
+        "tant qu'il n'est pas déployé : utilisez « Déployer main en production ». "
+        f"{html.escape(version[0])}</p>{listing}</div>"
+    )
+
+
 def render_prod(
-    job: Job | None, version: tuple[str, str] | None = None, elsewhere: bool = False
+    job: Job | None,
+    version: tuple[str, str] | None = None,
+    elsewhere: bool = False,
+    pending: list[tuple[str, str]] | None = None,
 ) -> str:
     label, css = prod_status(job, elsewhere)
     version_line = ""
-    if version is not None:
+    alert = ""
+    if version is not None and version[1] == "stale":
+        alert = render_behind_alert(version, pending, CONFIG.deploy_branch)
+    elif version is not None:
         version_line = f'<div class="status {version[1]}">{html.escape(version[0])}</div>'
     disabled = " disabled" if css == "busy" else ""
     # The real stack and its data: a stray tap must not rebuild it.
@@ -194,7 +365,7 @@ def render_prod(
         f'<div class="status {css}">{html.escape(label)}</div></div>'
         f'<div class="actions"><form method="post" action="/prod/deploy" onsubmit="{confirm}">'
         f'<button class="primary"{disabled}>Déployer main en production</button></form>{log}</div>'
-        "</div>"
+        f"{alert}</div>"
     )
 
 
@@ -209,14 +380,13 @@ def render_page(
     review_busy: bool = False,
     prod_version: tuple[str, str] | None = None,
     deploy_elsewhere: bool = False,
+    pending_commits: list[tuple[str, str]] | None = None,
+    merged: list[dict] | None = None,
 ) -> str:
-    rows = [
-        render_row(host, pr["number"], pr, previews.get(pr["number"]), job_by_pr.get(pr["number"]))
-        for pr in prs
-    ]
+    board = render_board(host, prs, previews, job_by_pr, merged or [])
     # A preview whose PR is no longer open still shows, to be removed.
     open_numbers = {pr["number"] for pr in prs}
-    rows += [
+    rows = [
         render_row(host, number, {}, preview, job_by_pr.get(number))
         for number, preview in sorted(previews.items(), reverse=True)
         if number not in open_numbers
@@ -230,7 +400,7 @@ def render_page(
     review_card = "" if reviews is None else ops_review.render_reviews(reviews, review_busy)
     refresh = '<meta http-equiv="refresh" content="4">' if busy else ""
     banner = f'<div class="banner">{html.escape(error)}</div>' if error else ""
-    empty = '<p class="lead">Aucune PR ouverte.</p>' if not rows else ""
+    orphans = f"<h2>Previews de PR fermées</h2>{''.join(rows)}" if rows else ""
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{refresh}
@@ -239,9 +409,9 @@ def render_page(
 <div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/?refresh=1" class="refresh">Rafraîchir</a></div>
-{render_prod(prod_job, prod_version, deploy_elsewhere)}
+{render_prod(prod_job, prod_version, deploy_elsewhere, pending_commits)}
 {review_card}
-{banner}{"".join(rows)}{empty}
+{banner}{board}{orphans}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
 </footer>
 </main></body></html>"""

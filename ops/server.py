@@ -25,7 +25,7 @@ from base64 import b64decode
 from binascii import Error as Base64Error
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from ops import jobs as ops_jobs
 from ops import render as ops_render
@@ -94,18 +94,22 @@ class Handler(BaseHTTPRequestHandler):
                 prod = ops_jobs.prod_job
             deployed, origin = ops_jobs.deployed_sha(), ops_jobs.origin_main_sha()
             behind = ops_jobs.commits_behind(deployed, origin) if deployed and origin else None
+            pending = ops_jobs.pending_commits(deployed, origin) if behind else []
             previews, preview_warning = ops_jobs.list_previews()
+            flash, ops_jobs.flash_error = ops_jobs.flash_error, None
             page = ops_render.render_page(
                 self.headers.get("Host"),
                 prs,
                 previews,
                 job_by_pr,
-                " ".join(filter(None, (error, preview_warning))) or None,
+                " ".join(filter(None, (error, preview_warning, flash))) or None,
                 prod,
                 ops_review.list_reviews(limit=60) if SCHEDULER_ON else None,
                 ops_review.running_since is not None,
                 ops_render.version_status(deployed, origin, behind),
                 ops_jobs.deploy_elsewhere(prod),
+                pending,
+                ops_jobs.list_merged_prs(),
             )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
@@ -139,6 +143,11 @@ class Handler(BaseHTTPRequestHandler):
             and parts[2] in ("up", "rebase", "down")
         ):
             ops_jobs.start_job(int(parts[1]), parts[2])
+            self.redirect_home()
+        elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "move":
+            length = int(self.headers.get("Content-Length") or 0)
+            fields = parse_qs(self.rfile.read(min(length, 1024)).decode(errors="replace"))
+            ops_jobs.flash_error = ops_jobs.move_pr(int(parts[1]), fields.get("to", [""])[0])
             self.redirect_home()
         elif parts == ["prod", "deploy"]:
             ops_jobs.start_prod_deploy()
