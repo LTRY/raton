@@ -14,16 +14,18 @@ final class LibraryModel: ObservableObject {
 
     init(channelID: Int? = nil) { self.channelID = channelID }
 
-    private func query(page: Int, search: String) -> [String: String] {
-        var query = ["page": String(page)]
-        if !search.isEmpty { query["q"] = search }
-        if let channelID { query["channel_id"] = String(channelID) }
-        return query
+    @Published var filters = LibraryFilters()
+
+    private func query(page: Int, search: String) -> [URLQueryItem] {
+        var items = [URLQueryItem(name: "page", value: String(page))]
+        if !search.isEmpty { items.append(URLQueryItem(name: "q", value: search)) }
+        if let channelID { items.append(URLQueryItem(name: "channel_id", value: String(channelID))) }
+        return items + filters.queryItems
     }
 
     func reload(api: RatonAPI, search: String) async {
         do {
-            let reply: LibraryReply = try await api.get("/api/library", query: query(page: 1, search: search))
+            let reply: LibraryReply = try await api.get("/api/library", items: query(page: 1, search: search))
             items = reply.items
             total = reply.total
             page = reply.page
@@ -41,7 +43,7 @@ final class LibraryModel: ObservableObject {
         defer { loading = false }
         do {
             let reply: LibraryReply = try await api.get(
-                "/api/library", query: query(page: page + 1, search: search))
+                "/api/library", items: query(page: page + 1, search: search))
             let known = Set(items.map(\.id))
             items += reply.items.filter { !known.contains($0.id) }
             page = reply.page
@@ -79,6 +81,7 @@ struct LibraryView: View {
     @EnvironmentObject private var state: AppState
     @StateObject private var model = LibraryModel()
     @State private var search = ""
+    @State private var showFilters = false
 
     var body: some View {
         Group {
@@ -89,6 +92,11 @@ struct LibraryView: View {
                         SearchField(placeholder: "Rechercher une fiche", text: $search) {
                             Task { await model.reload(api: api, search: search) }
                         }
+                        Button { showFilters = true } label: {
+                            Label(model.filters.isDefault ? "Filtres" : "Filtres actifs", systemImage: "slider.horizontal.3")
+                        }
+                        .buttonStyle(SandButtonStyle(active: !model.filters.isDefault, fill: false))
+                        .padding(.horizontal, 16).padding(.bottom, 12)
                         if model.loaded {
                             Text("\(model.total) fiche\(model.total > 1 ? "s" : "")")
                                 .font(.raton(15)).foregroundStyle(Theme.textMuted)
@@ -100,6 +108,12 @@ struct LibraryView: View {
                 .refreshable { await model.reload(api: api, search: search) }
                 .task { await model.reload(api: api, search: search) }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
+                .sheet(isPresented: $showFilters) {
+                    LibraryFiltersSheet(api: api, filters: model.filters) { chosen in
+                        model.filters = chosen
+                        Task { await model.reload(api: api, search: search) }
+                    }
+                }
             }
         }
         .ratonPage()

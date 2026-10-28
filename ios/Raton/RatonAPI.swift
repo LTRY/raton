@@ -34,7 +34,12 @@ final class RatonAPI {
     }
 
     func get<T: Decodable>(_ path: String, query: [String: String] = [:]) async throws -> T {
-        try decode(try await send("GET", path, query: query))
+        try decode(try await send("GET", path, query: query.map { URLQueryItem(name: $0.key, value: $0.value) }))
+    }
+
+    /// A GET whose query repeats a name (`asset=audio&asset=video`).
+    func get<T: Decodable>(_ path: String, items: [URLQueryItem]) async throws -> T {
+        try decode(try await send("GET", path, query: items))
     }
 
     func post<T: Decodable>(_ path: String, body: [String: Any]? = nil) async throws -> T {
@@ -69,11 +74,11 @@ final class RatonAPI {
     }
 
     private func send(
-        _ method: String, _ path: String, query: [String: String] = [:], body: [String: Any]? = nil
+        _ method: String, _ path: String, query: [URLQueryItem] = [], body: [String: Any]? = nil
     ) async throws -> Data {
         var components = URLComponents(string: baseURL.absoluteString + path)
         if !query.isEmpty {
-            components?.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            components?.queryItems = query
         }
         guard let url = components?.url else { throw RatonError(message: "Adresse invalide.") }
         var request = URLRequest(url: url)

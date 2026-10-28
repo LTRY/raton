@@ -165,6 +165,7 @@ struct ChannelItem: Codable, Identifiable, Hashable {
     let id: Int
     let name: String
     let rating: Int
+    let categories: [String]
     let autoMetadataEnabled: Bool
     let autoShortsEnabled: Bool
     let avatarUrl: String?
@@ -192,6 +193,9 @@ struct ChannelState: Codable {
 struct PlaylistSummary: Codable, Identifiable, Hashable {
     let id: Int
     let title: String
+    let source: String
+    let categories: [String]
+    let freeListening: Bool
     let itemCount: Int
     let coverVideoId: Int?
     let coverHasThumbnail: Bool
@@ -211,6 +215,9 @@ struct PlaylistItem: Codable, Identifiable, Hashable {
 struct PlaylistDetail: Codable {
     let id: Int
     let title: String
+    let source: String
+    let categories: [String]
+    let freeListening: Bool
     let items: [PlaylistItem]
 }
 
@@ -324,4 +331,47 @@ struct YoutubeChannel: Codable, Identifiable, Hashable {
     let thumbnailUrl: String?
     let existing: ChannelRef?
     var id: String { ytChannelId }
+}
+
+/// A vue enregistrée (`GET /api/library/views`).
+struct SavedView: Codable, Hashable {
+    let name: String
+    let assets: [String]
+    let categories: [String]
+    let excludedAssets: [String]
+    let excludedCategories: [String]
+    let rated: Bool
+    let assetFilterMode: String
+    let categoryFilterMode: String
+}
+
+// MARK: Réglages
+
+struct CurfewSettings: Codable {
+    let enabled: Bool
+    let start: String
+    let end: String
+    let active: Bool
+}
+
+struct RatonLanguage: Codable {
+    let address: String
+    let nickname: String
+}
+
+/// The part of `GET /api/settings` that is the user's own (the rest is administration).
+struct UserSettings: Codable {
+    let screenTimeLimits: [String: [String: Int]]
+    let curfew: CurfewSettings
+    let ratonLanguage: RatonLanguage
+}
+
+struct ScreenTimeItem: Codable {
+    let seconds: Double
+    let count: Int
+    let limitMinutes: Int
+}
+
+struct ScreenTimeReply: Codable {
+    let periods: [String: [String: ScreenTimeItem]]
 }
