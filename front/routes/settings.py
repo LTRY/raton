@@ -41,7 +41,6 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
         request,
         "settings.html",
         {
-            "users": api.get("/users"),
             "channel_count": counts["channels"],
             "rated_channel_count": counts["rated_channels"],
             "video_count": counts["videos"],
@@ -53,8 +52,6 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
             "quota_bytes": counts["quota_bytes"],
             "storage_percent": counts["storage_percent"],
             "playback_time_stats": screen_time_rings(record(api.get("/screen-time"))),
-            "media_root": settings["media_root"],
-            "quota_gb": round(settings["global_quota_bytes"] / 1024 / 1024 / 1024, 2),
             "llm_usage": record(api.get("/llm/usage")),
             "last_auto_scan": {
                 "at": scan.last_at,
@@ -99,8 +96,6 @@ def json_list(text: str) -> list:
 
 @router.post("/settings")
 def settings_form(
-    media_root: str = Form(...),
-    quota_gb: float = Form(...),
     video_category_labels: str = Form(""),
     video_category_styles: str = Form(""),
     video_library_views: str = Form(""),
@@ -118,8 +113,6 @@ def settings_form(
     """The no-JS form of /settings: the colour editor writes its JSON in `video_category_styles`;
     without it the plain list of `video_category_labels` is used."""
     update = {
-        "media_root": media_root,
-        "global_quota_bytes": int(quota_gb * 1024 * 1024 * 1024),
         "video_library_views": json_list(form_text_value(video_library_views)),
         "no_progress_category_labels": form_list_values(no_progress_categories),
         # Unchecked checkbox: the browser sends nothing, so an empty value means "off".

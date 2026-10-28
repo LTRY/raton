@@ -1551,37 +1551,6 @@ button.secondary {
   margin: 0;
 }
 
-.settings-users {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.settings-user {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* The name takes its own line; "vous" and the actions sit under it. */
-.settings-user label {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
-.settings-user input {
-  width: 100%;
-}
-
-.settings-user-current {
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
 .settings-user-action {
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
@@ -7513,6 +7482,18 @@ turbo-frame {
   padding: 0;
 }
 
+/* /user lists a delete button beside each choice; the choice takes the rest of the row. */
+.chat-user-list li {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-user-list li > form:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .chat-user-choice {
   align-items: center;
   background: transparent;
@@ -10920,12 +10901,6 @@ a.log-title:hover { color: var(--color-primary); }
 .settings-head { align-items: baseline; display: flex; gap: 12px; justify-content: space-between; margin: 0 0 16px; }
 .settings-head h1 { font-size: 24px; margin: 0; }
 .settings-head-link { color: var(--color-primary); font-size: 14px; font-weight: 700; }
-.settings-stats { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 20px; }
-.settings-stats div { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; min-width: 0; padding: 12px 16px; }
-.settings-stats dt { color: var(--color-text-muted); font-size: 12px; }
-.settings-stats dd { font-size: 24px; font-weight: 800; line-height: 1.2; margin: 2px 0 0; }
-.settings-stats dd small { color: var(--color-text-muted); font-size: 13px; font-weight: 600; }
-.settings-stats .settings-stat-text { font-size: 15px; line-height: 1.5; }
 .settings-hint { color: var(--color-text-muted); font-size: 13px; margin: 0; }
 .settings-total { font-size: 14px; margin: 0; }
 .settings-table-scroll { overflow-x: auto; }
@@ -10963,8 +10938,7 @@ a.log-title:hover { color: var(--color-primary); }
 .settings-checkbox-option { min-height: 32px; }
 
 @media (max-width: 900px) {
-  .settings-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+  }
 
 @media (max-width: 800px) {
   .settings-nav { margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
@@ -10972,8 +10946,7 @@ a.log-title:hover { color: var(--color-primary); }
   .settings-actions span { display: none; }
   .settings-actions button { flex: 1; min-height: 44px; }
   .settings-card { padding: 16px; }
-  .settings-stats dd { font-size: 20px; }
-}
+  }
 
 /* Stats page (/stats): charts are plain CSS bars, no JS. */
 .stats-grid {
@@ -11547,7 +11520,6 @@ body::before {
 /* Panels and form blocks: same blur-free glass look as the cards above (the
    border keeps its colour so a panel's edge stays readable on the cream). */
 .settings-card,
-.settings-stats div,
 .stats-card,
 .filters-form,
 .download-form,

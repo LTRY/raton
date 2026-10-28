@@ -4400,18 +4400,16 @@ def test_rating_returns_to_internal_origin_and_rejects_external_redirect():
 
 
 def post_settings(db, media_root, **fields):
-    """The no-JS settings form, with the fields a test cares about (quota 2.5 Go by default)."""
-    return post_form(db, "/settings", {"media_root": str(media_root), "quota_gb": "2.5", **fields})
+    """The no-JS settings form, with the fields a test cares about."""
+    return post_form(db, "/settings", fields)
 
 
-def test_settings_form_updates_media_root_and_quota(tmp_path):
+def test_settings_form_stores_the_plain_category_labels(tmp_path):
     db = make_session()
 
     response = post_settings(db, tmp_path, video_category_labels="Maker\nScience\nmaker\nHistoire")
 
     assert response.headers["location"] == "/settings"
-    assert db.get(AppSetting, "media_root").value == str(tmp_path)
-    assert db.get(AppSetting, "global_quota_bytes").value == str(int(2.5 * 1024 * 1024 * 1024))
     # The plain list is stored as bare labels; their colours are assigned when read.
     assert get_video_category_label_styles(db) == [
         {"label": "maker", "color": "#16a34a"},
@@ -4504,8 +4502,9 @@ def test_settings_page_renders_custom_category_labels(tmp_path):
     assert 'data-category-new-color type="color"' in rendered
     assert "Sous-bibliothèques" in rendered
     assert "data-initial-views=" in rendered
-    # Summary tiles and the collapsed rarely-used blocks.
-    assert 'class="settings-stats"' in rendered
+    # The collapsed rarely-used blocks; no summary tiles, no media root / quota / users cards.
+    assert 'class="settings-stats"' not in rendered
+    assert 'name="media_root"' not in rendered and 'id="utilisateurs"' not in rendered
     assert 'class="settings-fold settings-fold-card"' in rendered
     assert "data-settings-nav" in rendered
     assert 'href="/logs"' in rendered

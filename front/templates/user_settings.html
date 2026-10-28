@@ -22,7 +22,7 @@
 
   <div class="settings-card" id="switch">
     <h2 class="settings-card-title">Changer d’utilisateur</h2>
-    <p class="settings-hint">Vu, notes en étoiles, commentaires, cloches, playlists, discussions, historique et paramètres de cette page sont propres à chaque utilisateur. Supprimer un utilisateur se fait dans <a href="/settings#utilisateurs">Paramètres</a>.</p>
+    <p class="settings-hint">Vu, notes en étoiles, commentaires, cloches, playlists, discussions, historique et paramètres de cette page sont propres à chaque utilisateur. </p>
     <ul class="chat-user-list">
       {% for user in users.users %}
       <li>
@@ -34,6 +34,11 @@
             {% if user.current %}<svg class="chat-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>{% endif %}
           </button>
         </form>
+        {% if users.users | length > 1 %}
+        <form method="post" action="/users/{{ user.id }}/delete" data-turbo-confirm="Supprimer {{ user.name }} et tout ce qui lui est propre (Vu, notes en étoiles, playlists, discussions) ?">
+          <button type="submit" class="settings-user-action settings-user-delete">Supprimer</button>
+        </form>
+        {% endif %}
       </li>
       {% endfor %}
     </ul>

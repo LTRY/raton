@@ -727,10 +727,10 @@ pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
 `/settings` sur une colonne de 720 px au plus :
 
 - « Nom » : champ et « Renommer » (`POST /users/{id}/rename`, `next=/user`) ;
-- « Changer d'utilisateur » : rappel de ce qui est propre a chacun (lien vers
-  `/settings#utilisateurs` pour supprimer), une ligne par utilisateur
+- « Changer d'utilisateur » : rappel de ce qui est propre a chacun, une ligne par utilisateur
   (pastille, nom, coche sur le courant, desactive ; `POST /users/switch`
-  recharge l'accueil pour lui avec « Bonjour <nom> ! »), puis « Nouvel
+  recharge l'accueil pour lui avec « Bonjour <nom> ! » ; « Supprimer » avec
+  confirmation, `POST /users/{id}/delete`, quand il en reste plusieurs), puis « Nouvel
   utilisateur » et « Ajouter » (`POST /users`) ;
 - un formulaire (`POST /user`, barre « Enregistrer ») : « Raton et toi »
   (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
@@ -1760,9 +1760,6 @@ a l'etat actif). De haut en bas :
 
 - titre "Parametres" et lien "Voir tous les logs" vers `/logs` (a droite du
   titre) ;
-- resume en quatre tuiles : quota global, cout LLM cumule, date du dernier
-  scan automatique ("Jamais" sinon), nombre de categories et de
-  sous-bibliotheques ;
 - navigation par ancres (`data-settings-nav`) : colonne a gauche sur grand
   ecran, barre de pilules defilante sous 800px ;
 - cartes de reglages. Les blocs peu consultes sont replies dans un `<details>` :
@@ -1774,20 +1771,14 @@ a l'etat actif). De haut en bas :
   sous 800px).
 
 Les champs, noms de formulaire et attributs `data-*` des editeurs sont
-inchanges.
+inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root et
+quota global, reglables par l'API ou l'environnement, voir
+[04 Configuration et deploiement](04-configuration-et-deploiement.md)), ni
+carte « Utilisateurs » : renommer, changer et supprimer un utilisateur se fait
+dans `/user`.
 
 Permet de modifier :
 
-- les utilisateurs (carte « Utilisateurs », ancre `#utilisateurs`, juste
-  apres « General ») : rappel de ce qui est partage et de ce qui est propre a
-  chacun (et renvoi vers la page de l'utilisateur, ouverte par le bouton rond
-  du tiroir de l'accueil), puis une ligne par utilisateur (son nom dans un champ, « vous » sur
-  l'utilisateur courant, « Renommer », et « Supprimer » avec confirmation
-  quand il en reste plusieurs). Ses champs appartiennent a des formulaires
-  places apres celui des parametres (`form=`), les formulaires ne
-  s'imbriquant pas ;
-- media root ;
-- quota global ;
 - styles des categories de video ;
 - categories sans barre de progression (voir la
   section "Barre de progression de lecture" plus haut) : une case a cocher par label de categorie connu, plus les
