@@ -107,6 +107,10 @@ def test_sql_filters_match_the_python_twin(db):
         )
         return {video.id for video in db.scalars(statement)}
 
+    # The full product of filters and modes (6912 cases) cost half a minute of `make ci`. Each
+    # filter combination gets one mode pair instead, cycled: the product's last 5 dimensions vary
+    # fastest (32 combinations), so every (assets, categories) pair still meets all 9 mode pairs.
+    mode_pairs = list(itertools.product(modes, modes))
     cases = [
         (
             asset_filters,
@@ -114,12 +118,19 @@ def test_sql_filters_match_the_python_twin(db):
             excluded_assets,
             excluded_categories,
             rated,
-            asset_mode,
-            category_mode,
+            *mode_pairs[index % len(mode_pairs)],
             hide,
             uncategorized,
         )
-        for asset_filters, category_filters, excluded_assets, excluded_categories, rated, hide, uncategorized in (
+        for index, (
+            asset_filters,
+            category_filters,
+            excluded_assets,
+            excluded_categories,
+            rated,
+            hide,
+            uncategorized,
+        ) in enumerate(
             itertools.product(
                 [set(), {"audio"}, {"audio", "video"}, set(kinds)],
                 [set(), {"musique"}, set(labels)],
@@ -130,8 +141,9 @@ def test_sql_filters_match_the_python_twin(db):
                 [False, True],
             )
         )
-        for asset_mode, category_mode in itertools.product(modes, modes)
     ]
+    covered = {(frozenset(case[0]), frozenset(case[1]), case[5], case[6]) for case in cases}
+    assert len(covered) == 4 * 3 * len(mode_pairs)
     # Videos without labels of their own inherit their channel's on the fly...
     before = [sql_ids(args) for args in cases]
     # ...and `ensure_video_channel` persists that copy when they are displayed: same answers either way.
