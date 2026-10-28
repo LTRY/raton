@@ -270,7 +270,15 @@ a jour : le commit dont l'image `raton-api` a ete construite (label
 `raton.git-sha`, pose par `make up` via l'argument de build `GIT_SHA`, lu par
 `docker inspect`) compare au `origin/main` recupere par `git fetch` (au plus
 toutes les 30 s). Le texte est « A jour avec origin/main », « En retard de N
-commits » (en rouge, a redeployer), ou « Version deployee inconnue » quand
+commits » (en rouge, a redeployer : la carte affiche alors une **alerte** « La
+production est en retard » qui explique qu'un merge ne deploie rien et liste les
+15 commits les plus recents manquants (`git log <deploye>..origin/main`) sous
+forme de **graphe** a la maniere d'un client git (`ops/graph.py`) : une ligne
+verticale, `origin/main` en haut, un point par commit colore selon l'auteur, la
+production en bas avec son sha ; chaque commit montre ses etiquettes `[TAG]` en
+pastilles, son titre, son numero de PR, son sha court, son auteur (initiale
+coloree) et son age (« il y a 3 h »), avec « … et N commits plus anciens » au
+dela de 15), ou « Version deployee inconnue » quand
 l'image n'a pas le label (deploiement anterieur, ou `docker compose up` sans
 `make up`) ; elle reste vraie meme si le depot a ete avance sans redeployer. Un script qui ne peut pas demarrer (par exemple
 non executable) termine le travail en echec et l'ecrit dans le journal ; les
@@ -328,11 +336,25 @@ le merge ne deploie rien.
   liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
-  et les boutons **Deployer**/**Redeployer**, **Ouvrir**, **Rebase** (PR du depot
-  ouvertes) et **Retirer**. En
+  et les boutons **Ouvrir** et **Retirer** (le deploiement se fait en glissant la tuile, ci-dessous). En
   haut de la page : **Rafraichir** et la carte **Production** (« Deploiement de
-  main » ci-dessus). Les
-  previews dont la PR est fermee restent listees pour etre retirees, et
+  main » ci-dessus). La page est toujours en **mode sombre** (palette fixe,
+  independante du reglage du systeme). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
+  quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
+  preview), **Preview deployee** (preview construite ou en construction) et
+  **Merger** (les 5 dernieres PR mergees, en lecture seule). Glisser une
+  tuile sur une colonne (souris : glisser directement ; tactile : appui long,
+  un balayage plus rapide fait defiler ; evenements `pointer`, car le
+  glisser-deposer HTML5 ne marche pas au doigt ; requete `POST /prs/<N>/move`,
+  champ `to`) agit sur la PR avec `gh` :
+  vers **Draft**, `gh pr ready --undo` ; vers **PR a traiter**, sortie du draft
+  et retrait de la preview s'il y en a une ; vers **Preview deployee**, sortie
+  du draft puis `up` (deposer une tuile sur sa propre colonne **Preview
+  deployee** la reconstruit) ; vers **Merger**, apres confirmation, `gh pr merge
+  --squash` puis `sweep` (une PR en draft ne se merge pas, une PR de fork n'a ni
+  preview ni deplacement). Un echec de `gh` s'affiche une fois en bandeau ; le
+  `GH_TOKEN` doit pouvoir ecrire sur les PR. Les
+  previews dont la PR est fermee restent listees sous le tableau pour etre retirees, et
   **Retirer les previews des PR fermees** les supprime toutes. La sortie de
   chaque action est dans `.local/previews/logs/pr-<N>.log` (lien **Journal**).
   Un script de preview ou de deploiement tourne dans le conteneur, qui
@@ -344,11 +366,7 @@ le merge ne deploie rien.
   (`docker-compose.preview.yml`), puis attend qu'elle reponde (depuis `raton-ops`,
   la boucle locale est le conteneur lui-meme : le script joint l'hote par
   `host.docker.internal`) ; `down <N>` supprime conteneurs, images,
-  worktree et copie de la DB ; `rebase <N>` rebase la branche de la PR sur
-  `main` (`gh pr update-branch --rebase`, fait par GitHub, sans checkout local ;
-  echoue en cas de conflit, a resoudre a la main) : la tete de la PR bouge, la
-  preview passe donc « en retard » jusqu'au prochain **Redeployer**, et le
-  `GH_TOKEN` doit pouvoir ecrire sur le depot ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
+  worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
   `retire-stale` retire celles qu'un deploiement rendrait perimees (voir « DB » ci-dessous).
 - **Service du back** : `preview-api`, jamais `api`. Il rejoint le reseau de la pile
   reelle (pour atteindre `raton-db`), ou Compose l'aliase par son nom de

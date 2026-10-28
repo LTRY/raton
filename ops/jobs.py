@@ -43,7 +43,7 @@ class Preview:
 
 @dataclass
 class Job:
-    action: str  # "up", "rebase" or "down"; "deploy" for the production
+    action: str  # "up" or "down"; "deploy" for the production
     started: float
     returncode: int | None = None
     pr: int | None = None  # None for the production deploy
@@ -184,7 +184,7 @@ def list_open_prs() -> tuple[list[dict], str | None]:
 
 
 def fetch_open_prs() -> tuple[list[dict], str | None]:
-    fields = "number,title,url,headRefName,headRefOid,isCrossRepository,author"
+    fields = "number,title,url,headRefName,headRefOid,isCrossRepository,isDraft,author"
     try:
         result = subprocess.run(
             ["gh", "pr", "list", "--state", "open", "--limit", "100", "--json", fields],
@@ -198,6 +198,19 @@ def fetch_open_prs() -> tuple[list[dict], str | None]:
     if result.returncode != 0:
         return [], f"gh pr list a échoué : {result.stderr.strip()}"
     return sorted(json.loads(result.stdout), key=lambda pr: -pr["number"]), None
+
+
+def list_merged_prs(limit: int = 5) -> list[dict]:
+    """The last merged PRs (cached for CACHE_TTL), for the board's last column; [] if `gh` fails."""
+    return cached(("merged", limit), CACHE_TTL, lambda: fetch_merged_prs(limit))
+
+
+def fetch_merged_prs(limit: int) -> list[dict]:
+    out = run_text(
+        ["gh", "pr", "list", "--state", "merged", "--limit", str(limit)]
+        + ["--json", "number,title,url,author"]
+    )
+    return json.loads(out) if out else []
 
 
 def run_text(command: list[str], timeout: float = 15) -> str | None:
@@ -249,6 +262,35 @@ def commits_behind(deployed: str, origin: str) -> int | None:
 def count_behind(deployed: str, origin: str) -> int | None:
     count = run_text(["git", "rev-list", "--count", f"{deployed}..{origin}"])
     return int(count) if count and count.isdigit() else None
+
+
+@dataclass(frozen=True)
+class Commit:
+    sha: str  # short
+    title: str
+    author: str
+    timestamp: int  # committer date, Unix seconds
+
+
+def pending_commits(deployed: str, origin: str, limit: int = 15) -> list[Commit]:
+    """The newest commits origin/main has that the deployed one lacks."""
+    return cached(
+        ("pending", deployed, origin, limit),
+        CACHE_TTL,
+        lambda: read_pending(deployed, origin, limit),
+    )
+
+
+def read_pending(deployed: str, origin: str, limit: int) -> list[Commit]:
+    out = run_text(
+        ["git", "log", f"-{limit}", "--format=%h%x09%s%x09%an%x09%ct", f"{deployed}..{origin}"]
+    )
+    commits = []
+    for line in (out or "").splitlines():
+        parts = line.split("\t")
+        if len(parts) == 4 and parts[3].isdigit():
+            commits.append(Commit(parts[0], parts[1], parts[2], int(parts[3])))
+    return commits
 
 
 def log_path(pr: int) -> Path:
@@ -432,6 +474,66 @@ def start_job(pr: int, action: str) -> bool:
         save_job(job)
     run_in_background(job, [str(PREVIEW_SH), action, str(pr)], log_path(pr), on_change=save_job)
     return True
+
+
+# The board's columns, left to right; a PR is moved to one by `move_pr`.
+COLUMNS = ("draft", "todo", "preview", "merged")
+
+# Why the last move failed, shown once by the page (the move runs inside a form post).
+flash_error: str | None = None
+
+
+def run_gh(args: list[str]) -> str | None:
+    """Run `gh <args>`; the error text to show when it fails, None when it worked."""
+    try:
+        result = subprocess.run(
+            ["gh", *args],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except OSError, subprocess.TimeoutExpired:
+        return f"gh {' '.join(args)} n'a pas pu s'exécuter."
+    if result.returncode != 0:
+        return f"gh {' '.join(args)} a échoué : {result.stderr.strip()}"
+    return None
+
+
+def move_pr(number: int, target: str) -> str | None:
+    """Move a PR to a board column; the error to show when it cannot, None when done.
+
+    draft: marks the PR as draft. todo: ready for review, its preview (if any) removed.
+    preview: ready for review, preview (re)built. merged: squash-merged, then the previews of
+    closed PRs are swept.
+    """
+    if target not in COLUMNS:
+        return f"Colonne inconnue : {target}"
+    prs, error = fetch_open_prs()
+    pr = next((p for p in prs if p["number"] == number), None)
+    if pr is None:
+        return error or f"La PR {number} n'est pas ouverte."
+    invalidate_caches()
+    draft = pr.get("isDraft", False)
+    if target == "draft":
+        return None if draft else run_gh(["pr", "ready", str(number), "--undo"])
+    if target == "merged":
+        if draft:
+            return "Une PR en draft ne se merge pas : sortez-la d'abord du draft."
+        failure = run_gh(["pr", "merge", str(number), "--squash"])
+        if failure is None:
+            start_sweep()
+        return failure
+    if target == "preview" and pr.get("isCrossRepository"):
+        return "Fork : pas de preview (son code tournerait sur cette machine)."
+    if draft and (failure := run_gh(["pr", "ready", str(number)])):
+        return failure
+    if target == "preview":
+        start_job(number, "up")
+    elif number in list_previews()[0]:
+        start_job(number, "down")
+    return None
 
 
 def deploy_elsewhere(prod: Job | None) -> bool:
