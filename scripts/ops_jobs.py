@@ -98,22 +98,48 @@ def parse_previews(text: str) -> tuple[dict[int, Preview], list[str]]:
     return previews, invalid
 
 
-def list_previews() -> tuple[dict[int, Preview], str | None]:
-    """The previews, and a French warning when `list` failed or printed lines that were skipped."""
+# `list` runs on every refresh of the page: a hung docker must not freeze it.
+LIST_TIMEOUT_SECONDS = 30
+
+
+def run_list_script() -> tuple[int, str, str] | str:
+    """(returncode, stdout, stderr) of `list`, or the French error when it cannot run to the end."""
     try:
-        result = subprocess.run(
-            [str(PREVIEW_SH), "list"], cwd=REPO, capture_output=True, text=True, check=False
+        # Its own process group, so a timeout stops docker too, which would keep the pipes open.
+        process = subprocess.Popen(
+            [str(PREVIEW_SH), "list"],
+            cwd=REPO,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
         )
     except OSError as error:
-        return {}, f"Impossible de lancer {CONFIG.previews_script} list : {error}"
-    previews, invalid = parse_previews(result.stdout)
+        return f"Impossible de lancer {CONFIG.previews_script} list : {error}"
+    try:
+        stdout, stderr = process.communicate(timeout=LIST_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.communicate()
+        return (
+            f"{CONFIG.previews_script} list n'a pas répondu en {LIST_TIMEOUT_SECONDS} s : arrêté."
+        )
+    return process.returncode, stdout, stderr
+
+
+def list_previews() -> tuple[dict[int, Preview], str | None]:
+    """The previews, and a French warning when `list` failed or printed lines that were skipped."""
+    outcome = run_list_script()
+    if isinstance(outcome, str):
+        print(outcome, file=sys.stderr, flush=True)
+        return {}, outcome
+    returncode, stdout, stderr = outcome
+    previews, invalid = parse_previews(stdout)
     warnings = []
-    if result.returncode != 0:
-        detail = result.stderr.strip().splitlines()[-1:] or [""]
+    if returncode != 0:
+        detail = stderr.strip().splitlines()[-1:] or [""]
         warnings.append(
-            f"{CONFIG.previews_script} list a échoué (code {result.returncode}) : {detail[0]}".rstrip(
-                " :"
-            )
+            f"{CONFIG.previews_script} list a échoué (code {returncode}) : {detail[0]}".rstrip(" :")
         )
     if invalid:
         plural = "s" if len(invalid) > 1 else ""
@@ -127,8 +153,37 @@ def list_previews() -> tuple[dict[int, Preview], str | None]:
     return previews, warning
 
 
+# The page refreshes every 4 s while a job runs: GitHub and Docker are asked at most this often
+# (the "Rafraîchir" link and the end of a job skip the wait).
+CACHE_TTL = 15.0
+_cache: dict[tuple, tuple[float, object]] = {}
+_cache_lock = threading.Lock()
+
+
+def cached(key: tuple, ttl: float, compute: Callable[[], object]) -> object:
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit is not None and time.time() - hit[0] < ttl:
+            return hit[1]
+    value = compute()  # outside the lock: a slow gh must not block the other lookups
+    with _cache_lock:
+        _cache[key] = (time.time(), value)
+    return value
+
+
+def invalidate_caches() -> None:
+    global _origin_cache
+    with _cache_lock:
+        _cache.clear()
+    _origin_cache = (0.0, None)
+
+
 def list_open_prs() -> tuple[list[dict], str | None]:
-    """The open PRs, newest first, and the error to show when `gh` cannot list them."""
+    """The open PRs (cached for CACHE_TTL), and the error to show when `gh` cannot list them."""
+    return cached(("prs",), CACHE_TTL, fetch_open_prs)
+
+
+def fetch_open_prs() -> tuple[list[dict], str | None]:
     fields = "number,title,url,headRefName,headRefOid,isCrossRepository,author"
     try:
         result = subprocess.run(
@@ -157,7 +212,11 @@ def run_text(command: list[str], timeout: float = 15) -> str | None:
 
 
 def deployed_sha() -> str | None:
-    """The commit the deployed container was built from (image label), None if unknown."""
+    """The commit the deployed container was built from (image label, cached), None if unknown."""
+    return cached(("deployed",), CACHE_TTL, read_deployed_sha)
+
+
+def read_deployed_sha() -> str | None:
     if not CONFIG.deploy_container or not CONFIG.deploy_sha_label:
         return None
     label_format = '{{ index .Config.Labels "' + CONFIG.deploy_sha_label + '" }}'
@@ -184,6 +243,10 @@ def origin_main_sha() -> str | None:
 
 def commits_behind(deployed: str, origin: str) -> int | None:
     """How many commits origin/main has that the deployed commit lacks, None if git cannot say."""
+    return cached(("behind", deployed, origin), CACHE_TTL, lambda: count_behind(deployed, origin))
+
+
+def count_behind(deployed: str, origin: str) -> int | None:
     count = run_text(["git", "rev-list", "--count", f"{deployed}..{origin}"])
     return int(count) if count and count.isdigit() else None
 
@@ -353,6 +416,7 @@ def run_in_background(
             job.returncode = returncode
             if on_change:
                 on_change(job)
+        invalidate_caches()  # the job changed what the page shows (a PR, a deployed commit)
 
     threading.Thread(target=run, daemon=True).start()
 

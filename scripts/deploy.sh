@@ -16,7 +16,7 @@ deploy() {
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   cd "$(dirname "$self")/.."
   if [ -z "${DEPLOY_LOCK_HELD:-}" ]; then
-    DEPLOY_LOCK_HELD=1 exec python3 scripts/deploy_lock.py "$self" "$@"
+    exec python3 scripts/deploy_lock.py "$self" "$@"
   fi
   local branch
   branch="$(git rev-parse --abbrev-ref HEAD)"

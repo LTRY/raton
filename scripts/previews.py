@@ -84,6 +84,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         parts = self.path.split("?")[0].strip("/").split("/")
         if parts == [""]:
+            if "refresh=1" in self.path.partition("?")[2].split("&"):
+                ops_jobs.invalidate_caches()
             prs, error = ops_jobs.list_open_prs()
             with ops_jobs.jobs_lock:
                 job_by_pr = dict(ops_jobs.jobs)

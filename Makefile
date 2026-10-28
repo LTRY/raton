@@ -1,4 +1,4 @@
-.PHONY: uninstall install test lint format compose-config ci up down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews
+.PHONY: uninstall install test lint format compose-config ci up up-locked down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews
 
 # Shell environment first, then MEDIA_HOST_ROOT from .env, then the default.
 MEDIA_HOST_ROOT ?= $(shell sed -n 's/^MEDIA_HOST_ROOT=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
@@ -43,7 +43,12 @@ docs-build:
 
 ci: css lint test compose-config
 
+# One deploy at a time, the same lock as scripts/deploy.sh and the previews page's button
+# (scripts/deploy_lock.py); a deploy.sh that already holds it runs `make up` without taking it again.
 up:
+	python3 scripts/deploy_lock.py $(MAKE) --no-print-directory up-locked
+
+up-locked:
 	mkdir -p "$(MEDIA_HOST_ROOT)" "$${LOG_HOST_DIR:-.local/logs}"
 	# Before the api migrates the real DB at startup: a preview on it would keep old code there.
 	./scripts/preview.sh retire-stale

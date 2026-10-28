@@ -238,7 +238,7 @@ def render_page(
 <body><main>
 <div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
-</div><a href="/" class="refresh">Rafraîchir</a></div>
+</div><a href="/?refresh=1" class="refresh">Rafraîchir</a></div>
 {render_prod(prod_job, prod_version, deploy_elsewhere)}
 {review_card}
 {banner}{"".join(rows)}{empty}

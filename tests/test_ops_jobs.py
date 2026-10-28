@@ -338,7 +338,7 @@ def test_deploy_sh_run_by_hand_fails_cleanly_while_a_deploy_holds_the_lock(lock_
 
     os.close(fd)
     assert result.returncode == 75
-    assert "deploy.sh: un déploiement est déjà en cours : rien n'est déployé" in result.stderr
+    assert "Un déploiement est déjà en cours : rien n'est déployé" in result.stderr
 
 
 def test_the_button_does_not_start_a_second_deploy_while_the_lock_is_held(lock_path, job_state):
@@ -369,3 +369,80 @@ def test_the_page_shows_an_interrupted_deploy_as_a_failure():
 
     assert prod_status(job) == ("Déploiement interrompu (la page a redémarré)", "error")
     assert "interrompu" in render_page("h", [], {}, {}, None, job)
+
+
+def test_make_up_runs_under_the_deploy_lock():
+    dry_run = subprocess.run(
+        ["make", "-n", "up"], cwd=REPO, capture_output=True, text=True, check=True
+    ).stdout
+
+    assert "scripts/deploy_lock.py" in dry_run and "up-locked" in dry_run
+
+
+def test_a_nested_command_does_not_take_the_lock_again(lock_path):
+    """deploy.sh runs `make up` inside its own lock: the inner call must go through."""
+    fd = deploy_lock.acquire()
+    try:
+        result = subprocess.run(
+            [sys.executable, str(REPO / "scripts" / "deploy_lock.py"), "echo", "inner"],
+            env={
+                **os.environ,
+                "DEPLOY_LOCK_PATH": str(lock_path),
+                "DEPLOY_LOCK_HELD": "1",
+            },
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    finally:
+        os.close(fd)
+
+    assert (result.returncode, result.stdout.strip()) == (0, "inner")
+
+
+# --- hardening of the page's lookups ---------------------------------------------------------
+
+
+def test_a_hung_list_script_is_stopped_with_its_children(tmp_path, monkeypatch):
+    script = tmp_path / "preview.sh"
+    script.write_text("#!/bin/sh\nsleep 60 &\nwait\n")
+    script.chmod(0o755)
+    monkeypatch.setattr(ops_jobs, "PREVIEW_SH", script)
+    monkeypatch.setattr(ops_jobs, "LIST_TIMEOUT_SECONDS", 0.3)
+
+    started = time.time()
+    previews, warning = ops_jobs.list_previews()
+
+    assert time.time() - started < 5
+    assert previews == {}
+    assert "n'a pas répondu" in warning
+
+
+def test_page_lookups_are_cached_until_invalidated(monkeypatch):
+    calls = []
+    monkeypatch.setattr(ops_jobs, "_cache", {})
+    monkeypatch.setattr(ops_jobs, "fetch_open_prs", lambda: calls.append(1) or ([], None))
+
+    ops_jobs.list_open_prs()
+    ops_jobs.list_open_prs()
+    assert len(calls) == 1
+
+    ops_jobs.invalidate_caches()
+    ops_jobs.list_open_prs()
+    assert len(calls) == 2
+
+
+def test_a_finished_job_invalidates_the_caches(job_state, monkeypatch):
+    script = job_state / "preview.sh"
+    script.write_text("#!/bin/sh\nexit 0\n")
+    script.chmod(0o755)
+    monkeypatch.setattr(ops_jobs, "PREVIEW_SH", script)
+    monkeypatch.setattr(ops_jobs, "_cache", {("prs",): (time.time(), "stale")})
+
+    ops_jobs.start_job(31, "up")
+    for _ in range(100):
+        if ops_jobs.jobs[31].returncode is not None and not ops_jobs._cache:
+            break
+        time.sleep(0.05)
+
+    assert ops_jobs._cache == {}

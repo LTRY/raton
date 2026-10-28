@@ -260,12 +260,14 @@ bouton ou d'un `scripts/deploy.sh` lance a la main. `deploy.sh` se relance sous
 `.local/previews/deploy.lock` puis execute le script ; le verrou est tenu tant
 que le deploiement (et ses processus fils) tourne, et le noyau le libere si le
 processus meurt. Si un autre deploiement le tient, `deploy.sh` n'a rien fait
-quand il affiche `deploy.sh: un deploiement est deja en cours : rien n'est
+quand `deploy_lock.py` affiche `Un deploiement est deja en cours : rien n'est
 deploye` et sort avec le code 75. La page lit le meme verrou : quand il est tenu
 par un deploiement qu'elle n'a pas lance, la carte **Production** affiche
 « Deploiement deja en cours (lance hors de cette page) », le bouton est grise
-et un POST sur `/prod/deploy` ne lance rien. Un `make up` tape directement,
-sans passer par `deploy.sh`, ne prend pas le verrou. Un flock ne protege que
+et un POST sur `/prod/deploy` ne lance rien. `make up` prend le
+meme verrou (sa recette passe par `deploy_lock.py`, cible `up-locked`) ; quand
+`deploy.sh` l'a deja pris, le `make up` qu'il lance le sait par la variable
+`DEPLOY_LOCK_HELD=1` et ne le reprend pas. Un flock ne protege que
 les processus d'un meme noyau : le depot monte dans `raton-ops` par bind mount
 et la machine hote partagent le noyau sous Linux, mais pas avec Docker
 Desktop (macOS, Windows), ou le verrou ne croise pas la frontiere de la VM ;
@@ -406,8 +408,9 @@ Une sortie vide veut dire aucune preview. Les lignes vides sont ignorees. Toute
 autre ligne qui ne respecte pas ce format, ou qui repete un numero de PR deja
 liste (la premiere est gardee), est **ignoree mais signalee** : la page affiche
 en bandeau « N ligne(s) invalide(s) ignoree(s) (premiere : ... ») et le meme
-texte va sur la sortie du serveur. Un `list` qui sort avec un code non nul ou
-qui ne peut pas demarrer est signale de la meme facon (les lignes valides qu'il
+texte va sur la sortie du serveur. Un `list` qui sort avec un code non nul,
+qui ne peut pas demarrer ou qui ne repond pas en 30 s (il est alors arrete,
+avec son groupe de processus) est signale de la meme facon (les lignes valides qu'il
 a imprimees sont gardees). `scripts/ops_jobs.py` : `parse_previews` (retourne
 les previews et les lignes invalides), `list_previews`.
 
@@ -416,6 +419,12 @@ les previews et les lignes invalides), `list_previews`.
 appelle `scripts/preview.sh` avec un faux `docker` et un faux `gh` (`list`,
 `sweep`, appels incorrects) et teste `parse_previews` sur des lignes valides
 et invalides.
+
+**Cache des lectures** : la page se rafraichit toutes les 4 s pendant un job.
+La liste des PR (`gh`), le commit deploye (`docker inspect`) et le retard sur
+`origin/main` sont gardes 15 s (`CACHE_TTL`), le `git fetch` 30 s ; le lien
+**Rafraichir** (`/?refresh=1`) et la fin d'un job les relisent aussitot. La liste
+des previews (`list`) n'est pas mise en cache.
 
 **Jeton de la page** : la page peut deployer en production depuis un conteneur
 root qui pilote Docker. Par defaut elle est ouverte, comme Raton (LAN de
