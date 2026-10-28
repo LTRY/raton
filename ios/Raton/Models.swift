@@ -242,6 +242,8 @@ struct PlaylistItem: Codable, Identifiable, Hashable {
     let title: String
     let channelName: String?
     let durationSeconds: Int
+    let hasAudio: Bool
+    let hasVideo: Bool
     let hasThumbnail: Bool
     let seen: Bool
     var id: Int { itemId }
@@ -409,4 +411,13 @@ struct ScreenTimeItem: Codable {
 
 struct ScreenTimeReply: Codable {
     let periods: [String: [String: ScreenTimeItem]]
+}
+
+extension PlaylistItem {
+    func hasFile(_ kind: MediaKind) -> Bool { kind == .audio ? hasAudio : hasVideo }
+
+    var queueTrack: QueueTrack {
+        QueueTrack(videoID: videoId, title: title, channelName: channelName, durationSeconds: durationSeconds,
+                   hasAudio: hasAudio, hasVideo: hasVideo, hasThumbnail: hasThumbnail)
+    }
 }

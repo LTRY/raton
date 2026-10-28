@@ -448,13 +448,17 @@ struct NowPlayingBar: View {
     @EnvironmentObject private var player: PlayerController
 
     var body: some View {
-        if player.track?.kind == .audio {
+        if player.track?.kind == .audio || player.queue != nil {
             HStack(spacing: 16) {
                 Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
                     .foregroundStyle(Color(hex: 0xF3E8D9))
                 Spacer()
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                }
+                if player.queue != nil {
+                    Button { player.next() } label: { Image(systemName: "forward.fill") }
+                        .accessibilityLabel("Piste suivante")
                 }
                 Button { player.stop() } label: { Image(systemName: "xmark") }
             }

@@ -77,7 +77,7 @@ Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlist
 | Chaine | Cloches videos et shorts, note, categories, actualiser le profil, supprimer, puis ses fiches | `PUT /api/channels/{id}/bells/{section}`, `.../rating`, `.../categories`, `POST .../refresh-profile`, `DELETE`, `GET /api/library?channel_id=` |
 | Bibliotheque | Toutes les fiches, recherche, 50 par page ; feuille de filtres : vues enregistrees, tri, section (videos, shorts), types de fichier et categories a trois etats (inclus, exclu, neutre) avec mode « un des » ou « tous les », notees, sans categorie, « Tout voir » | `GET /api/library` (`sort`, `section`, `asset`, `exclude_asset`, `category`, `exclude_category`, `rated`, `uncategorized`, `hide`, modes, `q`), `GET /api/library/views`, `GET /api/categories` |
 | Playlists | Liste ; creer, importer une playlist YouTube | `GET/POST /api/playlists`, `POST /api/playlists/import-url` |
-| Playlist | Fiches dans l'ordre ; renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
+| Playlist | Lecteur de file en tete (voir « Lecteur de playlist »), fiches dans l'ordre : un toucher joue la piste, le « i » ouvre la fiche ; renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
 | Fiche | Lecteur, note, categories, Vu et Indesiree, onglets, menu | voir ci-dessous |
 | Reglages | Nom, changer d'utilisateur, temps d'ecran (minutes par jour, usage du jour), couvre-feu, « Raton et toi », adresse du serveur | `GET/PUT /api/settings`, `GET /api/screen-time`, `PUT /api/users/{id}` |
 
@@ -123,6 +123,31 @@ duration_seconds, watched_seconds}`, a la pause, a la fin et a l'arret du
 lecteur, si au moins une seconde a ete regardee. Les secondes regardees
 s'accumulent par pas de moins de 5 s (un saut est une avance, pas du
 visionnage). Le Vu a 90 % est decide par le back. Si `sponsor_skip_enabled`, le lecteur saute les `skip_segments` que le back donne.
+
+## Lecteur de playlist
+
+Le haut d'une playlist est un lecteur de file, avec les regles du lecteur du
+front (`front/static/js/playlist-player.js`, `docs/spec/08-medias-et-lecteurs.md`,
+« File d'une playlist ») :
+
+- le choix Video / Audio, l'aleatoire et la boucle sont gardes d'un lancement a
+  l'autre (`UserDefaults`) ; une fiche sans le fichier du mode choisi est
+  grisee (« Ignoree ») et sautee ;
+- a la fin d'une piste la suivante demarre ; sans boucle la lecture s'arrete
+  apres la derniere ; l'aleatoire ne rejoue rien avant d'avoir tout joue ;
+  « precedent » apres 3 s revient au debut de la piste, sinon rejoue la
+  piste d'avant ;
+- une piste demarre a 0 (pas de reprise) et son activite est rapportee par
+  piste (`POST /api/videos/{id}/activity`), sauf en ecoute libre ;
+- la file (`PlaylistQueue`) vit dans `PlayerController` : elle continue quand on
+  quitte la playlist, la barre sous les onglets propose pause, suivante et
+  fermer, l'ecran verrouille propose piste precedente / suivante a la place des
+  sauts de 15 s ; lancer une fiche seule ou fermer la barre vide la file ;
+- changer l'ordre, retirer une fiche ou trier relit la playlist et met la file
+  a jour sans couper la piste.
+
+La barre ne ramene pas a la page de la playlist, et ouvrir depuis la playlist
+la fiche d'une video en cours de lecture la coupe en la quittant.
 
 ## Pas encore
 

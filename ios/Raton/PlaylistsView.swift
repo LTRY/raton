@@ -81,10 +81,12 @@ struct PlaylistsView: View {
     }
 }
 
-/// A playlist: its fiches in order; a tap opens the fiche, where it is played.
+/// A playlist: its fiches in order, with the queue player on top; a tap on a row plays it, the
+/// "i" opens its fiche.
 struct PlaylistView: View {
     let playlist: PlaylistSummary
     @EnvironmentObject private var state: AppState
+    @EnvironmentObject private var player: PlayerController
     @State private var detail: PlaylistDetail?
     @State private var errorMessage: String?
     @State private var showRename = false
@@ -129,8 +131,18 @@ struct PlaylistView: View {
                             .accessibilityLabel("Plus d'options")
                         }
                         ErrorMessage(text: errorMessage)
+                        if let detail { PlaylistPlayerPanel(detail: detail, api: api) }
                         ForEach(detail?.items ?? []) { item in
-                            NavigationLink(value: item.videoId) {
+                            let playable = item.hasFile(player.queueMode)
+                            let isCurrent = player.queue?.playlistID == playlist.id && player.track?.videoID == item.videoId
+                            Button {
+                                if player.queue?.playlistID == playlist.id {
+                                    player.playQueueTrack(item.videoId)
+                                } else if let detail {
+                                    player.playQueue(playlistID: detail.id, title: detail.title, free: detail.freeListening,
+                                                     tracks: detail.items.map(\.queueTrack), startID: item.videoId, api: api)
+                                }
+                            } label: {
                                 ListRow {
                                     HStack(spacing: 12) {
                                         Thumbnail(videoID: item.videoId, hasThumbnail: item.hasThumbnail, api: api)
@@ -143,15 +155,27 @@ struct PlaylistView: View {
                                                 Text(channel).font(.raton(14, .semibold))
                                                     .foregroundStyle(Theme.textMuted).lineLimit(1)
                                             }
-                                            Text(Format.clock(Double(item.durationSeconds)))
+                                            Text(playable
+                                                 ? Format.clock(Double(item.durationSeconds))
+                                                 : "Ignorée : \(player.queueMode == .audio ? "audio" : "vidéo") non téléchargé\(player.queueMode == .audio ? "" : "e")")
                                                 .font(.raton(13)).foregroundStyle(Theme.textMuted)
                                         }
                                         Spacer(minLength: 0)
-                                        if item.seen {
+                                        if isCurrent {
+                                            Image(systemName: player.isPlaying ? "speaker.wave.2.fill" : "pause.fill")
+                                                .foregroundStyle(Theme.primary)
+                                        } else if item.seen && !(detail?.freeListening ?? false) {
                                             Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.textFaint)
                                         }
+                                        NavigationLink(value: item.videoId) {
+                                            Image(systemName: "info.circle").font(.system(size: 22))
+                                                .foregroundStyle(Theme.textMuted).frame(width: 36, height: 44)
+                                        }
+                                        .accessibilityLabel("Ouvrir la fiche")
                                     }
                                 }
+                                .background(isCurrent ? Theme.tint : Color.clear)
+                                .opacity(playable ? 1 : 0.5)
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
@@ -169,6 +193,8 @@ struct PlaylistView: View {
                 }
                 .refreshable { await load(api) }
                 .task { await load(api) }
+                // The next track ends up Vu: read the rows again to show it.
+                .onChange(of: player.track) { _ in Task { await load(api) } }
                 .sheet(isPresented: $showRename) {
                     TextPromptSheet(title: "Renommer", placeholder: "Titre", action: "Enregistrer", initial: detail?.title ?? playlist.title) { title in
                         let _: PlaylistSummary = try await api.put("/api/playlists/\(playlist.id)/title", body: ["title": title])
@@ -215,7 +241,10 @@ struct PlaylistView: View {
 
     private func load(_ api: RatonAPI) async {
         do {
-            detail = try await api.get("/api/playlists/\(playlist.id)")
+            let fresh: PlaylistDetail = try await api.get("/api/playlists/\(playlist.id)")
+            detail = fresh
+            // A move, a removal or a download changes what the playing queue holds.
+            player.updateQueue(playlistID: fresh.id, free: fresh.freeListening, tracks: fresh.items.map(\.queueTrack))
             errorMessage = nil
         } catch {
             if !(error is CancellationError) { errorMessage = error.localizedDescription }
