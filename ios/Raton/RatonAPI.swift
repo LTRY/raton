@@ -68,6 +68,8 @@ final class RatonAPI {
     private func decode<T: Decodable>(_ data: Data) throws -> T {
         do {
             return try decoder.decode(T.self, from: data)
+        } catch let error as DecodingError {
+            throw RatonError(message: "Réponse inattendue du serveur (\(RatonAPI.describe(error))). Le serveur est peut-être plus ancien que l'app.")
         } catch {
             throw RatonError(message: "Réponse inattendue du serveur.")
         }
@@ -99,6 +101,21 @@ final class RatonAPI {
         }
         guard http.statusCode < 400 else { throw RatonAPI.statusError(http.statusCode, data) }
         return data
+    }
+
+    /// Which field the JSON lacked or had the wrong type for, to tell a server older than the app.
+    private static func describe(_ error: DecodingError) -> String {
+        func path(_ context: DecodingError.Context) -> String {
+            context.codingPath.map(\.stringValue).joined(separator: ".")
+        }
+        switch error {
+        case .keyNotFound(let key, let context):
+            return "champ absent : " + (path(context).isEmpty ? key.stringValue : path(context) + "." + key.stringValue)
+        case .typeMismatch(_, let context), .valueNotFound(_, let context), .dataCorrupted(let context):
+            return "champ invalide : " + path(context)
+        @unknown default:
+            return "format inconnu"
+        }
     }
 
     private static func statusError(_ status: Int, _ data: Data) -> RatonError {

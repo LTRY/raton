@@ -136,6 +136,41 @@ struct VideoDetail: Codable, Identifiable, Hashable {
     let channel: ChannelRef?
     let hasTranscript: Bool
     let transcriptLines: [TranscriptLine]
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, url, isNew, rating, categories, listState, shownState, comment, durationSeconds
+        case mediaUrls, metadata, documents, sponsorSegments, sponsorSkipEnabled, skipSegments
+        case resumePositions, filesPurged, playlists, channel, hasTranscript, transcriptLines
+    }
+
+    /// `shown_state` came with this app: a back that predates it still has to open its fiches, so
+    /// the app falls back on the stored choice and shows the automatic state as normal.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        url = try c.decode(String.self, forKey: .url)
+        isNew = try c.decode(Bool.self, forKey: .isNew)
+        rating = try c.decode(Int.self, forKey: .rating)
+        categories = try c.decodeIfPresent([String].self, forKey: .categories) ?? []
+        listState = try c.decodeIfPresent(String.self, forKey: .listState)
+        shownState = try c.decodeIfPresent(String.self, forKey: .shownState)
+            ?? (listState == "watched" || listState == "hidden" ? listState! : "normal")
+        comment = try c.decodeIfPresent(String.self, forKey: .comment)
+        durationSeconds = try c.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        mediaUrls = try c.decode(MediaURLs.self, forKey: .mediaUrls)
+        metadata = try c.decode(VideoMetadata.self, forKey: .metadata)
+        documents = try c.decode(VideoDocuments.self, forKey: .documents)
+        sponsorSegments = try c.decodeIfPresent([SponsorSegment].self, forKey: .sponsorSegments) ?? []
+        sponsorSkipEnabled = try c.decodeIfPresent(Bool.self, forKey: .sponsorSkipEnabled) ?? false
+        skipSegments = try c.decodeIfPresent([SkipSegment].self, forKey: .skipSegments) ?? []
+        resumePositions = try c.decodeIfPresent([String: PlaybackPosition].self, forKey: .resumePositions) ?? [:]
+        filesPurged = try c.decodeIfPresent(Bool.self, forKey: .filesPurged) ?? false
+        playlists = try c.decodeIfPresent([VideoPlaylistRef].self, forKey: .playlists) ?? []
+        channel = try c.decodeIfPresent(ChannelRef.self, forKey: .channel)
+        hasTranscript = try c.decodeIfPresent(Bool.self, forKey: .hasTranscript) ?? false
+        transcriptLines = try c.decodeIfPresent([TranscriptLine].self, forKey: .transcriptLines) ?? []
+    }
 }
 
 /// The `PUT`/`POST` replies that carry a fiche's state back; only used to know the call succeeded.
