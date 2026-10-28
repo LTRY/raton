@@ -30,6 +30,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>PlusJakartaSans.ttf</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

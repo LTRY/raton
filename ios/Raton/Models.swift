@@ -30,6 +30,7 @@ struct VideoCard: Codable, Identifiable, Hashable {
     let channelName: String?
     let durationSeconds: Int?
     let isNew: Bool
+    let rating: Int
     let hasVideo: Bool
     let hasAudio: Bool
     let hasThumbnail: Bool

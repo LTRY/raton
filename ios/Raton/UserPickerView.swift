@@ -3,38 +3,48 @@ import SwiftUI
 /// Picks the user the app acts for (`GET /api/users`); also reachable from Réglages.
 struct UserPickerView: View {
     @EnvironmentObject private var state: AppState
-    var onPicked: () -> Void = {}
+    let title: String
+    var back = false
 
     @State private var users: [RatonUser] = []
     @State private var loading = true
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
-            if let errorMessage {
-                Section {
-                    Text(errorMessage).foregroundStyle(.red)
-                    Button("Réessayer") { Task { await load() } }
-                    Button("Changer de serveur", role: .destructive) { state.forgetServer() }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                PageHeader(title: title, back: back)
+                if let errorMessage {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(errorMessage).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                        Button("Réessayer") { Task { await load() } }
+                            .buttonStyle(PillButtonStyle())
+                        Button("Changer de serveur") { state.forgetServer() }
+                            .font(.raton(15, .medium)).foregroundStyle(Theme.textMuted)
+                    }
+                    .padding(16)
                 }
-            }
-            ForEach(users) { user in
-                Button {
-                    state.setUser(user.id)
-                    onPicked()
-                } label: {
-                    HStack {
-                        Text(user.name)
-                        Spacer()
-                        if user.id == state.userID {
-                            Image(systemName: "checkmark").foregroundStyle(.tint)
+                ForEach(users) { user in
+                    Button {
+                        state.setUser(user.id)
+                    } label: {
+                        HStack {
+                            Text(user.name).font(.raton(17, .semibold)).foregroundStyle(Theme.text)
+                            Spacer()
+                            if user.id == state.userID {
+                                Image(systemName: "checkmark").foregroundStyle(Theme.primary)
+                            }
                         }
+                        .padding(.horizontal, 16).padding(.vertical, 18)
+                        .background(Color.white)
+                        .overlay(alignment: .bottom) { Theme.border.frame(height: 1) }
                     }
                 }
-                .foregroundStyle(.primary)
+                if loading && users.isEmpty { ProgressView().frame(maxWidth: .infinity).padding(.top, 40) }
             }
         }
-        .overlay { if loading && users.isEmpty { ProgressView() } }
+        .ratonPage()
+        .toolbar(.hidden, for: .navigationBar)
         .task { await load() }
     }
 

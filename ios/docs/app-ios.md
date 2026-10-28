@@ -12,9 +12,10 @@ qui a besoin d'une valeur que l'API ne donne pas obtient un nouveau champ ou
 endpoint calcule par un service de `back/services/`, jamais une copie de la
 regle en Swift.
 
-**Etat : jalon 1, jamais compile.** Le code a ete ecrit sans Xcode ni Swift :
-il n'a ete ni compile ni lance. Le premier build peut demander de petites
-corrections.
+**Etat : jalon 1.** Le projet se genere et se compile avec Xcode, et tourne
+dans le simulateur iPhone (iOS 18) sur les donnees de demo (`make demo`). La
+lecture d'un vrai fichier video ou audio, l'ecran verrouille et le reseau local
+d'un iPhone reel n'ont pas ete essayes.
 
 ## Construire et lancer
 
@@ -44,6 +45,19 @@ L'utilisateur est nomme par l'en-tete `X-Raton-User` (son id), que
 `Info.plist` porte `NSAllowsLocalNetworking` et `NSAllowsArbitraryLoads`
 (l'URL est saisie par l'utilisateur, ce peut etre un nom de domaine du LAN),
 `NSLocalNetworkUsageDescription` en francais, et `UIBackgroundModes` = `audio`.
+
+## Apparence
+
+L'app reprend le style des pages du front, a partir de ses jetons
+(`front/static/css/tailwind.input.css`, `@theme` et `:root`), copies dans
+`ios/Raton/Theme.swift` : fond creme `#fbf6ee`, surfaces blanches, texte brun
+`#2b2018`, terracotta `#c2410c` pour l'accent, police Plus Jakarta Sans
+(`ios/Raton/Resources/PlusJakartaSans.ttf`, la police variable du front
+convertie de woff2 en ttf, licence OFL), la mascotte `raccoon-empty.png`, la
+barre d'onglets en pilule flottante, des boutons ronds blancs pour le retour,
+des lignes de liste a vignette a gauche (duree, barre de progression),
+etoiles ambre. Clair seulement (`UIUserInterfaceStyle` = `Light`). Un changement
+de jeton cote front se reporte a la main dans `Theme.swift`.
 
 ## Ecrans (jalon 1)
 
@@ -88,5 +102,5 @@ visionnage). Le Vu a 90 % est decide par le back.
 
 ## Pas dans le jalon 1
 
-Exploration, chaines et cloche, playlists, Historique, discussions (chat),
+Accueil, Exploration, chaines et cloche, playlists, Historique, discussions (chat),
 notes, imports, mode hors ligne, publication sur l'App Store.

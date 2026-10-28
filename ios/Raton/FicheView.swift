@@ -2,13 +2,16 @@ import AVKit
 import SwiftUI
 
 /// A fiche: `GET /api/videos/{id}`, then `POST .../open` (what clears the Nouveau label), with the
-/// Vu / Indésirée buttons, the stars and the player.
+/// player, the Vu / Indésirée buttons and the stars. Laid out like the web's fiche page.
 struct FicheView: View {
     let videoID: Int
 
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var player: PlayerController
+    @Environment(\.dismiss) private var dismiss
     @State private var detail: VideoDetail?
+    @State private var mode: MediaKind = .video
+    @State private var showInfo = false
     @State private var errorMessage: String?
     @State private var busy = false
 
@@ -16,31 +19,23 @@ struct FicheView: View {
 
     var body: some View {
         ScrollView {
-            if let detail, let api = state.api {
-                VStack(alignment: .leading, spacing: 16) {
-                    media(detail, api: api)
-                    Text(detail.title).font(.title3).bold()
-                    if let channel = detail.channel {
-                        Text(channel.name).foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                topBar
+                if let detail, let api = state.api {
+                    playerArea(detail, api: api)
+                    if isLoaded, player.track?.kind == .audio, mode == .audio {
+                        AudioControls().padding(.horizontal, 16).padding(.top, 12)
                     }
-                    playButtons(detail, api: api)
-                    actions(detail, api: api)
-                    if let message = errorMessage {
-                        Text(message).foregroundStyle(.red)
-                    }
-                    if let description = detail.metadata.description, !description.isEmpty {
-                        Text(description).font(.callout)
-                    }
+                    infoBlock(detail, api: api)
+                } else if let message = errorMessage {
+                    Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger).padding()
+                } else {
+                    ProgressView().padding(.top, 80)
                 }
-                .padding()
-            } else if let message = errorMessage {
-                Text(message).foregroundStyle(.red).padding()
-            } else {
-                ProgressView().padding(.top, 80).frame(maxWidth: .infinity)
             }
         }
-        .navigationTitle("Fiche")
-        .navigationBarTitleDisplayMode(.inline)
+        .ratonPage()
+        .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
         // The video is tied to this screen; audio goes on.
         .onDisappear {
@@ -50,87 +45,139 @@ struct FicheView: View {
 
     // MARK: Parts
 
-    @ViewBuilder
-    private func media(_ detail: VideoDetail, api: RatonAPI) -> some View {
-        if isLoaded, player.track?.kind == .video, let avPlayer = player.player {
-            VideoPlayer(player: avPlayer)
-                .aspectRatio(16 / 9, contentMode: .fit)
-        } else {
-            Thumbnail(videoID: detail.id, hasThumbnail: detail.mediaUrls.thumbnail != nil, api: api)
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+    private var topBar: some View {
+        ZStack {
+            HStack {
+                Button { dismiss() } label: { Image(systemName: "arrow.left") }
+                    .buttonStyle(CircleButtonStyle())
+                    .accessibilityLabel("Retour")
+                Spacer()
+            }
+            if let detail { modePill(detail) }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    /// Video / audio switch; each side is available only when the fiche has that file (they can coexist).
+    private func modePill(_ detail: VideoDetail) -> some View {
+        HStack(spacing: 4) {
+            ForEach([MediaKind.video, MediaKind.audio], id: \.self) { kind in
+                let available = (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil
+                Button {
+                    select(kind)
+                } label: {
+                    Image(systemName: kind == .video ? "video" : "waveform")
+                        .font(.system(size: 18))
+                        .foregroundStyle(mode == kind ? Theme.primary : Theme.textMuted)
+                        .frame(width: 58, height: 38)
+                        .background(Capsule().fill(mode == kind ? Color.white : Color.clear))
+                }
+                .disabled(!available)
+                .opacity(available ? 1 : 0.35)
+                .accessibilityLabel(kind == .video ? "Vidéo" : "Audio")
+            }
+        }
+        .padding(4)
+        .background(Capsule().fill(Theme.surfaceMuted))
+        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+    }
+
+    private func select(_ kind: MediaKind) {
+        mode = kind
+        if isLoaded, player.track?.kind != kind { player.stop() }
     }
 
     @ViewBuilder
-    private func playButtons(_ detail: VideoDetail, api: RatonAPI) -> some View {
-        // The two files can coexist: offer each one the fiche has.
-        if detail.mediaUrls.video == nil && detail.mediaUrls.audio == nil {
-            Text(detail.filesPurged
-                ? "Les fichiers ont été supprimés (purge après le Vu)."
-                : "Cette fiche n'a pas de fichier vidéo ou audio.")
-                .foregroundStyle(.secondary)
-        } else {
-            HStack {
-                if detail.mediaUrls.video != nil {
-                    Button {
-                        player.play(detail: detail, kind: .video, api: api)
-                    } label: {
-                        Label("Lire la vidéo", systemImage: "play.rectangle.fill")
+    private func playerArea(_ detail: VideoDetail, api: RatonAPI) -> some View {
+        let hasFile = (mode == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil
+        ZStack {
+            Theme.player
+            if isLoaded, player.track?.kind == .video, mode == .video, let avPlayer = player.player {
+                VideoPlayer(player: avPlayer)
+            } else if hasFile {
+                let playing = isLoaded && player.track?.kind == mode && player.isPlaying
+                Button {
+                    if isLoaded, player.track?.kind == mode {
+                        player.togglePlayPause()
+                    } else {
+                        player.play(detail: detail, kind: mode, api: api)
                     }
-                    .buttonStyle(.borderedProminent)
+                } label: {
+                    Image(systemName: playing ? "pause.fill" : "play.fill")
+                        .font(.system(size: 34)).foregroundStyle(.white)
+                        .frame(width: 72, height: 72)
+                        .background(Circle().fill(Theme.primary))
                 }
-                if detail.mediaUrls.audio != nil {
-                    Button {
-                        player.play(detail: detail, kind: .audio, api: api)
-                    } label: {
-                        Label("Écouter l'audio", systemImage: "headphones")
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
-            if isLoaded, player.track?.kind == .audio {
-                AudioControls()
+                .accessibilityLabel(playing ? "Pause" : "Lecture")
+            } else {
+                Text(detail.filesPurged
+                    ? "Les fichiers ont été supprimés (purge après le Vu)."
+                    : "Cette fiche n'a pas de fichier vidéo ou audio.")
+                    .font(.raton(15)).foregroundStyle(Color(hex: 0xC2AF98))
+                    .multilineTextAlignment(.center).padding(24)
             }
         }
+        .aspectRatio(16 / 9, contentMode: .fit)
     }
 
-    private func actions(_ detail: VideoDetail, api: RatonAPI) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                // Same toggles as the front: Vu <-> unwatched, Indésirée <-> back to automatic.
+    private func infoBlock(_ detail: VideoDetail, api: RatonAPI) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(detail.title).font(.raton(28, .bold)).foregroundStyle(Theme.text)
+            if let channel = detail.channel {
+                Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
+            }
+            HStack(spacing: 6) {
+                Spacer()
+                ForEach(1...5, id: \.self) { star in
+                    Button {
+                        send(api, "/api/videos/\(detail.id)/rating",
+                             ["rating": detail.rating == star ? 0 : star])
+                    } label: {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(star <= detail.rating ? Theme.amber : Color(hex: 0xF6E4DD))
+                    }
+                    .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
+                }
+            }
+            .disabled(busy)
+            Theme.border.frame(height: 1)
+            // Same toggles as the front: Vu <-> unwatched, Indésirée <-> back to automatic.
+            HStack(spacing: 8) {
                 Button {
                     send(api, "/api/videos/\(detail.id)/list-state",
                          ["state": detail.shownState == "watched" ? "unwatched" : "watched"])
                 } label: {
                     Label("Vu", systemImage: detail.shownState == "watched" ? "checkmark.circle.fill" : "checkmark.circle")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SandButtonStyle(active: detail.shownState == "watched"))
                 Button {
                     send(api, "/api/videos/\(detail.id)/list-state",
                          ["state": detail.shownState == "hidden" ? "clear" : "hidden"])
                 } label: {
                     Label("Indésirée", systemImage: detail.shownState == "hidden" ? "eye.slash.fill" : "eye.slash")
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SandButtonStyle(active: detail.shownState == "hidden"))
             }
             .disabled(busy)
-            HStack(spacing: 4) {
-                ForEach(1...5, id: \.self) { star in
-                    Button {
-                        send(api, "/api/videos/\(detail.id)/rating",
-                             ["rating": detail.rating == star ? 0 : star])
-                    } label: {
-                        Image(systemName: star <= detail.rating ? "star.fill" : "star")
-                            .foregroundStyle(.yellow)
-                            .font(.title3)
+            Button("Plus d'informations") { showInfo.toggle() }
+                .buttonStyle(SandButtonStyle(active: showInfo))
+            if showInfo {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let uploader = detail.metadata.uploader {
+                        Text(uploader).font(.raton(15, .semibold)).foregroundStyle(Theme.textSoft)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
+                    Text(detail.metadata.description ?? "Pas de description.")
+                        .font(.raton(15)).foregroundStyle(Theme.textSoft)
                 }
             }
-            .disabled(busy)
+            if let message = errorMessage {
+                Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+            }
         }
+        .padding(16)
+        .padding(.top, 8)
     }
 
     // MARK: Calls
@@ -138,7 +185,9 @@ struct FicheView: View {
     private func open() async {
         guard let api = state.api else { return }
         do {
-            detail = try await api.get("/api/videos/\(videoID)")
+            let loaded: VideoDetail = try await api.get("/api/videos/\(videoID)")
+            detail = loaded
+            mode = loaded.mediaUrls.video != nil ? .video : .audio
             // Opening the fiche is what takes it out of the Nouveautés.
             let _: VideoState? = try? await api.post("/api/videos/\(videoID)/open")
         } catch {
@@ -162,14 +211,14 @@ struct FicheView: View {
     }
 }
 
-/// Play/pause, ±15 s and a position slider for the audio of the loaded fiche.
+/// Seek bar, times and ±15 s for the audio of the loaded fiche.
 struct AudioControls: View {
     @EnvironmentObject private var player: PlayerController
     @State private var dragging = false
     @State private var dragPosition = 0.0
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             Slider(
                 value: Binding(
                     get: { dragging ? dragPosition : player.position },
@@ -181,21 +230,19 @@ struct AudioControls: View {
                     if !editing { player.seek(to: dragPosition) }
                 }
             )
+            .tint(Theme.primary)
             HStack {
-                Text(Format.clock(player.position)).font(.caption).monospacedDigit()
+                Text(Format.clock(player.position))
                 Spacer()
-                Text(Format.clock(player.duration)).font(.caption).monospacedDigit()
+                Text(Format.clock(player.duration))
             }
-            .foregroundStyle(.secondary)
-            HStack(spacing: 32) {
+            .font(.raton(14, .semibold)).monospacedDigit()
+            .foregroundStyle(Theme.textMuted)
+            HStack(spacing: 40) {
                 Button { player.skip(by: -15) } label: { Image(systemName: "gobackward.15") }
-                Button { player.togglePlayPause() } label: {
-                    Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                        .font(.system(size: 44))
-                }
                 Button { player.skip(by: 15) } label: { Image(systemName: "goforward.15") }
             }
-            .font(.title2)
+            .font(.system(size: 24)).foregroundStyle(Theme.textSoft)
         }
     }
 }
@@ -206,18 +253,19 @@ struct NowPlayingBar: View {
 
     var body: some View {
         if player.track?.kind == .audio {
-            HStack {
-                Text(player.title).lineLimit(1).font(.subheadline)
+            HStack(spacing: 16) {
+                Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
+                    .foregroundStyle(Color(hex: 0xF3E8D9))
                 Spacer()
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                 }
                 Button { player.stop() } label: { Image(systemName: "xmark") }
-                    .padding(.leading, 8)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 10)
-            .background(.regularMaterial)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18).padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.player))
+            .padding(.horizontal, 12)
         }
     }
 }
