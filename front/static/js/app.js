@@ -913,6 +913,9 @@ function bindCategoryLabelEditor(editor) {
   const addButton = editor.querySelector("[data-category-add]");
   const count = editor.querySelector("[data-category-count]");
   if (!source || !list || !input || !addButton) return;
+  // Rendered disabled so that without JavaScript the plain labels field is the one submitted.
+  source.disabled = false;
+  editor.dataset.ready = "";
 
   function readInitialLabels() {
     try {
@@ -1023,6 +1026,7 @@ function bindLibraryViewEditor(editor) {
   const addButton = editor.querySelector("[data-library-view-add]");
   const count = editor.querySelector("[data-library-view-count]");
   if (!source || !list || !addButton) return;
+  editor.dataset.ready = "";
 
   function readJsonAttribute(name, fallback) {
     try {
@@ -1067,8 +1071,17 @@ function bindLibraryViewEditor(editor) {
     }
   }
 
-  function buildModeSelect(value, onChange) {
+  function buildCaption(text) {
+    const caption = document.createElement("span");
+    caption.className = "settings-library-filter-label";
+    caption.textContent = text;
+    return caption;
+  }
+
+  function buildModeSelect(value, onChange, label) {
     const select = document.createElement("select");
+    select.setAttribute("aria-label", label);
+    select.title = label;
     [
       ["or", "||"],
       ["and", "&&"],
@@ -1166,9 +1179,9 @@ function bindLibraryViewEditor(editor) {
 
       const technical = document.createElement("div");
       technical.className = "settings-library-filter-row";
-      technical.append(buildModeSelect(view.asset_filter_mode, (mode) => {
+      technical.append(buildCaption("Types"), buildModeSelect(view.asset_filter_mode, (mode) => {
         views[index].asset_filter_mode = normalizeMode(mode);
-      }));
+      }, "Types : « || » une des cases suffit, « && » toutes sont requises"));
       const selectedAssets = checkedSet(view.assets);
       const technicalOptions = document.createElement("span");
       technicalOptions.className = "asset-filter-options";
@@ -1201,7 +1214,7 @@ function bindLibraryViewEditor(editor) {
       const technicalExcludeMarker = document.createElement("span");
       technicalExcludeMarker.className = "filter-exclude-marker";
       technicalExcludeMarker.textContent = "!!";
-      excludedTechnical.append(technicalExcludeMarker);
+      excludedTechnical.append(technicalExcludeMarker, buildCaption("Sauf types"));
       const excludedAssets = checkedSet(view.excluded_assets);
       const excludedTechnicalOptions = document.createElement("span");
       excludedTechnicalOptions.className = "asset-filter-options";
@@ -1222,9 +1235,9 @@ function bindLibraryViewEditor(editor) {
 
       const categories = document.createElement("div");
       categories.className = "settings-library-filter-row";
-      categories.append(buildModeSelect(view.category_filter_mode, (mode) => {
+      categories.append(buildCaption("Catégories"), buildModeSelect(view.category_filter_mode, (mode) => {
         views[index].category_filter_mode = normalizeMode(mode);
-      }));
+      }, "Catégories : « || » une des cases suffit, « && » toutes sont requises"));
       const selectedCategories = checkedSet(view.categories);
       const categoryList = document.createElement("span");
       categoryList.className = "category-filter-options";
@@ -1250,7 +1263,7 @@ function bindLibraryViewEditor(editor) {
       const categoryExcludeMarker = document.createElement("span");
       categoryExcludeMarker.className = "filter-exclude-marker";
       categoryExcludeMarker.textContent = "!!";
-      excludedCategories.append(categoryExcludeMarker);
+      excludedCategories.append(categoryExcludeMarker, buildCaption("Sauf catégories"));
       const selectedExcludedCategories = checkedSet(view.excluded_categories);
       const excludedCategoryList = document.createElement("span");
       excludedCategoryList.className = "category-filter-options";
@@ -1365,6 +1378,7 @@ document.querySelectorAll("[data-unsaved-guard]").forEach((form) => {
   const initial = serialize();
   const refresh = () => {
     const dirty = serialize() !== initial;
+    delete form.dataset.submitting; // A refused submission leaves the form editable and guarded again.
     bar.toggleAttribute("data-dirty", dirty);
     note.textContent = dirty ? "Modifications non enregistrées" : idleText;
   };
@@ -1379,6 +1393,14 @@ document.querySelectorAll("[data-unsaved-guard]").forEach((form) => {
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", window.ratonUnsavedGuard);
+    // In-app navigation (Turbo) does not unload the page: ask here too.
+    document.addEventListener("turbo:before-visit", (event) => {
+      const bar = document.querySelector("[data-settings-actions][data-dirty]");
+      if (!bar || bar.closest("form").dataset.submitting) return;
+      if (!window.confirm("Des modifications ne sont pas enregistrées. Quitter la page quand même ?")) {
+        event.preventDefault();
+      }
+    });
   }
 });
 

@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from front.api import Api, get_api
 from front.forms import form_list_values, form_text_value, split_labels
 from front.logs import LOG_FILTER_LABELS, log_days, normalize_log_filter
-from front.pages import page_href_builder, redirect
+from front.pages import append_query, page_href_builder, redirect
 from front.records import record
 from front.templating import templates
 
@@ -83,13 +83,18 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
 
 
 def json_list(text: str) -> list:
-    """A list typed in a settings editor's JSON field; anything else counts as empty, which the
-    API replaces with the defaults."""
+    """A list typed in a settings editor's JSON field. An empty field counts as an empty list,
+    which the API replaces with the defaults; text that is not a JSON list raises ValueError, so
+    a typo in the no-JavaScript JSON field cannot wipe the saved value."""
+    if not text.strip():
+        return []
     try:
         value = json.loads(text)
-    except json.JSONDecodeError:
-        return []
-    return value if isinstance(value, list) else []
+    except json.JSONDecodeError as exc:
+        raise ValueError("JSON invalide") from exc
+    if not isinstance(value, list):
+        raise ValueError("une liste est attendue")
+    return value
 
 
 @router.post("/settings")
@@ -108,10 +113,17 @@ def settings_form(
     auto_notes_excluded_categories: list[str] = Form(default=[]),
     api: Api = Depends(get_api),
 ):
-    """The no-JS form of /settings: the colour editor writes its JSON in `video_category_styles`;
-    without it the plain list of `video_category_labels` is used."""
+    """The form of /settings: the colour editor writes its JSON in `video_category_styles`; without
+    JavaScript that field is not sent and the plain list of `video_category_labels` is used, keeping
+    the colour of the labels already known."""
+    try:
+        library_views = json_list(form_text_value(video_library_views))
+        category_styles = json_list(form_text_value(video_category_styles))
+    except ValueError as exc:
+        message = f"Rien n’a été enregistré : un champ JSON est invalide ({exc})."
+        return redirect(append_query("/settings", {"level": "error", "message": message}))
     update = {
-        "video_library_views": json_list(form_text_value(video_library_views)),
+        "video_library_views": library_views,
         "no_progress_category_labels": form_list_values(no_progress_categories),
         # Unchecked checkbox: the browser sends nothing, so an empty value means "off".
         "auto_notes_enabled": bool(form_text_value(auto_notes_enabled)),
@@ -125,11 +137,20 @@ def settings_form(
             "music": screen_time_music_today,
         },
     }
-    styles = form_text_value(video_category_styles)
-    if styles:
-        update["video_category_label_styles"] = json_list(styles)
+    if category_styles:
+        update["video_category_label_styles"] = category_styles
     else:
-        update["video_category_labels"] = split_labels(form_text_value(video_category_labels))
+        known = api.get("/settings")["video_category_label_styles"]
+        colors = {item["label"]: item["color"] for item in known}
+        # An unknown label has no colour yet: the API gives it the next one of its palette.
+        labels = [
+            " ".join(label.lower().split())
+            for label in split_labels(form_text_value(video_category_labels))
+        ]
+        update["video_category_label_styles"] = [
+            {"label": label, **({"color": colors[label]} if label in colors else {})}
+            for label in labels
+        ]
     api.put("/settings", update)
     return redirect("/settings")
 

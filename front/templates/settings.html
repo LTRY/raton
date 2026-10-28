@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
+{# A one-line hint; what follows `call` sits behind a round "i" (a plain <details>, so it works without JavaScript). #}
+{% macro hint(short) %}
+<div class="settings-hint-row">
+  <p class="settings-hint">{{ short }}</p>
+  {% if caller %}
+  <details class="settings-help">
+    <summary aria-label="Plus d’explications" title="Plus d’explications">i</summary>
+    <div class="settings-help-body">{{ caller() }}</div>
+  </details>
+  {% endif %}
+</div>
+{% endmacro %}
 {% block content %}
 <section class="settings-page">
   <div class="settings-head">
@@ -54,7 +66,9 @@
 
         <div class="settings-card" id="llm-usage">
           <h2 class="settings-card-title">Coûts LLM</h2>
+          {% call hint("Coût réel facturé par l’API, pas une estimation.") %}
           <p class="settings-hint">Coût réel, mesuré à partir des tokens réellement facturés par l'API (pas une estimation) — tokens d'entrée (cache compris) et de sortie (réflexion comprise), au tarif du modèle utilisé par chaque job, y compris les réponses tronquées facturées malgré l'échec. Ne couvre que les jobs terminés depuis l'activation de ce suivi.</p>
+          {% endcall %}
           {% if llm_usage.by_kind %}
           <p class="settings-total">Total : <strong>${{ "%.4f"|format(llm_usage.total_cost_usd) }}</strong> sur {{ llm_usage.total_job_count }} job{{ "s" if llm_usage.total_job_count != 1 else "" }}</p>
           <details class="settings-fold">
@@ -166,14 +180,22 @@
                 <button type="button" data-category-add>Ajouter</button>
               </div>
             </div>
-            <textarea class="category-label-source" name="video_category_styles" rows="6" data-category-source>{{ video_category_label_styles | tojson }}</textarea>
+            <noscript>
+              <label>
+                Labels, un par ligne (les couleurs des labels déjà connus sont conservées)
+                <textarea name="video_category_labels" rows="8">{{ video_category_labels }}</textarea>
+              </label>
+            </noscript>
+            <textarea class="category-label-source" name="video_category_styles" rows="6" data-category-source disabled>{{ video_category_label_styles | tojson }}</textarea>
           </div>
         </div>
 
         <div class="settings-card" id="no-progress">
           <details class="settings-fold settings-fold-card">
           <summary><h2 class="settings-card-title">Catégories sans barre de progression</h2><span class="settings-fold-meta">{{ no_progress_categories | length }} cochée{{ "s" if no_progress_categories | length > 1 else "" }}</span></summary>
+          {% call hint("Les fiches des catégories cochées n’affichent jamais de barre de progression.") %}
           <p class="settings-hint">Les fiches dont une catégorie cochée ci-dessous n’affichent jamais de barre de progression de lecture, même en cours de visionnage (utile pour les contenus faits pour être rejoués, comme les AMV ou la musique).</p>
+          {% endcall %}
           <div class="settings-checkbox-list">
             {% for option in no_progress_category_options %}
             <label class="settings-checkbox-option">
@@ -195,6 +217,9 @@
             </div>
             <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
             <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
+            <noscript>
+              <p class="settings-hint">Sans JavaScript, les sous-bibliothèques se modifient en JSON : une liste d’objets avec <code>name</code>, <code>assets</code>, <code>categories</code>, <code>excluded_assets</code>, <code>excluded_categories</code>, <code>asset_filter_mode</code> et <code>category_filter_mode</code> (<code>or</code> ou <code>and</code>), <code>rated</code>. Un JSON invalide n’enregistre rien.</p>
+            </noscript>
             <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
           </div>
         </div>
@@ -204,7 +229,9 @@
         <div class="settings-card" id="sponsor-segments">
           <details class="settings-fold settings-fold-card">
           <summary><h2 class="settings-card-title">Segments sponsorisés</h2><span class="settings-fold-meta">{{ sponsor_segment_categories | length }} / {{ sponsor_segment_category_options | length }} catégories{% if sponsor_skip_enabled %} · saut auto{% endif %}</span></summary>
+          {% call hint("Catégories recherchées via SponsorBlock : détectées, affichées et sautées.") %}
           <p class="settings-hint">Catégories recherchées via SponsorBlock sur chaque vidéo (bouton "Rechercher les segments sponsors", onglet Segments de la page d'une vidéo). Une catégorie cochée est détectée, affichée et sautée ; décochée, elle ne l'est pour rien.</p>
+          {% endcall %}
           <div class="settings-checkbox-list">
             {% for option in sponsor_segment_category_options %}
             <label class="settings-checkbox-option">
@@ -241,7 +268,9 @@
         <div class="settings-card" id="auto-notes">
           <details class="settings-fold settings-fold-card">
           <summary><h2 class="settings-card-title">Notes automatiques</h2><span class="settings-fold-meta">{% if auto_notes_enabled %}activées{% else %}désactivées{% endif %} · {{ auto_notes_excluded_categories | length }} catégorie{{ "s" if auto_notes_excluded_categories | length > 1 else "" }} exclue{{ "s" if auto_notes_excluded_categories | length > 1 else "" }}</span></summary>
+          {% call hint("Notes structurées et résumé court des vidéos qui ont un transcript, chaque nuit à 5 h.") %}
           <p class="settings-hint">Chaque nuit à 5 h, jusqu’à 100 vidéos qui ont un transcript mais pas de notes reçoivent leurs notes structurées et un résumé court, en un lot Anthropic à moitié prix traité dans la journée. Ces notes alimentent la recherche du chat bibliothèque. Le bouton robot d’une vidéo reste disponible pour les questions suggérées. Les shorts et les vidéos dont une catégorie est cochée ci-dessous sont ignorés ; les notes déjà écrites ne sont jamais régénérées ni retirées de l’index. Coût réel dans « Coûts LLM » ci-dessus.</p>
+          {% endcall %}
           <div class="settings-checkbox-list">
             <label class="settings-checkbox-option">
               <input type="checkbox" name="auto_notes_enabled"{% if auto_notes_enabled %} checked{% endif %}>

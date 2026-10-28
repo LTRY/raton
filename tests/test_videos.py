@@ -4405,16 +4405,60 @@ def post_settings(db, media_root, **fields):
 
 def test_settings_form_stores_the_plain_category_labels(tmp_path):
     db = make_session()
+    known = {item["label"]: item["color"] for item in get_video_category_label_styles(db)}
 
     response = post_settings(db, tmp_path, video_category_labels="Maker\nScience\nmaker\nHistoire")
 
     assert response.headers["location"] == "/settings"
-    # The plain list is stored as bare labels; their colours are assigned when read.
+    # Labels already known keep their colour; a new one gets the palette's next colour.
+    styles = get_video_category_label_styles(db)
+    assert [item["label"] for item in styles] == ["maker", "science", "histoire"]
+    assert styles[0]["color"] == known["maker"] and styles[1]["color"] == known["science"]
+
+
+def test_settings_form_plain_labels_keep_the_colors_of_known_labels(tmp_path):
+    db = make_session()
+    post_settings(
+        db,
+        tmp_path,
+        video_category_styles=json.dumps([{"label": "maker", "color": "#ff0066"}]),
+    )
+
+    post_settings(db, tmp_path, video_category_labels="Histoire\nMaker")
+
     assert get_video_category_label_styles(db) == [
-        {"label": "maker", "color": "#16a34a"},
-        {"label": "science", "color": "#2563eb"},
-        {"label": "histoire", "color": "#7c3aed"},
+        {"label": "histoire", "color": "#16a34a"},
+        {"label": "maker", "color": "#ff0066"},
     ]
+
+
+def test_settings_form_refuses_invalid_json_and_saves_nothing(tmp_path):
+    db = make_session()
+    before = get_video_category_label_styles(db)
+
+    response = post_settings(
+        db,
+        tmp_path,
+        video_library_views="[{",
+        video_category_styles="[]",
+        video_category_labels="x",
+    )
+
+    assert "level=error" in response.headers["location"]
+    assert get_video_category_label_styles(db) == before
+
+
+def test_settings_page_without_javascript_offers_plain_fields_and_help(tmp_path):
+    db = make_session()
+
+    rendered = site(db).get("/settings").text
+
+    # The JSON field is enabled by app.js; the plain labels field only exists inside <noscript>.
+    assert 'name="video_category_styles" rows="6" data-category-source disabled' in rendered
+    assert "<noscript>" in rendered and 'name="video_category_labels"' in rendered
+    # Long explanations sit behind the round "i".
+    assert 'class="settings-help"' in rendered
+    assert rendered.count('class="settings-hint-row"') >= 4
 
 
 def test_settings_form_saves_category_label_colors(tmp_path):

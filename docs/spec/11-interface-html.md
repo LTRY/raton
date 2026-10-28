@@ -1777,8 +1777,32 @@ a l'etat actif). De haut en bas :
   sous 800px). Des qu'un champ differe de son etat au chargement (editeurs de
   categories et de sous-bibliotheques compris), elle affiche « Modifications
   non enregistrees » (`data-dirty`, bordure et texte en couleur d'accent, y
-  compris sous 800px) et le navigateur demande confirmation avant de quitter
-  la page ; un seul formulaire, un seul bouton « Enregistrer ».
+  compris sous 800px) et une confirmation est demandee avant de quitter la
+  page, qu'on la recharge, la ferme (`beforeunload`) ou navigue dans l'app
+  (`turbo:before-visit`) ; l'enregistrement du formulaire lui-meme ne la
+  declenche pas. Un seul formulaire, un seul bouton « Enregistrer ».
+
+Les explications longues (couts LLM, barre de progression, notes
+automatiques, segments sponsorises) sont derriere un « i » rond (macro `hint`
+de `settings.html`, un `<details class="settings-help">` : il marche sans
+JavaScript) ; une phrase d'une ligne reste visible a cote.
+
+Editeurs de categories et de sous-bibliotheques (`app.js`, ils posent
+`data-ready` sur leur conteneur) :
+
+- sous 800px, la ligne d'une sous-bibliotheque passe son intitule (« Types »,
+  « Sauf types », « Categories », « Sauf categories ») et, le cas echeant, son
+  select `||` / `&&` (libelle accessible explicite) sur une ligne, et les
+  cases sur la suivante ; les boutons monter / descendre / supprimer font
+  44px ;
+- sans JavaScript (`data-ready` absent), le panneau de categories est
+  remplace par un champ « un label par ligne » (`video_category_labels`, dans
+  un `<noscript>` ; le champ JSON `video_category_styles` est rendu `disabled`
+  et active par `app.js`) : `POST /settings` garde alors la couleur des
+  labels deja connus et donne la couleur suivante de la palette aux autres ;
+  les sous-bibliotheques s'editent dans leur champ JSON, rendu visible avec un
+  rappel du format. Un JSON invalide n'enregistre rien et revient sur
+  `/settings` avec un message d'erreur (jamais de remise a zero silencieuse).
 
 Les champs, noms de formulaire et attributs `data-*` des editeurs sont
 inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root et
