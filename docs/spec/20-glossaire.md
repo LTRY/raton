@@ -382,7 +382,7 @@ reelle (ou une copie quand la PR a une migration a jouer), sur le port `9000 + N
 previews (`make previews`), qui deploie aussi `main` sur la vraie instance
 (`scripts/deploy.sh`).
 
-- **Code** : `scripts/preview.sh`, `scripts/previews.py`, `docker-compose.preview.yml`, projet compose `raton-pr-<N>`
+- **Code** : `scripts/preview.sh`, `ops/server.py`, `docker-compose.preview.yml`, projet compose `raton-pr-<N>`
 - **A ne pas confondre avec** : `make demo` (le code local, pas celui d'une PR) ; l'apercu d'une playlist avant import.
 
 Specs : [04 Configuration et deploiement](04-configuration-et-deploiement.md).

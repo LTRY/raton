@@ -1,13 +1,7 @@
-from scripts import ops_config, ops_jobs, ops_render, ops_review
-
-
-def test_repository_ops_toml_matches_the_scripts_it_names():
-    config = ops_config.load()
-
-    assert config.project_name == "Raton"
-    for script in (config.deploy_script, config.previews_script):
-        assert (ops_config.REPO / script).is_file()
-    assert (ops_config.REPO / ".claude" / "skills" / config.review_skill / "SKILL.md").is_file()
+from ops import config as ops_config
+from ops import jobs as ops_jobs
+from ops import render as ops_render
+from ops import review as ops_review
 
 
 def test_missing_keys_and_file_fall_back_to_the_defaults(tmp_path):

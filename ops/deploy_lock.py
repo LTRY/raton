@@ -1,12 +1,12 @@
 """The deploy lock: one deploy at a time, whoever starts it (the page's button or a hand-run deploy.sh).
 
 Standard library only. The lock is an `fcntl.flock` on `.local/previews/deploy.lock`, held for as
-long as the deploy runs. As a command, `python3 scripts/deploy_lock.py <command...>` takes the lock
+long as the deploy runs. As a command, `python3 ops/deploy_lock.py <command...>` takes the lock
 without waiting, then replaces itself with the command (the open file keeps the lock until the
 command and its children exit); exit code 75 and a French message when someone else holds it.
 The command runs with DEPLOY_LOCK_HELD=1: a nested caller (deploy.sh running `make up`) sees the
 lock is already held by its own tree and does not take it again.
-Spec: docs/spec/04-configuration-et-deploiement.md, section "Deploiement de main".
+Spec: ops/docs/outil-ops.md, section "Verrou de deploiement".
 """
 
 import fcntl

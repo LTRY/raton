@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 SPEC_DIR = Path(__file__).resolve().parent.parent / "docs" / "spec"
+# ops/docs/ is the ops tool's own spec (ops/CLAUDE.md): same frontmatter rule, not published on the site.
+OPS_SPEC_FILES = sorted((SPEC_DIR.parent.parent / "ops" / "docs").glob("*.md"))
 SPEC_FILES = sorted(SPEC_DIR.glob("*.md"))
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 
@@ -26,7 +28,7 @@ def test_spec_files_are_found():
     assert len(SPEC_FILES) >= 19
 
 
-@pytest.mark.parametrize("path", SPEC_FILES, ids=lambda p: p.name)
+@pytest.mark.parametrize("path", SPEC_FILES + OPS_SPEC_FILES, ids=lambda p: p.name)
 def test_title_matches_first_heading(path):
     # The site renders the title itself and drops the markdown '# ' line, so they must not drift apart.
     match = re.search(r'^title: (".+")$', frontmatter(path), re.MULTILINE)

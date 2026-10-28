@@ -1,4 +1,4 @@
-# Settings of the ops tool (scripts/previews.py, scripts/ops_review.py): everything that names
+# Settings of the ops tool (ops/server.py, ops/review.py): everything that names
 # this project. Another project reuses the tool by providing its own ops.toml.
 # Spec: docs/spec/04-configuration-et-deploiement.md, section "Configuration de l'outil ops".
 

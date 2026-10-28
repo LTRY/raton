@@ -1,9 +1,9 @@
 """The daily log review of the ops container: runs the project's review skill with Claude Code.
 
-Started by the previews page (scripts/previews.py --scheduler): a thread wakes once a day at
+Started by the previews page (ops/server.py --scheduler): a thread wakes once a day at
 the review hour, runs `claude --bare -p "/<skill> <hours>"` in the repository and stores the
 verdict and its cost in .local/ops/reviews/ (one JSON file per run), shown by the page.
-The skill, hour, model and budget come from ops.toml (scripts/ops_config.py).
+The skill, hour, model and budget come from ops.toml (ops/config.py).
 Standard library only, like the page. Spec: docs/spec/13-jobs-logs-planification.md, section
 "Revue quotidienne des journaux".
 """
@@ -17,7 +17,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from scripts.ops_config import CONFIG, REPO
+from ops.config import CONFIG, REPO
 
 REVIEW_DIR = REPO / ".local" / "ops" / "reviews"
 

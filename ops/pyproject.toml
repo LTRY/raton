@@ -1,0 +1,12 @@
+# The ops tool is standard library only: no dependency, no build. This file scopes its lint rules
+# (those of the repository root) and marks the folder as a unit of its own, with its CLAUDE.md,
+# its tests (ops/tests, run by the root `make test`) and its spec (ops/docs).
+[project]
+name = "ops"
+version = "0.1.0"
+description = "Previews page, deploy of the main branch and daily log review for a Docker Compose project"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[tool.ruff]
+extend = "../pyproject.toml"

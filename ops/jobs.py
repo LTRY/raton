@@ -1,9 +1,9 @@
 """The jobs behind the previews page: reading the PRs and previews, running the scripts.
 
 Everything here is standard library only and reads its project names from ops.toml
-(scripts/ops_config.py). The page (scripts/ops_render.py) and the server (scripts/previews.py)
+(ops/config.py). The page (ops/render.py) and the server (ops/server.py)
 read the state kept here (`jobs`, `prod_job`); the action threads write it under `jobs_lock`.
-Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+Spec: ops/docs/outil-ops.md, section "Previews des PR".
 """
 
 import json
@@ -18,8 +18,8 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from scripts import deploy_lock
-from scripts.ops_config import CONFIG, REPO
+from ops import deploy_lock
+from ops.config import CONFIG, REPO
 
 PREVIEW_SH = REPO / CONFIG.previews_script
 DEPLOY_SH = REPO / CONFIG.deploy_script

@@ -2,8 +2,8 @@ import json
 import subprocess
 from datetime import datetime
 
-from scripts import ops_review
-from scripts.ops_review import Review
+from ops import review as ops_review
+from ops.review import Review
 
 
 def make_review(started: str, trigger: str = "scheduled", cost: float | None = 0.12) -> Review:

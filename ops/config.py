@@ -2,14 +2,17 @@
 
 Standard library only, like the page and the review that use it. A missing key falls back to the
 default below, so a project only writes what differs. Spec:
-docs/spec/04-configuration-et-deploiement.md, section "Configuration de l'outil ops".
+ops/docs/outil-ops.md, section "Configuration de l'outil ops".
 """
 
+import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+# The project the tool serves: OPS_REPO when set (the ops container mounts it elsewhere than the
+# tool's own checkout), else the repository this package sits in.
+REPO = Path(os.environ.get("OPS_REPO") or Path(__file__).resolve().parent.parent)
 CONFIG_PATH = REPO / "ops.toml"
 
 

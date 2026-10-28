@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = ROOT / "back"
 FRONT = ROOT / "front"
 MCP = ROOT / "mcp_server"
+OPS = ROOT / "ops"
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "api_route"}
 
 
@@ -211,3 +212,23 @@ def test_services_spec_lists_every_service_module():
         f"docs/spec/10-services.md: missing {sorted(actual - documented)}, "
         f"stale {sorted(documented - actual)}"
     )
+
+
+def test_ops_tool_is_independent_of_the_project():
+    # ops/ serves any project through its ops.toml (ops/CLAUDE.md): it imports none of Raton's code
+    # and carries no project name; the tests and the spec may name it, as examples of a project.
+    for prefix in ("back", "front", "mcp_server", "scripts"):
+        assert not imports_of(OPS, prefix), imports_of(OPS, prefix)
+    named = [
+        str(path.relative_to(ROOT))
+        for path in OPS.glob("*.py")
+        if re.search(r"raton", path.read_text(encoding="utf-8"), re.IGNORECASE)
+    ]
+    assert not named, f"ops/ must not name the project it serves: {named}"
+
+
+def test_project_code_does_not_import_the_ops_tool():
+    # The project only gives the tool a contract of scripts (ops/docs/outil-ops.md); the one thing it
+    # shares is the deploy lock, which it runs as a command (`make up`), not as an import.
+    for root in (APP, FRONT, MCP):
+        assert not imports_of(root, "ops"), imports_of(root, "ops")

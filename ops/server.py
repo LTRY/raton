@@ -1,21 +1,21 @@
 """The previews page: lists the open PRs and deploys or removes their preview with one click.
 
 It also deploys main to the real stack (button at the top of the page). Every project-specific
-name (scripts, container, image label...) comes from ops.toml (scripts/ops_config.py).
+name (scripts, container, image label...) comes from ops.toml (ops/config.py).
 
-Usage: python3 -m scripts.previews [--host 127.0.0.1] [--port 8999] [--scheduler]
-`make previews` starts it as the `raton-ops` container (docker-compose.yml), with --scheduler:
-the daily log review (scripts/ops_review.py).
+Usage: python3 -m ops.server [--host 127.0.0.1] [--port 8999] [--scheduler]
+The project starts it as a container (the `ops` image stage), with --scheduler:
+the daily log review (ops/review.py).
 
-A small standard-library server, outside Raton (no import of back/ or front/): it reads the
-open PRs with `gh` and runs the project's preview and deploy scripts (scripts/ops_jobs.py), and
-renders the page with scripts/ops_render.py. Each action runs in the background; its output goes
+A small standard-library server that knows nothing of the project it serves: it reads the
+open PRs with `gh` and runs the project's preview and deploy scripts (ops/jobs.py), and
+renders the page with ops/render.py. Each action runs in the background; its output goes
 to .local/previews/logs/ (pr-<N>.log, prod.log), shown by the page; their state is kept in
 .local/previews/jobs/ so a restart of the page does not forget them.
-Unauthenticated by default, like Raton itself (trusted LAN); with OPS_TOKEN set, every request must
+Unauthenticated by default, like the projects it serves (trusted LAN); with OPS_TOKEN set, every request must
 carry it as the password of HTTP Basic auth. It only ever builds an open PR of this repository
 (preview.sh refuses forks), and refuses a form posted from another site.
-Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+Spec: ops/docs/outil-ops.md.
 """
 
 import argparse
@@ -27,7 +27,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-from scripts import ops_jobs, ops_render, ops_review
+from ops import jobs as ops_jobs
+from ops import render as ops_render
+from ops import review as ops_review
 
 # Whether this process runs the daily log review (--scheduler); set by main().
 SCHEDULER_ON = False
@@ -158,7 +160,7 @@ def main() -> None:
     parser.add_argument(
         "--scheduler",
         action="store_true",
-        help="run the daily log review (scripts/ops_review.py) and show it on the page",
+        help="run the daily log review (ops/review.py) and show it on the page",
     )
     args = parser.parse_args()
     ops_jobs.load_jobs()

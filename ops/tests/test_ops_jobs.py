@@ -11,10 +11,10 @@ import sys
 import time
 
 import pytest
-
-from scripts import deploy_lock, ops_jobs
-from scripts.ops_jobs import Job, Preview, parse_preview_line, parse_previews
-from scripts.ops_render import preview_status, prod_status, render_page
+from ops import deploy_lock
+from ops import jobs as ops_jobs
+from ops.jobs import Job, Preview, parse_preview_line, parse_previews
+from ops.render import preview_status, prod_status, render_page
 
 REPO = ops_jobs.REPO
 SHA = "a" * 40
@@ -298,7 +298,7 @@ def test_the_lock_is_exclusive_and_released_with_its_descriptor(lock_path):
 
 def run_deploy_lock_cli(lock_path, *command):
     return subprocess.run(
-        [sys.executable, str(REPO / "scripts" / "deploy_lock.py"), *command],
+        [sys.executable, str(REPO / "ops" / "deploy_lock.py"), *command],
         env={**os.environ, "DEPLOY_LOCK_PATH": str(lock_path)},
         capture_output=True,
         text=True,
@@ -376,7 +376,7 @@ def test_make_up_runs_under_the_deploy_lock():
         ["make", "-n", "up"], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout
 
-    assert "scripts/deploy_lock.py" in dry_run and "up-locked" in dry_run
+    assert "ops/deploy_lock.py" in dry_run and "up-locked" in dry_run
 
 
 def test_a_nested_command_does_not_take_the_lock_again(lock_path):
@@ -384,7 +384,7 @@ def test_a_nested_command_does_not_take_the_lock_again(lock_path):
     fd = deploy_lock.acquire()
     try:
         result = subprocess.run(
-            [sys.executable, str(REPO / "scripts" / "deploy_lock.py"), "echo", "inner"],
+            [sys.executable, str(REPO / "ops" / "deploy_lock.py"), "echo", "inner"],
             env={
                 **os.environ,
                 "DEPLOY_LOCK_PATH": str(lock_path),
