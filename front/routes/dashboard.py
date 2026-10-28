@@ -38,7 +38,7 @@ def dashboard(request: Request, discussion: int | None = None, api: Api = Depend
             "curfew_mode": api.get("/curfew")["active"],
             "raton": {"scenario": record(api.post("/raton/visit"))},
             "chat_widget_config": library_chat_widget_config(
-                chat or api.get("/chat"), settings["llm_provider_label"], api.get("/users")
+                chat or api.get("/chat"), settings["llm_provider_label"]
             ),
             # The toast of a user switch (front/routes/users.py).
             **message_context(request),

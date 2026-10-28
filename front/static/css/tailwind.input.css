@@ -726,20 +726,19 @@ h2 {
 .settings-screen-time-grid small { color: var(--color-text-muted); }
 .settings-screen-time-header { color: var(--color-text-muted); font-size: 12px; font-weight: 800; }
 
-/* The user's page (/user): the settings cards, narrower, without the side menu. */
-.user-page { margin: 0 auto; max-width: 720px; }
-.user-page .settings-card + .settings-card, .user-page .settings-card + .user-form, .user-form .settings-card + .settings-card { margin-top: 14px; }
-.settings-head.user-head { align-items: center; display: flex; gap: 12px; justify-content: flex-start; }
-.user-head h1 { min-width: 0; overflow-wrap: anywhere; }
-.chat-user-avatar.user-head-avatar { font-size: 20px; height: 48px; width: 48px; }
+/* /settings holds several forms (the user's, then the admin one): their cards keep the sections' rhythm. */
+.settings-sections > .settings-form { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.settings-user-head { align-items: center; display: flex; gap: 12px; }
+.settings-user-head h2 { font-size: 20px; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.chat-user-avatar.settings-user-avatar { font-size: 20px; height: 48px; width: 48px; }
+.settings-layout.settings-layout-single { grid-template-columns: minmax(0, 720px); justify-content: center; }
 /* `.settings-form label` stacks a label above its field: radios sit next to their text. */
 .settings-form #raton-language .settings-checkbox-option { align-items: center; display: flex; gap: 6px; }
-.user-curfew-note { color: var(--color-text-muted); font-weight: 600; margin: 0 0 14px; }
+.user-curfew-note { color: var(--color-text-muted); font-weight: 600; margin: 0; }
 .user-rename { align-items: center; display: flex; gap: 10px; }
 .user-rename label { flex: 1; min-width: 0; }
 .user-rename input { box-sizing: border-box; width: 100%; }
 .settings-form .user-nickname { margin-top: 10px; }
-.user-form .settings-actions { margin-top: 14px; }
 
 .settings-curfew { display: grid; gap: 10px; min-width: 0; }
 .settings-curfew-hours { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; }
@@ -7519,24 +7518,6 @@ turbo-frame {
 }
 
 
-.chat-user-button {
-  align-items: center;
-  flex: none;
-  text-decoration: none;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  box-shadow: 0 10px 30px rgba(43, 32, 24, 0.18);
-  color: var(--color-text);
-  cursor: pointer;
-  display: flex;
-  font-size: 18px;
-  font-weight: 700;
-  height: 52px;
-  justify-content: center;
-  list-style: none;
-  width: 52px;
-}
 
 
 
@@ -8908,19 +8889,6 @@ turbo-frame {
 
   .settings-layout {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .settings-nav {
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-    position: static;
-    top: auto;
-  }
-
-  .settings-nav-link {
-    flex: 0 0 auto;
-    white-space: nowrap;
   }
 
   .dashboard-media-row {
@@ -11038,11 +11006,11 @@ a.log-title:hover { color: var(--color-primary); }
   }
 
 @media (max-width: 800px) {
-  .settings-nav { margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
+  /* The admin settings stay on a computer: a phone only gets the user's own (docs/spec/11). */
+  .settings-page .settings-admin { display: none; }
   .settings-actions { bottom: calc(72px + var(--tabbar-safe-bottom)); }
   .settings-actions span { display: none; }
   .settings-actions[data-dirty] span { display: block; }
-  .settings-nav-group { display: none; }
   .settings-library-filter-label { flex: 1 1 0; min-width: 0; }
   .settings-library-filter-row .asset-filter-options,
   .settings-library-filter-row .category-filter-options { flex: 1 1 100%; }
@@ -12483,8 +12451,8 @@ body::before {
   }
 }
 
-/* No discussions menu on a phone: the ☰, its drawer and the user button go
-   with it (docs/spec/11-interface-html.md, "Discussions"). */
+/* No discussions menu on a phone: the ☰ and its drawer
+   (docs/spec/11-interface-html.md, "Discussions"). */
 @media (max-width: 800px) {
   .dashboard-home .chat-bar .chat-nav {
     display: none;

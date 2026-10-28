@@ -11,11 +11,8 @@ l'ecran.
 ## Utilisateurs
 
 Plusieurs personnes peuvent utiliser la meme instance. Chacune choisit son
-utilisateur, ou en ajoute un, sur sa page `/user` (« Paramètres de
-l'utilisateur »), ouverte par le bouton rond en bas du tiroir « Discussions »
-de l'accueil (comme le bouton de compte d'une app de chat), sur ordinateur
-seulement : sur telephone, l'accueil n'a pas ce tiroir ; on les renomme
-ou les supprime dans `/settings`. Pas de mot de passe (LAN de
+utilisateur, en ajoute un, le renomme ou le supprime en haut des Parametres
+`/settings` (« Paramètres de l'utilisateur »). Pas de mot de passe (LAN de
 confiance, voir [15 Securite](15-securite.md)).
 
 - **Partage** : les chaines, les fiches, leurs fichiers media, transcripts,
@@ -31,7 +28,10 @@ confiance, voir [15 Securite](15-securite.md)).
 
 ### Paramètres de l'utilisateur
 
-La page `/user` reunit les reglages propres a l'utilisateur courant :
+Le haut des Parametres `/settings` reunit les reglages propres a
+l'utilisateur courant (les seuls de la page affiches sur telephone, le reste
+etant d'administration, voir [11 Interface HTML](11-interface-html.md),
+« Parametres ») :
 
 - **Nom** : le renommer ;
 - **Changer d'utilisateur** : la liste des utilisateurs, et l'ajout d'un
@@ -78,7 +78,7 @@ stockage) et le temps de lecture par type de media sont dans `/settings`.
 
 ### Couvre-feu
 
-Un interrupteur de la page de l'utilisateur `/user` (carte « Couvre-feu »,
+Un interrupteur des Parametres de l'utilisateur `/settings` (carte « Couvre-feu »,
 desactive par defaut) ferme Raton chaque jour sur une plage horaire, `22:00` a
 `10:00` par defaut (heures `Europe/Paris`, debut inclus, fin exclue ; la plage
 peut passer minuit ; un debut egal a la fin ne ferme jamais). C'est un reglage
@@ -95,8 +95,10 @@ active. Pendant son couvre-feu :
   `back/services/common/curfew.py`) : plus de lecture, de recherche dans la
   bibliotheque, d'import ni de reglage, y compris pour le serveur MCP (qui agit
   pour l'utilisateur par defaut) ;
-- l'**accueil** reste ouvert : Raton, la barre de chat bibliotheque, le tiroir
-  « Discussions » et le menu des utilisateurs ;
+- l'**accueil** reste ouvert : Raton, la barre de chat bibliotheque et le tiroir
+  « Discussions » ;
+- les **Parametres** `/settings` restent ouverts, reduits au changement
+  d'utilisateur et a la carte « Couvre-feu » ;
 - toute autre page du front affiche la page « Couvre-feu » (Raton en bonnet de
   nuit, boutons « Écrire dans l'historique » et « Discuter avec Raton ») ;
 - l'**Historique** reste ouvert : il ne montre plus que les lignes de lecture,
@@ -109,9 +111,9 @@ fin du couvre-feu en cours ou, hors couvre-feu, du prochain, sans toucher aux
 reglages (`POST /api/curfew/skip`, reglage `curfew_skip_until`). Une fois
 reporte, le bouton devient « Rétablir le couvre-feu ».
 
-Le couvre-feu se desactive a tout moment, meme en cours : `/user` reste ouverte
-et n'y garde que la carte « Couvre-feu » (interrupteur, heures, « Enregistrer »)
-; changer d'utilisateur depuis `/user` reste possible, sans mot de
+Le couvre-feu se desactive a tout moment, meme en cours : `/settings` reste
+ouverte et n'y garde que la carte « Couvre-feu » (interrupteur, heures,
+« Enregistrer ») et « Changer d'utilisateur » ; changer d'utilisateur reste possible, sans mot de
 passe comme le reste des utilisateurs. Les jobs planifies (scan, purge, notes automatiques) tournent dans le
 back sans passer par l'API : ils continuent.
 
