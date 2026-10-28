@@ -39,6 +39,7 @@ final class NouveautesModel: ObservableObject {
 }
 
 struct NouveautesView: View {
+    var back = false
     @EnvironmentObject private var state: AppState
     @StateObject private var model = NouveautesModel()
     @State private var firstLoadDone = false
@@ -48,7 +49,7 @@ struct NouveautesView: View {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "Nouveautés") {
+                        PageHeader(title: "Nouveautés", back: back) {
                             NavigationLink {
                                 HistoriqueView()
                             } label: {

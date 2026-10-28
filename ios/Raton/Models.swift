@@ -289,3 +289,39 @@ struct LibraryChat: Codable {
     let messages: [LibraryChatMessage]
     let conversations: [LibraryChatConversation]
 }
+
+/// `POST /api/raton/visit`: Raton's line for this visit.
+struct RatonLine: Codable {
+    let line: String
+    let art: String
+    let ctaLabel: String
+    let ctaHref: String
+}
+
+struct YoutubeFicheRef: Codable, Hashable {
+    let id: Int
+    let title: String
+}
+
+struct YoutubeVideo: Codable, Identifiable, Hashable {
+    let ytVideoId: String
+    let title: String
+    let url: String
+    let channelName: String?
+    let durationSeconds: Int?
+    let viewCount: Int?
+    let thumbnailUrl: String
+    let existing: YoutubeFicheRef?
+    var id: String { ytVideoId }
+}
+
+struct YoutubeChannel: Codable, Identifiable, Hashable {
+    let ytChannelId: String
+    let name: String
+    let handle: String?
+    let url: String
+    let subscriberCount: Int?
+    let thumbnailUrl: String?
+    let existing: ChannelRef?
+    var id: String { ytChannelId }
+}

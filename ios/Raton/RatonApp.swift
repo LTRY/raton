@@ -28,7 +28,7 @@ struct RootView: View {
             } else {
                 Group {
                     switch tab {
-                    case 0: NavigationStack { NouveautesView() }
+                    case 0: AccueilView()
                     case 1: NavigationStack { ChannelsView() }
                     case 2: NavigationStack { LibraryView() }
                     case 3: NavigationStack { PlaylistsView() }
@@ -53,7 +53,7 @@ struct RootView: View {
 struct TabPill: View {
     @Binding var tab: Int
     private let items = [
-        (icon: "house", label: "Nouveautés"),
+        (icon: "house", label: "Accueil"),
         (icon: "tv", label: "Chaînes"),
         (icon: "books.vertical", label: "Bibliothèque"),
         (icon: "text.line.first.and.arrowtriangle.forward", label: "Playlists"),
