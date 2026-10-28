@@ -3521,7 +3521,7 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
     logs_rendered = site(db).get("/logs").text
 
     assert "Historique" in history_rendered
-    assert "Temps de lecture" in dashboard_rendered
+    assert 'id="playback-time"' not in dashboard_rendered
     assert "<h3>Global</h3>" in dashboard_rendered
     assert "<h3>Active</h3>" in dashboard_rendered
     assert "Vidéos" in dashboard_rendered
@@ -3533,7 +3533,6 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
     assert "<p><span>Shorts</span><strong>0</strong></p>" in dashboard_rendered
     assert "Stockage" in dashboard_rendered
     assert "5.0 Mo" in dashboard_rendered
-    assert ">0m</span>" in dashboard_rendered
     assert "screen-time-track" not in dashboard_rendered
     assert "<th>Action</th>" not in dashboard_rendered
     assert ">played<" not in dashboard_rendered

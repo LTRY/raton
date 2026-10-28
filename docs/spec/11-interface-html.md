@@ -680,7 +680,7 @@ page), decoupee en un bloc
 `details.dashboard-day-group` repliable par journee de lecture (macro
 partagee `history_day_list` dans `_macros.html`) — regles ci-dessous. Le temps de lecture y figure
 deux fois : le carrousel de cartes « Temps de lecture » (macro
-`playback_time_cards`, memes chiffres que `/settings` et que la barre de limite
+`playback_time_cards`, memes chiffres que la barre de limite
 de Raton) en haut de page, et, dans l'en-tete de chaque journee, le temps total
 regarde ce jour-la (« 1 h 12 de lecture »). Ce total compte toutes les lectures
 de la journee ; il ne depend pas de la pagination.
@@ -828,16 +828,15 @@ de videos »), pas dans la bibliotheque.
 - Telephone (800px et moins) : miniature de 112px, le ↗ et l'action passent sous
   le texte.
 
-## Parametres : statistiques et temps de lecture
+## Parametres : statistiques
 
 Les statistiques de la bibliotheque (fiches, transcripts, chaines, chaines
-actives, videos, shorts, medias, stockage utilise / quota avec jauge) et le
-carrousel "Temps de lecture" sont des cartes de `/settings` (ancres
-`#library-stats` et `#playback-time`), calculees par `library_stats_context`
+actives, videos, shorts, medias, stockage utilise / quota avec jauge) sont une
+carte de `/settings` (ancre `#library-stats`), calculees par `library_stats_context`
 (`front/routes/settings.py`, compteurs dans `back/services/videos/stats.py`). La carte stockage renvoie vers `/stats` (bouton
 "Voir les graphiques").
 
-Le carrousel "Temps de lecture" (`.screen-time-carousel`, periodes
+Le carrousel "Temps de lecture" de `/dashboard/historique` (`.screen-time-carousel`, periodes
 aujourd'hui/7 jours/30 jours) n'accepte le changement de periode que via les
 boutons precedent/suivant ou le scroll-snap programme (`scrollTo`) ; le
 glisser tactile horizontal est desactive (`touch-action: pan-y`) pour que,
