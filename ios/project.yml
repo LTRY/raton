@@ -1,0 +1,25 @@
+name: Raton
+options:
+  bundleIdPrefix: fr.raton
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Raton:
+    type: application
+    platform: iOS
+    sources:
+      - path: Raton
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Raton/Info.plist
+        # Set your own team in Xcode (Signing & Capabilities) to build onto a device.
+        CODE_SIGN_STYLE: Automatic

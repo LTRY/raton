@@ -456,6 +456,7 @@ crochets, puis un resume court a l'imperatif, en anglais :
 | `[CI]` | workflows GitHub, `scripts/`, Makefile, Docker |
 | `[OPS]` | l'outil `ops/` (page des previews, lancement du deploiement), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
 | `[MONITORING]` | l'outil `monitoring/` (revue des journaux et autres rapports), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
+| `[IOS]` | l'app iOS native `ios/` (Swift, SwiftUI), son code et sa spec ; un champ d'API dont elle a besoin reste `[BACK]` |
 | `[DOCS]` | uniquement `docs/spec/` ou commentaires, sans changement de comportement |
 
 Regles :
@@ -476,7 +477,7 @@ Regles :
 - la description est en anglais (les termes du glossaire restent tels quels),
   suit `.github/pull_request_template.md` et reste concrete : « What »
   (une puce par changement, sans limite : page, bouton, route, comportement ;
-  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `OPS`, `MONITORING`, `DOCS` quand la PR en
+  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `OPS`, `MONITORING`, `IOS`, `DOCS` quand la PR en
   touche plusieurs), « Why » (une phrase), « How » (l'approche en quelques
   puces : ou vit la regle, ce qui est deplace ou remplace, les compromis),
   et les captures d'ecran pour tout

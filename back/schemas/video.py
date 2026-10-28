@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field
 
@@ -166,6 +166,10 @@ class VideoDetailRead(VideoRead):
 
     is_new: bool
     list_state: str | None
+    # How the fiche is greyed out for the user (the stored choice, else deduced from the playback)
+    # and the state deduced from the playback alone: the same pair as on the cards of the lists.
+    shown_state: Literal["normal", "watched", "hidden"]
+    auto_state: Literal["normal", "watched"]
     comment: str | None
     duration_seconds: int | None
     watched_at: datetime | None

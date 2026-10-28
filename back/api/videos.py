@@ -130,6 +130,8 @@ def video_detail_read(detail: VideoDetail) -> VideoDetailRead:
         **VideoRead.of(video, state.rating).model_dump(),
         is_new=state.is_new,
         list_state=state.list_state,
+        shown_state=detail.shown_state,
+        auto_state=detail.auto_state,
         comment=state.comment,
         duration_seconds=video.duration_seconds,
         watched_at=state.watched_at,

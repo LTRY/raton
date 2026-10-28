@@ -39,6 +39,10 @@ peuvent tourner dans deux conteneurs (voir
 rien de `back/`, `back/` rien de `front/`, `mcp_server/` ni l'un ni l'autre, et
 seuls `front/api.py`, `front/proxy.py` et `mcp_server/api.py` parlent HTTP.
 
+`ios/` est un autre client de la meme API : une app Swift qui appelle l'URL du
+front (qui relaie `/api`, flux media compris), sans une ligne de Python
+([L'app iOS](../../ios/docs/app-ios.md)).
+
 Ce qui decide d'un comportement (un filtre, un etat Vu/Indesiree deduit de la
 lecture, la categorie « sans barre de progression », la pagination, un tri)
 est calcule par le back et arrive tout fait dans la reponse de l'API ; le

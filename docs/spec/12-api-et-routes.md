@@ -306,8 +306,11 @@ n'existait pas.
   brutes (meme service `detail_view` ; la page `GET /videos/{id}` du front
   la lit) : les champs de
   `GET /api/videos`, plus `is_new`, `list_state` (choix enregistre, pas
-  l'etat deduit de la lecture), `comment`, `duration_seconds`, `watched_at`
-  (ces cinq-la et `rating` sont ceux de l'utilisateur), `files_purged` (la
+  l'etat deduit de la lecture), `shown_state` et `auto_state` (comme sur
+  les cartes des listes : le grisage affiche, et l'etat deduit de la lecture
+  seule), `comment`, `duration_seconds`, `watched_at`
+  (ces cinq-la, `shown_state`, `auto_state` et `rating` sont ceux de
+  l'utilisateur), `files_purged` (la
   purge a retire les fichiers apres le premier Vu, de quiconque : la page le
   dit),
   `media_urls` (`video`, `audio`, `thumbnail`, `subtitles` : la route qui sert

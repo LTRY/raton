@@ -7,11 +7,11 @@ from pathlib import Path
 import pytest
 
 SPEC_DIR = Path(__file__).resolve().parent.parent / "docs" / "spec"
-# ops/docs/ and monitoring/docs/ are the tools' own specs (ops/CLAUDE.md, monitoring/CLAUDE.md): same
+# ops/docs/, monitoring/docs/ and ios/docs/ are the units' own specs (ops/CLAUDE.md, monitoring/CLAUDE.md): same
 # frontmatter rule, not published on the site.
 OPS_SPEC_FILES = sorted(
     path
-    for tool in ("ops", "monitoring")
+    for tool in ("ops", "monitoring", "ios")
     for path in (SPEC_DIR.parent.parent / tool / "docs").glob("*.md")
 )
 SPEC_FILES = sorted(SPEC_DIR.glob("*.md"))
