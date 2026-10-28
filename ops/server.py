@@ -109,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
                 ops_render.version_status(deployed, origin, behind),
                 ops_jobs.deploy_elsewhere(prod),
                 pending,
-                ops_jobs.list_merged_prs(),
+                ops_jobs.list_merged_prs(deployed),
                 deployed,
                 behind,
             )
@@ -150,7 +150,10 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length") or 0)
             fields = parse_qs(self.rfile.read(min(length, 1024)).decode(errors="replace"))
             ops_jobs.flash_error = ops_jobs.move_pr(int(parts[1]), fields.get("to", [""])[0])
-            self.redirect_home()
+            # No redirect: the page's own fetch reloads, and a redirected GET would read (and
+            # lose) the error before that reload.
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.end_headers()
         elif parts == ["prod", "deploy"]:
             ops_jobs.start_prod_deploy()
             self.redirect_home()

@@ -1,3 +1,4 @@
+import json
 import time
 
 from ops.jobs import Job, Preview, parse_previews
@@ -37,7 +38,7 @@ def test_preview_status_compares_the_running_commit_with_the_pr_head():
 
     assert preview_status(OPEN_PR, up_to_date, None) == ("En ligne (aaaaaaa)", "ok")
     assert preview_status(OPEN_PR, behind, None)[1] == "stale"
-    assert preview_status(OPEN_PR, None, None) == ("Pas de preview", "none")
+    assert preview_status(OPEN_PR, None, None) == ("", "none")  # no preview: nothing to say
     assert preview_status(OPEN_PR, None, Job("up", 0.0))[1] == "busy"
     assert preview_status(OPEN_PR, up_to_date, Job("up", 0.0, returncode=1))[1] == "error"
     assert preview_status(OPEN_PR, None, Job("down", 0.0)) == ("Suppression…", "busy")
@@ -369,3 +370,31 @@ def test_up_to_date_production_shows_no_alert():
 
     assert 'class="alert"' not in page
     assert "À jour" in page
+
+
+def test_a_card_without_preview_shows_no_status_line():
+    page = render_page("h", [OPEN_PR], {}, {}, None)
+
+    assert "Pas de preview" not in page
+    assert 'class="status' not in column(page, "todo")
+
+
+def test_merged_column_keeps_only_prs_the_production_lacks(monkeypatch):
+    from ops import jobs
+
+    merged = [
+        {"number": 9, "title": "Live", "mergeCommit": {"oid": "a" * 40}},
+        {"number": 8, "title": "Not live", "mergeCommit": {"oid": "b" * 40}},
+        {"number": 7, "title": "No commit", "mergeCommit": None},
+    ]
+    # git says "ancestor" (empty output, exit 0) only for the PR already deployed
+    monkeypatch.setattr(
+        jobs,
+        "run_text",
+        lambda command: (
+            json.dumps(merged) if command[0] == "gh" else ("" if command[3] == "a" * 40 else None)
+        ),
+    )
+
+    assert [pr["number"] for pr in jobs.fetch_merged_prs("d" * 40, 30)] == [8, 7]
+    assert len(jobs.fetch_merged_prs(None, 30)) == 3  # unknown deployed commit: the last few

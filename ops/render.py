@@ -73,7 +73,7 @@ def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[
     if job is not None and job.returncode != 0:
         return (JOB_ERROR_LABELS[job.action], "error")
     if preview is None:
-        return ("Pas de preview", "none")
+        return ("", "none")
     if preview.state != "running":
         return (f"Arrêtée ({preview.state})", "error")
     if pr and pr.get("headRefOid") and pr["headRefOid"] != preview.sha:
@@ -149,7 +149,7 @@ BOARD_COLUMNS = (
     ("draft", "Draft", "Pas prête : déposer ici met la PR en draft."),
     ("todo", "PR à traiter", "Prête pour relecture, sans preview."),
     ("preview", "Preview déployée", "Déposer ici construit la preview (ou la reconstruit)."),
-    ("merged", "Merger", "Déposer ici merge la PR (squash)."),
+    ("merged", "Merger", "Mergées, pas encore en production. Déposer ici merge la PR (squash)."),
 )
 
 
@@ -197,6 +197,7 @@ def render_row(
     port = f" · port {preview.port}" if preview is not None else ""
     if preview is not None and preview.db in DB_LABELS:
         port += f" · {DB_LABELS[preview.db]}"
+    status = f'<div class="status {css}">{html.escape(label)}</div>' if label else ""
     card = (
         f'<div class="pr card" data-pr="{number}">'
         if column is not None and not pr.get("isCrossRepository")
@@ -205,7 +206,7 @@ def render_row(
     return (
         f'{card}<div class="info"><div class="title">{title}</div>'
         f'<div class="meta">{" · ".join(meta)}{port}</div>'
-        f'<div class="status {css}">{html.escape(label)}</div></div>'
+        f"{status}</div>"
         f'<div class="actions">{"".join(actions)}</div></div>'
     )
 
@@ -216,7 +217,7 @@ def render_merged(pr: dict) -> str:
         title = f'<a href="{html.escape(pr["url"])}">{title}</a>'
     return (
         f'<div class="pr card done"><div class="info"><div class="title">{title}</div>'
-        f'<div class="meta">#{pr["number"]} · mergée</div></div></div>'
+        f'<div class="meta">#{pr["number"]} · mergée, pas encore en production</div></div></div>'
     )
 
 

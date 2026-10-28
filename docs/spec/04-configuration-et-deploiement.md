@@ -342,7 +342,10 @@ le merge ne deploie rien.
   independante du reglage du systeme). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
   quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
   preview), **Preview deployee** (preview construite ou en construction) et
-  **Merger** (les 5 dernieres PR mergees, en lecture seule). Glisser une
+  **Merger** (les PR mergees que la production ne contient pas encore, en lecture
+  seule : `gh pr list --state merged`, gardees si leur commit de merge n'est
+  pas un ancetre du commit deploye ; un deploiement les retire de la colonne ;
+  sans commit deploye connu, les 5 dernieres). Glisser une
   tuile sur une colonne (souris : glisser directement ; tactile : appui long,
   un balayage plus rapide fait defiler ; evenements `pointer`, car le
   glisser-deposer HTML5 ne marche pas au doigt ; requete `POST /prs/<N>/move`,

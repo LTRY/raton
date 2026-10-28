@@ -200,17 +200,32 @@ def fetch_open_prs() -> tuple[list[dict], str | None]:
     return sorted(json.loads(result.stdout), key=lambda pr: -pr["number"]), None
 
 
-def list_merged_prs(limit: int = 5) -> list[dict]:
-    """The last merged PRs (cached for CACHE_TTL), for the board's last column; [] if `gh` fails."""
-    return cached(("merged", limit), CACHE_TTL, lambda: fetch_merged_prs(limit))
+def list_merged_prs(deployed: str | None, limit: int = 30) -> list[dict]:
+    """The merged PRs that the deployed version does not contain yet (cached for CACHE_TTL).
+
+    They leave the board's last column once a deploy carries them. With no known deployed
+    commit nothing can be told apart, so the last 5 merged PRs show instead.
+    """
+    return cached(("merged", deployed, limit), CACHE_TTL, lambda: fetch_merged_prs(deployed, limit))
 
 
-def fetch_merged_prs(limit: int) -> list[dict]:
+def fetch_merged_prs(deployed: str | None, limit: int) -> list[dict]:
     out = run_text(
         ["gh", "pr", "list", "--state", "merged", "--limit", str(limit)]
-        + ["--json", "number,title,url,author"]
+        + ["--json", "number,title,url,author,mergeCommit"]
     )
-    return json.loads(out) if out else []
+    prs = json.loads(out) if out else []
+    if deployed is None:
+        return prs[:5]
+    return [pr for pr in prs if not in_deployed(pr.get("mergeCommit"), deployed)]
+
+
+def in_deployed(merge_commit: dict | None, deployed: str) -> bool:
+    """Whether the deployed commit contains the PR's merge commit (git exits 1 when not, 128 when unknown)."""
+    oid = (merge_commit or {}).get("oid")
+    if not oid:
+        return False
+    return run_text(["git", "merge-base", "--is-ancestor", oid, deployed]) is not None
 
 
 def run_text(command: list[str], timeout: float = 15) -> str | None:
@@ -522,6 +537,7 @@ def move_pr(number: int, target: str) -> str | None:
         if draft:
             return "Une PR en draft ne se merge pas : sortez-la d'abord du draft."
         failure = run_gh(["pr", "merge", str(number), "--squash"])
+        invalidate_caches()
         if failure is None:
             start_sweep()
         return failure
