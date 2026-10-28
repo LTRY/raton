@@ -259,7 +259,8 @@ n'y participe pas, et le journal est lu en lecture seule.
   Un echec compte comme la revue du jour : pas de nouvel essai en boucle.
 - **Execution** : `claude --bare -p "/review-logs 24"` dans le depot, donc le
   skill `review-logs` (`.claude/skills/review-logs/`) sans copie de ses
-  consignes. `--bare` ignore les hooks du depot et n'accepte que
+  consignes ; le nom du skill, les outils autorises et les valeurs par defaut
+  viennent de `ops.toml` (voir « Configuration de l'outil ops » dans 04). `--bare` ignore les hooks du depot et n'accepte que
   `ANTHROPIC_API_KEY` ; le skill lit le journal dans `LOG_DIR`. Les outils sont
   limites a la lecture (`Read`, le digest, `jq`, `grep`, `ls`, `head`, `tail`,
   `docker ps`/`docker compose logs`) ; `--max-budget-usd` plafonne une revue

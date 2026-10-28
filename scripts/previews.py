@@ -1,6 +1,7 @@
 """The previews page: lists the open PRs and deploys or removes their preview with one click.
 
-It also deploys main to the real stack (scripts/deploy.sh, button at the top of the page).
+It also deploys main to the real stack (button at the top of the page). Every project-specific
+name (scripts, container, image label...) comes from ops.toml (scripts/ops_config.py).
 
 Usage: python3 -m scripts.previews [--host 127.0.0.1] [--port 8999] [--scheduler]
 `make previews` starts it as the `raton-ops` container (docker-compose.yml), with --scheduler:
@@ -30,10 +31,10 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from scripts import ops_review
+from scripts.ops_config import CONFIG, REPO
 
-REPO = Path(__file__).resolve().parent.parent
-PREVIEW_SH = REPO / "scripts" / "preview.sh"
-DEPLOY_SH = REPO / "scripts" / "deploy.sh"
+PREVIEW_SH = REPO / CONFIG.previews_script
+DEPLOY_SH = REPO / CONFIG.deploy_script
 LOG_DIR = REPO / ".local" / "previews" / "logs"
 
 
@@ -104,16 +105,17 @@ def run_text(command: list[str], timeout: float = 15) -> str | None:
         result = subprocess.run(
             command, cwd=REPO, capture_output=True, text=True, check=False, timeout=timeout
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError, subprocess.TimeoutExpired:
         return None
     return result.stdout.strip() if result.returncode == 0 else None
 
 
 def deployed_sha() -> str | None:
-    """The commit the running api image was built from (label set by `make up`), None if unknown."""
-    sha = run_text(
-        ["docker", "inspect", "--format", '{{ index .Config.Labels "raton.git-sha" }}', API_CONTAINER]
-    )
+    """The commit the deployed container was built from (image label), None if unknown."""
+    if not CONFIG.deploy_container or not CONFIG.deploy_sha_label:
+        return None
+    label_format = '{{ index .Config.Labels "' + CONFIG.deploy_sha_label + '" }}'
+    sha = run_text(["docker", "inspect", "--format", label_format, CONFIG.deploy_container])
     return sha if sha and re.fullmatch(r"[0-9a-f]{40}", sha) else None
 
 
@@ -123,13 +125,13 @@ _origin_cache: tuple[float, str | None] = (0.0, None)
 
 
 def origin_main_sha() -> str | None:
-    """The current head of origin/main, fetched at most every ORIGIN_TTL seconds."""
+    """The current head of origin/<deploy branch>, fetched at most every ORIGIN_TTL seconds."""
     global _origin_cache
     fetched_at, sha = _origin_cache
     if time.time() - fetched_at < ORIGIN_TTL:
         return sha
-    run_text(["git", "fetch", "-q", "origin", "main"], timeout=30)
-    sha = run_text(["git", "rev-parse", "origin/main"])
+    run_text(["git", "fetch", "-q", "origin", CONFIG.deploy_branch], timeout=30)
+    sha = run_text(["git", "rev-parse", f"origin/{CONFIG.deploy_branch}"])
     _origin_cache = (time.time(), sha)
     return sha
 
@@ -145,7 +147,6 @@ def log_path(pr: int) -> Path:
 
 
 PROD_LOG = LOG_DIR / "prod.log"
-API_CONTAINER = "raton-api"
 
 
 def run_in_background(job: Job, command: list[str], log_file: Path) -> None:
@@ -368,7 +369,8 @@ def render_prod(job: Job | None, version: tuple[str, str] | None = None) -> str:
         version_line = f'<div class="status {version[1]}">{html.escape(version[0])}</div>'
     disabled = " disabled" if css == "busy" else ""
     # The real stack and its data: a stray tap must not rebuild it.
-    confirm = "return confirm('Déployer main sur la vraie instance de Raton ?')"
+    name = CONFIG.project_name.replace("'", "")
+    confirm = html.escape(f"return confirm('Déployer main sur la vraie instance de {name} ?')")
     log = '<a class="log" href="/prod/log">Journal</a>' if job is not None else ""
     return (
         '<div class="pr prod"><div class="info"><h2>Production</h2>'
@@ -415,10 +417,10 @@ def render_page(
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{refresh}
-<title>Previews des PR · Raton</title><style>{STYLE}</style></head>
+<title>Previews des PR · {html.escape(CONFIG.project_name)}</title><style>{STYLE}</style></head>
 <body><main>
 <div class="top"><div><h1>Previews des PR</h1>
-<p class="lead">Une instance jetable de Raton par PR (données de démo), sur le port 9000 + numéro.</p>
+<p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/" class="refresh">Rafraîchir</a></div>
 {render_prod(prod_job, prod_version)}
 {review_card}
@@ -498,7 +500,7 @@ class Handler(BaseHTTPRequestHandler):
             start_prod_deploy()
             self.redirect_home()
         elif parts == ["reviews", "run"] and SCHEDULER_ON:
-            ops_review.start_review(ops_review.DEFAULT_HOURS, "manual")
+            ops_review.start_review(ops_review.CONFIG.review_hours, "manual")
             self.redirect_home()
         elif parts == ["sweep"]:
             start_sweep()

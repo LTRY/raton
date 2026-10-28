@@ -1,0 +1,40 @@
+# Settings of the ops tool (scripts/previews.py, scripts/ops_review.py): everything that names
+# this project. Another project reuses the tool by providing its own ops.toml.
+# Spec: docs/spec/04-configuration-et-deploiement.md, section "Configuration de l'outil ops".
+
+[project]
+name = "Raton"
+
+[deploy]
+# Run by the "Déployer main en production" button; must exit non-zero when it fails.
+script = "scripts/deploy.sh"
+branch = "main"
+# The running container and the image label holding the git commit it was built from.
+container = "raton-api"
+sha_label = "raton.git-sha"
+
+[previews]
+# `<script> up|rebase|down|sweep <pr>` and `<script> list`: the project's own preview logic.
+script = "scripts/preview.sh"
+
+[review]
+# The Claude Code skill run daily with the number of hours to read, e.g. `/review-logs 24`.
+skill = "review-logs"
+# Read-only tools the review may use (Claude Code --allowedTools syntax).
+allowed_tools = [
+    "Read",
+    "Skill",
+    "Bash(python -m back.core.logs_digest:*)",
+    "Bash(jq:*)",
+    "Bash(grep:*)",
+    "Bash(ls:*)",
+    "Bash(tail:*)",
+    "Bash(head:*)",
+    "Bash(docker ps:*)",
+    "Bash(docker compose logs:*)",
+]
+# Defaults, overridden by OPS_REVIEW_HOUR, OPS_REVIEW_HOURS, OPS_REVIEW_MODEL, OPS_REVIEW_MAX_USD.
+hour = 8
+hours = 24
+model = "sonnet"
+max_usd = 1.0
