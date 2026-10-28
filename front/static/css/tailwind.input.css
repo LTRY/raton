@@ -7488,7 +7488,6 @@ turbo-frame {
 }
 
 /* Pinned to the bottom of the drawer, like the "new session" pill of a chat app. */
-/* Bottom row of the drawer: the user button on the left, "Nouvelle discussion" next to it. */
 .chat-drawer-foot {
   align-items: center;
   bottom: 0;
