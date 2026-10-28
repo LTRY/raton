@@ -62,7 +62,6 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
             "video_category_labels_list": settings["video_category_labels"],
             "video_category_label_styles": styles,
             "video_library_views": settings["video_library_views"],
-            "screen_time_limits": settings["screen_time_limits"],
             "no_progress_categories": settings["no_progress_category_labels"],
             "no_progress_category_options": with_unknown_labels(
                 styles, settings["no_progress_category_labels"]
@@ -103,10 +102,6 @@ def settings_form(
     video_category_styles: str = Form(""),
     video_library_views: str = Form(""),
     no_progress_categories: list[str] = Form(default=[]),
-    screen_time_video_today: int = Form(120),
-    screen_time_short_today: int = Form(30),
-    screen_time_podcast_today: int = Form(120),
-    screen_time_music_today: int = Form(180),
     sponsor_segment_categories: list[str] = Form(default=[]),
     sponsor_skip_enabled: str = Form(default=""),
     auto_notes_enabled: str = Form(default=""),
@@ -130,12 +125,6 @@ def settings_form(
         "auto_notes_excluded_category_labels": form_list_values(auto_notes_excluded_categories),
         "sponsor_segment_categories": form_list_values(sponsor_segment_categories),
         "sponsor_skip_enabled": bool(form_text_value(sponsor_skip_enabled)),
-        "screen_time_today_minutes": {
-            "video": screen_time_video_today,
-            "short": screen_time_short_today,
-            "podcast": screen_time_podcast_today,
-            "music": screen_time_music_today,
-        },
     }
     if category_styles:
         update["video_category_label_styles"] = category_styles

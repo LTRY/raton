@@ -32,7 +32,6 @@
         <a href="#libraries" class="settings-nav-link">Sous-bibliothèques</a>
         <p class="settings-nav-group">Lecture</p>
         <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
-        <a href="#screen-time" class="settings-nav-link">Temps d’écran</a>
         <p class="settings-nav-group">Automatisation</p>
         <a href="#auto-notes" class="settings-nav-link">Notes automatiques</a>
         <p class="settings-nav-group">Autres pages</p>
@@ -246,20 +245,6 @@
             </label>
           </div>
           </details>
-        </div>
-
-        <div class="settings-card" id="screen-time">
-          <fieldset class="settings-screen-time">
-            <legend class="settings-card-title">Temps d’écran</legend>
-            <div class="settings-screen-time-grid settings-screen-time-header"><span>Type</span><span>Jour</span></div>
-            {% for kind, label in [('video', 'Vidéos'), ('short', 'Shorts'), ('podcast', 'Podcasts'), ('music', 'Musique')] %}
-            <div class="settings-screen-time-grid">
-              <strong>{{ label }}</strong>
-              <label><span class="visually-hidden">{{ label }} · today</span><input name="screen_time_{{ kind }}_today" type="number" min="1" value="{{ screen_time_limits[kind]['today'] }}" required><small>min</small></label>
-            </div>
-            {% endfor %}
-            <small class="settings-hint">Les indicateurs passent progressivement du vert au rouge à mesure que la limite approche.</small>
-          </fieldset>
         </div>
 
         <h2 class="settings-group-title" id="group-automatisation">Automatisation</h2>
