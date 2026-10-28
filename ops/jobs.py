@@ -43,7 +43,7 @@ class Preview:
 
 @dataclass
 class Job:
-    action: str  # "up", "rebase" or "down"; "deploy" for the production
+    action: str  # "up" or "down"; "deploy" for the production
     started: float
     returncode: int | None = None
     pr: int | None = None  # None for the production deploy

@@ -89,7 +89,7 @@ def test_sweep_keeps_the_previews_of_open_prs(fake_bin):
 def test_bad_usage_exits_with_2_and_a_message_on_stderr(fake_bin):
     env, _ = fake_bin
 
-    for args in ((), ("bogus",), ("up",), ("up", "abc"), ("down", "1x"), ("rebase",)):
+    for args in ((), ("bogus",), ("up",), ("up", "abc"), ("down", "1x")):
         result = run_preview_sh(env, *args)
         assert result.returncode == 2, args
         assert result.stderr.strip(), args

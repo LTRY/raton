@@ -7,7 +7,7 @@ Loaded when you work under `ops/`. The root `CLAUDE.md` still applies (branch, `
 A standalone tool that serves one project at a time: the previews page, the deploy of the main branch and the daily log review. It is meant to be reused by other projects, so it must not know Raton.
 
 - Everything that names the project comes from the project's `ops.toml` (`ops/config.py`). A new project-specific value is a new key there, with a default, never a constant in the code.
-- The project provides the contract: `ops.toml`, a previews script (`up|rebase|down|sweep|list`), a deploy script, and a way to start the tool. The contract is in `ops/docs/outil-ops.md`; changing it changes every project that uses the tool, so write the change in the spec first.
+- The project provides the contract: `ops.toml`, a previews script (`up|down|sweep|list`), a deploy script, and a way to start the tool. The contract is in `ops/docs/outil-ops.md`; changing it changes every project that uses the tool, so write the change in the spec first.
 - Standard library only, no dependency: the container has no virtualenv.
 - No import of `back/`, `front/`, `mcp_server/` or `scripts/`, and no project name in the code (`tests/test_code_structure.py` checks both). The project's own scripts are called by path, never imported.
 

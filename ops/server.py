@@ -140,7 +140,7 @@ class Handler(BaseHTTPRequestHandler):
             len(parts) == 3
             and parts[0] == "prs"
             and parts[1].isdigit()
-            and parts[2] in ("up", "rebase", "down")
+            and parts[2] in ("up", "down")
         ):
             ops_jobs.start_job(int(parts[1]), parts[2])
             self.redirect_home()

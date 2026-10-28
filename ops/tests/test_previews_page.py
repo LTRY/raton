@@ -40,11 +40,7 @@ def test_preview_status_compares_the_running_commit_with_the_pr_head():
     assert preview_status(OPEN_PR, None, None) == ("Pas de preview", "none")
     assert preview_status(OPEN_PR, None, Job("up", 0.0))[1] == "busy"
     assert preview_status(OPEN_PR, up_to_date, Job("up", 0.0, returncode=1))[1] == "error"
-    assert preview_status(OPEN_PR, None, Job("rebase", 0.0)) == ("Rebase…", "busy")
-    assert preview_status(OPEN_PR, None, Job("rebase", 0.0, returncode=1)) == (
-        "Échec du rebase",
-        "error",
-    )
+    assert preview_status(OPEN_PR, None, Job("down", 0.0)) == ("Suppression…", "busy")
 
 
 def test_a_form_from_another_site_is_refused():
@@ -68,12 +64,9 @@ def test_page_escapes_titles_and_lists_previews_of_closed_prs():
     )
 
     assert "Une PR &lt;ouverte&gt;" in page
-    assert 'action="/prs/31/up"' in page
-    assert 'action="/prs/32/up"' not in page  # a fork never gets a deploy button
+    assert 'action="/prs/31/up"' not in page  # deploying is dragging the card, not a button
     assert 'action="/prs/5/down"' in page
-    assert 'action="/prs/31/rebase"' in page
-    assert 'action="/prs/32/rebase"' not in page  # nor a rebase: the branch is not ours
-    assert 'action="/prs/5/rebase"' not in page  # nor a closed PR
+    assert "/rebase" not in page
     assert 'href="http://nas:9005/"' in page
     assert "DB réelle" in page
     assert "http-equiv" not in page  # no auto-refresh while nothing is building
@@ -83,7 +76,7 @@ def test_refresh_and_production_deploy_sit_above_the_prs():
     page = render_page("nas:8999", [OPEN_PR], {}, {}, None)
 
     deploy = page.index('action="/prod/deploy"')
-    assert page.index(">Rafraîchir<") < deploy < page.index('action="/prs/31/up"')
+    assert page.index(">Rafraîchir<") < deploy < page.index('data-pr="31"')
     assert "return confirm(" in page  # a stray tap must not rebuild the real stack
     assert 'href="/prod/log"' not in page  # no journal before a first deploy
 

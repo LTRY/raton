@@ -14,7 +14,7 @@ container = "raton-api"
 sha_label = "raton.git-sha"
 
 [previews]
-# `<script> up|rebase|down|sweep <pr>` and `<script> list`: the project's own preview logic.
+# `<script> up|down|sweep <pr>` and `<script> list`: the project's own preview logic.
 script = "scripts/preview.sh"
 
 [jobs]

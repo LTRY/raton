@@ -29,7 +29,7 @@ contient `ops/`. Un autre projet reutilise l'outil en fournissant son propre
   `branch` (suivie pour comparer avec la version deployee), `container` et
   `sha_label` (conteneur en marche et label de son image qui porte le commit
   construit ; sans eux, la version deployee reste « inconnue »).
-- `[previews] script` : le script de previews (`up`, `rebase`, `down`, `sweep`,
+- `[previews] script` : le script de previews (`up`, `down`, `sweep`,
   `list`), propre au projet : la base partagee ou copiee, les ports et les
   reseaux y restent.
 - `[jobs] timeout_minutes` (30 par defaut) : un job de preview ou de deploiement
@@ -76,12 +76,11 @@ d'autre. Il n'a pas de terminal : il ne lit pas l'entree standard.
 | Appel | Role | Sortie |
 |---|---|---|
 | `<script> up <pr>` | construit et lance la preview de la PR | journal du job |
-| `<script> rebase <pr>` | remet la branche de la PR a jour sur la branche principale | journal du job |
 | `<script> down <pr>` | retire la preview de la PR | journal du job |
 | `<script> sweep` | retire les previews des PR qui ne sont plus ouvertes (sans argument) | ignoree |
 | `<script> list` | liste les previews | lue par la page (ci-dessous) |
 
-`<pr>` est un numero de PR, entier decimal. Les sous-commandes `up`, `rebase` et
+`<pr>` est un numero de PR, entier decimal. Les sous-commandes `up` et
 `down` tournent comme jobs en arriere-plan (un a la fois par PR), avec stdout et
 stderr dans `.local/previews/logs/pr-<N>.log`.
 

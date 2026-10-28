@@ -56,10 +56,9 @@ def version_status(deployed: str | None, origin: str | None, behind: int | None)
     return (f"Différente d'origin/main : {deployed[:7]} déployé, origin/main {origin[:7]}", "stale")
 
 
-JOB_BUSY_LABELS = {"up": "Construction…", "rebase": "Rebase…", "down": "Suppression…"}
+JOB_BUSY_LABELS = {"up": "Construction…", "down": "Suppression…"}
 JOB_ERROR_LABELS = {
     "up": "Échec du déploiement",
-    "rebase": "Échec du rebase",
     "down": "Échec de la suppression",
 }
 
@@ -157,7 +156,7 @@ DB_LABELS = {"shared": "DB réelle", "copy": "copie de la DB"}
 BOARD_COLUMNS = (
     ("draft", "Draft", "Pas prête : déposer ici met la PR en draft."),
     ("todo", "PR à traiter", "Prête pour relecture, sans preview."),
-    ("preview", "Preview déployée", "Déposer ici construit la preview de la PR."),
+    ("preview", "Preview déployée", "Déposer ici construit la preview (ou la reconstruit)."),
     ("merged", "Merger", "Déposer ici merge la PR (squash)."),
 )
 
@@ -195,19 +194,6 @@ def render_row(
         )
     if pr.get("isCrossRepository"):
         label, css = "Fork : pas de preview", "none"
-    elif pr:
-        verb = "Redéployer" if preview is not None else "Déployer"
-        disabled = " disabled" if busy else ""
-        actions.append(
-            f'<form method="post" action="/prs/{number}/up">'
-            f'<button class="primary"{disabled}>{verb}</button></form>'
-        )
-    if pr and not pr.get("isCrossRepository"):
-        disabled = " disabled" if busy else ""
-        actions.append(
-            f'<form method="post" action="/prs/{number}/rebase">'
-            f"<button{disabled}>Rebase</button></form>"
-        )
     if preview is not None:
         disabled = " disabled" if busy else ""
         actions.append(
@@ -283,7 +269,9 @@ BOARD_SCRIPT = """
         if (!ghost) return;
         ghost.remove(); card.classList.remove('dragging');
         if (over) over.classList.remove('over');
-        if (cancel || !over || over === card.closest('.col')) return;
+        if (cancel || !over) return;
+        // Dropping a card on its own column does nothing, except in Preview déployée: it rebuilds.
+        if (over === card.closest('.col') && over.dataset.col !== 'preview') return;
         if (over.dataset.col === 'merged' && !confirm('Merger la PR ?')) return;
         fetch('/prs/' + card.dataset.pr + '/move', {method: 'POST', body: new URLSearchParams({to: over.dataset.col})})
           .then(function () { location.reload(); });

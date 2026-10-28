@@ -332,8 +332,7 @@ le merge ne deploie rien.
   liste les PR ouvertes (via `gh`, qui doit etre connecte au depot), l'etat de
   leur preview (« Pas de preview », « Construction… », « En ligne », « En ligne,
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
-  et les boutons **Deployer**/**Redeployer**, **Ouvrir**, **Rebase** (PR du depot
-  ouvertes) et **Retirer**. En
+  et les boutons **Ouvrir** et **Retirer** (le deploiement se fait en glissant la tuile, ci-dessous). En
   haut de la page : **Rafraichir** et la carte **Production** (« Deploiement de
   main » ci-dessus). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
   quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
@@ -345,7 +344,8 @@ le merge ne deploie rien.
   champ `to`) agit sur la PR avec `gh` :
   vers **Draft**, `gh pr ready --undo` ; vers **PR a traiter**, sortie du draft
   et retrait de la preview s'il y en a une ; vers **Preview deployee**, sortie
-  du draft puis `up` ; vers **Merger**, apres confirmation, `gh pr merge
+  du draft puis `up` (deposer une tuile sur sa propre colonne **Preview
+  deployee** la reconstruit) ; vers **Merger**, apres confirmation, `gh pr merge
   --squash` puis `sweep` (une PR en draft ne se merge pas, une PR de fork n'a ni
   preview ni deplacement). Un echec de `gh` s'affiche une fois en bandeau ; le
   `GH_TOKEN` doit pouvoir ecrire sur les PR. Les
@@ -361,11 +361,7 @@ le merge ne deploie rien.
   (`docker-compose.preview.yml`), puis attend qu'elle reponde (depuis `raton-ops`,
   la boucle locale est le conteneur lui-meme : le script joint l'hote par
   `host.docker.internal`) ; `down <N>` supprime conteneurs, images,
-  worktree et copie de la DB ; `rebase <N>` rebase la branche de la PR sur
-  `main` (`gh pr update-branch --rebase`, fait par GitHub, sans checkout local ;
-  echoue en cas de conflit, a resoudre a la main) : la tete de la PR bouge, la
-  preview passe donc « en retard » jusqu'au prochain **Redeployer**, et le
-  `GH_TOKEN` doit pouvoir ecrire sur le depot ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
+  worktree et copie de la DB ; `list` liste les previews ; `sweep` retire celles des PR fermees ;
   `retire-stale` retire celles qu'un deploiement rendrait perimees (voir « DB » ci-dessous).
 - **Service du back** : `preview-api`, jamais `api`. Il rejoint le reseau de la pile
   reelle (pour atteindre `raton-db`), ou Compose l'aliase par son nom de
