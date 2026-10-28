@@ -103,6 +103,9 @@ struct NouveautesView: View {
 struct VideoRow: View {
     let card: VideoCard
     let api: RatonAPI
+    var dateLine = false
+    // Room for the "⋮" menu a list lays over the row's top right corner.
+    var menu = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -131,7 +134,12 @@ struct VideoRow: View {
                 Text(card.title)
                     .font(.raton(16, .bold)).foregroundStyle(Theme.text).lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-                if let channel = card.channelName {
+                    .padding(.trailing, menu ? 26 : 0)
+                if dateLine {
+                    if let date = Format.frenchDate(card.publishedAt) {
+                        Text(date).font(.raton(14)).foregroundStyle(Theme.textMuted).lineLimit(1)
+                    }
+                } else if let channel = card.channelName {
                     Text(channel).font(.raton(14, .semibold)).foregroundStyle(Theme.textMuted).lineLimit(1)
                 }
                 Spacer(minLength: 0)

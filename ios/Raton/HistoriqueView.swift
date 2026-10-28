@@ -30,9 +30,16 @@ struct HistoriqueView: View {
                         PageHeader(title: "Historique", back: true)
                         ErrorMessage(text: errorMessage)
                         ForEach(days, id: \.day) { group in
-                            Text(Self.dayTitle(group.day))
-                                .font(.raton(18, .bold)).foregroundStyle(Theme.text)
-                                .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(Self.dayTitle(group.day))
+                                    .font(.raton(18, .bold)).foregroundStyle(Theme.text)
+                                Spacer(minLength: 0)
+                                Text("\(group.rows.count) média\(group.rows.count > 1 ? "s" : "")")
+                                    .font(.raton(13, .bold)).foregroundStyle(Theme.textSoft)
+                                    .padding(.horizontal, 10).padding(.vertical, 4)
+                                    .glass(in: Capsule())
+                            }
+                            .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 6)
                             ForEach(group.rows) { row in
                                 rowView(row)
                                     .task { await loadMore(api, after: row) }

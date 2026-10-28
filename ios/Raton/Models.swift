@@ -36,6 +36,7 @@ struct VideoCard: Codable, Identifiable, Hashable {
     let hasThumbnail: Bool
     let playback: CardPlayback?
     let shownState: String
+    let publishedAt: String?
 }
 
 struct NouveautesStack: Codable, Identifiable, Hashable {
@@ -193,6 +194,32 @@ struct LibraryReply: Codable {
     let page: Int
     let totalPages: Int
     let total: Int
+    // A channel page only: counts, and what "Explorer la suite" imports next.
+    let counts: [String: Int]?
+    let exploreNextPage: Int?
+    let explorePageSize: Int?
+}
+
+/// `GET /api/channels/{id}`: the channel with its profile (banner, description, keywords).
+struct ChannelDetail: Codable {
+    let id: Int
+    let url: String
+    let name: String
+    let rating: Int
+    let categories: [String]
+    let autoMetadataEnabled: Bool
+    let autoShortsEnabled: Bool
+    let description: String?
+    let keywords: [String]
+    let avatarUrl: String?
+    let bannerUrl: String?
+}
+
+/// `GET /api/jobs/{id}`: the app only waits for `done`.
+struct JobProgress: Codable {
+    let status: String
+    let message: String
+    let done: Bool
 }
 
 /// `GET /api/channels` item.
@@ -204,7 +231,9 @@ struct ChannelItem: Codable, Identifiable, Hashable {
     let autoMetadataEnabled: Bool
     let autoShortsEnabled: Bool
     let avatarUrl: String?
+    let bannerUrl: String?
     let videoCount: Int
+    let lastPlayedAt: String?
 }
 
 struct ChannelsReply: Codable {
@@ -256,6 +285,13 @@ struct PlaylistDetail: Codable {
     let categories: [String]
     let freeListening: Bool
     let items: [PlaylistItem]
+    let stats: PlaylistStats?
+}
+
+struct PlaylistStats: Codable, Hashable {
+    let count: Int
+    let totalDurationSeconds: Int
+    let seenCount: Int
 }
 
 struct HistoryVideo: Codable, Hashable {

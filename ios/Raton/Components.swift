@@ -83,3 +83,25 @@ struct ListRow<Content: View>: View {
             .padding(.horizontal, 12).padding(.vertical, 4)
     }
 }
+
+/// The web's "Fiches affichées" switch: the list shows everything, or leaves out the Vu and Indésirée fiches.
+struct HideToggle: View {
+    @Binding var showAll: Bool
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach([(true, "list.bullet", "Tout voir"), (false, "eye.slash", "Masquer les fiches vues")], id: \.0) { option in
+                let active = showAll == option.0
+                Button { showAll = option.0 } label: {
+                    Image(systemName: option.1).font(.system(size: 17))
+                        .foregroundStyle(active ? Theme.primary : Theme.textMuted)
+                        .frame(width: 44, height: 38)
+                        .background(Capsule().fill(active ? Color.white.opacity(0.8) : Color.clear))
+                }
+                .accessibilityLabel(option.2)
+            }
+        }
+        .padding(4)
+        .glass(in: Capsule())
+    }
+}

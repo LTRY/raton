@@ -85,12 +85,15 @@ struct TabPill: View {
 struct PageHeader<Trailing: View>: View {
     let title: String
     var back = false
+    // The number next to the title, in the little pill of the web's list pages.
+    var badge: Int? = nil
     @ViewBuilder var trailing: Trailing
     @Environment(\.dismiss) private var dismiss
 
-    init(title: String, back: Bool = false, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+    init(title: String, back: Bool = false, badge: Int? = nil, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
         self.title = title
         self.back = back
+        self.badge = badge
         self.trailing = trailing()
     }
 
@@ -102,6 +105,11 @@ struct PageHeader<Trailing: View>: View {
                     .accessibilityLabel("Retour")
             }
             Text(title).font(.raton(30, .bold)).foregroundStyle(Theme.text).lineLimit(2)
+            if let badge {
+                Text("\(badge)").font(.raton(14, .bold)).foregroundStyle(Theme.textSoft)
+                    .padding(.horizontal, 10).padding(.vertical, 3)
+                    .glass(in: Capsule())
+            }
             Spacer(minLength: 0)
             trailing
         }

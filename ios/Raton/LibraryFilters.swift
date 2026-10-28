@@ -17,6 +17,23 @@ struct LibraryFilters: Equatable {
 
     var isDefault: Bool { self == LibraryFilters() }
 
+    /// What the "Filtres" pill counts and the pills under it list: (label, kind, remove).
+    var activePills: [(label: String, excluded: Bool, remove: (inout LibraryFilters) -> Void)] {
+        var pills: [(label: String, excluded: Bool, remove: (inout LibraryFilters) -> Void)] = []
+        for value in assets.sorted() { pills.append((Self.assetLabel(value), false, { $0.assets.remove(value) })) }
+        for value in excludedAssets.sorted() { pills.append((Self.assetLabel(value), true, { $0.excludedAssets.remove(value) })) }
+        for value in categories.sorted() { pills.append((value, false, { $0.categories.remove(value) })) }
+        for value in excludedCategories.sorted() { pills.append((value, true, { $0.excludedCategories.remove(value) })) }
+        if rated { pills.append(("Notées", false, { $0.rated = false })) }
+        if uncategorized { pills.append(("Sans catégorie", false, { $0.uncategorized = false })) }
+        return pills
+    }
+
+    private static func assetLabel(_ kind: String) -> String {
+        ["video": "Vidéo", "audio": "Audio", "shorts": "Shorts", "metadata": "Métadonnées",
+         "transcript": "Transcript", "imported": "Manuelles", "notes": "Notes"][kind] ?? kind
+    }
+
     var queryItems: [URLQueryItem] {
         var items = [URLQueryItem(name: "sort", value: sort), URLQueryItem(name: "section", value: section)]
         items += assets.sorted().map { URLQueryItem(name: "asset", value: $0) }

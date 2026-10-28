@@ -9,8 +9,12 @@ final class ChannelsModel: ObservableObject {
     private var totalPages = 1
     private var loading = false
 
+    // The web's defaults: only the rated channels, by last media played.
+    @Published var ratedOnly = true
+    @Published var sort = "activity"
+
     private func query(page: Int, search: String) -> [String: String] {
-        var query = ["page": String(page)]
+        var query = ["page": String(page), "sort": sort, "rated": ratedOnly ? "true" : "false"]
         if !search.isEmpty { query["q"] = search }
         return query
     }
@@ -45,7 +49,7 @@ final class ChannelsModel: ObservableObject {
 
 struct ChannelsView: View {
     @EnvironmentObject private var state: AppState
-    @StateObject private var model = ChannelsModel()
+    @StateObject fileprivate var model = ChannelsModel()
     @State private var search = ""
     @State private var showAdd = false
 
@@ -54,7 +58,7 @@ struct ChannelsView: View {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "Chaînes") {
+                        PageHeader(title: "Chaînes", badge: model.count) {
                             Menu {
                                 Button { showAdd = true } label: { Label("Ajouter par adresse", systemImage: "link") }
                                 NavigationLink { YoutubeSearchView() } label: {
@@ -67,28 +71,11 @@ struct ChannelsView: View {
                         SearchField(placeholder: "Rechercher une chaîne", text: $search) {
                             Task { await model.reload(api: api, search: search) }
                         }
+                        filterRow(api)
                         ErrorMessage(text: model.errorMessage)
                         ForEach(model.items) { channel in
-                            NavigationLink(value: channel) {
-                                ListRow {
-                                    HStack(spacing: 14) {
-                                        AvatarView(path: channel.avatarUrl, name: channel.name, api: api)
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(channel.name)
-                                                .font(.raton(17, .bold)).foregroundStyle(Theme.text)
-                                                .lineLimit(2)
-                                            Text("\(channel.videoCount) fiche\(channel.videoCount > 1 ? "s" : "")")
-                                                .font(.raton(14)).foregroundStyle(Theme.textMuted)
-                                        }
-                                        Spacer(minLength: 0)
-                                        if channel.autoMetadataEnabled || channel.autoShortsEnabled {
-                                            Image(systemName: "bell.fill").foregroundStyle(Theme.primary)
-                                        }
-                                    }
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .task { await model.loadMore(api: api, search: search, after: channel) }
+                            ChannelCard(channel: channel, api: api)
+                                .task { await model.loadMore(api: api, search: search, after: channel) }
                         }
                         if model.loaded && model.items.isEmpty && model.errorMessage == nil {
                             EmptyMessage(text: "Aucune chaîne.")
@@ -109,130 +96,44 @@ struct ChannelsView: View {
     }
 }
 
-/// A channel: its two cloches (vidéos, shorts) and its fiches.
-struct ChannelView: View {
-    let channel: ChannelItem
-    @EnvironmentObject private var state: AppState
-    @StateObject private var model: LibraryModel
-    @State private var videosBell: Bool
-    @State private var shortsBell: Bool
-    @State private var busy = false
-    @State private var errorMessage: String?
-    @State private var rating: Int
-    @State private var categories: [String]
-    @State private var showCategories = false
-    @State private var confirmDelete = false
-    @Environment(\.dismiss) private var dismiss
+extension ChannelsView {
+    private static let sorts = [
+        ("activity", "Dernier média joué"), ("rating", "Note"), ("alpha", "A-Z"), ("added", "Ajoutées récemment"),
+    ]
 
-    init(channel: ChannelItem) {
-        _rating = State(initialValue: channel.rating)
-        _categories = State(initialValue: channel.categories)
-        self.channel = channel
-        _model = StateObject(wrappedValue: LibraryModel(channelID: channel.id))
-        _videosBell = State(initialValue: channel.autoMetadataEnabled)
-        _shortsBell = State(initialValue: channel.autoShortsEnabled)
-    }
-
-    var body: some View {
-        Group {
-            if let api = state.api {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: channel.name, back: true) {
-                            Menu {
-                                Button { showCategories = true } label: { Label("Catégories", systemImage: "tag") }
-                                Button { Task { await refreshProfile(api) } } label: {
-                                    Label("Actualiser le profil", systemImage: "arrow.clockwise")
-                                }
-                                Button(role: .destructive) { confirmDelete = true } label: {
-                                    Label("Supprimer la chaîne", systemImage: "trash")
-                                }
-                            } label: { Image(systemName: "ellipsis") }
-                            .buttonStyle(CircleButtonStyle())
-                            .accessibilityLabel("Plus d'options")
-                        }
-                        HStack(spacing: 6) {
-                            CategoryChips(categories: categories, api: api)
-                            Spacer()
-                            ForEach(1...5, id: \.self) { star in
-                                Button { Task { await setRating(api, rating == star ? 0 : star) } } label: {
-                                    Image(systemName: "star.fill").font(.system(size: 22))
-                                        .foregroundStyle(star <= rating ? Theme.amber : Theme.textFaint.opacity(0.55))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 16).padding(.bottom, 12)
-                        HStack(spacing: 8) {
-                            bellButton("Cloche vidéos", isOn: videosBell) { toggle(api, "videos") }
-                            bellButton("Cloche shorts", isOn: shortsBell) { toggle(api, "shorts") }
-                        }
-                        .padding(.horizontal, 16).padding(.bottom, 12)
-                        ErrorMessage(text: errorMessage)
-                        VideoList(model: model, api: api, search: "")
-                    }
-                }
-                .refreshable { await model.reload(api: api, search: "") }
-                .task { await model.reload(api: api, search: "") }
-                .sheet(isPresented: $showCategories) {
-                    CategoryPickerSheet(api: api, selected: categories) { chosen in
-                        do {
-                            let _: ChannelState = try await api.put(
-                                "/api/channels/\(channel.id)/categories", body: ["categories": chosen])
-                            categories = chosen
-                        } catch { errorMessage = error.localizedDescription }
-                    }
-                }
-                .confirmationDialog("Supprimer cette chaîne et ses fiches ?", isPresented: $confirmDelete, titleVisibility: .visible) {
-                    Button("Supprimer", role: .destructive) {
-                        Task {
-                            do {
-                                try await api.delete("/api/channels/\(channel.id)")
-                                dismiss()
-                            } catch { errorMessage = error.localizedDescription }
-                        }
-                    }
-                }
+    /// "★ Notées" and the sort, the two controls under the search of the web page.
+    fileprivate func filterRow(_ api: RatonAPI) -> some View {
+        HStack(spacing: 14) {
+            Button {
+                model.ratedOnly.toggle()
+                Task { await model.reload(api: api, search: search) }
+            } label: {
+                Label("Notées", systemImage: "star.fill")
+                    .font(.raton(15, .bold))
+                    .foregroundStyle(model.ratedOnly ? Theme.primary : Theme.textSoft)
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .glass(in: Capsule(), tint: model.ratedOnly ? Theme.primary : nil, interactive: true)
             }
-        }
-        .ratonPage()
-        .toolbar(.hidden, for: .navigationBar)
-    }
-
-    private func setRating(_ api: RatonAPI, _ value: Int) async {
-        do {
-            let _: ChannelState = try await api.put("/api/channels/\(channel.id)/rating", body: ["rating": value])
-            rating = value
-        } catch { errorMessage = error.localizedDescription }
-    }
-
-    private func refreshProfile(_ api: RatonAPI) async {
-        let _: QueuedJob? = try? await api.post("/api/channels/\(channel.id)/refresh-profile")
-    }
-
-    private func bellButton(_ title: String, isOn: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: isOn ? "bell.fill" : "bell")
-        }
-        .buttonStyle(SandButtonStyle(active: isOn))
-        .disabled(busy)
-    }
-
-    /// The cloche is the user's own follow switch; the back decides what turning it on imports.
-    private func toggle(_ api: RatonAPI, _ section: String) {
-        let enable = section == "videos" ? !videosBell : !shortsBell
-        busy = true
-        errorMessage = nil
-        Task {
-            do {
-                let reply: ChannelBellReply = try await api.put(
-                    "/api/channels/\(channel.id)/bells/\(section)", body: ["enabled": enable])
-                videosBell = reply.channel.autoMetadataEnabled
-                shortsBell = reply.channel.autoShortsEnabled
-            } catch {
-                errorMessage = error.localizedDescription
+            Menu {
+                ForEach(Self.sorts, id: \.0) { sort in
+                    Button {
+                        model.sort = sort.0
+                        Task { await model.reload(api: api, search: search) }
+                    } label: {
+                        if model.sort == sort.0 { Label(sort.1, systemImage: "checkmark") } else { Text(sort.1) }
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "line.3.horizontal.decrease").font(.system(size: 13))
+                    Text(Self.sorts.first { $0.0 == model.sort }?.1 ?? "").font(.raton(15, .bold))
+                    Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
+                }
+                .foregroundStyle(Theme.textSoft)
             }
-            busy = false
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 16).padding(.bottom, 8)
     }
 }
 

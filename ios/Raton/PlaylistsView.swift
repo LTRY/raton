@@ -7,13 +7,19 @@ struct PlaylistsView: View {
     @State private var errorMessage: String?
     @State private var showNew = false
     @State private var showImport = false
+    @State private var search = ""
+
+    private var shown: [PlaylistSummary] {
+        let query = search.trimmingCharacters(in: .whitespaces).lowercased()
+        return query.isEmpty ? playlists : playlists.filter { $0.title.lowercased().contains(query) }
+    }
 
     var body: some View {
         Group {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "Playlists") {
+                        PageHeader(title: "Playlists", badge: playlists.count) {
                             Menu {
                                 Button { showNew = true } label: { Label("Nouvelle playlist", systemImage: "plus") }
                                 Button { showImport = true } label: { Label("Importer depuis YouTube", systemImage: "square.and.arrow.down") }
@@ -21,28 +27,14 @@ struct PlaylistsView: View {
                             .buttonStyle(CircleButtonStyle())
                             .accessibilityLabel("Ajouter une playlist")
                         }
+                        SearchField(placeholder: "Rechercher une playlist", text: $search) {}
                         ErrorMessage(text: errorMessage)
-                        ForEach(playlists) { playlist in
-                            NavigationLink(value: playlist) {
-                                ListRow {
-                                    HStack(spacing: 14) {
-                                        if let cover = playlist.coverVideoId {
-                                            Thumbnail(videoID: cover, hasThumbnail: playlist.coverHasThumbnail, api: api)
-                                                .frame(width: 96, height: 54).clipped()
-                                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                                        }
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(playlist.title)
-                                                .font(.raton(17, .bold)).foregroundStyle(Theme.text).lineLimit(2)
-                                            Text("\(playlist.itemCount) fiche\(playlist.itemCount > 1 ? "s" : "")")
-                                                .font(.raton(14)).foregroundStyle(Theme.textMuted)
-                                        }
-                                        Spacer(minLength: 0)
-                                    }
-                                }
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 22) {
+                            ForEach(shown) { playlist in
+                                PlaylistTile(playlist: playlist, api: api, onChange: { Task { await load(api) } })
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.horizontal, 16).padding(.top, 4)
                         if loaded && playlists.isEmpty && errorMessage == nil {
                             EmptyMessage(text: "Aucune playlist.")
                         }
@@ -81,6 +73,93 @@ struct PlaylistsView: View {
     }
 }
 
+/// A playlist of the grid, like the web's `.pl-card`: two layers behind the cover (the stack), the
+/// source chip, the "⋯" menu, the number of videos, then the title.
+struct PlaylistTile: View {
+    let playlist: PlaylistSummary
+    let api: RatonAPI
+    let onChange: () -> Void
+    @State private var confirmDelete = false
+
+    private var chip: String {
+        playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : "Manuelle"
+    }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink(value: playlist) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ZStack(alignment: .bottomTrailing) {
+                        cover
+                        Text("\(playlist.itemCount) vidéo\(playlist.itemCount == 1 ? "" : "s")")
+                            .font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
+                            .padding(.horizontal, 9).padding(.vertical, 4)
+                            .glass(in: Capsule()).padding(8)
+                    }
+                    .overlay(alignment: .topLeading) {
+                        Text(chip).font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .glass(in: Capsule()).padding(8)
+                    }
+                    .background(stackLayers)
+                    Text(playlist.title).font(.raton(16, .bold)).foregroundStyle(Theme.textSoft)
+                        .lineLimit(2).multilineTextAlignment(.leading)
+                }
+            }
+            .buttonStyle(.plain)
+            Menu {
+                Button(role: .destructive) { confirmDelete = true } label: { Label("Supprimer", systemImage: "trash") }
+                Button { Task { await duplicate() } } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.textSoft)
+                    .frame(width: 32, height: 32).glass(in: Circle(), interactive: true)
+            }
+            .padding(8)
+            .accessibilityLabel("Actions sur \(playlist.title)")
+        }
+        .confirmationDialog("Supprimer « \(playlist.title) » ? Les vidéos sont conservées.",
+                            isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Supprimer", role: .destructive) { Task { await delete() } }
+        }
+    }
+
+    @ViewBuilder
+    private var cover: some View {
+        Group {
+            if let id = playlist.coverVideoId, playlist.coverHasThumbnail {
+                AsyncImage(url: api.url("/api/videos/\(id)/thumbnail?w=320")) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Theme.surfaceMuted }
+            } else {
+                LinearGradient(colors: [Color(hex: 0xF3E3D0), Color(hex: 0xF0D2BC)], startPoint: .top, endPoint: .bottom)
+            }
+        }
+        .frame(maxWidth: .infinity).aspectRatio(16 / 10, contentMode: .fit).clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.7), lineWidth: 1))
+    }
+
+    /// The two cards peeking out above the cover.
+    private var stackLayers: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.35))
+                .padding(.horizontal, 14).offset(y: -10)
+            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.55))
+                .padding(.horizontal, 7).offset(y: -5)
+        }
+    }
+
+    private func duplicate() async {
+        let _: PlaylistSummary? = try? await api.post("/api/playlists/\(playlist.id)/duplicate")
+        onChange()
+    }
+
+    private func delete() async {
+        try? await api.delete("/api/playlists/\(playlist.id)")
+        onChange()
+    }
+}
+
 /// A playlist: its fiches in order, with the queue player on top; a tap on a row plays it, the
 /// "i" opens its fiche.
 struct PlaylistView: View {
@@ -99,7 +178,7 @@ struct PlaylistView: View {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: detail?.title ?? playlist.title, back: true) {
+                        PageHeader(title: "", back: true) {
                             Menu {
                                 Button { showRename = true } label: { Label("Renommer", systemImage: "pencil") }
                                 Button { showCategories = true } label: { Label("Catégories", systemImage: "tag") }
@@ -131,7 +210,10 @@ struct PlaylistView: View {
                             .accessibilityLabel("Plus d'options")
                         }
                         ErrorMessage(text: errorMessage)
-                        if let detail { PlaylistPlayerPanel(detail: detail, api: api) }
+                        if let detail {
+                            PlaylistPlayerPanel(detail: detail, api: api)
+                            PlaylistTitleBlock(detail: detail)
+                        }
                         ForEach(detail?.items ?? []) { item in
                             let playable = item.hasFile(player.queueMode)
                             let isCurrent = player.queue?.playlistID == playlist.id && player.track?.videoID == item.videoId

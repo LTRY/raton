@@ -25,23 +25,57 @@ struct PlaylistPlayerPanel: View {
             }
         }
         .padding(16)
+        .glassCard(radius: 28)
+        .padding(.horizontal, 16).padding(.bottom, 8)
     }
 
     private var modePicker: some View {
         HStack(spacing: 8) {
             ForEach([MediaKind.video, MediaKind.audio], id: \.self) { kind in
-                Button(kind == .video ? "Vidéo" : "Audio") { player.setQueueMode(kind) }
-                    .buttonStyle(SandButtonStyle(active: player.queueMode == kind))
+                let active = player.queueMode == kind
+                Button { player.setQueueMode(kind) } label: {
+                    Text(kind == .video ? "Vidéo" : "Audio").font(.raton(16, .bold))
+                        .foregroundStyle(active ? Theme.primary : Theme.textMuted)
+                        .frame(maxWidth: .infinity).frame(height: 40)
+                        .background(Capsule().fill(active ? Color.white.opacity(0.85) : Color.clear))
+                }
             }
         }
+        .padding(4)
+        .glass(in: Capsule())
+    }
+
+    /// The square cover of the audio mode: the track's thumbnail, or the terracotta gradient, with its "Audio" tag.
+    private var art: some View {
+        ZStack(alignment: .topLeading) {
+            if let current = player.queue?.currentTrack, current.hasThumbnail, owns {
+                AsyncImage(url: api.url("/api/videos/\(current.videoID)/thumbnail")) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { gradient }
+            } else {
+                gradient
+            }
+            Text("Audio").font(.raton(13, .bold)).foregroundStyle(Theme.text)
+                .padding(.horizontal, 12).padding(.vertical, 5)
+                .background(Capsule().fill(Color.white.opacity(0.9))).padding(12)
+        }
+        .frame(width: 250, height: 250).clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+    }
+
+    private var gradient: some View {
+        LinearGradient(colors: [Color(hex: 0xE8A07A), Color(hex: 0xC2410C), Color(hex: 0x8A2C10)],
+                       startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     @ViewBuilder
     private var stage: some View {
         if owns, player.track?.kind == .video, let avPlayer = player.player {
             VideoPlayer(player: avPlayer).aspectRatio(16 / 9, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         } else {
-            VStack(spacing: 4) {
+            VStack(spacing: 10) {
+                if player.queueMode == .audio { art }
                 if owns, let current = player.queue?.currentTrack {
                     Text(current.title).font(.raton(18, .bold)).foregroundStyle(Theme.text)
                         .multilineTextAlignment(.center).lineLimit(2)
@@ -61,7 +95,7 @@ struct PlaylistPlayerPanel: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 26) {
+        HStack(spacing: 22) {
             toggle("shuffle", on: player.shuffle, label: "Aléatoire") { player.shuffle.toggle() }
             Button { player.previous() } label: { Image(systemName: "backward.fill") }
                 .disabled(!owns).accessibilityLabel("Piste précédente")
@@ -88,11 +122,38 @@ struct PlaylistPlayerPanel: View {
 
     private func toggle(_ icon: String, on: Bool, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textMuted)
-                .frame(width: 38, height: 38)
-                .background(Circle().fill(on ? Theme.primary.opacity(0.18) : Color.clear))
+            Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
+                .frame(width: 46, height: 46)
+                .glass(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
         }
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// The title block under the player: name, kind and the figures of the playlist, like the web's.
+struct PlaylistTitleBlock: View {
+    let detail: PlaylistDetail
+
+    private var kind: String {
+        detail.source == "url" ? "Playlist YouTube" : detail.source == "csv" ? "Playlist CSV Takeout" : "Playlist manuelle"
+    }
+
+    private var figures: String {
+        guard let stats = detail.stats else { return "" }
+        let minutes = Int((Double(stats.totalDurationSeconds) / 60).rounded())
+        let duration = minutes >= 60 ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
+        let seen = detail.freeListening ? "écoute libre" : "\(stats.seenCount) vue\(stats.seenCount > 1 ? "s" : "") sur \(stats.count)"
+        return "\(duration) · \(stats.count) vidéo\(stats.count > 1 ? "s" : "") · \(seen)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(detail.title).font(.raton(30, .bold)).foregroundStyle(Theme.text)
+            Text(kind).font(.raton(16)).foregroundStyle(Theme.textMuted)
+            if !figures.isEmpty { Text(figures).font(.raton(16)).foregroundStyle(Theme.textMuted) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20).padding(.vertical, 12)
     }
 }
