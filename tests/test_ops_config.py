@@ -1,4 +1,4 @@
-from scripts import ops_config, ops_review, previews
+from scripts import ops_config, ops_jobs, ops_render, ops_review
 
 
 def test_repository_ops_toml_matches_the_scripts_it_names():
@@ -35,15 +35,15 @@ def test_the_review_command_reads_the_skill_and_tools_from_the_config(monkeypatc
 
 
 def test_deployed_sha_is_unknown_without_a_container_to_inspect(monkeypatch):
-    monkeypatch.setattr(previews, "CONFIG", ops_config.OpsConfig())
+    monkeypatch.setattr(ops_jobs, "CONFIG", ops_config.OpsConfig())
 
-    assert previews.deployed_sha() is None
+    assert ops_jobs.deployed_sha() is None
 
 
 def test_the_project_name_is_escaped_in_the_page(monkeypatch):
-    monkeypatch.setattr(previews, "CONFIG", ops_config.OpsConfig(project_name="A<b>'c"))
+    monkeypatch.setattr(ops_render, "CONFIG", ops_config.OpsConfig(project_name="A<b>'c"))
 
-    page = previews.render_page("nas:8999", [], {}, {}, None)
+    page = ops_render.render_page("nas:8999", [], {}, {}, None)
 
     assert "A&lt;b&gt;&#x27;c" in page
     assert "<b>" not in page

@@ -308,6 +308,10 @@ projet reutilise l'outil en fournissant son propre `ops.toml` et ses scripts.
 - `[previews] script` : le script de previews (`up`, `rebase`, `down`, `sweep`,
   `list`), propre au projet : la base partagee ou copiee, les ports et les
   reseaux y restent.
+- `[jobs] timeout_minutes` (30 par defaut) : un job de preview ou de deploiement
+  encore en cours apres ce delai est arrete (SIGTERM puis SIGKILL sur tout son
+  groupe de processus), son journal le dit et la page le montre en echec ; sans
+  cela, le bouton resterait grise indefiniment.
 - `[review]` : `skill` (skill Claude Code lance chaque jour), `allowed_tools`
   (outils en lecture seule), puis les valeurs par defaut `hour`, `hours`,
   `model`, `max_usd`, que `OPS_REVIEW_HOUR`, `OPS_REVIEW_HOURS`,
@@ -315,6 +319,19 @@ projet reutilise l'outil en fournissant son propre `ops.toml` et ses scripts.
 
 Une cle absente prend la valeur par defaut de `OpsConfig`. Verification :
 `tests/test_ops_config.py`.
+
+**Jeton de la page** : la page peut deployer en production depuis un conteneur
+root qui pilote Docker. Par defaut elle est ouverte, comme Raton (LAN de
+confiance). Avec `OPS_TOKEN` dans le `.env`, chaque requete (page, journaux,
+actions) doit porter ce jeton comme mot de passe d'une authentification HTTP
+Basic (nom d'utilisateur libre) ; le navigateur le demande une fois. Sans jeton
+et avec une interface autre que loopback, la page affiche un avertissement au
+demarrage. Le jeton ne vit pas dans `ops.toml` (versionne).
+
+**Code** : `scripts/ops_jobs.py` (PR, previews, lancement des scripts en
+arriere-plan), `scripts/ops_render.py` (HTML et libelles d'etat),
+`scripts/previews.py` (serveur, jeton), `scripts/ops_review.py` (revue des
+journaux). Le linter (`make lint`, `make format`) couvre `scripts/`.
 
 ## Previews des PR
 

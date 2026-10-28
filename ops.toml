@@ -17,6 +17,10 @@ sha_label = "raton.git-sha"
 # `<script> up|rebase|down|sweep <pr>` and `<script> list`: the project's own preview logic.
 script = "scripts/preview.sh"
 
+[jobs]
+# A deploy or preview job still running after this long is stopped (its process group is killed).
+timeout_minutes = 30
+
 [review]
 # The Claude Code skill run daily with the number of hours to read, e.g. `/review-logs 24`.
 skill = "review-logs"

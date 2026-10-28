@@ -21,6 +21,7 @@ class OpsConfig:
     deploy_container: str = ""
     deploy_sha_label: str = ""
     previews_script: str = "scripts/preview.sh"
+    job_timeout_minutes: int = 30
     review_skill: str = "review-logs"
     review_allowed_tools: tuple[str, ...] = field(default=("Read", "Skill"))
     review_hour: int = 8
@@ -34,6 +35,7 @@ def parse(data: dict) -> OpsConfig:
     default = OpsConfig()
     project, deploy = data.get("project", {}), data.get("deploy", {})
     previews, review = data.get("previews", {}), data.get("review", {})
+    jobs = data.get("jobs", {})
     return OpsConfig(
         project_name=project.get("name", default.project_name),
         deploy_script=deploy.get("script", default.deploy_script),
@@ -41,6 +43,7 @@ def parse(data: dict) -> OpsConfig:
         deploy_container=deploy.get("container", default.deploy_container),
         deploy_sha_label=deploy.get("sha_label", default.deploy_sha_label),
         previews_script=previews.get("script", default.previews_script),
+        job_timeout_minutes=int(jobs.get("timeout_minutes", default.job_timeout_minutes)),
         review_skill=review.get("skill", default.review_skill),
         review_allowed_tools=tuple(review.get("allowed_tools", default.review_allowed_tools)),
         review_hour=int(review.get("hour", default.review_hour)),
