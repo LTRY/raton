@@ -13,7 +13,7 @@ exposee hors LAN.
 
 Les utilisateurs (voir [20 Glossaire](20-glossaire.md), « Utilisateur ») ne
 sont pas des comptes : aucun mot de passe, et n'importe qui sur le LAN peut
-choisir n'importe quel utilisateur (bouton du tiroir « Discussions », cookie
+choisir n'importe quel utilisateur (carte « Changer d'utilisateur » des Parametres, cookie
 `raton_user`, en-tete `X-Raton-User`), en ajouter, en renommer ou en
 supprimer. Ils separent ce que chacun garde pour soi (Vu, etoiles, playlists,
 discussions...), pas ce que chacun a le droit de voir.

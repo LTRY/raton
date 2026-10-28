@@ -7488,7 +7488,6 @@ turbo-frame {
 }
 
 /* Pinned to the bottom of the drawer, like the "new session" pill of a chat app. */
-/* Bottom row of the drawer: the user button on the left, "Nouvelle discussion" next to it. */
 .chat-drawer-foot {
   align-items: center;
   bottom: 0;
@@ -12451,21 +12450,11 @@ body::before {
   }
 }
 
-/* Phone (no top bar): the row with the discussions menu stays at the top
-   while a long discussion scrolls. Lifted above the tab bar while the drawer
-   is open, since the sticky row is the drawer's stacking context. */
+/* No discussions menu on a phone: the ☰ and its drawer
+   (docs/spec/11-interface-html.md, "Discussions"). */
 @media (max-width: 800px) {
-  .dashboard-home .chat-bar[data-chat-empty="false"] .discussion-header {
-    background: color-mix(in srgb, var(--color-bg) 88%, transparent);
-    margin-inline: -16px;
-    padding: max(8px, env(safe-area-inset-top)) 16px 8px;
-    position: sticky;
-    top: 0;
-    z-index: 30;
-  }
-
-  .dashboard-home .chat-bar .discussion-header:has([data-chat-drawer]:not([hidden])) {
-    z-index: 1001;
+  .dashboard-home .chat-bar .chat-nav {
+    display: none;
   }
 }
 
