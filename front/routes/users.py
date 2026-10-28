@@ -1,5 +1,5 @@
 """The user's own page (`/user`, opened from the home drawer's round button: their name, the
-user switch, Raton's language, the couvre-feu), and the user forms of that page and of
+user switch, Raton's language, the screen time limits, the couvre-feu), and the user forms of that page and of
 `/settings`.
 
 The chosen user is the `raton_user` cookie, which only the front sets: every page and every
@@ -35,8 +35,8 @@ def _users(api: Api) -> dict[int, str]:
 
 @router.get("/user", response_class=HTMLResponse)
 def user_page(request: Request, api: Api = Depends(get_api)):
-    """Open during the couvre-feu (its API calls are): the name, the user addition and Raton's
-    language are then hidden, and the couvre-feu card stays so that it can be switched off."""
+    """Open during the couvre-feu (its API calls are): the name, the user addition, Raton's
+    language and the screen time limits are then hidden, and the couvre-feu card stays so that it can be switched off."""
     settings = api.get("/settings")
     curfew = record(settings["curfew"])
     return templates.TemplateResponse(
@@ -47,6 +47,7 @@ def user_page(request: Request, api: Api = Depends(get_api)):
             "curfew": curfew,
             "curfew_mode": curfew.active,
             "raton_language": record(settings["raton_language"]),
+            "screen_time_limits": settings["screen_time_limits"],
             **message_context(request),
         },
     )
@@ -56,6 +57,10 @@ def user_page(request: Request, api: Api = Depends(get_api)):
 def user_form(
     raton_address: str | None = Form(None),
     raton_nickname: str | None = Form(None),
+    screen_time_video_today: int | None = Form(None),
+    screen_time_short_today: int | None = Form(None),
+    screen_time_podcast_today: int | None = Form(None),
+    screen_time_music_today: int | None = Form(None),
     curfew_enabled: str = Form(default=""),
     curfew_start: str = Form("22:00"),
     curfew_end: str = Form("10:00"),
@@ -66,11 +71,17 @@ def user_form(
             "/settings",
             {
                 # During the couvre-feu the form only holds the couvre-feu card: the language
-                # fields are absent and stay as they are.
+                # and screen time fields are absent and stay as they are.
                 "raton_address": raton_address,
                 "raton_nickname": None
                 if raton_nickname is None
                 else form_text_value(raton_nickname),
+                "screen_time_today_minutes": {
+                    "video": screen_time_video_today,
+                    "short": screen_time_short_today,
+                    "podcast": screen_time_podcast_today,
+                    "music": screen_time_music_today,
+                },
                 # Unchecked checkbox: the browser sends nothing, so an empty value means "off".
                 "curfew_enabled": bool(form_text_value(curfew_enabled)),
                 "curfew_start": curfew_start,

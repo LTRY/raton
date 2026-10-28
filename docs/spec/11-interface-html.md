@@ -734,13 +734,15 @@ pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
   utilisateur » et « Ajouter » (`POST /users`) ;
 - un formulaire (`POST /user`, barre « Enregistrer ») : « Raton et toi »
   (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
-  t'appelle ») et « Couvre-feu » (interrupteur, heures de debut et de fin en
-  `input type="time"`).
+  t'appelle »), « Temps d'écran » (ancre `#screen-time` : une ligne par type,
+  Vidéos, Shorts, Podcasts, Musique, avec la limite du jour en minutes,
+  `screen_time_<kind>_today`) et « Couvre-feu » (interrupteur, heures de debut
+  et de fin en `input type="time"`).
 
 Pendant le couvre-feu, la page reste ouverte mais ne garde que « Changer
 d'utilisateur » (sans l'ajout), la carte « Couvre-feu » (pour le desactiver ;
-`POST /user` n'envoie alors ni le tutoiement ni le surnom, qui restent
-inchanges) et la note « Couvre-feu jusqu'à 10:00 : tu peux le désactiver
+`POST /user` n'envoie alors ni le tutoiement, ni le surnom, ni les limites de
+temps d'ecran, qui restent inchanges) et la note « Couvre-feu jusqu'à 10:00 : tu peux le désactiver
 ci-dessous ou changer d'utilisateur ».
 
 ### Couvre-feu
@@ -1764,7 +1766,7 @@ a l'etat actif). De haut en bas :
   ranges en cinq groupes : « Apercu » (Bibliotheque, Couts LLM, Suivi
   automatique : lecture seule, sans champ), « Bibliotheque video » (categories,
   barre de progression, sous-bibliotheques), « Lecture » (segments
-  sponsorises, temps d'ecran), « Automatisation » (notes automatiques) et
+  sponsorises), « Automatisation » (notes automatiques) et
   « Autres pages » (liens vers `/rag` et `/raton/variations`, sans carte) ;
   les sections de la page suivent le meme ordre, chacune sous un intitule de
   groupe (`.settings-group-title`) ;
@@ -1809,7 +1811,7 @@ inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root e
 quota global, reglables par l'API ou l'environnement, voir
 [04 Configuration et deploiement](04-configuration-et-deploiement.md)), ni
 carte « Utilisateurs » : renommer, changer et supprimer un utilisateur se fait
-dans `/user`.
+dans `/user`, comme les limites de temps d'ecran (propres a chaque utilisateur).
 
 Permet de modifier :
 
@@ -1831,8 +1833,6 @@ Permet de modifier :
   [08 Medias et lecteurs](08-medias-et-lecteurs.md) ;
 - vues sauvegardees de la bibliotheque video (celles de l'utilisateur
   courant) ;
-- limites de temps d'ecran par type (`video`/`short`/`podcast`/`music`) et par
-  periode (`today`/`week`/`month`), celles de l'utilisateur courant ;
 - le lien « Phrases de Raton » de la navigation ouvre `/raton/variations` (toutes les
   repliques de Raton), voir [18 Raton](18-raton-scenarios.md).
 

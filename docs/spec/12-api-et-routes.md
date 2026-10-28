@@ -175,8 +175,9 @@ Utilisateurs (`front/routes/users.py`) — le front seul pose le cookie
 requete » plus bas) :
 
 - `GET /user` : la page de l'utilisateur courant (nom, changement
-  d'utilisateur, langage de Raton, couvre-feu), ouverte aussi pendant son
-  couvre-feu ; `POST /user` `raton_address`, `raton_nickname`,
+  d'utilisateur, langage de Raton, temps d'ecran, couvre-feu), ouverte aussi
+  pendant son couvre-feu ; `POST /user` `raton_address`, `raton_nickname`,
+  `screen_time_<kind>_today` (`video`, `short`, `podcast`, `music`),
   `curfew_enabled`, `curfew_start`, `curfew_end` : `PUT /api/settings`, puis
   redirige vers `/user` avec « Paramètres enregistrés. » ou le message du back.
 - `POST /user/curfew/skip`, `POST /user/curfew/resume` : « Désactiver le

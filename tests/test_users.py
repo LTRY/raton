@@ -151,6 +151,33 @@ def test_the_user_page_switches_renames_and_sets_ratons_language(db):
     assert 'value="Chef"' in page
 
 
+def test_the_user_page_sets_the_screen_time_limits(db):
+    user_id(db)
+    site = site_client()
+
+    assert 'name="screen_time_video_today"' in site.get("/user").text
+    assert 'id="screen-time"' not in site.get("/settings").text
+    saved = site.post(
+        "/user",
+        data={
+            "screen_time_video_today": "45",
+            "screen_time_short_today": "5",
+            "screen_time_podcast_today": "90",
+            "screen_time_music_today": "0",
+        },
+        follow_redirects=False,
+    )
+
+    assert saved.headers["location"].startswith("/user?")
+    limits = TestClient(app).get("/api/settings").json()["screen_time_limits"]
+    assert {kind: limits[kind]["today"] for kind in limits} == {
+        "video": 45,
+        "short": 5,
+        "podcast": 90,
+        "music": 1,
+    }
+
+
 def test_ratons_language_is_each_users_own_and_reaches_the_library_chat(db):
     other = add_user(db, "Invité")
     api = TestClient(app)

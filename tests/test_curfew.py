@@ -293,3 +293,4 @@ def test_the_user_page_stays_open_during_the_curfew_for_the_switch_and_the_curfe
     assert page.status_code == 200
     assert page.text.count('action="/users/switch"') == 2
     assert "/rename" not in page.text
+    assert 'id="screen-time"' not in page.text
