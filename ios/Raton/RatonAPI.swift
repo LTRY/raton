@@ -45,6 +45,21 @@ final class RatonAPI {
         try decode(try await send("PUT", path, body: body))
     }
 
+    func delete(_ path: String) async throws {
+        _ = try await send("DELETE", path)
+    }
+
+    /// Polls `GET /api/llm-jobs/{id}` until the answer is written (the back applies a finished job on
+    /// the poll that sees it), as the front's chat does.
+    func waitForLLMJob(_ jobID: Int) async throws -> LLMJobStatus {
+        while true {
+            let job: LLMJobStatus = try await get("/api/llm-jobs/\(jobID)")
+            if job.status == "failed" { throw RatonError(message: job.message ?? "Réponse impossible.") }
+            if job.status == "done" || job.status == "applied" { return job }
+            try await Task.sleep(nanoseconds: 2_000_000_000)
+        }
+    }
+
     private func decode<T: Decodable>(_ data: Data) throws -> T {
         do {
             return try decoder.decode(T.self, from: data)

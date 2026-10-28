@@ -28,6 +28,8 @@ final class PlayerController: ObservableObject {
     private var endObserver: NSObjectProtocol?
     private var watchedSeconds: Double = 0
     private var lastTrackedTime: Double?
+    // Segments the back says to skip (SponsorBlock): the player only jumps over them.
+    private var skipSegments: [SkipSegment] = []
 
     init() {
         configureRemoteCommands()
@@ -36,9 +38,10 @@ final class PlayerController: ObservableObject {
     // MARK: Loading
 
     /// Starts playing the fiche's file; does nothing when that file is already the loaded one.
-    func play(detail: VideoDetail, kind: MediaKind, api: RatonAPI) {
+    func play(detail: VideoDetail, kind: MediaKind, api: RatonAPI, startAt: Double? = nil) {
         let newTrack = Track(videoID: detail.id, kind: kind)
         if track == newTrack {
+            if let startAt { seek(to: startAt) }
             resume()
             return
         }
@@ -66,7 +69,11 @@ final class PlayerController: ObservableObject {
         let player = AVPlayer(url: api.url(path))
         self.player = player
         observe(player)
-        if let resume = detail.resumePositions[kind.rawValue]?.positionSeconds, resume >= 3 {
+        skipSegments = detail.sponsorSkipEnabled ? detail.skipSegments : []
+        if let startAt {
+            player.seek(to: CMTime(seconds: startAt, preferredTimescale: 600))
+            position = startAt
+        } else if let resume = detail.resumePositions[kind.rawValue]?.positionSeconds, resume >= 3 {
             player.seek(to: CMTime(seconds: resume, preferredTimescale: 600))
             position = resume
         }
@@ -118,13 +125,17 @@ final class PlayerController: ObservableObject {
 
     private func observe(_ player: AVPlayer) {
         timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 1, preferredTimescale: 600), queue: .main
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main
         ) { [weak self] time in
             guard let self, time.seconds.isFinite else { return }
             self.position = time.seconds
             if let itemDuration = player.currentItem?.duration.seconds,
                itemDuration.isFinite, itemDuration > 0 {
                 self.duration = itemDuration
+            }
+            if let segment = self.skipSegments.first(where: { time.seconds >= $0.start && time.seconds < $0.end - 0.5 }) {
+                self.seek(to: segment.end)
+                return
             }
             self.trackWatchedTime()
             self.updateNowPlaying()

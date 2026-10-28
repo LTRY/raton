@@ -56,8 +56,18 @@ struct MediaURLs: Codable, Hashable {
     let thumbnail: String?
 }
 
+struct Chapter: Codable, Hashable {
+    let title: String
+    let startSeconds: Double?
+}
+
 struct VideoMetadata: Codable, Hashable {
     let description: String?
+    let tags: [String]
+    let chapters: [Chapter]
+    let viewCount: Int?
+    let likeCount: Int?
+    let commentCount: Int?
     let uploader: String?
 }
 
@@ -66,21 +76,66 @@ struct PlaybackPosition: Codable, Hashable {
     let atMs: Int
 }
 
+struct ChatMessage: Codable, Hashable {
+    let role: String
+    let content: String
+}
+
+struct VideoDocuments: Codable, Hashable {
+    let transcript: String?
+    let notes: String?
+    let shortSummary: String?
+    let suggestedQuestions: [String]
+    let chatMessages: [ChatMessage]
+}
+
+struct SponsorSegment: Codable, Hashable {
+    let category: String
+    let startSeconds: Double
+    let endSeconds: Double
+}
+
+struct SkipSegment: Codable, Hashable {
+    let start: Double
+    let end: Double
+}
+
+struct TranscriptLine: Codable, Hashable {
+    let startSeconds: Double
+    let text: String
+}
+
+struct VideoPlaylistRef: Codable, Hashable {
+    let playlistId: Int
+    let title: String
+    let itemId: Int
+}
+
 /// `GET /api/videos/{id}` (`VideoDetailRead`).
 struct VideoDetail: Codable, Identifiable, Hashable {
     let id: Int
     let title: String
+    let url: String
     let isNew: Bool
     let rating: Int
+    let categories: [String]
     let listState: String?
     // How the fiche is greyed out ("normal", "watched" or "hidden"): decided by the back.
     let shownState: String
+    let comment: String?
     let durationSeconds: Int?
     let mediaUrls: MediaURLs
     let metadata: VideoMetadata
+    let documents: VideoDocuments
+    let sponsorSegments: [SponsorSegment]
+    let sponsorSkipEnabled: Bool
+    let skipSegments: [SkipSegment]
     let resumePositions: [String: PlaybackPosition]
     let filesPurged: Bool
+    let playlists: [VideoPlaylistRef]
     let channel: ChannelRef?
+    let hasTranscript: Bool
+    let transcriptLines: [TranscriptLine]
 }
 
 /// The `PUT`/`POST` replies that carry a fiche's state back; only used to know the call succeeded.
@@ -188,4 +243,49 @@ struct HistoriqueReply: Codable {
     let rows: [HistoryRow]
     let page: Int
     let totalPages: Int
+}
+
+struct CategoryStyle: Codable, Hashable {
+    let label: String
+    let color: String
+}
+
+/// A queued background job (download, LLM request).
+struct QueuedJob: Codable {
+    let jobId: Int
+    let status: String
+    let statusUrl: String?
+    let conversationId: Int?
+}
+
+struct LLMJobStatus: Codable {
+    let id: Int
+    let status: String
+    let message: String?
+    let documents: VideoDocuments?
+    let chatMessages: [ChatMessage]?
+    let libraryChat: LibraryChat?
+}
+
+struct LibraryChatCitation: Codable, Hashable {
+    let videoId: Int
+    let title: String
+}
+
+struct LibraryChatMessage: Codable, Hashable {
+    let role: String
+    let content: String
+    let citations: [LibraryChatCitation]
+}
+
+struct LibraryChatConversation: Codable, Identifiable, Hashable {
+    let id: Int
+    let title: String
+}
+
+struct LibraryChat: Codable {
+    let conversationId: Int?
+    let title: String?
+    let messages: [LibraryChatMessage]
+    let conversations: [LibraryChatConversation]
 }

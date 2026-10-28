@@ -30,6 +30,14 @@ extension Color {
     }
 }
 
+extension Color {
+    /// "#rrggbb", as the API gives category colors; gray when it cannot be read.
+    init(hexString: String) {
+        let digits = hexString.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        self.init(hex: UInt32(digits, radix: 16) ?? 0x7A6A57)
+    }
+}
+
 extension Font {
     /// Plus Jakarta Sans (variable font bundled in the app), at a fixed size.
     static func raton(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
@@ -54,13 +62,15 @@ struct CircleButtonStyle: ButtonStyle {
 /// The sand-colored buttons under a fiche ("Plus d'informations", "Commentaire").
 struct SandButtonStyle: ButtonStyle {
     var active = false
+    // False for a button that sits in a horizontal scroller: it keeps its own width.
+    var fill = true
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.raton(16, .medium))
             .foregroundStyle(active ? Theme.primary : Theme.textSoft)
             .lineLimit(1)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: fill ? .infinity : nil)
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .background(RoundedRectangle(cornerRadius: 8).fill(active ? Theme.tint : Theme.surfaceMuted))
