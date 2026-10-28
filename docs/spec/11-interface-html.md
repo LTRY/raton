@@ -1706,9 +1706,12 @@ Contenu ordonne :
    dans le menu « ⋮ », point 1) ;
    sous 800 px les labels techniques sont masques (seuls restent les labels
    categories et les playlists), chaque groupe occupe sa propre ligne sous la
-   chaine, aligne sur le bord droit, et le groupe des categories commence par
-   son bouton "+ Categories", a la taille de son texte, suivi de ses
-   labels ;
+   chaine, aligne sur le bord gauche comme le titre (la note en etoiles
+   suit, alignee de la meme facon), et le groupe des categories commence par
+   son bouton "+ Categories", de la meme taille que les autres labels (10 px,
+   meme sur iOS : `text-size-adjust: 100%` sur `html`), suivi de ses
+   labels ; le titre n'a pas de marge haute, pour rapprocher le titre de la
+   barre de lecture ;
 3. titre ;
 4. chaine ;
 5. note sur 5 étoiles ;

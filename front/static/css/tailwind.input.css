@@ -110,6 +110,13 @@
   --glass-saturate-smoke: 160%;
 }
 
+html {
+  /* iOS Safari otherwise inflates small text (the 10px labels) unevenly, so a
+     chip drawn as a <button> ends up bigger than its <span> siblings. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 html,
 body {
   /* Last-resort net for "no horizontal page scroll on phones" (see
@@ -5660,6 +5667,7 @@ turbo-frame {
 }
 
 .category-label-add {
+  appearance: none;
   background: none;
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-pill);
@@ -5669,6 +5677,7 @@ turbo-frame {
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
+  margin: 0;
   padding: 2px 7px;
 }
 
@@ -12013,12 +12022,22 @@ body::before {
   }
 
   .video-detail-label-groups .category-labels {
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .video-detail-heading .video-detail-label-groups .category-label-add {
     order: -1;
     width: auto;
+  }
+
+  /* Categories and the rating sit under the title, against the left edge like it. */
+  .video-detail-heading-side {
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .video-detail-heading h1 {
+    margin-top: 0;
   }
 
   /* The shared progress bar between the slides and the format toggle; the
