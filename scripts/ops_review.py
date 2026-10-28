@@ -1,8 +1,9 @@
-"""The daily log review of the `raton-ops` container: runs the `review-logs` skill with Claude Code.
+"""The daily log review of the ops container: runs the project's review skill with Claude Code.
 
 Started by the previews page (scripts/previews.py --scheduler): a thread wakes once a day at
-OPS_REVIEW_HOUR, runs `claude --bare -p "/review-logs 24"` in the repository and stores the verdict
-and its cost in .local/ops/reviews/ (one JSON file per run), shown by the page.
+the review hour, runs `claude --bare -p "/<skill> <hours>"` in the repository and stores the
+verdict and its cost in .local/ops/reviews/ (one JSON file per run), shown by the page.
+The skill, hour, model and budget come from ops.toml (scripts/ops_config.py).
 Standard library only, like the page. Spec: docs/spec/13-jobs-logs-planification.md, section
 "Revue quotidienne des journaux".
 """
@@ -15,31 +16,13 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+from scripts.ops_config import CONFIG, REPO
+
 REVIEW_DIR = REPO / ".local" / "ops" / "reviews"
 
-DEFAULT_HOUR = 8
-DEFAULT_HOURS = 24
-DEFAULT_MAX_USD = 1.0
 RUN_TIMEOUT_SECONDS = 20 * 60
 TICK_SECONDS = 30
-
-# The skill is read-only: the CLI may read files and run the digest and the log queries, nothing
-# else. The docker commands are the skill's fallback when the journal is missing.
-ALLOWED_TOOLS = [
-    "Read",
-    "Skill",
-    "Bash(python -m back.core.logs_digest:*)",
-    "Bash(jq:*)",
-    "Bash(grep:*)",
-    "Bash(ls:*)",
-    "Bash(tail:*)",
-    "Bash(head:*)",
-    "Bash(docker ps:*)",
-    "Bash(docker compose logs:*)",
-]
 
 
 @dataclass
@@ -66,13 +49,13 @@ def build_command(hours: int, model: str | None, max_usd: float) -> list[str]:
         "claude",
         "--bare",
         "-p",
-        f"/review-logs {hours}",
+        f"/{CONFIG.review_skill} {hours}",
         "--output-format",
         "json",
         "--max-budget-usd",
         str(max_usd),
         "--allowedTools",
-        *ALLOWED_TOOLS,
+        *CONFIG.review_allowed_tools,
     ]
     if model:
         command += ["--model", model]
@@ -111,12 +94,12 @@ def execute_review(hours: int, trigger: str, now: datetime | None = None) -> Rev
         text="",
     )
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        review.text = "ANTHROPIC_API_KEY est absente de l'environnement du conteneur raton-ops."
+        review.text = "ANTHROPIC_API_KEY est absente de l'environnement du conteneur ops."
     else:
         command = build_command(
             hours,
-            os.environ.get("OPS_REVIEW_MODEL", "sonnet"),
-            float(os.environ.get("OPS_REVIEW_MAX_USD") or DEFAULT_MAX_USD),
+            os.environ.get("OPS_REVIEW_MODEL") or CONFIG.review_model,
+            float(os.environ.get("OPS_REVIEW_MAX_USD") or CONFIG.review_max_usd),
         )
         try:
             result = subprocess.run(
@@ -203,8 +186,8 @@ def cost_since(reviews: list[Review], now: datetime, days: int) -> float:
 
 
 def scheduler_loop() -> None:
-    hour = int(os.environ.get("OPS_REVIEW_HOUR") or DEFAULT_HOUR)
-    hours = int(os.environ.get("OPS_REVIEW_HOURS") or DEFAULT_HOURS)
+    hour = int(os.environ.get("OPS_REVIEW_HOUR") or CONFIG.review_hour)
+    hours = int(os.environ.get("OPS_REVIEW_HOURS") or CONFIG.review_hours)
     while True:
         if is_due(datetime.now(), hour, list_reviews(limit=50)):
             start_review(hours, "scheduled")
@@ -230,7 +213,7 @@ def verdict_line(review: Review) -> str:
 def render_reviews(reviews: list[Review], busy: bool, now: datetime | None = None) -> str:
     """The "Revue des journaux" card of the previews page."""
     now = now or datetime.now()
-    hour = int(os.environ.get("OPS_REVIEW_HOUR") or DEFAULT_HOUR)
+    hour = int(os.environ.get("OPS_REVIEW_HOUR") or CONFIG.review_hour)
     if busy:
         status, css = "Revue en cours…", "busy"
     elif not reviews:
@@ -252,8 +235,8 @@ def render_reviews(reviews: list[Review], busy: bool, now: datetime | None = Non
     total = format_cost(cost_since(reviews, now, 30))
     return (
         '<div class="pr prod"><div class="info"><h2>Revue des journaux</h2>'
-        f'<div class="meta">Tous les jours à {hour} h : le skill review-logs relit les '
-        f"{DEFAULT_HOURS} dernières heures. Coût des 30 derniers jours : {total}.</div>"
+        f'<div class="meta">Tous les jours à {hour} h : le skill {CONFIG.review_skill} relit les '
+        f"{CONFIG.review_hours} dernières heures. Coût des 30 derniers jours : {total}.</div>"
         f'<div class="status {css}">{html.escape(status)}</div>'
         f'<ul class="meta reviews">{rows}</ul></div>'
         '<div class="actions"><form method="post" action="/reviews/run">'

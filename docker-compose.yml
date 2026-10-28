@@ -104,6 +104,8 @@ services:
       TZ: ${TZ:-Europe/Paris}
       # gh and git over HTTPS (previews, fetch of origin/main).
       GH_TOKEN: ${GH_TOKEN:-}
+      # When set, the page asks for it as the password of HTTP Basic auth (any user name).
+      OPS_TOKEN: ${OPS_TOKEN:-}
       # The daily log review: Claude Code on the Anthropic API, billed per token.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPS_REVIEW_HOUR: ${OPS_REVIEW_HOUR:-8}

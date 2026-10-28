@@ -291,6 +291,48 @@ puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make
 (Node >= 22.22 requis), `make docs-build` construit l'image comme le fait la CI
 (job `docs` de `ci.yml`).
 
+## Configuration de l'outil ops
+
+La page des previews, le deploiement de `main` et la revue quotidienne des journaux
+(`scripts/previews.py`, `scripts/ops_review.py`) ne connaissent pas Raton par
+leur code : tout ce qui nomme le projet est lu dans `ops.toml`, a la racine du
+depot (`scripts/ops_config.py`, bibliotheque standard seulement). Un autre
+projet reutilise l'outil en fournissant son propre `ops.toml` et ses scripts.
+
+- `[project] name` : nom affiche dans le titre de la page et la confirmation du
+  deploiement.
+- `[deploy]` : `script` (lance par le bouton **Deployer main en production**),
+  `branch` (suivie pour comparer avec la version deployee), `container` et
+  `sha_label` (conteneur en marche et label de son image qui porte le commit
+  construit ; sans eux, la version deployee reste « inconnue »).
+- `[previews] script` : le script de previews (`up`, `rebase`, `down`, `sweep`,
+  `list`), propre au projet : la base partagee ou copiee, les ports et les
+  reseaux y restent.
+- `[jobs] timeout_minutes` (30 par defaut) : un job de preview ou de deploiement
+  encore en cours apres ce delai est arrete (SIGTERM puis SIGKILL sur tout son
+  groupe de processus), son journal le dit et la page le montre en echec ; sans
+  cela, le bouton resterait grise indefiniment.
+- `[review]` : `skill` (skill Claude Code lance chaque jour), `allowed_tools`
+  (outils en lecture seule), puis les valeurs par defaut `hour`, `hours`,
+  `model`, `max_usd`, que `OPS_REVIEW_HOUR`, `OPS_REVIEW_HOURS`,
+  `OPS_REVIEW_MODEL` et `OPS_REVIEW_MAX_USD` surchargent.
+
+Une cle absente prend la valeur par defaut de `OpsConfig`. Verification :
+`tests/test_ops_config.py`.
+
+**Jeton de la page** : la page peut deployer en production depuis un conteneur
+root qui pilote Docker. Par defaut elle est ouverte, comme Raton (LAN de
+confiance). Avec `OPS_TOKEN` dans le `.env`, chaque requete (page, journaux,
+actions) doit porter ce jeton comme mot de passe d'une authentification HTTP
+Basic (nom d'utilisateur libre) ; le navigateur le demande une fois. Sans jeton
+et avec une interface autre que loopback, la page affiche un avertissement au
+demarrage. Le jeton ne vit pas dans `ops.toml` (versionne).
+
+**Code** : `scripts/ops_jobs.py` (PR, previews, lancement des scripts en
+arriere-plan), `scripts/ops_render.py` (HTML et libelles d'etat),
+`scripts/previews.py` (serveur, jeton), `scripts/ops_review.py` (revue des
+journaux). Le linter (`make lint`, `make format`) couvre `scripts/`.
+
 ## Previews des PR
 
 Une preview est une instance jetable de Raton (back et front) construite a
