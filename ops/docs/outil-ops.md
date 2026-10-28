@@ -161,7 +161,7 @@ d'une meme machine (`ops/tests/test_ops_jobs.py`).
 
 `ops/jobs.py` (PR, previews, lancement des scripts en arriere-plan, jobs
 persistes), `ops/deploy_lock.py` (verrou de deploiement), `ops/render.py` (HTML et
-libelles d'etat), `ops/server.py` (serveur, jeton), `ops/review.py` (revue des
+libelles d'etat), `ops/graph.py` (graphe des commits de l'alerte de production), `ops/server.py` (serveur, jeton), `ops/review.py` (revue des
 journaux), `ops/config.py` (`ops.toml`). Les tests sont dans `ops/tests/`, lances
 par `make test` ; le linter (`make lint`, `make format`) couvre `ops/`. Un test de
 `tests/test_code_structure.py` garde l'outil independant de Raton : `ops/` n'importe

@@ -272,9 +272,13 @@ a jour : le commit dont l'image `raton-api` a ete construite (label
 toutes les 30 s). Le texte est « A jour avec origin/main », « En retard de N
 commits » (en rouge, a redeployer : la carte affiche alors une **alerte** « La
 production est en retard » qui explique qu'un merge ne deploie rien et liste les
-15 commits les plus recents manquants, `git log <deploye>..origin/main`, chacun
-avec son sha court, ses etiquettes `[TAG]` en pastilles, son titre et son
-numero de PR), ou « Version deployee inconnue » quand
+15 commits les plus recents manquants (`git log <deploye>..origin/main`) sous
+forme de **graphe** a la maniere d'un client git (`ops/graph.py`) : une ligne
+verticale, `origin/main` en haut, un point par commit colore selon l'auteur, la
+production en bas avec son sha ; chaque commit montre ses etiquettes `[TAG]` en
+pastilles, son titre, son numero de PR, son sha court, son auteur (initiale
+coloree) et son age (« il y a 3 h »), avec « … et N commits plus anciens » au
+dela de 15), ou « Version deployee inconnue » quand
 l'image n'a pas le label (deploiement anterieur, ou `docker compose up` sans
 `make up`) ; elle reste vraie meme si le depot a ete avance sans redeployer. Un script qui ne peut pas demarrer (par exemple
 non executable) termine le travail en echec et l'ecrit dans le journal ; les

@@ -306,10 +306,12 @@ def test_a_failed_gh_call_is_reported_and_nothing_follows(monkeypatch):
     assert jobs.move_pr(31, "merged") == "gh pr merge a échoué : conflits"
 
 
-def test_stale_production_alert_lists_the_missing_commits_with_their_titles():
+def test_stale_production_alert_draws_the_missing_commits_as_a_graph():
+    from ops.jobs import Commit
+
     pending = [
-        ("abc1234", "[FRONT][BACK] Stats: link <channels> (#80)"),
-        ("def5678", "Plain title"),
+        Commit("abc1234", "[FRONT][BACK] Stats: link <channels> (#80)", "Ada", 1_000_000),
+        Commit("def5678", "Plain title", "Bob", 1_000_000 - 7200),
     ]
     page = render_page(
         "h",
@@ -317,8 +319,10 @@ def test_stale_production_alert_lists_the_missing_commits_with_their_titles():
         {},
         {},
         None,
-        prod_version=("En retard de 2 commits", "stale"),
+        prod_version=("En retard de 5 commits", "stale"),
         pending_commits=pending,
+        deployed="b" * 40,
+        behind=5,
     )
 
     assert "La production est en retard" in page
@@ -327,6 +331,37 @@ def test_stale_production_alert_lists_the_missing_commits_with_their_titles():
     assert "Stats: link &lt;channels&gt;" in page
     assert '<span class="pr-ref">#80</span>' in page
     assert "Plain title" in page
+    assert '<span class="avatar">A</span>Ada' in page
+    assert "origin/main" in page  # the branch on top
+    assert '<span class="branch prod">production</span> <code class="sha">bbbbbbb' in page
+    assert "… et 3 commits plus anciens" in page  # 5 behind, 2 drawn
+
+
+def test_age_is_written_in_french():
+    from ops.graph import ago
+
+    assert ago(100, 130) == "à l'instant"
+    assert ago(0, 600) == "il y a 10 min"
+    assert ago(0, 7300) == "il y a 2 h"
+    assert ago(0, 3 * 86400) == "il y a 3 j"
+    assert ago(0, 70 * 86400) == "il y a 2 mois"
+
+
+def test_an_author_keeps_the_same_colour():
+    from ops.graph import author_color
+
+    assert author_color("Ada") == author_color("Ada")
+    assert author_color("Ada") != author_color("Bob")
+
+
+def test_pending_commits_are_read_from_git_log(monkeypatch):
+    from ops import jobs
+
+    monkeypatch.setattr(
+        jobs, "run_text", lambda command: "abc1234\t[OPS] Title\tAda\t100\nbroken line\n"
+    )
+
+    assert jobs.read_pending("d", "o", 15) == [jobs.Commit("abc1234", "[OPS] Title", "Ada", 100)]
 
 
 def test_up_to_date_production_shows_no_alert():

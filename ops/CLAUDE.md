@@ -13,7 +13,7 @@ A standalone tool that serves one project at a time: the previews page, the depl
 
 ## Layout
 
-- `ops/*.py`: the package (`config`, `jobs`, `render`, `review`, `server`, `deploy_lock`), run from the project's root as `python -m ops.server`.
+- `ops/*.py`: the package (`config`, `jobs`, `render`, `graph`, `review`, `server`, `deploy_lock`), run from the project's root as `python -m ops.server`.
 - `ops/tests/`: its tests, run by the root `make test`.
 - `ops/docs/outil-ops.md`: its spec (frontmatter `title:` equal to the first `# ` heading, French, like `docs/spec/`).
 - `ops/pyproject.toml`: scopes the lint rules; the tool has no build and no dependency.

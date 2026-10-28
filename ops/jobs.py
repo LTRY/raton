@@ -264,8 +264,16 @@ def count_behind(deployed: str, origin: str) -> int | None:
     return int(count) if count and count.isdigit() else None
 
 
-def pending_commits(deployed: str, origin: str, limit: int = 15) -> list[tuple[str, str]]:
-    """(short sha, title) of the newest commits origin/main has that the deployed one lacks."""
+@dataclass(frozen=True)
+class Commit:
+    sha: str  # short
+    title: str
+    author: str
+    timestamp: int  # committer date, Unix seconds
+
+
+def pending_commits(deployed: str, origin: str, limit: int = 15) -> list[Commit]:
+    """The newest commits origin/main has that the deployed one lacks."""
     return cached(
         ("pending", deployed, origin, limit),
         CACHE_TTL,
@@ -273,10 +281,16 @@ def pending_commits(deployed: str, origin: str, limit: int = 15) -> list[tuple[s
     )
 
 
-def read_pending(deployed: str, origin: str, limit: int) -> list[tuple[str, str]]:
-    out = run_text(["git", "log", f"-{limit}", "--format=%h%x09%s", f"{deployed}..{origin}"])
-    pairs = [line.partition("\t") for line in (out or "").splitlines()]
-    return [(sha, title) for sha, _, title in pairs if sha]
+def read_pending(deployed: str, origin: str, limit: int) -> list[Commit]:
+    out = run_text(
+        ["git", "log", f"-{limit}", "--format=%h%x09%s%x09%an%x09%ct", f"{deployed}..{origin}"]
+    )
+    commits = []
+    for line in (out or "").splitlines():
+        parts = line.split("\t")
+        if len(parts) == 4 and parts[3].isdigit():
+            commits.append(Commit(parts[0], parts[1], parts[2], int(parts[3])))
+    return commits
 
 
 def log_path(pr: int) -> Path:

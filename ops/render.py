@@ -5,12 +5,13 @@ library only. Spec: ops/docs/outil-ops.md, section "Previews des PR".
 """
 
 import html
-import re
 from urllib.parse import urlsplit
 
 from ops import review as ops_review
 from ops.config import CONFIG
-from ops.jobs import Job, Preview
+from ops.graph import STYLE as GRAPH_STYLE
+from ops.graph import render_graph
+from ops.jobs import Commit, Job, Preview
 
 
 def preview_url(host: str | None, port: int) -> str:
@@ -120,15 +121,6 @@ button:disabled { opacity: .5; cursor: default; }
 .alert { flex-basis: 100%; background: var(--warn-bg); border: 1px solid var(--warn-line);
   border-left-width: 5px; border-radius: 10px; padding: 10px 12px; }
 .alert p { margin: 0 0 8px; overflow-wrap: anywhere; }
-.commits { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.commits li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; background: var(--card);
-  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 0; }
-.sha { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip); color: var(--accent);
-  border-radius: 6px; padding: 1px 6px; }
-.tag { font-size: 11px; font-weight: 700; letter-spacing: .03em; background: var(--accent); color: #fff;
-  border-radius: 999px; padding: 1px 8px; }
-.ctitle { font-weight: 600; flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-.pr-ref { color: var(--muted); font-size: 12px; }
 .board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; align-items: start;
   overflow-x: auto; margin-bottom: 18px; padding-bottom: 6px; }
 .col { background: var(--col); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
@@ -312,36 +304,21 @@ def render_board(
     return f'<div class="board">{columns}</div><script>{BOARD_SCRIPT}</script>'
 
 
-TITLE_TAGS = re.compile(r"((?:\[[A-Za-z]+\])+)\s*(.*?)(?:\s*\(#(\d+)\))?")
-
-
-def render_commit(sha: str, title: str) -> str:
-    """One commit of the alert: short sha, leading [TAG] chips, title, trailing (#N) reference."""
-    match = TITLE_TAGS.fullmatch(title)
-    tags, text, ref = match.groups() if match else ("", title, None)
-    chips = "".join(
-        f'<span class="tag">{html.escape(t)}</span>' for t in re.findall(r"\[(.*?)\]", tags)
-    )
-    ref_html = f'<span class="pr-ref">#{ref}</span>' if ref else ""
-    return (
-        f'<li><code class="sha">{html.escape(sha)}</code>{chips}'
-        f'<span class="ctitle">{html.escape(text)}</span>{ref_html}</li>'
-    )
-
-
 def render_behind_alert(
-    version: tuple[str, str], pending: list[tuple[str, str]] | None, deploy_branch: str
+    version: tuple[str, str],
+    pending: list[Commit] | None,
+    deployed: str | None,
+    behind: int | None,
 ) -> str:
     """The alert shown when the deployed version trails origin/<branch>: why, and what is missing."""
     if version[1] != "stale":
         return ""
-    commits = "".join(render_commit(sha, title) for sha, title in pending or [])
-    listing = f'<ul class="commits">{commits}</ul>' if commits else ""
+    graph = render_graph(pending, deployed, behind, CONFIG.deploy_branch) if pending else ""
     return (
         '<div class="alert"><p><strong>La production est en retard.</strong> '
-        f"Ce qui est mergé sur {html.escape(deploy_branch)} n'est pas encore en ligne "
+        f"Ce qui est mergé sur {html.escape(CONFIG.deploy_branch)} n'est pas encore en ligne "
         "tant qu'il n'est pas déployé : utilisez « Déployer main en production ». "
-        f"{html.escape(version[0])}</p>{listing}</div>"
+        f"{html.escape(version[0])}</p>{graph}</div>"
     )
 
 
@@ -349,13 +326,15 @@ def render_prod(
     job: Job | None,
     version: tuple[str, str] | None = None,
     elsewhere: bool = False,
-    pending: list[tuple[str, str]] | None = None,
+    pending: list[Commit] | None = None,
+    deployed: str | None = None,
+    behind: int | None = None,
 ) -> str:
     label, css = prod_status(job, elsewhere)
     version_line = ""
     alert = ""
     if version is not None and version[1] == "stale":
-        alert = render_behind_alert(version, pending, CONFIG.deploy_branch)
+        alert = render_behind_alert(version, pending, deployed, behind)
     elif version is not None:
         version_line = f'<div class="status {version[1]}">{html.escape(version[0])}</div>'
     disabled = " disabled" if css == "busy" else ""
@@ -385,8 +364,10 @@ def render_page(
     review_busy: bool = False,
     prod_version: tuple[str, str] | None = None,
     deploy_elsewhere: bool = False,
-    pending_commits: list[tuple[str, str]] | None = None,
+    pending_commits: list[Commit] | None = None,
     merged: list[dict] | None = None,
+    deployed: str | None = None,
+    behind: int | None = None,
 ) -> str:
     board = render_board(host, prs, previews, job_by_pr, merged or [])
     # A preview whose PR is no longer open still shows, to be removed.
@@ -409,12 +390,12 @@ def render_page(
     return f"""<!doctype html>
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">{refresh}
-<title>Previews des PR · {html.escape(CONFIG.project_name)}</title><style>{STYLE}</style></head>
+<title>Previews des PR · {html.escape(CONFIG.project_name)}</title><style>{STYLE}{GRAPH_STYLE}</style></head>
 <body><main>
 <div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/?refresh=1" class="refresh">Rafraîchir</a></div>
-{render_prod(prod_job, prod_version, deploy_elsewhere, pending_commits)}
+{render_prod(prod_job, prod_version, deploy_elsewhere, pending_commits, deployed, behind)}
 {review_card}
 {banner}{board}{orphans}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>

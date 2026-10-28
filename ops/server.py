@@ -110,6 +110,8 @@ class Handler(BaseHTTPRequestHandler):
                 ops_jobs.deploy_elsewhere(prod),
                 pending,
                 ops_jobs.list_merged_prs(),
+                deployed,
+                behind,
             )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
