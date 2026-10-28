@@ -4559,6 +4559,8 @@ def test_settings_page_renders_custom_category_labels(tmp_path):
     assert 'href="/rag"' in rendered and 'href="/raton/variations"' in rendered
     assert 'id="rag"' not in rendered and 'id="raton"' not in rendered
     assert 'href="#auto-notes"' in rendered
+    # The sub-libraries card is folded, its count stays in the summary.
+    assert '<summary><h2 class="settings-card-title">Sous-bibliothèques</h2>' in rendered
     assert "data-settings-actions" in rendered and "data-unsaved-guard" in rendered
     assert 'href="/logs"' in rendered
 

@@ -211,16 +211,15 @@
 
         <div class="settings-card" id="libraries">
           <div class="settings-library-builder" data-library-view-editor data-initial-views='{{ video_library_views | tojson }}' data-asset-options='{{ video_library_asset_options | tojson }}' data-category-options='{{ video_category_label_styles | tojson }}'>
-            <div class="settings-category-header">
-              <h2 class="settings-card-title">Sous-bibliothèques</h2>
-              <output data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output>
-            </div>
+            <details class="settings-fold settings-fold-card">
+            <summary><h2 class="settings-card-title">Sous-bibliothèques</h2><output class="settings-fold-meta" data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output></summary>
             <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
             <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
             <noscript>
               <p class="settings-hint">Sans JavaScript, les sous-bibliothèques se modifient en JSON : une liste d’objets avec <code>name</code>, <code>assets</code>, <code>categories</code>, <code>excluded_assets</code>, <code>excluded_categories</code>, <code>asset_filter_mode</code> et <code>category_filter_mode</code> (<code>or</code> ou <code>and</code>), <code>rated</code>. Un JSON invalide n’enregistre rien.</p>
             </noscript>
             <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
+            </details>
           </div>
         </div>
 

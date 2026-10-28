@@ -11025,6 +11025,9 @@ a.log-title:hover { color: var(--color-primary); }
 }
 .settings-fold-card[open] > summary::after { content: "▴"; }
 .settings-fold-card > summary .settings-card-title { margin-right: auto; }
+.settings-fold-card > .settings-library-list,
+.settings-fold-card > [data-library-view-add],
+.settings-fold-card > .category-label-source,
 .settings-fold-card > .settings-hint,
 .settings-fold-card > .settings-checkbox-list { margin-top: 10px; }
 .settings-fold-meta { color: var(--color-text-muted); font-size: 13px; font-weight: 400; }

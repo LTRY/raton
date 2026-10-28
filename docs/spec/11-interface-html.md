@@ -1769,7 +1769,7 @@ a l'etat actif). De haut en bas :
   les sections de la page suivent le meme ordre, chacune sous un intitule de
   groupe (`.settings-group-title`) ;
 - cartes de reglages. Les blocs peu consultes sont replies dans un `<details>` :
-  "Categories sans barre de progression", "Notes automatiques" et "Segments sponsorises" (resume du
+  "Categories sans barre de progression", "Notes automatiques", "Sous-bibliotheques" (nombre de vues dans l'en-tete) et "Segments sponsorises" (resume du
   nombre de cases cochees dans l'en-tete ; les cases d'un bloc replie sont
   quand meme envoyees), et le detail des tableaux de "Couts LLM" (le total
   reste visible) ;
