@@ -74,8 +74,8 @@ struct PlaylistPlayerPanel: View {
                 }
             } label: {
                 Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 26)).foregroundStyle(.white)
-                    .frame(width: 60, height: 60).background(Circle().fill(Theme.primary))
+                    .font(.system(size: 26)).foregroundStyle(Theme.primary)
+                    .frame(width: 60, height: 60).glass(in: Circle(), tint: Theme.primary, interactive: true)
             }
             .disabled(playable == 0)
             .accessibilityLabel(owns && player.isPlaying ? "Pause" : "Lecture")
@@ -90,7 +90,7 @@ struct PlaylistPlayerPanel: View {
         Button(action: action) {
             Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textMuted)
                 .frame(width: 38, height: 38)
-                .background(Circle().fill(on ? Theme.tint : Color.clear))
+                .background(Circle().fill(on ? Theme.primary.opacity(0.18) : Color.clear))
         }
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])

@@ -24,8 +24,7 @@ struct SearchField: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .background(Capsule().fill(Color.white))
-        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+        .glass(in: Capsule())
         .padding(.horizontal, 16).padding(.bottom, 12)
     }
 }
@@ -72,14 +71,15 @@ struct AvatarView: View {
     }
 }
 
-/// A white edge-to-edge row with the hairline under it, as the web's lists.
+/// A glass card row, floating over the backdrop.
 struct ListRow<Content: View>: View {
+    var tint: Color? = nil
     @ViewBuilder let content: Content
     var body: some View {
         content
             .padding(.horizontal, 16).padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.white)
-            .overlay(alignment: .bottom) { Theme.border.frame(height: 1) }
+            .glassCard(radius: 20, tint: tint)
+            .padding(.horizontal, 12).padding(.vertical, 4)
     }
 }

@@ -52,8 +52,7 @@ struct ChatView: View {
                         TextField("Pose une question à ta bibliothèque", text: $question, axis: .vertical)
                             .font(.raton(16))
                             .padding(.horizontal, 14).padding(.vertical, 10)
-                            .background(Capsule().fill(Color.white))
-                            .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                            .glass(in: Capsule())
                         Button {
                             let asked = question
                             question = ""
@@ -82,7 +81,7 @@ struct ChatView: View {
         let mine = message.role == "user"
         VStack(alignment: .leading, spacing: 6) {
             Text(message.content)
-                .font(.raton(15)).foregroundStyle(mine ? .white : Theme.text)
+                .font(.raton(15)).foregroundStyle(mine ? Color(hex: 0x7C2D12) : Theme.text)
             // Sources of the answer: tapping one opens its fiche.
             ForEach(message.citations, id: \.videoId) { citation in
                 NavigationLink(value: citation.videoId) {
@@ -92,8 +91,7 @@ struct ChatView: View {
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 14).fill(mine ? Theme.primary : Color.white))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(mine ? Color.clear : Theme.border, lineWidth: 1))
+        .glassCard(radius: 18, tint: mine ? Theme.primary : nil)
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
     }
 

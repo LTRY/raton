@@ -33,8 +33,7 @@ struct ServerURLView: View {
                     .submitLabel(.go)
                     .onSubmit { Task { await connect() } }
                     .padding(.horizontal, 18).padding(.vertical, 14)
-                    .background(Capsule().fill(Color.white))
-                    .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                    .glass(in: Capsule())
                 Text("L'adresse de la page Raton ouverte dans le navigateur, avec son port.")
                     .font(.raton(14)).foregroundStyle(Theme.textMuted)
                 if let errorMessage {

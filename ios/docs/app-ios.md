@@ -49,16 +49,28 @@ L'utilisateur est nomme par l'en-tete `X-Raton-User` (son id), que
 
 ## Apparence
 
-L'app reprend le style des pages du front, a partir de ses jetons
-(`front/static/css/tailwind.input.css`, `@theme` et `:root`), copies dans
-`ios/Raton/Theme.swift` : fond creme `#fbf6ee`, surfaces blanches, texte brun
-`#2b2018`, terracotta `#c2410c` pour l'accent, police Plus Jakarta Sans
-(`ios/Raton/Resources/PlusJakartaSans.ttf`, la police variable du front
-convertie de woff2 en ttf, licence OFL), la mascotte `raccoon-empty.png`, la
-barre d'onglets en pilule flottante, des boutons ronds blancs pour le retour,
-des lignes de liste a vignette a gauche (duree, barre de progression),
-etoiles ambre. Clair seulement (`UIUserInterfaceStyle` = `Light`). Un changement
-de jeton cote front se reporte a la main dans `Theme.swift`.
+L'app est en Liquid Glass. Les couleurs et la police viennent toujours des jetons
+du front (`front/static/css/tailwind.input.css`, copies dans
+`ios/Raton/Theme.swift`) : texte brun `#2b2018`, terracotta `#c2410c` pour
+l'accent, police Plus Jakarta Sans (`ios/Raton/Resources/PlusJakartaSans.ttf`,
+licence OFL), mascotte `raccoon-empty.png`, etoiles ambre. Clair seulement
+(`UIUserInterfaceStyle` = `Light`). Un changement de jeton cote front se reporte
+a la main dans `Theme.swift`.
+
+- **Fond** : `GlassBackdrop`, un degrade creme avec des lumieres terracotta, ambre
+  et rose, derriere chaque ecran (`ratonPage()`). Le verre a besoin d'une
+  couleur a refracter : sur un fond creme uni il serait invisible.
+- **Verre** : un seul point d'entree, `glass(in:tint:interactive:)` (et
+  `glassCard`), dans `Theme.swift`. Sur iOS 26 c'est le `glassEffect` du systeme ;
+  avant, un materiau flou (`ultraThinMaterial`) avec un liseré clair et une
+  ombre. Tout passe par la : barre d'onglets en pilule flottante, boutons
+  ronds de retour et de menu, boutons Sable (actifs teintes terracotta),
+  champs de saisie, pastilles de categories, lignes de liste et cartes de
+  fiche (`ListRow`, `VideoRow`), bulles de discussion, barre de lecture,
+  lecteur de playlist. Seule la zone du lecteur video reste sombre.
+- Le `glassEffect` est dans un `#if compiler(>=6.2)` : il ne se compile qu'avec
+  Xcode 26. Avec Xcode 16 (la version utilisee pour verifier ce depot) seul le
+  repli en materiau est construit et vu ; le rendu iOS 26 n'a pas ete observe.
 
 ## Ecrans
 

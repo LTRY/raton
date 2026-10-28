@@ -139,7 +139,7 @@ struct VideoRow: View {
                     if card.isNew {
                         Text("Nouveau").font(.raton(12, .bold)).foregroundStyle(Theme.primary)
                             .padding(.horizontal, 8).padding(.vertical, 2)
-                            .background(Capsule().fill(Theme.tint))
+                            .glass(in: Capsule(), tint: Theme.primary)
                     }
                     Spacer(minLength: 0)
                     StarsView(rating: card.rating, size: 13)
@@ -148,8 +148,9 @@ struct VideoRow: View {
             .padding(.horizontal, 12).padding(.vertical, 8)
             .frame(height: 100)
         }
-        .background(Color.white)
-        .overlay(alignment: .bottom) { Theme.border.frame(height: 1) }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .glassCard(radius: 20)
+        .padding(.horizontal, 12).padding(.vertical, 4)
         .opacity(card.shownState == "normal" ? 1 : 0.55)
     }
 }

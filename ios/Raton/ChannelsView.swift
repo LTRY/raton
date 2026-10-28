@@ -157,7 +157,7 @@ struct ChannelView: View {
                             ForEach(1...5, id: \.self) { star in
                                 Button { Task { await setRating(api, rating == star ? 0 : star) } } label: {
                                     Image(systemName: "star.fill").font(.system(size: 22))
-                                        .foregroundStyle(star <= rating ? Theme.amber : Color(hex: 0xF6E4DD))
+                                        .foregroundStyle(star <= rating ? Theme.amber : Theme.textFaint.opacity(0.55))
                                 }
                             }
                         }
@@ -253,8 +253,7 @@ struct AddChannelSheet: View {
                     .font(.raton(17)).keyboardType(.URL)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .padding(.horizontal, 18).padding(.vertical, 14)
-                    .background(Capsule().fill(Color.white))
-                    .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                    .glass(in: Capsule())
                 ErrorMessage(text: errorMessage)
                 Button(busy ? "Ajout…" : "Ajouter") { Task { await add() } }
                     .buttonStyle(PillButtonStyle())

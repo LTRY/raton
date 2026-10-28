@@ -46,7 +46,7 @@ struct CategoryChips: View {
                 Text(label)
                     .font(.raton(13, .semibold)).foregroundStyle(color)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Capsule().fill(color.opacity(0.12)))
+                    .glass(in: Capsule(), tint: color)
             }
         }
         .task { styles = (try? await api.get("/api/categories")) ?? [] }
@@ -331,8 +331,7 @@ struct CommentPanel: View {
                 .frame(minHeight: 140)
                 .scrollContentBackground(.hidden)
                 .padding(10)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, lineWidth: 1))
+                .glassCard(radius: 10)
             Button(saving ? "Enregistrement…" : "Enregistrer") {
                 saving = true
                 Task {
@@ -376,8 +375,7 @@ struct ChatPanel: View {
                 TextField("Poser une question sur cette fiche", text: $question, axis: .vertical)
                     .font(.raton(16))
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .background(Capsule().fill(Color.white))
-                    .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                    .glass(in: Capsule())
                 Button {
                     let asked = question
                     question = ""
@@ -396,10 +394,9 @@ struct ChatPanel: View {
 
     private func bubble(_ text: String, mine: Bool) -> some View {
         Text(text)
-            .font(.raton(15)).foregroundStyle(mine ? .white : Theme.text)
+            .font(.raton(15)).foregroundStyle(mine ? Color(hex: 0x7C2D12) : Theme.text)
             .padding(12)
-            .background(RoundedRectangle(cornerRadius: 14).fill(mine ? Theme.primary : Color.white))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(mine ? Color.clear : Theme.border, lineWidth: 1))
+            .glassCard(radius: 18, tint: mine ? Theme.primary : nil)
             .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
     }
 

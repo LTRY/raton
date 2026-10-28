@@ -141,14 +141,13 @@ struct FicheView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(mode == kind ? Theme.primary : Theme.textMuted)
                         .frame(width: 58, height: 38)
-                        .background(Capsule().fill(mode == kind ? Color.white : Color.clear))
+                        .background(Capsule().fill(mode == kind ? Color.white.opacity(0.75) : Color.clear))
                 }
                 .accessibilityLabel(kind == .video ? "Vidéo" : "Audio")
             }
         }
         .padding(4)
-        .background(Capsule().fill(Theme.surfaceMuted))
-        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+        .glass(in: Capsule(), interactive: true)
     }
 
     private func select(_ kind: MediaKind) {
@@ -203,6 +202,8 @@ struct FicheView: View {
             }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 12)
     }
 
     // MARK: Info block
@@ -219,7 +220,7 @@ struct FicheView: View {
                     Text("+ Catégories")
                         .font(.raton(14, .semibold)).foregroundStyle(Theme.textFaint)
                         .padding(.horizontal, 12).padding(.vertical, 8)
-                        .overlay(Capsule().strokeBorder(Theme.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                        .glass(in: Capsule(), interactive: true)
                 }
                 Spacer(minLength: 0)
             }
@@ -231,7 +232,7 @@ struct FicheView: View {
                     } label: {
                         Image(systemName: "star.fill")
                             .font(.system(size: 24))
-                            .foregroundStyle(star <= detail.rating ? Theme.amber : Color(hex: 0xF6E4DD))
+                            .foregroundStyle(star <= detail.rating ? Theme.amber : Theme.textFaint.opacity(0.55))
                     }
                     .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
                 }
@@ -287,7 +288,10 @@ struct FicheView: View {
                         .buttonStyle(SandButtonStyle(active: tab == item, fill: false))
                 }
             }
+            // Room for the glass shadows, which the scroller would clip.
+            .padding(.vertical, 14)
         }
+        .padding(.vertical, -14)
     }
 
     @ViewBuilder
@@ -451,7 +455,7 @@ struct NowPlayingBar: View {
         if player.track?.kind == .audio || player.queue != nil {
             HStack(spacing: 16) {
                 Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
-                    .foregroundStyle(Color(hex: 0xF3E8D9))
+                    .foregroundStyle(Theme.text)
                 Spacer()
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -462,9 +466,9 @@ struct NowPlayingBar: View {
                 }
                 Button { player.stop() } label: { Image(systemName: "xmark") }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.text)
             .padding(.horizontal, 18).padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.player))
+            .glass(in: Capsule(), tint: Theme.primary, interactive: true)
             .padding(.horizontal, 12)
         }
     }

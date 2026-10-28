@@ -49,7 +49,7 @@ struct RootView: View {
     }
 }
 
-/// The floating pill at the bottom, as on the web: icons only, the current one on a terracotta wash.
+/// The floating glass pill at the bottom: icons only, the current one on a terracotta wash.
 struct TabPill: View {
     @Binding var tab: Int
     private let items = [
@@ -70,15 +70,13 @@ struct TabPill: View {
                         .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(tab == index ? Theme.primary : Theme.textMuted)
                         .frame(maxWidth: .infinity).frame(height: 48)
-                        .background(Capsule().fill(tab == index ? Theme.tint : Color.clear))
+                        .background(Capsule().fill(tab == index ? Theme.primary.opacity(0.16) : Color.clear))
                 }
                 .accessibilityLabel(items[index].label)
             }
         }
         .padding(5)
-        .background(Capsule().fill(Color(hex: 0xFFF8EF)))
-        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
-        .shadow(color: Theme.shadow.opacity(0.14), radius: 12, y: 6)
+        .glass(in: Capsule(), interactive: true)
         .padding(.horizontal, 12)
     }
 }

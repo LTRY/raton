@@ -46,8 +46,8 @@ struct UserPickerView: View {
                             }
                         }
                         .padding(.horizontal, 16).padding(.vertical, 18)
-                        .background(Color.white)
-                        .overlay(alignment: .bottom) { Theme.border.frame(height: 1) }
+                        .glassCard(radius: 20)
+                        .padding(.horizontal, 12).padding(.vertical, 4)
                     }
                     .contextMenu {
                         if manage {

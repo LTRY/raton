@@ -62,8 +62,7 @@ struct AccueilView: View {
                             .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                         .padding(.horizontal, 18).padding(.vertical, 10)
-                        .background(Capsule().fill(Color.white))
-                        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                        .glass(in: Capsule())
                         .padding(.horizontal, 16).padding(.bottom, 16)
                     }
                     .frame(minHeight: 640)

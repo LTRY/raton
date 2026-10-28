@@ -143,7 +143,7 @@ struct PlaylistView: View {
                                                      tracks: detail.items.map(\.queueTrack), startID: item.videoId, api: api)
                                 }
                             } label: {
-                                ListRow {
+                                ListRow(tint: isCurrent ? Theme.primary : nil) {
                                     HStack(spacing: 12) {
                                         Thumbnail(videoID: item.videoId, hasThumbnail: item.hasThumbnail, api: api)
                                             .frame(width: 96, height: 54).clipped()
@@ -174,7 +174,6 @@ struct PlaylistView: View {
                                         .accessibilityLabel("Ouvrir la fiche")
                                     }
                                 }
-                                .background(isCurrent ? Theme.tint : Color.clear)
                                 .opacity(playable ? 1 : 0.5)
                             }
                             .buttonStyle(.plain)
@@ -290,8 +289,7 @@ struct TextPromptSheet: View {
                     .textInputAutocapitalization(keyboardURL ? .never : .sentences)
                     .autocorrectionDisabled(keyboardURL)
                     .padding(.horizontal, 18).padding(.vertical, 14)
-                    .background(Capsule().fill(Color.white))
-                    .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+                    .glass(in: Capsule())
                 ErrorMessage(text: errorMessage)
                 Button(busy ? "…" : action) {
                     busy = true
