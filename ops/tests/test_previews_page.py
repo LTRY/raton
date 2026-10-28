@@ -120,14 +120,6 @@ def test_a_script_that_cannot_start_ends_the_job_with_an_error(tmp_path):
     assert "Impossible de lancer" in log_file.read_text()
 
 
-def test_page_shows_the_reviews_card_only_when_the_scheduler_is_on():
-    without = render_page("h", [], {}, {}, None)
-    with_card = render_page("h", [], {}, {}, None, None, [], False)
-
-    assert "Revue des journaux" not in without
-    assert "Revue des journaux" in with_card
-
-
 def test_version_status_compares_the_deployed_commit_with_origin_main():
     old, new = "a" * 40, "b" * 40
 

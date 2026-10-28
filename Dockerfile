@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # Four images from one file: `back` (the API, the scheduler, ffmpeg), `front` (the pages), `mcp` (the MCP server)
-# and `ops` (the previews page and the daily log review).
+# `ops` (the previews page and the deploy) and `monitoring` (the daily log review).
 # docker-compose.yml builds each with its `target`.
 
 # Compiles front/static/css/app.css with the Tailwind standalone CLI (no
@@ -95,9 +95,9 @@ EXPOSE 8002
 CMD ["python", "-m", "mcp_server"]
 
 # The operations container: runs as root on purpose, it drives the host's Docker through the
-# mounted socket (previews, deploy of main) and runs the daily log review with Claude Code.
+# mounted socket (previews, deploy of main).
 # It carries no Raton dependency: the repository is mounted at the host's own path (see the `ops`
-# service of docker-compose.yml), and the page and the review use the standard library only.
+# service of docker-compose.yml), and the page uses the standard library only.
 FROM python:3.14-slim AS ops
 
 ENV PYTHONUNBUFFERED=1 \
@@ -111,9 +111,6 @@ RUN apt-get update \
 COPY --from=docker:28-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker:28-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
-# Claude Code CLI, for the review-logs skill (ops/review.py).
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
 # The repository belongs to the host user, not to root; GH_TOKEN (env) authenticates git over HTTPS.
 # The image has no ssh client nor keys: an SSH origin of the host checkout (git@github.com:...)
 # is fetched over HTTPS instead, without touching the checkout's own config.
@@ -124,4 +121,23 @@ RUN git config --global --add safe.directory '*' \
 
 WORKDIR /app
 EXPOSE 8999
-CMD ["sh", "-c", "[ -n \"$OPS_REPO\" ] || { echo 'OPS_REPO is empty: start it with make previews' >&2; exit 1; }; cd \"$OPS_REPO\" && exec python -m ops.server --host 0.0.0.0 --scheduler"]
+CMD ["sh", "-c", "[ -n \"$OPS_REPO\" ] || { echo 'OPS_REPO is empty: start it with make previews' >&2; exit 1; }; cd \"$OPS_REPO\" && exec python -m ops.server --host 0.0.0.0"]
+
+# The monitoring container: the daily log review (Claude Code on the Anthropic API) and its page.
+# No Docker socket, no Raton dependency: the repository is mounted on /project (see the `monitoring`
+# service of docker-compose.yml), the journal read-only, and the tool uses the standard library only.
+FROM python:3.14-slim AS monitoring
+
+ENV PYTHONUNBUFFERED=1 \
+    PATH="/root/.local/bin:$PATH"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl jq tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI, for the review-logs skill (monitoring/review.py).
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+WORKDIR /app
+EXPOSE 8998
+CMD ["sh", "-c", "cd \"$MONITORING_REPO\" && exec python -m monitoring.server --host 0.0.0.0"]

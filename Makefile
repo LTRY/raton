@@ -1,4 +1,4 @@
-.PHONY: uninstall install test lint format compose-config ci up up-locked down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews
+.PHONY: uninstall install test lint format compose-config ci up up-locked down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews monitoring
 
 # Shell environment first, then MEDIA_HOST_ROOT from .env, then the default.
 MEDIA_HOST_ROOT ?= $(shell sed -n 's/^MEDIA_HOST_ROOT=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
@@ -20,12 +20,12 @@ test:
 	uv run --python 3.14 --extra dev pytest
 
 lint:
-	uv run --python 3.14 --extra dev ruff check back front mcp_server ops scripts tests alembic
-	uv run --python 3.14 --extra dev ruff format --check back front mcp_server ops scripts tests alembic
+	uv run --python 3.14 --extra dev ruff check back front mcp_server ops monitoring scripts tests alembic
+	uv run --python 3.14 --extra dev ruff format --check back front mcp_server ops monitoring scripts tests alembic
 
 format:
-	uv run --python 3.14 --extra dev ruff check --fix back front mcp_server ops scripts tests alembic
-	uv run --python 3.14 --extra dev ruff format back front mcp_server ops scripts tests alembic
+	uv run --python 3.14 --extra dev ruff check --fix back front mcp_server ops monitoring scripts tests alembic
+	uv run --python 3.14 --extra dev ruff format back front mcp_server ops monitoring scripts tests alembic
 
 compose-config:
 	docker compose config
@@ -76,10 +76,15 @@ demo: css
 	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
 
 # The raton-ops container (docker-compose.yml, profile `ops`): the page that deploys the PR previews
-# and main (ops/server.py, port 8999 on the interface of APP_BIND) and the daily log review.
+# and main (ops/server.py, port 8999 on the interface of APP_BIND).
 previews:
 	docker compose --profile ops up --build -d ops
 	-docker image prune -f
 
 uninstall:
 	./scripts/uninstall.sh $(ARGS)
+
+# The raton-monitoring container (docker-compose.yml, profile `monitoring`): the daily log review and
+# its page (monitoring/server.py, port 8998 on the interface of APP_BIND).
+monitoring:
+	docker compose --profile monitoring up --build -d monitoring

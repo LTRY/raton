@@ -1,0 +1,13 @@
+# The monitoring tool is standard library only: no dependency, no build. This file scopes its lint
+# rules (those of the repository root) and marks the folder as a unit of its own, with its
+# CLAUDE.md, its tests (monitoring/tests, run by the root `make test`) and its spec
+# (monitoring/docs).
+[project]
+name = "monitoring"
+version = "0.1.0"
+description = "Daily log review and monitoring page for a Docker Compose project"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[tool.ruff]
+extend = "../pyproject.toml"

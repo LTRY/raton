@@ -19,6 +19,7 @@ _SPEC.loader.exec_module(check_pr_title)
         "[FRONT][BACK][DB] Add the playlist position",
         "[DOCS] Clarify the glossary",
         "[OPS] Move the previews page into ops/",
+        "[OPS][MONITORING] Split the log review out of ops/",
         "[CI] " + "A" * 72,
     ],
 )

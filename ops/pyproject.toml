@@ -4,7 +4,7 @@
 [project]
 name = "ops"
 version = "0.1.0"
-description = "Previews page, deploy of the main branch and daily log review for a Docker Compose project"
+description = "Previews page and deploy of the main branch for a Docker Compose project"
 requires-python = ">=3.14,<3.15"
 dependencies = []
 

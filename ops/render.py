@@ -1,4 +1,4 @@
-"""The previews page: HTML, CSS and the status labels of the previews, the deploy and the reviews.
+"""The previews page: HTML, CSS and the status labels of the previews and the deploy.
 
 Pure functions of their arguments (the server, ops/server.py, gathers the data), standard
 library only. Spec: ops/docs/outil-ops.md, section "Previews des PR".
@@ -7,7 +7,6 @@ library only. Spec: ops/docs/outil-ops.md, section "Previews des PR".
 import html
 from urllib.parse import urlsplit
 
-from ops import review as ops_review
 from ops.config import CONFIG
 from ops.graph import STYLE as GRAPH_STYLE
 from ops.graph import render_graph
@@ -114,7 +113,6 @@ button, .open, .refresh { font: inherit; font-size: 14px; border-radius: 8px; pa
 button.primary, .open { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 button:disabled { opacity: .5; cursor: default; }
 .log { font-size: 13px; color: var(--muted); }
-.reviews { margin: 6px 0 0; padding-left: 18px; }
 .alert { flex-basis: 100%; }
 .alert-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; color: var(--busy); }
 .alert-head strong { font-size: 15px; }
@@ -363,8 +361,6 @@ def render_page(
     job_by_pr: dict[int, Job],
     error: str | None,
     prod_job: Job | None = None,
-    reviews: list[ops_review.Review] | None = None,
-    review_busy: bool = False,
     prod_version: tuple[str, str] | None = None,
     deploy_elsewhere: bool = False,
     pending_commits: list[Commit] | None = None,
@@ -384,9 +380,7 @@ def render_page(
         any(job.returncode is None for job in job_by_pr.values())
         or (prod_job is not None and prod_job.returncode is None)
         or deploy_elsewhere
-        or review_busy
     )
-    review_card = "" if reviews is None else ops_review.render_reviews(reviews, review_busy)
     refresh = '<meta http-equiv="refresh" content="4">' if busy else ""
     banner = f'<div class="banner">{html.escape(error)}</div>' if error else ""
     orphans = f"<h2>Previews de PR fermées</h2>{''.join(rows)}" if rows else ""
@@ -399,7 +393,6 @@ def render_page(
 <p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/?refresh=1" class="refresh">Rafraîchir</a></div>
 {render_prod(prod_job, prod_version, deploy_elsewhere, pending_commits, deployed, behind)}
-{review_card}
 {banner}{board}{orphans}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
 </footer>

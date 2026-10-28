@@ -1,9 +1,9 @@
-"""The daily log review of the ops container: runs the project's review skill with Claude Code.
+"""The daily log review of the monitoring container: runs the project's review skill with Claude Code.
 
-Started by the previews page (ops/server.py --scheduler): a thread wakes once a day at
+Started by the monitoring page (monitoring/server.py): a thread wakes once a day at
 the review hour, runs `claude --bare -p "/<skill> <hours>"` in the repository and stores the
-verdict and its cost in .local/ops/reviews/ (one JSON file per run), shown by the page.
-The skill, hour, model and budget come from ops.toml (ops/config.py).
+verdict and its cost in .local/monitoring/reviews/ (one JSON file per run), shown by the page.
+The skill, hour, model and budget come from monitoring.toml (monitoring/config.py).
 Standard library only, like the page. Spec: docs/spec/13-jobs-logs-planification.md, section
 "Revue quotidienne des journaux".
 """
@@ -17,9 +17,9 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 
-from ops.config import CONFIG, REPO
+from monitoring.config import CONFIG, REPO
 
-REVIEW_DIR = REPO / ".local" / "ops" / "reviews"
+REVIEW_DIR = REPO / ".local" / "monitoring" / "reviews"
 
 RUN_TIMEOUT_SECONDS = 20 * 60
 TICK_SECONDS = 30
@@ -94,12 +94,12 @@ def execute_review(hours: int, trigger: str, now: datetime | None = None) -> Rev
         text="",
     )
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        review.text = "ANTHROPIC_API_KEY est absente de l'environnement du conteneur ops."
+        review.text = "ANTHROPIC_API_KEY est absente de l'environnement du conteneur monitoring."
     else:
         command = build_command(
             hours,
-            os.environ.get("OPS_REVIEW_MODEL") or CONFIG.review_model,
-            float(os.environ.get("OPS_REVIEW_MAX_USD") or CONFIG.review_max_usd),
+            os.environ.get("MONITORING_REVIEW_MODEL") or CONFIG.review_model,
+            float(os.environ.get("MONITORING_REVIEW_MAX_USD") or CONFIG.review_max_usd),
         )
         try:
             result = subprocess.run(
@@ -186,8 +186,8 @@ def cost_since(reviews: list[Review], now: datetime, days: int) -> float:
 
 
 def scheduler_loop() -> None:
-    hour = int(os.environ.get("OPS_REVIEW_HOUR") or CONFIG.review_hour)
-    hours = int(os.environ.get("OPS_REVIEW_HOURS") or CONFIG.review_hours)
+    hour = int(os.environ.get("MONITORING_REVIEW_HOUR") or CONFIG.review_hour)
+    hours = int(os.environ.get("MONITORING_REVIEW_HOURS") or CONFIG.review_hours)
     while True:
         if is_due(datetime.now(), hour, list_reviews(limit=50)):
             start_review(hours, "scheduled")
@@ -211,9 +211,9 @@ def verdict_line(review: Review) -> str:
 
 
 def render_reviews(reviews: list[Review], busy: bool, now: datetime | None = None) -> str:
-    """The "Revue des journaux" card of the previews page."""
+    """The "Revue des journaux" card of the monitoring page."""
     now = now or datetime.now()
-    hour = int(os.environ.get("OPS_REVIEW_HOUR") or CONFIG.review_hour)
+    hour = int(os.environ.get("MONITORING_REVIEW_HOUR") or CONFIG.review_hour)
     if busy:
         status, css = "Revue en cours…", "busy"
     elif not reviews:

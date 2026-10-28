@@ -78,8 +78,7 @@ services:
       RATON_API_URL: http://api:8001
       MCP_TRANSPORT: streamable-http
 
-  # The operations container (`make previews`): the previews page, the deploy of main and the daily
-  # log review. Root with the Docker socket on purpose: it drives the host's Docker. Behind a
+  # The operations container (`make previews`): the previews page and the deploy of main. Root with the Docker socket on purpose: it drives the host's Docker. Behind a
   # profile so that `make up` (and so a deploy it runs itself) never recreates it mid-job.
   ops:
     container_name: raton-ops
@@ -97,20 +96,41 @@ services:
       # The repository at its host path: the bind mounts of the compose files it runs are
       # resolved by the host's Docker, so both sides must agree on the path (OPS_REPO is set by the Makefile).
       - .:${OPS_REPO:-/project}
-      - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton:ro
     environment:
       OPS_REPO: ${OPS_REPO:-}
-      LOG_DIR: /var/log/raton
       TZ: ${TZ:-Europe/Paris}
       # gh and git over HTTPS (previews, fetch of origin/main).
       GH_TOKEN: ${GH_TOKEN:-}
       # When set, the page asks for it as the password of HTTP Basic auth (any user name).
       OPS_TOKEN: ${OPS_TOKEN:-}
+
+  # The monitoring container (`make monitoring`): the daily log review and its page. No Docker
+  # socket. Behind a profile like `ops`, so that `make up` never recreates it mid-review.
+  monitoring:
+    container_name: raton-monitoring
+    profiles: [monitoring]
+    image: ${RATON_MONITORING_IMAGE:-raton-monitoring:local}
+    build:
+      context: .
+      target: monitoring
+    restart: unless-stopped
+    ports:
+      # Same interface as the app (APP_BIND): the page has no authentication by default.
+      - "${APP_BIND:-127.0.0.1}:${MONITORING_PORT:-8998}:8998"
+    volumes:
+      - .:/project
+      - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton:ro
+    environment:
+      MONITORING_REPO: /project
+      LOG_DIR: /var/log/raton
+      TZ: ${TZ:-Europe/Paris}
+      # When set, the page asks for it as the password of HTTP Basic auth (any user name).
+      MONITORING_TOKEN: ${MONITORING_TOKEN:-}
       # The daily log review: Claude Code on the Anthropic API, billed per token.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OPS_REVIEW_HOUR: ${OPS_REVIEW_HOUR:-8}
-      OPS_REVIEW_MODEL: ${OPS_REVIEW_MODEL:-sonnet}
-      OPS_REVIEW_MAX_USD: ${OPS_REVIEW_MAX_USD:-1}
+      MONITORING_REVIEW_HOUR: ${MONITORING_REVIEW_HOUR:-8}
+      MONITORING_REVIEW_MODEL: ${MONITORING_REVIEW_MODEL:-sonnet}
+      MONITORING_REVIEW_MAX_USD: ${MONITORING_REVIEW_MAX_USD:-1}
 
 volumes:
   postgres_data:

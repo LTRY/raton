@@ -1,0 +1,28 @@
+# Settings of the monitoring tool (monitoring/server.py, monitoring/review.py): everything that
+# names this project. Another project reuses the tool by providing its own monitoring.toml.
+# Spec: docs/spec/04-configuration-et-deploiement.md, section "Configuration de l'outil monitoring".
+
+[project]
+name = "Raton"
+
+[review]
+# The Claude Code skill run daily with the number of hours to read, e.g. `/review-logs 24`.
+skill = "review-logs"
+# Read-only tools the review may use (Claude Code --allowedTools syntax). No `docker` here: the
+# container has no Docker CLI, the skill reads the journal in $LOG_DIR.
+allowed_tools = [
+    "Read",
+    "Skill",
+    "Bash(python -m back.core.logs_digest:*)",
+    "Bash(jq:*)",
+    "Bash(grep:*)",
+    "Bash(ls:*)",
+    "Bash(tail:*)",
+    "Bash(head:*)",
+]
+# Defaults, overridden by MONITORING_REVIEW_HOUR, MONITORING_REVIEW_HOURS, MONITORING_REVIEW_MODEL,
+# MONITORING_REVIEW_MAX_USD.
+hour = 8
+hours = 24
+model = "sonnet"
+max_usd = 1.0

@@ -246,13 +246,13 @@ Verification : `tests/test_app_logging.py`, `tests/test_logs_digest.py`.
 
 ## Revue quotidienne des journaux
 
-Le conteneur `raton-ops` (voir [04 Configuration et deploiement](04-configuration-et-deploiement.md),
+Le conteneur `raton-monitoring` (voir [04 Configuration et deploiement](04-configuration-et-deploiement.md),
 « Docker Compose ») lance chaque jour la revue des 24 dernieres heures, sans
 intervention. Ce n'est pas un job de `api` : le scheduler APScheduler du back
 n'y participe pas, et le journal est lu en lecture seule.
 
-- **Planification** : un fil de `ops/review.py` verifie l'heure toutes les 30 s
-  et lance la revue des qu'il est `OPS_REVIEW_HOUR` (8 par defaut, fuseau `TZ`,
+- **Planification** : un fil de `monitoring/review.py` verifie l'heure toutes les 30 s
+  et lance la revue des qu'il est `MONITORING_REVIEW_HOUR` (8 par defaut, fuseau `TZ`,
   Europe/Paris par defaut) et qu'aucune revue planifiee n'existe pour la date
   du jour. Comme il regarde l'horloge au lieu de dormir jusqu'a 8 h, il rattrape
   une machine endormie a 8 h ou un conteneur relance plus tard dans la journee.
@@ -260,25 +260,25 @@ n'y participe pas, et le journal est lu en lecture seule.
 - **Execution** : `claude --bare -p "/review-logs 24"` dans le depot, donc le
   skill `review-logs` (`.claude/skills/review-logs/`) sans copie de ses
   consignes ; le nom du skill, les outils autorises et les valeurs par defaut
-  viennent de `ops.toml` (voir « Configuration de l'outil ops » dans `ops/docs/outil-ops.md`). `--bare` ignore les hooks du depot et n'accepte que
+  viennent de `monitoring.toml` (voir « Configuration de l'outil monitoring » dans `monitoring/docs/outil-monitoring.md`). `--bare` ignore les hooks du depot et n'accepte que
   `ANTHROPIC_API_KEY` ; le skill lit le journal dans `LOG_DIR`. Les outils sont
-  limites a la lecture (`Read`, le digest, `jq`, `grep`, `ls`, `head`, `tail`,
-  `docker ps`/`docker compose logs`) ; `--max-budget-usd` plafonne une revue
-  (`OPS_REVIEW_MAX_USD`, 1 $ par defaut) et `OPS_REVIEW_MODEL` choisit le modele
+  limites a la lecture (`Read`, le digest, `jq`, `grep`, `ls`, `head`, `tail`) ;
+  `--max-budget-usd` plafonne une revue
+  (`MONITORING_REVIEW_MAX_USD`, 1 $ par defaut) et `MONITORING_REVIEW_MODEL` choisit le modele
   (`sonnet` par defaut).
 - **Cout** : l'appel est facture au token sur la cle API, en plus de
   l'abonnement Claude. Le cout de chaque revue (`total_cost_usd` du CLI) est
-  stocke avec elle et affiche sur la page des previews : cout de la derniere
+  stocke avec elle et affiche sur la page de monitoring : cout de la derniere
   revue et total des 30 derniers jours.
-- **Resultat** : un fichier JSON par revue dans `.local/ops/reviews/` (date,
+- **Resultat** : un fichier JSON par revue dans `.local/monitoring/reviews/` (date,
   declencheur, cout, duree, verdict). La carte **Revue des journaux** de la page
-  des previews affiche le verdict de la derniere, les sept dernieres (lien vers
+  de monitoring affiche le verdict de la derniere, les sept dernieres (lien vers
   le texte complet, `/reviews/<id>`) et le bouton **Analyser maintenant**
   (revue manuelle, sans effet sur la revue planifiee du jour). Une cle API
   absente ou un CLI qui echoue est enregistre comme une revue en echec, avec la
   raison.
 
-Verification : `ops/tests/test_ops_review.py`.
+Verification : `monitoring/tests/test_monitoring_review.py`.
 
 ## Nombre de vues des videos
 
