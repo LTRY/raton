@@ -25,7 +25,7 @@ Regles :
 
 ### Utilisateur
 
-Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil. Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Indesiree, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, couvre-feu, langage de Raton, visites de Raton. Ses reglages propres sont sur sa page `/user` (« Paramètres de l'utilisateur »). Pas de mot de passe : Raton reste sur un LAN de confiance.
+Une personne qui utilise Raton, choisie depuis le bouton rond en bas du tiroir « Discussions » de l'accueil (sur ordinateur : le tiroir n'existe pas sur telephone). Les fiches, leurs fichiers, transcripts, notes structurees et resumes sont **partages** ; ce qui est a soi est **propre** a chaque utilisateur : Vu/Indesiree, note en etoiles, commentaire, Nouveau, cloches, playlists, discussions, historique et position de lecture, vues enregistrees, temps d'ecran, couvre-feu, langage de Raton, visites de Raton. Ses reglages propres sont sur sa page `/user` (« Paramètres de l'utilisateur »). Pas de mot de passe : Raton reste sur un LAN de confiance.
 
 - **Code** : `users`, `user_videos`, `user_channels`, `user_settings` ; cookie `raton_user`, en-tete `X-Raton-User`
 - **A ne pas confondre avec** : Un compte (aucune authentification) ; l'utilisateur par defaut, le plus ancien, pour qui agit un client qui n'en nomme aucun (le serveur MCP).
@@ -259,7 +259,7 @@ Questions-reponses avec le LLM. Deux portees : le chat d'**une** fiche (page det
 
 ### Discussion
 
-Un fil de questions-reponses du chat, que le modele relit a chaque question, propre a l'utilisateur qui l'a ouvert. Le chat d'une fiche en a une seule par utilisateur (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰), rangees sous « Récents ».
+Un fil de questions-reponses du chat, que le modele relit a chaque question, propre a l'utilisateur qui l'a ouvert. Le chat d'une fiche en a une seule par utilisateur (effacable) ; le chat bibliotheque en garde plusieurs : une question sans discussion en ouvre une nouvelle, nommee d'apres sa premiere question, et les precedentes restent dans le tiroir « Discussions » (☰, sur ordinateur seulement), rangees sous « Récents ».
 
 - **Code** : `transcript.chat.json` / `transcript.chat.<user_id>.json` (fiche), `library_chat_conversations` / `conversation_id` (bibliotheque)
 - **A ne pas confondre avec** : Le chat lui-meme (l'outil), ni l'onglet `Commentaire` d'une fiche.

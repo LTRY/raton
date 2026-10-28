@@ -592,7 +592,8 @@ barre d'onglets sur telephone).
 Des qu'une discussion est affichee (`data-chat-empty="false"`), Raton est
 masque : il ne reste que la conversation. On revient a Raton par le menu des
 discussions (☰ → « Raton »), le crayon « Nouvelle discussion » ou le bouton
-retour du navigateur (voir « Widget de chat »). Ni metriques, ni
+retour du navigateur ; sur telephone, qui n'a ni ☰ ni crayon, par le bouton
+retour seulement (voir « Widget de chat »). Ni metriques, ni
 Historique complet, ni temps de lecture : ils sont dans Bibliotheque et
 Parametres.
 
@@ -954,8 +955,10 @@ attribut `data-chat-config` :
   avec le bouton menu (☰) a gauche, le titre de la discussion ouverte au
   centre (tronque sur une ligne) et, a droite, « Nouvelle discussion »
   (crayon, visible quand la discussion a des messages). « Effacer » n'existe
-  pas pour cette portee. Sur telephone, cette ligne reste collee en haut de
-  l'ecran pendant qu'une discussion defile.
+  pas pour cette portee. Sur telephone (800px et moins), cette ligne n'existe
+  pas : ni ☰, ni tiroir, ni titre, ni crayon, donc ni liste des discussions,
+  ni bouton de l'utilisateur. Une discussion ouverte par son adresse
+  (`/?discussion={id}`) s'affiche sans en-tete.
   - ☰ ouvre un tiroir a gauche (`.chat-drawer`, 320px au plus, 86 % de la
     largeur sur telephone, glisse depuis la gauche sauf
     `prefers-reduced-motion`) sur un voile sombre ; ✕, Echap ou le voile le

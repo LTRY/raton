@@ -17,7 +17,9 @@ d'avant les utilisateurs appartiennent au premier, « Moi ».
 
 ### Changer d'utilisateur
 
-1. Sur l'accueil `/`, l'utilisateur ouvre le tiroir « Discussions » (☰).
+1. Sur l'accueil `/`, sur ordinateur, l'utilisateur ouvre le tiroir
+   « Discussions » (☰) ; sur telephone, le tiroir n'existe pas (voir
+   [11 Interface HTML](11-interface-html.md), « Discussions »).
 2. En bas a gauche, le bouton rond porte l'initiale de l'utilisateur courant ;
    il ouvre sa page `/user` (« Paramètres de l'utilisateur »), qui liste les
    utilisateurs sous « Changer d'utilisateur ».

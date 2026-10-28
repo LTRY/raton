@@ -13,7 +13,8 @@ l'ecran.
 Plusieurs personnes peuvent utiliser la meme instance. Chacune choisit son
 utilisateur, ou en ajoute un, sur sa page `/user` (« Paramètres de
 l'utilisateur »), ouverte par le bouton rond en bas du tiroir « Discussions »
-de l'accueil (comme le bouton de compte d'une app de chat) ; on les renomme
+de l'accueil (comme le bouton de compte d'une app de chat), sur ordinateur
+seulement : sur telephone, l'accueil n'a pas ce tiroir ; on les renomme
 ou les supprime dans `/settings`. Pas de mot de passe (LAN de
 confiance, voir [15 Securite](15-securite.md)).
 
