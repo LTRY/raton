@@ -722,28 +722,30 @@ le poids du fichier a gauche et les actions Vu/Indesiree + la notation a droite.
 
 ### Paramètres de l'utilisateur
 
-`/user` (`user_settings.html`, `front/routes/users.py`) : l'en-tete porte la
-pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
-`/settings` sur une colonne de 720 px au plus :
+Le haut de `/settings` (`settings.html`, voir « Parametres » plus bas) :
+l'en-tete du groupe porte la pastille de l'initiale et le nom de
+l'utilisateur courant, puis ses cartes :
 
-- « Nom » : champ et « Renommer » (`POST /users/{id}/rename`, `next=/user`) ;
+- « Nom » : champ et « Renommer » (`POST /users/{id}/rename`, `next=/settings`) ;
 - « Changer d'utilisateur » : rappel de ce qui est propre a chacun, une ligne par utilisateur
   (pastille, nom, coche sur le courant, desactive ; `POST /users/switch`
   recharge l'accueil pour lui avec « Bonjour <nom> ! » ; « Supprimer » avec
   confirmation, `POST /users/{id}/delete`, quand il en reste plusieurs), puis « Nouvel
   utilisateur » et « Ajouter » (`POST /users`) ;
-- un formulaire (`POST /user`, barre « Enregistrer ») : « Raton et toi »
+- un formulaire (`POST /user`, sa propre barre « Enregistrer ») : « Raton et toi »
   (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
   t'appelle »), « Temps d'écran » (ancre `#screen-time` : une ligne par type,
   Vidéos, Shorts, Podcasts, Musique, avec la limite du jour en minutes,
   `screen_time_<kind>_today`) et « Couvre-feu » (interrupteur, heures de debut
   et de fin en `input type="time"`).
 
-Pendant le couvre-feu, la page reste ouverte mais ne garde que « Changer
+Pendant le couvre-feu, `/settings` reste ouverte mais ne garde que « Changer
 d'utilisateur » (sans l'ajout), la carte « Couvre-feu » (pour le desactiver ;
 `POST /user` n'envoie alors ni le tutoiement, ni le surnom, ni les limites de
 temps d'ecran, qui restent inchanges) et la note « Couvre-feu jusqu'à 10:00 : tu peux le désactiver
-ci-dessous ou changer d'utilisateur ».
+ci-dessous ou changer d'utilisateur », sur une colonne de 720 px au plus
+(`settings-layout-single`) : ni navigation, ni parametres d'administration,
+dont les appels a l'API repondraient `423` et ne sont pas faits.
 
 ### Couvre-feu
 
@@ -762,13 +764,15 @@ Pendant le couvre-feu (regles dans [02 Fonctionnalites](02-fonctionnalites.md)) 
   perd ses liens, sa progression, Vu/Indesiree et la notation au profit du
   formulaire du commentaire (`POST /videos/{id}/comment`, retour sur la meme
   page) ;
-- `/user` reste ouverte (voir « Paramètres de l'utilisateur ») ;
+- `/settings` reste ouverte, reduite a sa partie utilisateur (voir
+  « Paramètres de l'utilisateur ») ;
 - ces quatre pages passent `curfew_mode` a `base.html` : la navigation ne garde
-  que l'accueil (« Raton ») et l'Historique (barre du haut : lien
-  « Historique » ; barre d'onglets mobile : onglets Accueil et Historique), sans
+  que l'accueil (« Raton »), l'Historique et les Parametres (barre du haut :
+  liens « Historique » et « Paramètres » ; barre d'onglets mobile : onglets
+  Accueil, Historique et Reglages), sans
   feuille d'import, mini-lecteur ni Raton d'exploration.
 
-La carte « Couvre-feu » est sur `/user` (ancre `#curfew`). Quand le couvre-feu est
+La carte « Couvre-feu » est sur `/settings` (ancre `#curfew`). Quand le couvre-feu est
 active, une carte dessous (`#curfew-tonight`, hors du formulaire) porte le bouton
 « Désactiver le couvre-feu pour ce soir » (`POST /user/curfew/skip`), ou, une
 fois reporte, « Couvre-feu désactivé jusqu'au <date> » et « Rétablir le
@@ -963,14 +967,10 @@ attribut `data-chat-config` :
     l'entree « Raton » (retour a l'ecran de Raton), « Récents » puis une
     ligne par discussion (titre tronque, corbeille discrete ; celle ouverte
     est surlignee, `aria-current`), puis, colles en bas du tiroir sur une
-    ligne (`.chat-drawer-foot`), le bouton rond de l'utilisateur a gauche et
-    le bouton pilule « Nouvelle discussion », qui place aussi le curseur dans
-    le champ. Les discussions listees sont celles de l'utilisateur courant.
-  - Le bouton rond (`.chat-user-button`, initiale du nom de l'utilisateur
-    courant ; sur le modele du bouton de compte d'une app de chat) est un
-    lien vers la page de l'utilisateur `/user` (voir « Paramètres de
-    l'utilisateur »). Son initiale vient de `GET /api/users` (`userMenu` de
-    la config du widget).
+    ligne (`.chat-drawer-foot`), le bouton pilule « Nouvelle discussion », qui
+    place aussi le curseur dans le champ. Les discussions listees sont celles
+    de l'utilisateur courant ; le changer se fait dans les Parametres (voir
+    « Paramètres de l'utilisateur »).
   - « Raton », « Nouvelle discussion » et le crayon reviennent a l'ecran de
     Raton (les deux derniers y font apparaitre le champ vide, pas « Raton ») : rien d'affiche, `conversationId` a `null`, et la question
     suivante ouvre une discussion (voir
@@ -1757,13 +1757,21 @@ cette page permet un controle persistant plutot qu'ephemere.
 Template : `settings.html`
 
 Meme langage visuel que la page Logs (cartes arrondies a filets, orange reserve
-a l'etat actif). De haut en bas :
+a l'etat actif). Deux parties (voir le [glossaire](20-glossaire.md)) : les
+**parametres de l'utilisateur** en haut (voir « Paramètres de l'utilisateur »
+plus haut ; leurs formulaires sont a part : `POST /user`, renommage, ajout,
+changement et suppression d'utilisateur), puis les **parametres
+d'administration** (un formulaire `POST /settings`). Sous 800px (le telephone),
+tout ce qui est d'administration porte `.settings-admin` et est masque
+(`display: none`) : le lien des logs, la navigation et le formulaire
+d'administration ; la page n'y montre que les parametres de l'utilisateur.
+De haut en bas :
 
 - titre "Parametres" et lien "Voir tous les logs" vers `/logs` (a droite du
   titre) ;
-- navigation (`data-settings-nav`) : colonne a gauche sur grand ecran, barre de
-  pilules defilante sous 800px (sans les intitules de groupe). Ses liens sont
-  ranges en cinq groupes : « Apercu » (Bibliotheque, Couts LLM, Suivi
+- navigation (`data-settings-nav`) : colonne a gauche sur grand ecran. Ses liens sont
+  ranges en six groupes : « Utilisateur » (Nom, Changer d'utilisateur, Raton
+  et toi, Temps d'ecran, Couvre-feu), « Apercu » (Bibliotheque, Couts LLM, Suivi
   automatique : lecture seule, sans champ), « Bibliotheque video » (categories,
   barre de progression, sous-bibliotheques), « Lecture » (segments
   sponsorises), « Automatisation » (notes automatiques) et
@@ -1775,14 +1783,14 @@ a l'etat actif). De haut en bas :
   nombre de cases cochees dans l'en-tete ; les cases d'un bloc replie sont
   quand meme envoyees), et le detail des tableaux de "Couts LLM" (le total
   reste visible) ;
-- barre d'enregistrement collante en bas de la page (au-dessus de la tab bar
-  sous 800px). Des qu'un champ differe de son etat au chargement (editeurs de
+- barre d'enregistrement collante en bas du formulaire d'administration (le
+  formulaire de l'utilisateur a la sienne, au-dessus de la tab bar sous 800px). Des qu'un champ differe de son etat au chargement (editeurs de
   categories et de sous-bibliotheques compris), elle affiche « Modifications
   non enregistrees » (`data-dirty`, bordure et texte en couleur d'accent, y
   compris sous 800px) et une confirmation est demandee avant de quitter la
   page, qu'on la recharge, la ferme (`beforeunload`) ou navigue dans l'app
   (`turbo:before-visit`) ; l'enregistrement du formulaire lui-meme ne la
-  declenche pas. Un seul formulaire, un seul bouton « Enregistrer ».
+  declenche pas. Ce suivi ne concerne que le formulaire d'administration.
 
 Les explications longues (couts LLM, barre de progression, notes
 automatiques, segments sponsorises) sont derriere un « i » rond (macro `hint`
@@ -1810,8 +1818,8 @@ Les champs, noms de formulaire et attributs `data-*` des editeurs sont
 inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root et
 quota global, reglables par l'API ou l'environnement, voir
 [04 Configuration et deploiement](04-configuration-et-deploiement.md)), ni
-carte « Utilisateurs » : renommer, changer et supprimer un utilisateur se fait
-dans `/user`, comme les limites de temps d'ecran (propres a chaque utilisateur).
+carte « Utilisateurs » distincte : renommer, changer et supprimer un
+utilisateur se fait dans les parametres de l'utilisateur, en haut de la page.
 
 Permet de modifier :
 

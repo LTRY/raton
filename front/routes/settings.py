@@ -7,8 +7,9 @@ from fastapi.responses import HTMLResponse
 from front.api import Api, get_api
 from front.forms import form_list_values, form_text_value, split_labels
 from front.logs import LOG_FILTER_LABELS, log_days, normalize_log_filter
-from front.pages import append_query, page_href_builder, redirect
+from front.pages import append_query, message_context, page_href_builder, redirect
 from front.records import record
+from front.routes.users import user_menu
 from front.templating import templates
 
 router = APIRouter()
@@ -31,7 +32,21 @@ def with_unknown_labels(styles: list[dict], labels: list[str]) -> list[dict]:
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request, api: Api = Depends(get_api)):
+    """The user's own settings, then the admin ones. Open during the couvre-feu (the API calls of
+    the user part are): only the user switch and the couvre-feu card are rendered then, and the
+    admin calls, which would answer 423, are not made."""
     settings = api.get("/settings")
+    curfew = record(settings["curfew"])
+    user_context = {
+        "users": user_menu(api.get("/users")),
+        "curfew": curfew,
+        "curfew_mode": curfew.active,
+        "raton_language": record(settings["raton_language"]),
+        "screen_time_limits": settings["screen_time_limits"],
+        **message_context(request),
+    }
+    if curfew.active:
+        return templates.TemplateResponse(request, "settings.html", user_context)
     counts = api.get("/stats")
     scan = record(api.get("/scan"))
     auto_notes = record(api.get("/auto-notes"))
@@ -77,6 +92,7 @@ def settings_page(request: Request, api: Api = Depends(get_api)):
             "sponsor_skip_enabled": settings["sponsor_skip_enabled"],
             "sponsor_segment_category_options": settings["sponsor_segment_category_choices"],
             "video_library_asset_options": VIDEO_LIBRARY_ASSET_OPTIONS,
+            **user_context,
         },
     )
 

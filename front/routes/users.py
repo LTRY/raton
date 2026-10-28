@@ -1,20 +1,16 @@
-"""The user's own page (`/user`, opened from the home drawer's round button: their name, the
-user switch, Raton's language, the screen time limits, the couvre-feu), and the user forms of that page and of
-`/settings`.
+"""The forms of the user part of `/settings` (their name, the user switch, Raton's language, the
+screen time limits, the couvre-feu; the page itself is `front/routes/settings.py`).
 
 The chosen user is the `raton_user` cookie, which only the front sets: every page and every
 `/api` call of this browser then acts for that user (see `front/api.py`).
 """
 
-from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, Form
+from fastapi.responses import RedirectResponse
 
 from front.api import USER_COOKIE, Api, ApiError, get_api
 from front.forms import form_text_value
-from front.library_chat import user_menu
-from front.pages import append_query, internal_return_path, message_context, redirect
-from front.records import record
-from front.templating import templates
+from front.pages import append_query, internal_return_path, redirect
 
 router = APIRouter()
 
@@ -29,28 +25,29 @@ def act_as(response: RedirectResponse, user_id: int) -> RedirectResponse:
     return response
 
 
+def user_initial(name: str) -> str:
+    """The letter in a user's round avatar."""
+    return name.strip()[:1].upper() or "?"
+
+
+def user_menu(users: dict) -> dict:
+    """The users of `GET /api/users`, the current one first-class: what the user part of
+    `/settings` lists."""
+    current = next(
+        (user for user in users["users"] if user["id"] == users["current_user_id"]),
+        users["users"][0],
+    )
+    return {
+        "current": {**current, "initial": user_initial(current["name"])},
+        "users": [
+            {**user, "initial": user_initial(user["name"]), "current": user["id"] == current["id"]}
+            for user in users["users"]
+        ],
+    }
+
+
 def _users(api: Api) -> dict[int, str]:
     return {user["id"]: user["name"] for user in api.get("/users")["users"]}
-
-
-@router.get("/user", response_class=HTMLResponse)
-def user_page(request: Request, api: Api = Depends(get_api)):
-    """Open during the couvre-feu (its API calls are): the name, the user addition, Raton's
-    language and the screen time limits are then hidden, and the couvre-feu card stays so that it can be switched off."""
-    settings = api.get("/settings")
-    curfew = record(settings["curfew"])
-    return templates.TemplateResponse(
-        request,
-        "user_settings.html",
-        {
-            "users": user_menu(api.get("/users")),
-            "curfew": curfew,
-            "curfew_mode": curfew.active,
-            "raton_language": record(settings["raton_language"]),
-            "screen_time_limits": settings["screen_time_limits"],
-            **message_context(request),
-        },
-    )
 
 
 @router.post("/user")
@@ -91,8 +88,8 @@ def user_form(
     except ApiError as exc:
         if exc.status == 423:
             raise
-        return redirect(append_query("/user", {"level": "error", "message": exc.detail}))
-    return redirect(append_query("/user", {"message": "Paramètres enregistrés."}))
+        return redirect(append_query("/settings", {"level": "error", "message": exc.detail}))
+    return redirect(append_query("/settings", {"message": "Paramètres enregistrés."}))
 
 
 @router.post("/user/curfew/skip")
@@ -101,15 +98,15 @@ def skip_curfew(api: Api = Depends(get_api)):
     try:
         api.post("/curfew/skip")
     except ApiError as exc:
-        return redirect(append_query("/user", {"level": "error", "message": exc.detail}))
-    return redirect(append_query("/user", {"message": "Couvre-feu désactivé pour ce soir."}))
+        return redirect(append_query("/settings", {"level": "error", "message": exc.detail}))
+    return redirect(append_query("/settings", {"message": "Couvre-feu désactivé pour ce soir."}))
 
 
 @router.post("/user/curfew/resume")
 def resume_curfew(api: Api = Depends(get_api)):
     """Cancel tonight's skip."""
     api.delete("/curfew/skip")
-    return redirect(append_query("/user", {"message": "Couvre-feu rétabli."}))
+    return redirect(append_query("/settings", {"message": "Couvre-feu rétabli."}))
 
 
 @router.post("/users/switch")

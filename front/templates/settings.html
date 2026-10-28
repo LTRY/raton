@@ -16,272 +16,397 @@
 <section class="settings-page">
   <div class="settings-head">
     <h1>Paramètres</h1>
-    <a class="settings-head-link" href="/logs">Voir tous les logs</a>
+    {% if not curfew_mode %}<a class="settings-head-link settings-admin" href="/logs">Voir tous les logs</a>{% endif %}
   </div>
 
-  <form class="settings-form" action="/settings" method="post" data-unsaved-guard>
-    <div class="settings-layout">
-      <nav class="settings-nav" data-settings-nav aria-label="Sections des paramètres">
-        <p class="settings-nav-group">Aperçu</p>
-        <a href="#library-stats" class="settings-nav-link">Bibliothèque</a>
-        <a href="#llm-usage" class="settings-nav-link">Coûts LLM</a>
-        <a href="#auto-scan" class="settings-nav-link">Suivi automatique</a>
-        <p class="settings-nav-group">Bibliothèque vidéo</p>
-        <a href="#categories" class="settings-nav-link">Catégories vidéo</a>
-        <a href="#no-progress" class="settings-nav-link">Barre de progression</a>
-        <a href="#libraries" class="settings-nav-link">Sous-bibliothèques</a>
-        <p class="settings-nav-group">Lecture</p>
-        <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
-        <p class="settings-nav-group">Automatisation</p>
-        <a href="#auto-notes" class="settings-nav-link">Notes automatiques</a>
-        <p class="settings-nav-group">Autres pages</p>
-        <a href="/rag" class="settings-nav-link settings-nav-external">Indexation RAG</a>
-        <a href="/raton/variations" class="settings-nav-link settings-nav-external">Phrases de Raton</a>
-      </nav>
-      <div class="settings-sections">
-        <h2 class="settings-group-title" id="group-apercu">Aperçu</h2>
+  {# The user's own settings first; the rest of the page is admin settings, hidden on a phone (.settings-admin). #}
+  <div class="settings-layout{{ ' settings-layout-single' if curfew_mode else '' }}">
+    {% if not curfew_mode %}
+    <nav class="settings-nav settings-admin" data-settings-nav aria-label="Sections des paramètres">
+      <p class="settings-nav-group">Utilisateur</p>
+      <a href="#name" class="settings-nav-link">Nom</a>
+      <a href="#switch" class="settings-nav-link">Changer d’utilisateur</a>
+      <a href="#raton-language" class="settings-nav-link">Raton et toi</a>
+      <a href="#screen-time" class="settings-nav-link">Temps d’écran</a>
+      <a href="#curfew" class="settings-nav-link">Couvre-feu</a>
+      <p class="settings-nav-group">Aperçu</p>
+      <a href="#library-stats" class="settings-nav-link">Bibliothèque</a>
+      <a href="#llm-usage" class="settings-nav-link">Coûts LLM</a>
+      <a href="#auto-scan" class="settings-nav-link">Suivi automatique</a>
+      <p class="settings-nav-group">Bibliothèque vidéo</p>
+      <a href="#categories" class="settings-nav-link">Catégories vidéo</a>
+      <a href="#no-progress" class="settings-nav-link">Barre de progression</a>
+      <a href="#libraries" class="settings-nav-link">Sous-bibliothèques</a>
+      <p class="settings-nav-group">Lecture</p>
+      <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
+      <p class="settings-nav-group">Automatisation</p>
+      <a href="#auto-notes" class="settings-nav-link">Notes automatiques</a>
+      <p class="settings-nav-group">Autres pages</p>
+      <a href="/rag" class="settings-nav-link settings-nav-external">Indexation RAG</a>
+      <a href="/raton/variations" class="settings-nav-link settings-nav-external">Phrases de Raton</a>
+    </nav>
+    {% endif %}
+    <div class="settings-sections">
+      <div class="settings-user-head" id="user">
+        <span class="chat-user-avatar settings-user-avatar" aria-hidden="true">{{ users.current.initial }}</span>
+        <h2>{{ users.current.name }}</h2>
+      </div>
 
-        <div class="settings-card library-stats" id="library-stats">
-          <h2 class="settings-card-title">Bibliothèque</h2>
-          <div class="dashboard-stat-group">
-            <h3>Global</h3>
-            <p><span>Fiches</span><strong>{{ video_count }}</strong></p>
-            <p><span>Transcripts</span><strong>{{ transcript_count }}</strong></p>
-            <p><span>Chaînes</span><strong>{{ channel_count }}</strong></p>
+      {% if curfew_mode %}
+      <p class="user-curfew-note">Couvre-feu jusqu’à {{ curfew.end }} : tu peux le désactiver ci-dessous ou changer d’utilisateur ; le reste de tes paramètres se modifie après.</p>
+      {% else %}
+      <div class="settings-card" id="name">
+        <h2 class="settings-card-title">Nom</h2>
+        <form class="user-rename" action="/users/{{ users.current.id }}/rename" method="post">
+          <input type="hidden" name="next" value="/settings">
+          <label><span class="visually-hidden">Nom</span><input name="name" value="{{ users.current.name }}" maxlength="40" required autocomplete="off"></label>
+          <button type="submit" class="secondary">Renommer</button>
+        </form>
+      </div>
+      {% endif %}
+
+      <div class="settings-card" id="switch">
+        <h2 class="settings-card-title">Changer d’utilisateur</h2>
+        <p class="settings-hint">Vu, notes en étoiles, commentaires, cloches, playlists, discussions, historique et paramètres de ce groupe sont propres à chaque utilisateur.</p>
+        <ul class="chat-user-list">
+          {% for user in users.users %}
+          <li>
+            <form method="post" action="/users/switch">
+              <input type="hidden" name="user_id" value="{{ user.id }}">
+              <button type="submit" class="chat-user-choice"{% if user.current %} aria-current="true" disabled{% endif %}>
+                <span class="chat-user-avatar" aria-hidden="true">{{ user.initial }}</span>
+                <span class="chat-user-name">{{ user.name }}</span>
+                {% if user.current %}<svg class="chat-user-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>{% endif %}
+              </button>
+            </form>
+            {% if users.users | length > 1 %}
+            <form method="post" action="/users/{{ user.id }}/delete" data-turbo-confirm="Supprimer {{ user.name }} et tout ce qui lui est propre (Vu, notes en étoiles, playlists, discussions) ?">
+              <button type="submit" class="settings-user-action settings-user-delete">Supprimer</button>
+            </form>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% if not curfew_mode %}
+        <form class="chat-user-add" method="post" action="/users">
+          <input type="text" name="name" maxlength="40" placeholder="Nouvel utilisateur" aria-label="Nom du nouvel utilisateur" autocomplete="off" required>
+          <button type="submit">Ajouter</button>
+        </form>
+        {% endif %}
+      </div>
+
+      <form class="settings-form user-form" action="/user" method="post">
+        {% if not curfew_mode %}
+        <div class="settings-card" id="raton-language">
+          <h2 class="settings-card-title">Raton et toi</h2>
+          <p class="settings-hint">La façon dont Raton te parle dans le chat de l’accueil.</p>
+          <div class="settings-checkbox-list" role="radiogroup" aria-label="Tutoiement ou vouvoiement">
+            <label class="settings-checkbox-option">
+              <input type="radio" name="raton_address" value="vous"{% if raton_language.address == 'vous' %} checked{% endif %}>
+              <span>Il te vouvoie</span>
+            </label>
+            <label class="settings-checkbox-option">
+              <input type="radio" name="raton_address" value="tu"{% if raton_language.address == 'tu' %} checked{% endif %}>
+              <span>Il te tutoie</span>
+            </label>
           </div>
-          <div class="dashboard-stat-group">
-            <h3>Active</h3>
-            <p><span>Chaînes</span><strong>{{ rated_channel_count }}</strong></p>
-            <p><span>Vidéos</span><strong>{{ regular_video_count }}</strong></p>
-            <p><span>Shorts</span><strong>{{ short_count }}</strong></p>
-            <p><span>Médias</span><strong>{{ downloaded_media_count }}</strong></p>
-          </div>
-          <p class="dashboard-storage-summary"><span>Stockage</span><strong>{{ format_storage_bytes(used_bytes|default(0)) }} / {{ format_storage_bytes(quota_bytes|default(0)) }}</strong></p>
-          <div class="media-progress-track dashboard-storage-progress" aria-label="Stockage utilisé">
-            <span style="width: {{ storage_percent|default(0) }}%"></span>
-          </div>
-          <a class="button-link secondary lg" href="/stats">Voir les graphiques</a>
+          <label class="user-nickname">Comment il t’appelle <input name="raton_nickname" value="{{ raton_language.nickname }}" maxlength="40" placeholder="Rien de particulier" autocomplete="off"></label>
         </div>
-
-        <div class="settings-card" id="llm-usage">
-          <h2 class="settings-card-title">Coûts LLM</h2>
-          {% call hint("Coût réel facturé par l’API, pas une estimation.") %}
-          <p class="settings-hint">Coût réel, mesuré à partir des tokens réellement facturés par l'API (pas une estimation) — tokens d'entrée (cache compris) et de sortie (réflexion comprise), au tarif du modèle utilisé par chaque job, y compris les réponses tronquées facturées malgré l'échec. Ne couvre que les jobs terminés depuis l'activation de ce suivi.</p>
-          {% endcall %}
-          {% if llm_usage.by_kind %}
-          <p class="settings-total">Total : <strong>${{ "%.4f"|format(llm_usage.total_cost_usd) }}</strong> sur {{ llm_usage.total_job_count }} job{{ "s" if llm_usage.total_job_count != 1 else "" }}</p>
-          <details class="settings-fold">
-            <summary>Voir le détail</summary>
-          <div class="settings-table-scroll">
-          <table class="settings-usage-table">
-            <thead>
-              <tr>
-                <th>Opération</th>
-                <th>Jobs</th>
-                <th>Tokens entrée</th>
-                <th>Tokens sortie</th>
-                <th>Coût</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in llm_usage.by_kind %}
-              <tr>
-                <td>{{ row.label }}</td>
-                <td>{{ row.job_count }}</td>
-                <td>{{ "{:,}".format(row.input_tokens).replace(",", " ") }}</td>
-                <td>{{ "{:,}".format(row.output_tokens).replace(",", " ") }}</td>
-                <td>${{ "%.4f"|format(row.cost_usd) }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td>Total</td>
-                <td>{{ llm_usage.total_job_count }}</td>
-                <td colspan="2"></td>
-                <td>${{ "%.4f"|format(llm_usage.total_cost_usd) }}</td>
-              </tr>
-            </tfoot>
-          </table>
-          <h3>Par modèle</h3>
-          <table class="settings-usage-table">
-            <thead>
-              <tr>
-                <th>Modèle</th>
-                <th>Jobs</th>
-                <th>Tokens entrée</th>
-                <th>Tokens sortie</th>
-                <th>Coût</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in llm_usage.by_model %}
-              <tr>
-                <td>{{ row.model }}</td>
-                <td>{{ row.job_count }}</td>
-                <td>{{ "{:,}".format(row.input_tokens).replace(",", " ") }}</td>
-                <td>{{ "{:,}".format(row.output_tokens).replace(",", " ") }}</td>
-                <td>${{ "%.4f"|format(row.cost_usd) }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          </div>
-          </details>
-          {% else %}
-          <p class="empty-state">Aucun job avec un coût mesuré pour l'instant.</p>
-          {% endif %}
-          {% if llm_usage.untracked_job_count %}
-          <p class="muted">{{ llm_usage.untracked_job_count }} job{{ "s" if llm_usage.untracked_job_count > 1 else "" }} sans coût mesuré (en attente, en échec avant toute réponse, ou modèle sans tarif connu).</p>
-          {% endif %}
-        </div>
-
-        <div class="settings-card" id="auto-scan">
-          <h2 class="settings-card-title">Suivi automatique</h2>
-          <p class="settings-hint">Scan quotidien (3h, heure de Paris) des chaînes dont la cloche est activée — importe les nouvelles fiches et pose le label "Nouveau".</p>
-          {% if last_auto_scan.at %}
-          <p>Dernier scan : {{ format_french_datetime(last_auto_scan.at) }}</p>
-          {% if last_auto_scan.status == "completed" %}
-          <p class="muted">{{ last_auto_scan.imported }} nouvelle{{ "s" if last_auto_scan.imported != 1 else "" }} fiche{{ "s" if last_auto_scan.imported != 1 else "" }} importée{{ "s" if last_auto_scan.imported != 1 else "" }}.</p>
-          {% elif last_auto_scan.status == "storage_low" %}
-          <p class="notice error">Ignoré : moins de 20% du quota de stockage disponible.</p>
-          {% elif last_auto_scan.status == "rate_limited" %}
-          <p class="muted">{{ last_auto_scan.imported }} fiche{{ "s" if last_auto_scan.imported != 1 else "" }} importée{{ "s" if last_auto_scan.imported != 1 else "" }} avant que YouTube limite les requêtes ; le reste sera repris au prochain scan.</p>
-          {% elif last_auto_scan.status == "failed" %}
-          <p class="notice error">Échec du dernier scan.</p>
-          {% endif %}
-          {% else %}
-          <p class="empty-state">Aucun scan automatique n'a encore tourné.</p>
-          {% endif %}
-          <p class="settings-hint">Le scan peut être lancé à la main. Sa progression s'affiche en notifications, tant que cette page reste ouverte.</p>
-          <button class="secondary" type="button" data-scan-run data-scan-url="/api/scan" data-scan-feed-url="/api/scan/events" data-scan-running="{{ 'true' if scan_running else 'false' }}" data-scan-after="{{ scan_events_last_id }}">Lancer le scan maintenant</button>
-        </div>
-
-        <h2 class="settings-group-title" id="group-bibliotheque">Bibliothèque vidéo</h2>
-
-        <div class="settings-card" id="categories">
-          <div class="settings-category-builder" data-category-label-editor data-initial-labels='{{ video_category_label_styles | tojson }}'>
-            <div class="settings-category-header">
-              <h2 class="settings-card-title">Catégories vidéo</h2>
-              <output data-category-count>{{ video_category_labels_list | length }} labels</output>
+        <div class="settings-card" id="screen-time">
+          <fieldset class="settings-screen-time">
+            <legend class="settings-card-title">Temps d’écran</legend>
+            <div class="settings-screen-time-grid settings-screen-time-header"><span>Type</span><span>Jour</span></div>
+            {% for kind, label in [('video', 'Vidéos'), ('short', 'Shorts'), ('podcast', 'Podcasts'), ('music', 'Musique')] %}
+            <div class="settings-screen-time-grid">
+              <strong>{{ label }}</strong>
+              <label><span class="visually-hidden">{{ label }} · today</span><input name="screen_time_{{ kind }}_today" type="number" min="1" value="{{ screen_time_limits[kind]['today'] }}" required><small>min</small></label>
             </div>
-            <div class="settings-category-panel">
-              <div class="settings-category-list" data-category-list aria-label="Labels de catégories vidéo"></div>
-              <div class="settings-category-add">
-                <label>
-                  Nouveau label
-                  <input data-category-input type="text" autocomplete="off" placeholder="histoire">
-                </label>
-                <label>
-                  Couleur
-                  <input class="settings-category-color-input" data-category-new-color type="color" value="#16a34a">
-                </label>
-                <button type="button" data-category-add>Ajouter</button>
-              </div>
-            </div>
-            <noscript>
-              <label>
-                Labels, un par ligne (les couleurs des labels déjà connus sont conservées)
-                <textarea name="video_category_labels" rows="8">{{ video_category_labels }}</textarea>
+            {% endfor %}
+            <small class="settings-hint">Les indicateurs passent progressivement du vert au rouge à mesure que la limite approche.</small>
+          </fieldset>
+        </div>
+        {% endif %}
+
+        <div class="settings-card" id="curfew">
+          <div class="settings-curfew">
+            <h2 class="settings-card-title">Couvre-feu</h2>
+            <p class="settings-hint">Pendant ces heures, Raton te ferme ses portes : plus de lecture, de recherche ni de réglages. Seuls l’accueil (Raton et ses discussions), l’historique, pour écrire un commentaire sous les vidéos, et tes paramètres restent ouverts. Tu peux le désactiver à tout moment, même pendant qu’il est en cours.</p>
+            <div class="settings-checkbox-list">
+              <label class="settings-checkbox-option">
+                <input type="checkbox" name="curfew_enabled"{% if curfew.enabled %} checked{% endif %}>
+                <span>Activer le couvre-feu</span>
               </label>
-            </noscript>
-            <textarea class="category-label-source" name="video_category_styles" rows="6" data-category-source disabled>{{ video_category_label_styles | tojson }}</textarea>
+            </div>
+            <div class="settings-curfew-hours">
+              <label>De <input name="curfew_start" type="time" value="{{ curfew.start }}" required></label>
+              <label>à <input name="curfew_end" type="time" value="{{ curfew.end }}" required></label>
+            </div>
           </div>
         </div>
 
-        <div class="settings-card" id="no-progress">
-          <details class="settings-fold settings-fold-card">
-          <summary><h2 class="settings-card-title">Catégories sans barre de progression</h2><span class="settings-fold-meta">{{ no_progress_categories | length }} cochée{{ "s" if no_progress_categories | length > 1 else "" }}</span></summary>
-          {% call hint("Les fiches des catégories cochées n’affichent jamais de barre de progression.") %}
-          <p class="settings-hint">Les fiches dont une catégorie cochée ci-dessous n’affichent jamais de barre de progression de lecture, même en cours de visionnage (utile pour les contenus faits pour être rejoués, comme les AMV ou la musique).</p>
-          {% endcall %}
-          <div class="settings-checkbox-list">
-            {% for option in no_progress_category_options %}
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="no_progress_categories" value="{{ option.label }}" {% if option.label in no_progress_categories %}checked{% endif %}>
-              <span class="category-label" {% if option.color %}style="{{ video_category_css_style(option) }}"{% endif %}>{{ option.label }}</span>
-            </label>
-            {% else %}
-            <p class="empty-state">Ajoute d’abord des catégories vidéo pour pouvoir les choisir ici.</p>
-            {% endfor %}
-          </div>
-          </details>
-        </div>
-
-        <div class="settings-card" id="libraries">
-          <div class="settings-library-builder" data-library-view-editor data-initial-views='{{ video_library_views | tojson }}' data-asset-options='{{ video_library_asset_options | tojson }}' data-category-options='{{ video_category_label_styles | tojson }}'>
-            <details class="settings-fold settings-fold-card">
-            <summary><h2 class="settings-card-title">Sous-bibliothèques</h2><output class="settings-fold-meta" data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output></summary>
-            <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
-            <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
-            <noscript>
-              <p class="settings-hint">Sans JavaScript, les sous-bibliothèques se modifient en JSON : une liste d’objets avec <code>name</code>, <code>assets</code>, <code>categories</code>, <code>excluded_assets</code>, <code>excluded_categories</code>, <code>asset_filter_mode</code> et <code>category_filter_mode</code> (<code>or</code> ou <code>and</code>), <code>rated</code>. Un JSON invalide n’enregistre rien.</p>
-            </noscript>
-            <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
-            </details>
-          </div>
-        </div>
-
-        <h2 class="settings-group-title" id="group-lecture">Lecture</h2>
-
-        <div class="settings-card" id="sponsor-segments">
-          <details class="settings-fold settings-fold-card">
-          <summary><h2 class="settings-card-title">Segments sponsorisés</h2><span class="settings-fold-meta">{{ sponsor_segment_categories | length }} / {{ sponsor_segment_category_options | length }} catégories{% if sponsor_skip_enabled %} · saut auto{% endif %}</span></summary>
-          {% call hint("Catégories recherchées via SponsorBlock : détectées, affichées et sautées.") %}
-          <p class="settings-hint">Catégories recherchées via SponsorBlock sur chaque vidéo (bouton "Rechercher les segments sponsors", onglet Segments de la page d'une vidéo). Une catégorie cochée est détectée, affichée et sautée ; décochée, elle ne l'est pour rien.</p>
-          {% endcall %}
-          <div class="settings-checkbox-list">
-            {% for option in sponsor_segment_category_options %}
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="sponsor_segment_categories" value="{{ option.value }}"{% if option.value in sponsor_segment_categories %} checked{% endif %}>
-              <span>{{ option.label }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          <div class="settings-checkbox-list">
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="sponsor_skip_enabled"{% if sponsor_skip_enabled %} checked{% endif %}>
-              <span>Sauter automatiquement les segments détectés</span>
-            </label>
-          </div>
-          </details>
-        </div>
-
-        <h2 class="settings-group-title" id="group-automatisation">Automatisation</h2>
-
-        <div class="settings-card" id="auto-notes">
-          <details class="settings-fold settings-fold-card">
-          <summary><h2 class="settings-card-title">Notes automatiques</h2><span class="settings-fold-meta">{% if auto_notes_enabled %}activées{% else %}désactivées{% endif %} · {{ auto_notes_excluded_categories | length }} catégorie{{ "s" if auto_notes_excluded_categories | length > 1 else "" }} exclue{{ "s" if auto_notes_excluded_categories | length > 1 else "" }}</span></summary>
-          {% call hint("Notes structurées et résumé court des vidéos qui ont un transcript, chaque nuit à 5 h.") %}
-          <p class="settings-hint">Chaque nuit à 5 h, jusqu’à 100 vidéos qui ont un transcript mais pas de notes reçoivent leurs notes structurées et un résumé court, en un lot Anthropic à moitié prix traité dans la journée. Ces notes alimentent la recherche du chat bibliothèque. Le bouton robot d’une vidéo reste disponible pour les questions suggérées. Les shorts et les vidéos dont une catégorie est cochée ci-dessous sont ignorés ; les notes déjà écrites ne sont jamais régénérées ni retirées de l’index. Coût réel dans « Coûts LLM » ci-dessus.</p>
-          {% endcall %}
-          <div class="settings-checkbox-list">
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="auto_notes_enabled"{% if auto_notes_enabled %} checked{% endif %}>
-              <span>Générer les notes automatiquement</span>
-            </label>
-          </div>
-          <p class="settings-hint">Ignorer les vidéos de ces catégories :</p>
-          <div class="settings-checkbox-list">
-            {% for option in auto_notes_category_options %}
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="auto_notes_excluded_categories" value="{{ option.label }}" {% if option.label in auto_notes_excluded_categories %}checked{% endif %}>
-              <span class="category-label" {% if option.color %}style="{{ video_category_css_style(option) }}"{% endif %}>{{ option.label }}</span>
-            </label>
-            {% else %}
-            <p class="empty-state">Ajoute d’abord des catégories vidéo pour pouvoir les choisir ici.</p>
-            {% endfor %}
-          </div>
-          <p class="settings-hint">Dernier passage : {% if auto_notes_last_run_at %}{{ format_french_datetime(auto_notes_last_run_at) }}{% if auto_notes_last_run_summary %} — {{ auto_notes_last_run_summary }}{% endif %}{% else %}jamais{% endif %}</p>
-          </details>
-        </div>
-
-        <div class="settings-actions lg" data-settings-actions>
-          <span data-settings-actions-note>Les changements s’appliquent à l’enregistrement.</span>
+        <div class="settings-actions lg">
+          <span>Les changements s’appliquent à l’enregistrement.</span>
           <button type="submit">Enregistrer</button>
         </div>
+      </form>
+
+      {% if curfew.enabled %}
+      <div class="settings-card" id="curfew-tonight">
+        {% if curfew.skipped_until %}
+        <p class="settings-hint">Couvre-feu désactivé jusqu’au {{ format_french_datetime(curfew.skipped_until) }}.</p>
+        <form action="/user/curfew/resume" method="post"><button type="submit" class="secondary">Rétablir le couvre-feu</button></form>
+        {% else %}
+        <form action="/user/curfew/skip" method="post"><button type="submit" class="secondary">Désactiver le couvre-feu pour ce soir</button></form>
+        {% endif %}
       </div>
+      {% endif %}
+
+      {% if not curfew_mode %}
+      <form class="settings-form settings-admin" action="/settings" method="post" data-unsaved-guard>
+      <h2 class="settings-group-title" id="group-apercu">Aperçu</h2>
+
+      <div class="settings-card library-stats" id="library-stats">
+        <h2 class="settings-card-title">Bibliothèque</h2>
+        <div class="dashboard-stat-group">
+          <h3>Global</h3>
+          <p><span>Fiches</span><strong>{{ video_count }}</strong></p>
+          <p><span>Transcripts</span><strong>{{ transcript_count }}</strong></p>
+          <p><span>Chaînes</span><strong>{{ channel_count }}</strong></p>
+        </div>
+        <div class="dashboard-stat-group">
+          <h3>Active</h3>
+          <p><span>Chaînes</span><strong>{{ rated_channel_count }}</strong></p>
+          <p><span>Vidéos</span><strong>{{ regular_video_count }}</strong></p>
+          <p><span>Shorts</span><strong>{{ short_count }}</strong></p>
+          <p><span>Médias</span><strong>{{ downloaded_media_count }}</strong></p>
+        </div>
+        <p class="dashboard-storage-summary"><span>Stockage</span><strong>{{ format_storage_bytes(used_bytes|default(0)) }} / {{ format_storage_bytes(quota_bytes|default(0)) }}</strong></p>
+        <div class="media-progress-track dashboard-storage-progress" aria-label="Stockage utilisé">
+          <span style="width: {{ storage_percent|default(0) }}%"></span>
+        </div>
+        <a class="button-link secondary lg" href="/stats">Voir les graphiques</a>
+      </div>
+
+      <div class="settings-card" id="llm-usage">
+        <h2 class="settings-card-title">Coûts LLM</h2>
+        {% call hint("Coût réel facturé par l’API, pas une estimation.") %}
+        <p class="settings-hint">Coût réel, mesuré à partir des tokens réellement facturés par l'API (pas une estimation) — tokens d'entrée (cache compris) et de sortie (réflexion comprise), au tarif du modèle utilisé par chaque job, y compris les réponses tronquées facturées malgré l'échec. Ne couvre que les jobs terminés depuis l'activation de ce suivi.</p>
+        {% endcall %}
+        {% if llm_usage.by_kind %}
+        <p class="settings-total">Total : <strong>${{ "%.4f"|format(llm_usage.total_cost_usd) }}</strong> sur {{ llm_usage.total_job_count }} job{{ "s" if llm_usage.total_job_count != 1 else "" }}</p>
+        <details class="settings-fold">
+          <summary>Voir le détail</summary>
+        <div class="settings-table-scroll">
+        <table class="settings-usage-table">
+          <thead>
+            <tr>
+              <th>Opération</th>
+              <th>Jobs</th>
+              <th>Tokens entrée</th>
+              <th>Tokens sortie</th>
+              <th>Coût</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in llm_usage.by_kind %}
+            <tr>
+              <td>{{ row.label }}</td>
+              <td>{{ row.job_count }}</td>
+              <td>{{ "{:,}".format(row.input_tokens).replace(",", " ") }}</td>
+              <td>{{ "{:,}".format(row.output_tokens).replace(",", " ") }}</td>
+              <td>${{ "%.4f"|format(row.cost_usd) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td>{{ llm_usage.total_job_count }}</td>
+              <td colspan="2"></td>
+              <td>${{ "%.4f"|format(llm_usage.total_cost_usd) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <h3>Par modèle</h3>
+        <table class="settings-usage-table">
+          <thead>
+            <tr>
+              <th>Modèle</th>
+              <th>Jobs</th>
+              <th>Tokens entrée</th>
+              <th>Tokens sortie</th>
+              <th>Coût</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in llm_usage.by_model %}
+            <tr>
+              <td>{{ row.model }}</td>
+              <td>{{ row.job_count }}</td>
+              <td>{{ "{:,}".format(row.input_tokens).replace(",", " ") }}</td>
+              <td>{{ "{:,}".format(row.output_tokens).replace(",", " ") }}</td>
+              <td>${{ "%.4f"|format(row.cost_usd) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        </details>
+        {% else %}
+        <p class="empty-state">Aucun job avec un coût mesuré pour l'instant.</p>
+        {% endif %}
+        {% if llm_usage.untracked_job_count %}
+        <p class="muted">{{ llm_usage.untracked_job_count }} job{{ "s" if llm_usage.untracked_job_count > 1 else "" }} sans coût mesuré (en attente, en échec avant toute réponse, ou modèle sans tarif connu).</p>
+        {% endif %}
+      </div>
+
+      <div class="settings-card" id="auto-scan">
+        <h2 class="settings-card-title">Suivi automatique</h2>
+        <p class="settings-hint">Scan quotidien (3h, heure de Paris) des chaînes dont la cloche est activée — importe les nouvelles fiches et pose le label "Nouveau".</p>
+        {% if last_auto_scan.at %}
+        <p>Dernier scan : {{ format_french_datetime(last_auto_scan.at) }}</p>
+        {% if last_auto_scan.status == "completed" %}
+        <p class="muted">{{ last_auto_scan.imported }} nouvelle{{ "s" if last_auto_scan.imported != 1 else "" }} fiche{{ "s" if last_auto_scan.imported != 1 else "" }} importée{{ "s" if last_auto_scan.imported != 1 else "" }}.</p>
+        {% elif last_auto_scan.status == "storage_low" %}
+        <p class="notice error">Ignoré : moins de 20% du quota de stockage disponible.</p>
+        {% elif last_auto_scan.status == "rate_limited" %}
+        <p class="muted">{{ last_auto_scan.imported }} fiche{{ "s" if last_auto_scan.imported != 1 else "" }} importée{{ "s" if last_auto_scan.imported != 1 else "" }} avant que YouTube limite les requêtes ; le reste sera repris au prochain scan.</p>
+        {% elif last_auto_scan.status == "failed" %}
+        <p class="notice error">Échec du dernier scan.</p>
+        {% endif %}
+        {% else %}
+        <p class="empty-state">Aucun scan automatique n'a encore tourné.</p>
+        {% endif %}
+        <p class="settings-hint">Le scan peut être lancé à la main. Sa progression s'affiche en notifications, tant que cette page reste ouverte.</p>
+        <button class="secondary" type="button" data-scan-run data-scan-url="/api/scan" data-scan-feed-url="/api/scan/events" data-scan-running="{{ 'true' if scan_running else 'false' }}" data-scan-after="{{ scan_events_last_id }}">Lancer le scan maintenant</button>
+      </div>
+
+      <h2 class="settings-group-title" id="group-bibliotheque">Bibliothèque vidéo</h2>
+
+      <div class="settings-card" id="categories">
+        <div class="settings-category-builder" data-category-label-editor data-initial-labels='{{ video_category_label_styles | tojson }}'>
+          <div class="settings-category-header">
+            <h2 class="settings-card-title">Catégories vidéo</h2>
+            <output data-category-count>{{ video_category_labels_list | length }} labels</output>
+          </div>
+          <div class="settings-category-panel">
+            <div class="settings-category-list" data-category-list aria-label="Labels de catégories vidéo"></div>
+            <div class="settings-category-add">
+              <label>
+                Nouveau label
+                <input data-category-input type="text" autocomplete="off" placeholder="histoire">
+              </label>
+              <label>
+                Couleur
+                <input class="settings-category-color-input" data-category-new-color type="color" value="#16a34a">
+              </label>
+              <button type="button" data-category-add>Ajouter</button>
+            </div>
+          </div>
+          <noscript>
+            <label>
+              Labels, un par ligne (les couleurs des labels déjà connus sont conservées)
+              <textarea name="video_category_labels" rows="8">{{ video_category_labels }}</textarea>
+            </label>
+          </noscript>
+          <textarea class="category-label-source" name="video_category_styles" rows="6" data-category-source disabled>{{ video_category_label_styles | tojson }}</textarea>
+        </div>
+      </div>
+
+      <div class="settings-card" id="no-progress">
+        <details class="settings-fold settings-fold-card">
+        <summary><h2 class="settings-card-title">Catégories sans barre de progression</h2><span class="settings-fold-meta">{{ no_progress_categories | length }} cochée{{ "s" if no_progress_categories | length > 1 else "" }}</span></summary>
+        {% call hint("Les fiches des catégories cochées n’affichent jamais de barre de progression.") %}
+        <p class="settings-hint">Les fiches dont une catégorie cochée ci-dessous n’affichent jamais de barre de progression de lecture, même en cours de visionnage (utile pour les contenus faits pour être rejoués, comme les AMV ou la musique).</p>
+        {% endcall %}
+        <div class="settings-checkbox-list">
+          {% for option in no_progress_category_options %}
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="no_progress_categories" value="{{ option.label }}" {% if option.label in no_progress_categories %}checked{% endif %}>
+            <span class="category-label" {% if option.color %}style="{{ video_category_css_style(option) }}"{% endif %}>{{ option.label }}</span>
+          </label>
+          {% else %}
+          <p class="empty-state">Ajoute d’abord des catégories vidéo pour pouvoir les choisir ici.</p>
+          {% endfor %}
+        </div>
+        </details>
+      </div>
+
+      <div class="settings-card" id="libraries">
+        <div class="settings-library-builder" data-library-view-editor data-initial-views='{{ video_library_views | tojson }}' data-asset-options='{{ video_library_asset_options | tojson }}' data-category-options='{{ video_category_label_styles | tojson }}'>
+          <details class="settings-fold settings-fold-card">
+          <summary><h2 class="settings-card-title">Sous-bibliothèques</h2><output class="settings-fold-meta" data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output></summary>
+          <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
+          <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
+          <noscript>
+            <p class="settings-hint">Sans JavaScript, les sous-bibliothèques se modifient en JSON : une liste d’objets avec <code>name</code>, <code>assets</code>, <code>categories</code>, <code>excluded_assets</code>, <code>excluded_categories</code>, <code>asset_filter_mode</code> et <code>category_filter_mode</code> (<code>or</code> ou <code>and</code>), <code>rated</code>. Un JSON invalide n’enregistre rien.</p>
+          </noscript>
+          <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
+          </details>
+        </div>
+      </div>
+
+      <h2 class="settings-group-title" id="group-lecture">Lecture</h2>
+
+      <div class="settings-card" id="sponsor-segments">
+        <details class="settings-fold settings-fold-card">
+        <summary><h2 class="settings-card-title">Segments sponsorisés</h2><span class="settings-fold-meta">{{ sponsor_segment_categories | length }} / {{ sponsor_segment_category_options | length }} catégories{% if sponsor_skip_enabled %} · saut auto{% endif %}</span></summary>
+        {% call hint("Catégories recherchées via SponsorBlock : détectées, affichées et sautées.") %}
+        <p class="settings-hint">Catégories recherchées via SponsorBlock sur chaque vidéo (bouton "Rechercher les segments sponsors", onglet Segments de la page d'une vidéo). Une catégorie cochée est détectée, affichée et sautée ; décochée, elle ne l'est pour rien.</p>
+        {% endcall %}
+        <div class="settings-checkbox-list">
+          {% for option in sponsor_segment_category_options %}
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="sponsor_segment_categories" value="{{ option.value }}"{% if option.value in sponsor_segment_categories %} checked{% endif %}>
+            <span>{{ option.label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="settings-checkbox-list">
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="sponsor_skip_enabled"{% if sponsor_skip_enabled %} checked{% endif %}>
+            <span>Sauter automatiquement les segments détectés</span>
+          </label>
+        </div>
+        </details>
+      </div>
+
+      <h2 class="settings-group-title" id="group-automatisation">Automatisation</h2>
+
+      <div class="settings-card" id="auto-notes">
+        <details class="settings-fold settings-fold-card">
+        <summary><h2 class="settings-card-title">Notes automatiques</h2><span class="settings-fold-meta">{% if auto_notes_enabled %}activées{% else %}désactivées{% endif %} · {{ auto_notes_excluded_categories | length }} catégorie{{ "s" if auto_notes_excluded_categories | length > 1 else "" }} exclue{{ "s" if auto_notes_excluded_categories | length > 1 else "" }}</span></summary>
+        {% call hint("Notes structurées et résumé court des vidéos qui ont un transcript, chaque nuit à 5 h.") %}
+        <p class="settings-hint">Chaque nuit à 5 h, jusqu’à 100 vidéos qui ont un transcript mais pas de notes reçoivent leurs notes structurées et un résumé court, en un lot Anthropic à moitié prix traité dans la journée. Ces notes alimentent la recherche du chat bibliothèque. Le bouton robot d’une vidéo reste disponible pour les questions suggérées. Les shorts et les vidéos dont une catégorie est cochée ci-dessous sont ignorés ; les notes déjà écrites ne sont jamais régénérées ni retirées de l’index. Coût réel dans « Coûts LLM » ci-dessus.</p>
+        {% endcall %}
+        <div class="settings-checkbox-list">
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="auto_notes_enabled"{% if auto_notes_enabled %} checked{% endif %}>
+            <span>Générer les notes automatiquement</span>
+          </label>
+        </div>
+        <p class="settings-hint">Ignorer les vidéos de ces catégories :</p>
+        <div class="settings-checkbox-list">
+          {% for option in auto_notes_category_options %}
+          <label class="settings-checkbox-option">
+            <input type="checkbox" name="auto_notes_excluded_categories" value="{{ option.label }}" {% if option.label in auto_notes_excluded_categories %}checked{% endif %}>
+            <span class="category-label" {% if option.color %}style="{{ video_category_css_style(option) }}"{% endif %}>{{ option.label }}</span>
+          </label>
+          {% else %}
+          <p class="empty-state">Ajoute d’abord des catégories vidéo pour pouvoir les choisir ici.</p>
+          {% endfor %}
+        </div>
+        <p class="settings-hint">Dernier passage : {% if auto_notes_last_run_at %}{{ format_french_datetime(auto_notes_last_run_at) }}{% if auto_notes_last_run_summary %} — {{ auto_notes_last_run_summary }}{% endif %}{% else %}jamais{% endif %}</p>
+        </details>
+      </div>
+
+      <div class="settings-actions lg" data-settings-actions>
+        <span data-settings-actions-note>Les changements s’appliquent à l’enregistrement.</span>
+        <button type="submit">Enregistrer</button>
+      </div>
+      </form>
+      {% endif %}
     </div>
-  </form>
+  </div>
 </section>
 {% endblock %}

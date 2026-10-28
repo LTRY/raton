@@ -1,6 +1,6 @@
 <!doctype html>
 {% set current_path = request.url.path if request is defined else "" %}
-{# During the couvre-feu (curfew.html, home, Historique) the pages only lead to the home and the Historique. #}
+{# During the couvre-feu (curfew.html, home, Historique, Paramètres) the pages only lead to the home, the Historique and the Paramètres. #}
 {% set curfew_mode = curfew_mode|default(false) %}
 <html lang="fr">
   <head>
@@ -37,6 +37,7 @@
       {% if curfew_mode %}
       <nav>
         <a href="/dashboard/historique" {% if current_path.startswith('/dashboard/historique') %}aria-current="page"{% endif %}>Historique</a>
+        <a href="/settings" {% if current_path.startswith('/settings') %}aria-current="page"{% endif %}>Paramètres</a>
       </nav>
       {% else %}
       <nav>
@@ -76,11 +77,11 @@
       <a class="tab-playlist{{ ' active' if tab_active else '' }}" href="/playlists" aria-label="Playlists" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="tab-pl tab-pl1" pathLength="1" d="M3.5 6h13"/><path class="tab-pl tab-pl2" pathLength="1" d="M3.5 11h13"/><path class="tab-pl tab-pl3" pathLength="1" d="M3.5 16h6"/><path class="tab-tri" d="M14 14.5v6l5.5-3z"/></svg>
       </a>
+      {% endif %}
       {% set tab_active = current_path.startswith('/settings') %}
       <a class="tab-settings{{ ' active' if tab_active else '' }}" href="/settings" aria-label="Réglages" {% if tab_active %}aria-current="page"{% endif %}>
         <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M4 17h16"/><circle class="tab-k1" cx="15" cy="7" r="2.5"/><circle class="tab-k2" cx="9" cy="17" r="2.5"/></svg>
       </a>
-      {% endif %}
     </nav>
     <main>
       {% block content %}{% endblock %}

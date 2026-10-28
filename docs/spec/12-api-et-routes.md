@@ -174,14 +174,12 @@ Utilisateurs (`front/routes/users.py`) — le front seul pose le cookie
 `raton_user`, qui dit pour qui agit ce navigateur (voir « Utilisateur d'une
 requete » plus bas) :
 
-- `GET /user` : la page de l'utilisateur courant (nom, changement
-  d'utilisateur, langage de Raton, temps d'ecran, couvre-feu), ouverte aussi
-  pendant son couvre-feu ; `POST /user` `raton_address`, `raton_nickname`,
+- `POST /user` (formulaire de la partie utilisateur de `/settings`) `raton_address`, `raton_nickname`,
   `screen_time_<kind>_today` (`video`, `short`, `podcast`, `music`),
   `curfew_enabled`, `curfew_start`, `curfew_end` : `PUT /api/settings`, puis
-  redirige vers `/user` avec « Paramètres enregistrés. » ou le message du back.
+  redirige vers `/settings` avec « Paramètres enregistrés. » ou le message du back.
 - `POST /user/curfew/skip`, `POST /user/curfew/resume` : « Désactiver le
-  couvre-feu pour ce soir » et « Rétablir le couvre-feu » de `/user`
+  couvre-feu pour ce soir » et « Rétablir le couvre-feu » de `/settings`
   (`POST`/`DELETE /api/curfew/skip`) ;
 - `POST /users/switch` `user_id` : agir comme cet utilisateur (pose le
   cookie), puis redirige vers `/` avec « Bonjour <nom> ! » ; un utilisateur
@@ -190,14 +188,18 @@ requete » plus bas) :
   aussitot comme lui ; un nom vide, trop long ou deja pris redirige vers `/`
   avec le message du back.
 - `POST /users/{id}/rename` `name` `next`, `POST /users/{id}/delete` :
-  formulaires de `/user` (« Nom » pour le renommage, « Changer d'utilisateur »
+  formulaires de `/settings` (« Nom » pour le renommage, « Changer d'utilisateur »
   pour la suppression), redirigent vers `next` (par defaut `/settings`) avec un
   message. Supprimer l'utilisateur courant efface le cookie (retour a
   l'utilisateur par defaut).
 
 Parametres et divers :
 
-- `GET /settings` : page parametres.
+- `GET /settings` : page parametres : la partie de l'utilisateur courant (nom,
+  changement d'utilisateur, langage de Raton, temps d'ecran, couvre-feu), puis
+  les reglages d'administration. Ouverte aussi pendant son couvre-feu, reduite
+  alors a la partie utilisateur (sans appel aux routes d'administration, qui
+  repondraient `423`).
 - `POST /settings` : mise a jour parametres.
 - `GET /logs` : logs jobs, filtres `status` (`all`, `errors`, `warnings`, `running`), `q` (recherche) et `page` (voir [11 Interface HTML](11-interface-html.md), section Logs).
 

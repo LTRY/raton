@@ -152,19 +152,21 @@ def test_curfew_pages_show_the_couvre_feu_and_the_historique_writes_commentaires
     assert closed.status_code == 423
     assert "Couvre-feu" in closed.text
     assert 'href="/dashboard/historique"' in closed.text
-    assert 'href="/settings"' not in closed.text
+    # The Paramètres stay reachable: their user part switches the couvre-feu off.
+    assert 'href="/settings"' in closed.text
+    assert 'href="/channels"' not in closed.text
 
     home = site.get("/")
     assert home.status_code == 200
     assert "data-chat" in home.text or "chat-bar" in home.text
     assert 'href="/dashboard/historique"' in home.text
     assert "Écrire dans l’historique" in home.text
-    assert 'href="/settings"' not in home.text
+    assert 'href="/channels"' not in home.text
 
     history = site.get("/dashboard/historique").text
     assert f'action="/videos/{video.id}/comment"' in history
     assert f'href="/videos/{video.id}"' not in history
-    assert 'href="/settings"' not in history
+    assert 'href="/channels"' not in history
 
     saved = site.post(
         f"/videos/{video.id}/comment",
@@ -175,11 +177,11 @@ def test_curfew_pages_show_the_couvre_feu_and_the_historique_writes_commentaires
     assert video_state(db, user_id(db), video.id).comment == "Idée du soir"
 
 
-def test_curfew_can_be_switched_off_from_the_user_page_while_it_is_on(db, front_client):
+def test_curfew_can_be_switched_off_from_the_settings_page_while_it_is_on(db, front_client):
     start_curfew_now(db)
     site = front_client(db)
 
-    page = site.get("/user")
+    page = site.get("/settings")
     assert page.status_code == 200
     assert 'id="curfew"' in page.text
     assert 'name="raton_address"' not in page.text
@@ -248,15 +250,15 @@ def test_skipping_a_curfew_that_is_off_is_refused(db):
     assert "rien à reporter" in response.json()["detail"]
 
 
-def test_the_user_page_skips_and_restores_the_curfew_for_tonight(db, front_client):
+def test_the_settings_page_skips_and_restores_the_curfew_for_tonight(db, front_client):
     start_curfew_now(db)
     site = front_client(db)
-    assert "Désactiver le couvre-feu pour ce soir" in site.get("/user").text
+    assert "Désactiver le couvre-feu pour ce soir" in site.get("/settings").text
 
     skipped = site.post("/user/curfew/skip")
     assert skipped.status_code == 200
     assert site.get("/channels").status_code == 200
-    page = site.get("/user").text
+    page = site.get("/settings").text
     assert "Rétablir le couvre-feu" in page
     assert "Désactiver le couvre-feu pour ce soir" not in page
 
@@ -282,15 +284,18 @@ def test_curfew_is_each_users_own(db):
     assert read_curfew(db, other.id).enabled is False
 
 
-def test_the_user_page_stays_open_during_the_curfew_for_the_switch_and_the_curfew_card(
+def test_the_settings_page_stays_open_during_the_curfew_for_the_switch_and_the_curfew_card(
     db, front_client
 ):
     add_user(db, "Camille")
     start_curfew_now(db)
 
-    page = front_client(db).get("/user")
+    page = front_client(db).get("/settings")
 
     assert page.status_code == 200
     assert page.text.count('action="/users/switch"') == 2
     assert "/rename" not in page.text
     assert 'id="screen-time"' not in page.text
+    # No admin card: their API calls are closed during the couvre-feu.
+    assert "settings-admin" not in page.text
+    assert 'href="/settings"' in page.text
