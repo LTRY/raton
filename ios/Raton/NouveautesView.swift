@@ -48,7 +48,15 @@ struct NouveautesView: View {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "Nouveautés")
+                        PageHeader(title: "Nouveautés") {
+                            NavigationLink {
+                                HistoriqueView()
+                            } label: {
+                                Image(systemName: "clock.arrow.circlepath")
+                            }
+                            .buttonStyle(CircleButtonStyle())
+                            .accessibilityLabel("Historique")
+                        }
                         if let message = model.errorMessage {
                             Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
                                 .padding(16)

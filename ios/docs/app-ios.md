@@ -12,7 +12,7 @@ qui a besoin d'une valeur que l'API ne donne pas obtient un nouveau champ ou
 endpoint calcule par un service de `back/services/`, jamais une copie de la
 regle en Swift.
 
-**Etat : jalon 1.** Le projet se genere et se compile avec Xcode, et tourne
+**Etat : jalons 1 et 2.** Le projet se genere et se compile avec Xcode, et tourne
 dans le simulateur iPhone (iOS 18) sur les donnees de demo (`make demo`). La
 lecture d'un fichier audio (m4a), la reprise, le rapport `/activity` et la
 lecture en arriere-plan y ont ete essayes ; la video, l'ecran verrouille et le
@@ -60,7 +60,7 @@ des lignes de liste a vignette a gauche (duree, barre de progression),
 etoiles ambre. Clair seulement (`UIUserInterfaceStyle` = `Light`). Un changement
 de jeton cote front se reporte a la main dans `Theme.swift`.
 
-## Ecrans (jalon 1)
+## Ecrans
 
 | Ecran | Role | Appels |
 | --- | --- | --- |
@@ -68,6 +68,11 @@ de jeton cote front se reporte a la main dans `Theme.swift`.
 | Choix de l'utilisateur (puis Reglages) | Liste des utilisateurs, l'id choisi est gardé | `GET /api/users` |
 | Nouveautes | Les fiches Nouvelles, une pile par chaine, dix chaines par page ; tirer pour rafraichir | `GET /api/nouveautes?page=N`, `GET /api/videos/{id}/thumbnail` |
 | Fiche | Titre, chaine, description, boutons Vu et Indesiree, etoiles, boutons de lecture | `GET /api/videos/{id}`, `POST /api/videos/{id}/open`, `PUT /api/videos/{id}/list-state`, `PUT /api/videos/{id}/rating` |
+| Chaines | Liste des chaines avec recherche ; la cloche en rouge si l'une des deux est active | `GET /api/channels?q=&page=` |
+| Chaine | Cloche videos et cloche shorts, puis les fiches de la chaine | `PUT /api/channels/{id}/bells/{section}` (`videos`, `shorts`), `GET /api/library?channel_id=` |
+| Bibliotheque | Toutes les fiches (ce que la liste laisse de cote, Vu et Indesiree, est le defaut du back), recherche, 50 par page | `GET /api/library?q=&page=` |
+| Playlists | Les playlists de l'utilisateur, puis les fiches d'une playlist dans l'ordre (toucher ouvre la fiche) | `GET /api/playlists`, `GET /api/playlists/{id}` |
+| Historique | Ce qui a ete lu, par jour, du plus recent au plus ancien (bouton a droite du titre de Nouveautes) | `GET /api/historique?page=N` |
 | Lecteur | Video dans la fiche, audio avec commandes ; la lecture reprend a la derniere position connue du serveur | `/api/videos/{id}/video` ou `/audio` (`media_urls` de la fiche : les deux fichiers peuvent coexister), `POST /api/videos/{id}/activity` |
 
 Details :
@@ -101,7 +106,10 @@ lecteur, si au moins une seconde a ete regardee. Les secondes regardees
 s'accumulent par pas de moins de 5 s (un saut est une avance, pas du
 visionnage). Le Vu a 90 % est decide par le back.
 
-## Pas dans le jalon 1
+## Pas encore
 
-Accueil, Exploration, chaines et cloche, playlists, Historique, discussions (chat),
-notes, imports, mode hors ligne, publication sur l'App Store.
+Accueil (la ligne de Raton et la barre de discussion), filtres de la
+Bibliotheque (categories, tris, vues enregistrees), Recherche YouTube, notes de
+chaines, categories, commentaire, creation et edition des playlists, discussion
+(chat), notes et quiz LLM, imports, telechargements, couvre-feu et temps
+d'ecran, mode hors ligne, publication sur l'App Store.

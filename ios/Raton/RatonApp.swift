@@ -27,10 +27,12 @@ struct RootView: View {
                 NavigationStack { UserPickerView(title: "Qui es-tu ?") }
             } else {
                 Group {
-                    if tab == 0 {
-                        NavigationStack { NouveautesView() }
-                    } else {
-                        NavigationStack { SettingsView() }
+                    switch tab {
+                    case 0: NavigationStack { NouveautesView() }
+                    case 1: NavigationStack { ChannelsView() }
+                    case 2: NavigationStack { LibraryView() }
+                    case 3: NavigationStack { PlaylistsView() }
+                    default: NavigationStack { SettingsView() }
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -51,7 +53,10 @@ struct RootView: View {
 struct TabPill: View {
     @Binding var tab: Int
     private let items = [
-        (icon: "books.vertical", label: "Nouveautés"),
+        (icon: "house", label: "Nouveautés"),
+        (icon: "tv", label: "Chaînes"),
+        (icon: "books.vertical", label: "Bibliothèque"),
+        (icon: "text.line.first.and.arrowtriangle.forward", label: "Playlists"),
         (icon: "slider.horizontal.3", label: "Réglages"),
     ]
 
@@ -64,7 +69,7 @@ struct TabPill: View {
                     Image(systemName: items[index].icon)
                         .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(tab == index ? Theme.primary : Theme.textMuted)
-                        .frame(width: 84, height: 48)
+                        .frame(maxWidth: .infinity).frame(height: 48)
                         .background(Capsule().fill(tab == index ? Theme.tint : Color.clear))
                 }
                 .accessibilityLabel(items[index].label)
@@ -74,14 +79,22 @@ struct TabPill: View {
         .background(Capsule().fill(Color(hex: 0xFFF8EF)))
         .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
         .shadow(color: Theme.shadow.opacity(0.14), radius: 12, y: 6)
+        .padding(.horizontal, 12)
     }
 }
 
 /// The title row of a screen: an optional round back button, then the big bold title.
-struct PageHeader: View {
+struct PageHeader<Trailing: View>: View {
     let title: String
     var back = false
+    @ViewBuilder var trailing: Trailing
     @Environment(\.dismiss) private var dismiss
+
+    init(title: String, back: Bool = false, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.back = back
+        self.trailing = trailing()
+    }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -90,8 +103,9 @@ struct PageHeader: View {
                     .buttonStyle(CircleButtonStyle())
                     .accessibilityLabel("Retour")
             }
-            Text(title).font(.raton(30, .bold)).foregroundStyle(Theme.text)
+            Text(title).font(.raton(30, .bold)).foregroundStyle(Theme.text).lineLimit(2)
             Spacer(minLength: 0)
+            trailing
         }
         .padding(.horizontal, 16)
         .padding(.top, 8)

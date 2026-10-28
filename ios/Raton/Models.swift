@@ -94,3 +94,98 @@ enum MediaKind: String {
     case video
     case audio
 }
+
+// MARK: Bibliothèque, chaînes, playlists, Historique
+
+/// `GET /api/library`: one page of cards (the Bibliothèque, or a channel's fiches).
+struct LibraryReply: Codable {
+    let items: [VideoCard]
+    let page: Int
+    let totalPages: Int
+    let total: Int
+}
+
+/// `GET /api/channels` item.
+struct ChannelItem: Codable, Identifiable, Hashable {
+    let id: Int
+    let name: String
+    let rating: Int
+    let autoMetadataEnabled: Bool
+    let autoShortsEnabled: Bool
+    let avatarUrl: String?
+    let videoCount: Int
+}
+
+struct ChannelsReply: Codable {
+    let items: [ChannelItem]
+    let page: Int
+    let totalPages: Int
+    let channelCount: Int
+}
+
+/// `PUT /api/channels/{id}/bells/{section}`: the channel with its bells as stored.
+struct ChannelBellReply: Codable {
+    let channel: ChannelState
+}
+
+struct ChannelState: Codable {
+    let id: Int
+    let autoMetadataEnabled: Bool
+    let autoShortsEnabled: Bool
+}
+
+struct PlaylistSummary: Codable, Identifiable, Hashable {
+    let id: Int
+    let title: String
+    let itemCount: Int
+    let coverVideoId: Int?
+    let coverHasThumbnail: Bool
+}
+
+struct PlaylistItem: Codable, Identifiable, Hashable {
+    let itemId: Int
+    let videoId: Int
+    let title: String
+    let channelName: String?
+    let durationSeconds: Int
+    let hasThumbnail: Bool
+    let seen: Bool
+    var id: Int { itemId }
+}
+
+struct PlaylistDetail: Codable {
+    let id: Int
+    let title: String
+    let items: [PlaylistItem]
+}
+
+struct HistoryVideo: Codable, Hashable {
+    let id: Int
+    let title: String
+    let rating: Int
+}
+
+struct HistoryPlayback: Codable, Hashable {
+    let action: String
+    let mediaLabel: String
+    let title: String
+    let progressPercent: Double
+    let isCompleted: Bool
+}
+
+struct HistoryRow: Codable, Identifiable, Hashable {
+    let jobId: Int
+    let day: String
+    let video: HistoryVideo?
+    let channel: ChannelRef?
+    let playback: HistoryPlayback
+    let watchedSeconds: Double
+    let shownState: String
+    var id: Int { jobId }
+}
+
+struct HistoriqueReply: Codable {
+    let rows: [HistoryRow]
+    let page: Int
+    let totalPages: Int
+}
