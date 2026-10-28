@@ -28,10 +28,16 @@ verifiee sur chaque formulaire, confirmation, un seul deploiement a la fois, et
 
 Ce conteneur tourne en **root** avec le socket Docker de l'hote monte : qui
 atteint la page ou le conteneur controle le Docker de l'hote. Il recoit aussi
-`GH_TOKEN` et `ANTHROPIC_API_KEY` (la revue quotidienne des journaux, voir
-[13](13-jobs-logs-planification.md)). C'est le prix de l'automatisation des
-previews et du deploiement ; la page reste donc sur l'interface d'`APP_BIND`
-(loopback par defaut).
+`GH_TOKEN`. C'est le prix de l'automatisation des previews et du deploiement ;
+la page reste donc sur l'interface d'`APP_BIND` (loopback par defaut).
+
+La page de monitoring (conteneur `raton-monitoring`, `make monitoring`, port
+`8998`) n'est pas authentifiee non plus par defaut (`MONITORING_TOKEN` l'active).
+Elle ne deploie rien et son conteneur n'a pas le socket Docker, mais il recoit
+`ANTHROPIC_API_KEY` (la revue quotidienne des journaux, voir
+[13](13-jobs-logs-planification.md)) et peut donc depenser au token : le bouton
+**Analyser maintenant** est plafonne par `MONITORING_REVIEW_MAX_USD`. Il ne lit
+que le journal, en lecture seule.
 
 Une preview tourne avec la cle Anthropic du `.env` et le mot de passe de la DB
 reelle (voir « Previews des PR » dans [04](04-configuration-et-deploiement.md)) :

@@ -1,1 +1,1 @@
-"""The ops tool: previews page, deploy of the main branch, daily log review. See ops/CLAUDE.md."""
+"""The ops tool: previews page and deploy of the main branch."""

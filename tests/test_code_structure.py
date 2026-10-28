@@ -9,6 +9,7 @@ APP = ROOT / "back"
 FRONT = ROOT / "front"
 MCP = ROOT / "mcp_server"
 OPS = ROOT / "ops"
+MONITORING = ROOT / "monitoring"
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "api_route"}
 
 
@@ -217,7 +218,7 @@ def test_services_spec_lists_every_service_module():
 def test_ops_tool_is_independent_of_the_project():
     # ops/ serves any project through its ops.toml (ops/CLAUDE.md): it imports none of Raton's code
     # and carries no project name; the tests and the spec may name it, as examples of a project.
-    for prefix in ("back", "front", "mcp_server", "scripts"):
+    for prefix in ("back", "front", "mcp_server", "scripts", "monitoring"):
         assert not imports_of(OPS, prefix), imports_of(OPS, prefix)
     named = [
         str(path.relative_to(ROOT))
@@ -232,3 +233,31 @@ def test_project_code_does_not_import_the_ops_tool():
     # shares is the deploy lock, which it runs as a command (`make up`), not as an import.
     for root in (APP, FRONT, MCP):
         assert not imports_of(root, "ops"), imports_of(root, "ops")
+
+
+def test_ops_tool_does_not_depend_on_claude():
+    # The Anthropic API key and the Claude Code CLI belong to the monitoring tool (monitoring/CLAUDE.md).
+    named = [
+        str(path.relative_to(ROOT))
+        for path in OPS.glob("*.py")
+        if re.search(r"claude|anthropic", path.read_text(encoding="utf-8"), re.IGNORECASE)
+    ]
+    assert not named, f"ops/ must not use Claude: {named}"
+
+
+def test_monitoring_tool_is_independent_of_the_project_and_of_ops():
+    # monitoring/ watches any project through its monitoring.toml (monitoring/CLAUDE.md): it imports
+    # none of Raton's code nor the ops tool, and carries no project name.
+    for prefix in ("back", "front", "mcp_server", "scripts", "ops"):
+        assert not imports_of(MONITORING, prefix), imports_of(MONITORING, prefix)
+    named = [
+        str(path.relative_to(ROOT))
+        for path in MONITORING.glob("*.py")
+        if re.search(r"raton", path.read_text(encoding="utf-8"), re.IGNORECASE)
+    ]
+    assert not named, f"monitoring/ must not name the project it watches: {named}"
+
+
+def test_project_code_does_not_import_the_monitoring_tool():
+    for root in (APP, FRONT, MCP):
+        assert not imports_of(root, "monitoring"), imports_of(root, "monitoring")

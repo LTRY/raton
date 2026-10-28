@@ -9,4 +9,3 @@ def test_repository_ops_toml_matches_the_scripts_it_names():
     assert config.project_name == "Raton"
     for script in (config.deploy_script, config.previews_script):
         assert (ops_config.REPO / script).is_file()
-    assert (ops_config.REPO / ".claude" / "skills" / config.review_skill / "SKILL.md").is_file()

@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "ops/tests"]
+testpaths = ["tests", "ops/tests", "monitoring/tests"]
 pythonpath = ["."]
 
 [tool.ruff]

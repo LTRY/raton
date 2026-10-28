@@ -54,19 +54,27 @@ Services :
   `ops` du `Dockerfile`), lance par `make previews` et non par `make up` (il est
   dans le profil Compose `ops`, pour qu'un deploiement lance depuis sa propre
   page ne le recree pas en cours de route). Il sert la page des previews (voir
-  « Previews des PR ») et execute la revue quotidienne des journaux (voir
+  « Previews des PR »). Il tourne en **root** avec le socket Docker de l'hote
+  monte : il pilote le Docker de l'hote (previews, `make up`). Aucune dependance
+  Raton dans l'image : Docker, git, `gh`, `make` et `jq`. Aucune dependance a
+  Claude : c'est l'affaire de `monitoring` ;
+- `monitoring` : le conteneur de surveillance `raton-monitoring` (image
+  `raton-monitoring:local`, etape `monitoring` du `Dockerfile`), lance par
+  `make monitoring` et non par `make up` (profil Compose `monitoring`). Il sert la
+  page de monitoring (voir « Configuration de l'outil monitoring ») et execute la
+  revue quotidienne des journaux (voir
   [13 Jobs, logs et planification](13-jobs-logs-planification.md), « Revue
-  quotidienne des journaux »). Il tourne en **root** avec le socket Docker de
-  l'hote monte : il pilote le Docker de l'hote (previews, `make up`). Aucune
-  dependance Raton dans l'image : Docker, git, `gh`, `make`, `jq` et le CLI
-  Claude Code.
+  quotidienne des journaux »). Il n'a **pas** le socket Docker : le depot est
+  monte sur `/project`, le journal en lecture seule. Aucune dependance Raton dans
+  l'image : `curl`, `jq` et le CLI Claude Code, avec `ANTHROPIC_API_KEY` ;
 
 Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app`,
-`raton-api` pour `api`, `raton-mcp` pour `mcp`, `raton-ops` pour `ops` et `raton-db` pour `db`, au lieu de `raton-app-1`...
+`raton-api` pour `api`, `raton-mcp` pour `mcp`, `raton-ops` pour `ops`, `raton-monitoring` pour `monitoring` et `raton-db` pour `db`, au lieu de `raton-app-1`...
 Une seule instance de la pile peut donc tourner par machine.
 
 Ports publies : `8000` (`app`, le front), `8002` (`mcp`, le serveur MCP) et
-`8999` (`ops`, la page des previews, sur l'interface d'`APP_BIND`), sur
+`8999` (`ops`, la page des previews) et `8998` (`monitoring`, la page de
+monitoring), tous deux sur l'interface d'`APP_BIND`, sur
 `127.0.0.1` par defaut ; `APP_BIND=0.0.0.0` et `MCP_BIND=0.0.0.0` les ouvrent
 au LAN. Ni `api` ni `db` ne publient de port : le navigateur et un raccourci
 iOS passent par le front, dont le relais `/api/*` atteint le back sur le
@@ -81,7 +89,9 @@ Volumes :
   depot est monte **au meme chemin que sur l'hote** (`OPS_REPO`, positionne
   par le Makefile) : les montages des fichiers compose qu'`ops` lance sont
   resolus par le Docker de l'hote, les deux cotes doivent donc s'accorder sur
-  le chemin. Le journal y est monte en lecture seule ;
+  le chemin ;
+- le depot (`.:/project`) et le journal en lecture seule
+  (`${LOG_HOST_DIR:-./.local/logs}:/var/log/raton:ro`) pour `monitoring` ;
 - `${LOG_HOST_DIR:-./.local/logs}:/var/log/raton` : le journal
   applicatif, qui doit survivre a la recreation du conteneur a chaque deploiement
   (voir [13 Jobs, logs et planification](13-jobs-logs-planification.md), section
@@ -309,14 +319,31 @@ puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make
 
 ## Configuration de l'outil ops
 
-La page des previews, le deploiement de `main` et la revue quotidienne des
-journaux sont l'outil `ops/` (`ops/server.py`, `ops/review.py`), decrit dans
+La page des previews et le deploiement de `main` sont l'outil `ops/`
+(`ops/server.py`), decrit dans
 `ops/docs/outil-ops.md` (« L'outil ops ») : configuration `ops.toml`, contrat du
 script de previews, jobs persistes, verrou de deploiement, jeton. Raton fournit le
 contrat : `ops.toml` (a la racine), `scripts/preview.sh`, `scripts/deploy.sh`,
 `docker-compose.preview.yml` et le service `ops` du compose (`make previews`).
 Verification : `tests/test_ops_toml.py` controle que les scripts nommes par
 `ops.toml` existent.
+
+## Configuration de l'outil monitoring
+
+La revue quotidienne des journaux (et, plus tard, d'autres rapports : couts du
+RAG, metriques fonctionnelles) est l'outil `monitoring/` (`monitoring/server.py`,
+`monitoring/review.py`), decrit dans `monitoring/docs/outil-monitoring.md`
+(« L'outil monitoring ») : configuration `monitoring.toml`, page sur le port
+`8998` (`MONITORING_PORT`), jeton `MONITORING_TOKEN`. Il est separe d'`ops` : il
+porte seul le CLI Claude Code et `ANTHROPIC_API_KEY`, `ops` n'en a plus. Raton
+fournit `monitoring.toml` (a la racine), le skill `review-logs` et le service
+`monitoring` du compose (`make monitoring`). Variables d'environnement de la revue :
+`MONITORING_REVIEW_HOUR`, `MONITORING_REVIEW_HOURS`, `MONITORING_REVIEW_MODEL`,
+`MONITORING_REVIEW_MAX_USD` (anciennement `OPS_REVIEW_*`). Les revues deja faites
+sont dans `.local/ops/reviews/` ; pour les garder, les deplacer a la main dans
+`.local/monitoring/reviews/`.
+Verification : `tests/test_monitoring_toml.py` controle que le skill nomme par
+`monitoring.toml` existe.
 
 ## Previews des PR
 
@@ -427,7 +454,8 @@ crochets, puis un resume court a l'imperatif, en anglais :
 | `[BACK]` | routes, services, modeles, scheduler, API JSON, logique metier |
 | `[DB]` | migration Alembic ou changement de schema (souvent avec `[BACK]`) |
 | `[CI]` | workflows GitHub, `scripts/`, Makefile, Docker |
-| `[OPS]` | l'outil `ops/` (page des previews, lancement du deploiement, revue des journaux), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
+| `[OPS]` | l'outil `ops/` (page des previews, lancement du deploiement), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
+| `[MONITORING]` | l'outil `monitoring/` (revue des journaux et autres rapports), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
 | `[DOCS]` | uniquement `docs/spec/` ou commentaires, sans changement de comportement |
 
 Regles :
@@ -448,7 +476,7 @@ Regles :
 - la description est en anglais (les termes du glossaire restent tels quels),
   suit `.github/pull_request_template.md` et reste concrete : « What »
   (une puce par changement, sans limite : page, bouton, route, comportement ;
-  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `OPS`, `DOCS` quand la PR en
+  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `OPS`, `MONITORING`, `DOCS` quand la PR en
   touche plusieurs), « Why » (une phrase), « How » (l'approche en quelques
   puces : ou vit la regle, ce qui est deplace ou remplace, les compromis),
   et les captures d'ecran pour tout

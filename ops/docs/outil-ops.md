@@ -4,8 +4,9 @@ title: "L'outil ops"
 
 # L'outil ops
 
-L'outil ops est le code de `ops/` : la page des previews, le deploiement de la
-branche principale et la revue quotidienne des journaux. Il tourne dans un
+L'outil ops est le code de `ops/` : la page des previews et le deploiement de la
+branche principale. Il ne depend pas de Claude : la revue quotidienne des journaux
+est l'outil `monitoring/` (`monitoring/docs/outil-monitoring.md`). Il tourne dans un
 conteneur a part (etape `ops` du `Dockerfile` du depot), en bibliotheque standard
 Python seulement, et ne connait aucun projet par son code : il lit un `ops.toml` a
 la racine du depot qu'il sert et appelle les scripts que ce fichier nomme. Le
@@ -36,10 +37,6 @@ contient `ops/`. Un autre projet reutilise l'outil en fournissant son propre
   encore en cours apres ce delai est arrete (SIGTERM puis SIGKILL sur tout son
   groupe de processus), son journal le dit et la page le montre en echec ; sans
   cela, le bouton resterait grise indefiniment.
-- `[review]` : `skill` (skill Claude Code lance chaque jour), `allowed_tools`
-  (outils en lecture seule), puis les valeurs par defaut `hour`, `hours`,
-  `model`, `max_usd`, que `OPS_REVIEW_HOUR`, `OPS_REVIEW_HOURS`,
-  `OPS_REVIEW_MODEL` et `OPS_REVIEW_MAX_USD` surchargent.
 
 Une cle absente prend la valeur par defaut de `OpsConfig`. Verification :
 `ops/tests/test_ops_config.py`.
@@ -161,8 +158,7 @@ d'une meme machine (`ops/tests/test_ops_jobs.py`).
 
 `ops/jobs.py` (PR, previews, lancement des scripts en arriere-plan, jobs
 persistes), `ops/deploy_lock.py` (verrou de deploiement), `ops/render.py` (HTML et
-libelles d'etat), `ops/graph.py` (graphe des commits de l'alerte de production), `ops/server.py` (serveur, jeton), `ops/review.py` (revue des
-journaux), `ops/config.py` (`ops.toml`). Les tests sont dans `ops/tests/`, lances
+libelles d'etat), `ops/graph.py` (graphe des commits de l'alerte de production), `ops/server.py` (serveur, jeton), `ops/config.py` (`ops.toml`). Les tests sont dans `ops/tests/`, lances
 par `make test` ; le linter (`make lint`, `make format`) couvre `ops/`. Un test de
 `tests/test_code_structure.py` garde l'outil independant de Raton : `ops/` n'importe
 rien de `back/`, `front/` ni `scripts/`, et ne contient pas le nom du projet.

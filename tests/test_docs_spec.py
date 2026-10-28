@@ -7,8 +7,13 @@ from pathlib import Path
 import pytest
 
 SPEC_DIR = Path(__file__).resolve().parent.parent / "docs" / "spec"
-# ops/docs/ is the ops tool's own spec (ops/CLAUDE.md): same frontmatter rule, not published on the site.
-OPS_SPEC_FILES = sorted((SPEC_DIR.parent.parent / "ops" / "docs").glob("*.md"))
+# ops/docs/ and monitoring/docs/ are the tools' own specs (ops/CLAUDE.md, monitoring/CLAUDE.md): same
+# frontmatter rule, not published on the site.
+OPS_SPEC_FILES = sorted(
+    path
+    for tool in ("ops", "monitoring")
+    for path in (SPEC_DIR.parent.parent / tool / "docs").glob("*.md")
+)
 SPEC_FILES = sorted(SPEC_DIR.glob("*.md"))
 FRONTMATTER = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 

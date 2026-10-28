@@ -1,4 +1,4 @@
-# Settings of the ops tool (ops/server.py, ops/review.py): everything that names
+# Settings of the ops tool (ops/server.py): everything that names
 # this project. Another project reuses the tool by providing its own ops.toml.
 # Spec: docs/spec/04-configuration-et-deploiement.md, section "Configuration de l'outil ops".
 
@@ -20,25 +20,3 @@ script = "scripts/preview.sh"
 [jobs]
 # A deploy or preview job still running after this long is stopped (its process group is killed).
 timeout_minutes = 30
-
-[review]
-# The Claude Code skill run daily with the number of hours to read, e.g. `/review-logs 24`.
-skill = "review-logs"
-# Read-only tools the review may use (Claude Code --allowedTools syntax).
-allowed_tools = [
-    "Read",
-    "Skill",
-    "Bash(python -m back.core.logs_digest:*)",
-    "Bash(jq:*)",
-    "Bash(grep:*)",
-    "Bash(ls:*)",
-    "Bash(tail:*)",
-    "Bash(head:*)",
-    "Bash(docker ps:*)",
-    "Bash(docker compose logs:*)",
-]
-# Defaults, overridden by OPS_REVIEW_HOUR, OPS_REVIEW_HOURS, OPS_REVIEW_MODEL, OPS_REVIEW_MAX_USD.
-hour = 8
-hours = 24
-model = "sonnet"
-max_usd = 1.0
