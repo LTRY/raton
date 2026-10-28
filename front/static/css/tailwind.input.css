@@ -11007,6 +11007,8 @@ a.log-title:hover { color: var(--color-primary); }
 @media (max-width: 800px) {
   /* The admin settings stay on a computer: a phone only gets the user's own (docs/spec/11). */
   .settings-page .settings-admin { display: none; }
+  /* A user setting a phone does not get either: set it from a computer. */
+  .settings-page .settings-desktop-only { display: none; }
   .settings-actions { bottom: calc(72px + var(--tabbar-safe-bottom)); }
   .settings-actions span { display: none; }
   .settings-actions[data-dirty] span { display: block; }

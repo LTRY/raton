@@ -122,6 +122,8 @@ def test_the_user_settings_are_on_the_settings_page_not_in_the_home_drawer(db):
     # The user part comes first and is not admin; the admin part is, hidden on a phone.
     assert page.index('id="switch"') < page.index('class="settings-form settings-admin"')
     assert 'id="switch"' not in page[page.index('class="settings-form settings-admin"') :]
+    # "Raton et toi" is a user setting, but a phone does not get it either.
+    assert 'class="settings-card settings-desktop-only" id="raton-language"' in page
 
 
 def test_the_settings_page_switches_renames_and_sets_ratons_language(db):
