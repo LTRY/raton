@@ -1326,7 +1326,15 @@ Contenu :
   Vu/Indesiree ne sont affiches dans aucune liste, Historique compris : ils sont
   remplaces par le glissement de la carte, vers la droite pour Vu, vers la
   gauche pour Indesiree (le bloc reste dans le DOM, masque en CSS, car le
-  glissement lit son etat). Le glissement peut commencer n'importe ou sur la
+  glissement lit son etat). Comme dans une boite mail, la carte glisse en
+  suivant le doigt et revele derriere elle une **bande coloree** (vert + oeil
+  « Vu »/« Non vu » vers la droite, rouge + oeil barre « Masquer »/« Reafficher »
+  vers la gauche) dont la largeur est celle du decalage : icone et mot restent
+  colles au bord de l'ecran, la bande est posee dans le conteneur de la carte (elle
+  defile avec la page, jamais en `fixed`) et se referme avec la carte au
+  relachement. Au-dela de 96 px la bande est « armee » (couleur pleine, icone
+  agrandie) : relacher valide l'action, sinon la carte revient sans rien changer.
+  Le glissement peut commencer n'importe ou sur la
   carte, y compris sur un lien ou un bouton (vignette, titre, Audio/Video,
   etoiles) : un simple appui garde son effet normal, et le clic qui suivrait
   un glissement confirme est annule. Seuls les champs de formulaire en sont

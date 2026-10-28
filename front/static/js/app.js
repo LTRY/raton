@@ -2685,9 +2685,10 @@ document.addEventListener("click", (event) => {
 if (!window.__videoSwipeBound) {
   window.__videoSwipeBound = true;
 
-  const SWIPE_THRESHOLD = 90; // px de glissement pour déclencher l'action au relâchement
-  const SWIPE_MAX = 130; // butée visuelle : la carte ne suit pas le doigt au-delà
+  const SWIPE_THRESHOLD = 96; // px de glissement pour armer l'action (relâcher = valider)
+  const SWIPE_MAX = 168; // butée visuelle : la carte ne suit pas le doigt au-delà
   const SWIPE_CLICK_GUARD_MS = 400;
+  const SWIPE_SETTLE_MS = 200; // même durée que la transition de retour de la carte
 
   const HIDE_ICON =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6 5.2A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3 3.9M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>';
@@ -2699,54 +2700,65 @@ if (!window.__videoSwipeBound) {
   let swipeContainer = null;
   let swipeStartX = null;
   let swipeStartY = null;
-  let swipeBaseRect = null;
   let swipeDeltaX = 0;
   let swipeDragging = false; // glissement horizontal confirmé (au-delà du seuil de désambiguation)
   let swipeDirection = null; // "hidden" | "watched" — direction du dernier rendu de l'indicateur
   let lastSwipeEndedAt = 0;
 
+  // Fin du geste : la carte revient (transition CSS) et la bande qu'elle
+  // révélait se referme avec elle avant d'être retirée.
   function resetSwipe() {
     if (swipeRow) {
       swipeRow.classList.remove("swipe-dragging");
       swipeRow.style.transform = "";
     }
-    swipeIndicator?.remove();
+    const indicator = swipeIndicator;
+    if (indicator) {
+      indicator.style.transition = `width ${SWIPE_SETTLE_MS}ms ease`;
+      indicator.style.width = "0px";
+      indicator.classList.remove("swipe-action-armed");
+      setTimeout(() => indicator.remove(), SWIPE_SETTLE_MS + 50);
+    }
     swipeIndicator = null;
     swipeRow = null;
     swipeContainer = null;
     swipeStartX = null;
     swipeStartY = null;
-    swipeBaseRect = null;
     swipeDeltaX = 0;
     swipeDragging = false;
     swipeDirection = null;
   }
 
+  // The strip lives in the row's offsetParent, at the row's own position: it
+  // scrolls with the page (a `fixed` copy drifted off the card whenever the
+  // page moved mid-gesture) and shows only the part the card has uncovered.
   function updateSwipeIndicator() {
     const direction = swipeDeltaX < 0 ? "hidden" : "watched";
     if (!swipeIndicator) {
       swipeIndicator = document.createElement("div");
-      swipeIndicator.style.position = "fixed";
-      swipeIndicator.style.top = `${swipeBaseRect.top}px`;
-      swipeIndicator.style.left = `${swipeBaseRect.left}px`;
-      swipeIndicator.style.width = `${swipeBaseRect.width}px`;
-      swipeIndicator.style.height = `${swipeBaseRect.height}px`;
-      document.body.appendChild(swipeIndicator);
+      swipeIndicator.style.top = `${swipeRow.offsetTop}px`;
+      swipeIndicator.style.height = `${swipeRow.offsetHeight}px`;
+      swipeRow.offsetParent.appendChild(swipeIndicator);
     }
     if (direction !== swipeDirection) {
       swipeDirection = direction;
       const current = swipeContainer.dataset.listState || "normal";
+      const [icon, label] =
+        direction === "hidden"
+          ? [HIDE_ICON, current === "hidden" ? "Réafficher" : "Masquer"]
+          : [WATCHED_ICON, current === "watched" ? "Non vu" : "Vu"];
+      swipeIndicator.className = `swipe-action-indicator swipe-action-${direction}`;
+      swipeIndicator.innerHTML = `<span class="swipe-action-content">${icon}<span>${label}</span></span>`;
       if (direction === "hidden") {
-        swipeIndicator.className = "swipe-action-indicator swipe-action-hidden";
-        const label = current === "hidden" ? "Réafficher" : "Masquer";
-        swipeIndicator.innerHTML = `<span>${label}</span>${HIDE_ICON}`;
+        swipeIndicator.style.left = "";
+        swipeIndicator.style.right = `calc(100% - ${swipeRow.offsetLeft + swipeRow.offsetWidth}px)`;
       } else {
-        swipeIndicator.className = "swipe-action-indicator swipe-action-watched";
-        const label = current === "watched" ? "Marquer non vu" : "Marquer vu";
-        swipeIndicator.innerHTML = `${WATCHED_ICON}<span>${label}</span>`;
+        swipeIndicator.style.right = "";
+        swipeIndicator.style.left = `${swipeRow.offsetLeft}px`;
       }
     }
-    swipeIndicator.style.opacity = String(Math.min(Math.abs(swipeDeltaX) / SWIPE_THRESHOLD, 1));
+    swipeIndicator.style.width = `${Math.abs(swipeDeltaX)}px`;
+    swipeIndicator.classList.toggle("swipe-action-armed", Math.abs(swipeDeltaX) >= SWIPE_THRESHOLD);
   }
 
   document.addEventListener("touchstart", (event) => {
@@ -2782,9 +2794,6 @@ if (!window.__videoSwipeBound) {
       if (Math.abs(deltaX) < 10) return;
       swipeDragging = true;
       swipeRow.classList.add("swipe-dragging");
-      // Capturé avant la première translation : sert de repère fixe à
-      // l'indicateur pendant tout le geste (la carte, elle, continue de bouger).
-      swipeBaseRect = swipeRow.getBoundingClientRect();
     }
     event.preventDefault();
     swipeDeltaX = Math.max(-SWIPE_MAX, Math.min(SWIPE_MAX, deltaX));

@@ -2546,33 +2546,58 @@ button.secondary {
 }
 
 /* Glissement en cours sur une carte vidéo (mobile) : pas de transition pour
-   suivre le doigt au pixel près ; un z-index positif la fait passer devant
-   l'indicateur de swipe (position: fixed, z-index auto) le temps du geste. */
+   suivre le doigt au pixel près. Fond opaque (les cartes « vue » et « indésirée »
+   sont translucides, la bande révélée transparaîtrait) et z-index positif pour
+   passer devant la bande, qui est posée dans le même conteneur. */
 .video-row.swipe-dragging,
 .dashboard-media-row.swipe-dragging {
+  background: var(--color-surface);
+  opacity: 1;
   transition: none;
   z-index: 1;
 }
 
-/* Bandeau révélé derrière la carte pendant le glissement : une seule instance
-   réutilisée par geste (créée/retirée en JS), positionnée en `fixed` sur le
-   rectangle d'origine de la carte pour rester immobile pendant qu'elle glisse. */
+/* Bande révélée derrière la carte pendant le glissement, comme dans une boîte
+   mail : posée en JS à la position de la carte (elle défile avec la page), sa
+   largeur suit le décalage de la carte et elle se referme avec elle. Le contenu
+   (icône + mot) garde une largeur fixe, collé au bord de l'écran. */
 .swipe-action-indicator {
   align-items: center;
   border-radius: var(--radius-md);
   color: var(--color-white);
   display: flex;
-  font-size: 13px;
-  font-weight: 600;
-  gap: 6px;
-  padding: 0 18px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+  overflow: hidden;
   pointer-events: none;
+  position: absolute;
+  transition: opacity 120ms ease;
+  z-index: 0;
 }
 
-.swipe-action-indicator svg {
-  flex-shrink: 0;
-  height: 18px;
-  width: 18px;
+.swipe-action-indicator.swipe-action-armed {
+  opacity: 1;
+}
+
+.swipe-action-content {
+  align-items: center;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 120ms ease;
+  white-space: nowrap;
+  width: 88px;
+}
+
+.swipe-action-content svg {
+  height: 24px;
+  width: 24px;
+}
+
+.swipe-action-armed .swipe-action-content {
+  transform: scale(1.12);
 }
 
 .swipe-action-hidden {
