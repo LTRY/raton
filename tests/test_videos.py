@@ -3521,7 +3521,7 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
     logs_rendered = site(db).get("/logs").text
 
     assert "Historique" in history_rendered
-    assert "Temps de lecture" in dashboard_rendered
+    assert 'id="playback-time"' not in dashboard_rendered
     assert "<h3>Global</h3>" in dashboard_rendered
     assert "<h3>Active</h3>" in dashboard_rendered
     assert "Vidéos" in dashboard_rendered
@@ -3533,7 +3533,6 @@ def test_dashboard_shows_user_activity_and_logs_keep_technical_statuses():
     assert "<p><span>Shorts</span><strong>0</strong></p>" in dashboard_rendered
     assert "Stockage" in dashboard_rendered
     assert "5.0 Mo" in dashboard_rendered
-    assert ">0m</span>" in dashboard_rendered
     assert "screen-time-track" not in dashboard_rendered
     assert "<th>Action</th>" not in dashboard_rendered
     assert ">played<" not in dashboard_rendered
@@ -4400,24 +4399,66 @@ def test_rating_returns_to_internal_origin_and_rejects_external_redirect():
 
 
 def post_settings(db, media_root, **fields):
-    """The no-JS settings form, with the fields a test cares about (quota 2.5 Go by default)."""
-    return post_form(db, "/settings", {"media_root": str(media_root), "quota_gb": "2.5", **fields})
+    """The no-JS settings form, with the fields a test cares about."""
+    return post_form(db, "/settings", fields)
 
 
-def test_settings_form_updates_media_root_and_quota(tmp_path):
+def test_settings_form_stores_the_plain_category_labels(tmp_path):
     db = make_session()
+    known = {item["label"]: item["color"] for item in get_video_category_label_styles(db)}
 
     response = post_settings(db, tmp_path, video_category_labels="Maker\nScience\nmaker\nHistoire")
 
     assert response.headers["location"] == "/settings"
-    assert db.get(AppSetting, "media_root").value == str(tmp_path)
-    assert db.get(AppSetting, "global_quota_bytes").value == str(int(2.5 * 1024 * 1024 * 1024))
-    # The plain list is stored as bare labels; their colours are assigned when read.
+    # Labels already known keep their colour; a new one gets the palette's next colour.
+    styles = get_video_category_label_styles(db)
+    assert [item["label"] for item in styles] == ["maker", "science", "histoire"]
+    assert styles[0]["color"] == known["maker"] and styles[1]["color"] == known["science"]
+
+
+def test_settings_form_plain_labels_keep_the_colors_of_known_labels(tmp_path):
+    db = make_session()
+    post_settings(
+        db,
+        tmp_path,
+        video_category_styles=json.dumps([{"label": "maker", "color": "#ff0066"}]),
+    )
+
+    post_settings(db, tmp_path, video_category_labels="Histoire\nMaker")
+
     assert get_video_category_label_styles(db) == [
-        {"label": "maker", "color": "#16a34a"},
-        {"label": "science", "color": "#2563eb"},
-        {"label": "histoire", "color": "#7c3aed"},
+        {"label": "histoire", "color": "#16a34a"},
+        {"label": "maker", "color": "#ff0066"},
     ]
+
+
+def test_settings_form_refuses_invalid_json_and_saves_nothing(tmp_path):
+    db = make_session()
+    before = get_video_category_label_styles(db)
+
+    response = post_settings(
+        db,
+        tmp_path,
+        video_library_views="[{",
+        video_category_styles="[]",
+        video_category_labels="x",
+    )
+
+    assert "level=error" in response.headers["location"]
+    assert get_video_category_label_styles(db) == before
+
+
+def test_settings_page_without_javascript_offers_plain_fields_and_help(tmp_path):
+    db = make_session()
+
+    rendered = site(db).get("/settings").text
+
+    # The JSON field is enabled by app.js; the plain labels field only exists inside <noscript>.
+    assert 'name="video_category_styles" rows="6" data-category-source disabled' in rendered
+    assert "<noscript>" in rendered and 'name="video_category_labels"' in rendered
+    # Long explanations sit behind the round "i".
+    assert 'class="settings-help"' in rendered
+    assert rendered.count('class="settings-hint-row"') >= 4
 
 
 def test_settings_form_saves_category_label_colors(tmp_path):
@@ -4504,10 +4545,23 @@ def test_settings_page_renders_custom_category_labels(tmp_path):
     assert 'data-category-new-color type="color"' in rendered
     assert "Sous-bibliothèques" in rendered
     assert "data-initial-views=" in rendered
-    # Summary tiles and the collapsed rarely-used blocks.
-    assert 'class="settings-stats"' in rendered
+    # The collapsed rarely-used blocks; no summary tiles, no media root / quota / users cards.
+    assert 'class="settings-stats"' not in rendered
+    assert 'name="media_root"' not in rendered and 'id="utilisateurs"' not in rendered
     assert 'class="settings-fold settings-fold-card"' in rendered
     assert "data-settings-nav" in rendered
+    # Overview first, then the settings groups; the link-only cards are navigation links now.
+    groups = [
+        rendered.index(f'id="{g}"')
+        for g in ("group-apercu", "group-bibliotheque", "group-lecture", "group-automatisation")
+    ]
+    assert groups == sorted(groups)
+    assert 'href="/rag"' in rendered and 'href="/raton/variations"' in rendered
+    assert 'id="rag"' not in rendered and 'id="raton"' not in rendered
+    assert 'href="#auto-notes"' in rendered
+    # The sub-libraries card is folded, its count stays in the summary.
+    assert '<summary><h2 class="settings-card-title">Sous-bibliothèques</h2>' in rendered
+    assert "data-settings-actions" in rendered and "data-unsaved-guard" in rendered
     assert 'href="/logs"' in rendered
 
 

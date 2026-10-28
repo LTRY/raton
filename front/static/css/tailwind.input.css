@@ -1551,37 +1551,6 @@ button.secondary {
   margin: 0;
 }
 
-.settings-users {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.settings-user {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-/* The name takes its own line; "vous" and the actions sit under it. */
-.settings-user label {
-  flex: 1 1 100%;
-  min-width: 0;
-}
-
-.settings-user input {
-  width: 100%;
-}
-
-.settings-user-current {
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
 .settings-user-action {
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
@@ -1630,6 +1599,44 @@ button.secondary {
   font-size: 13px;
 }
 
+/* Unsaved changes: the bar says so in the accent colour (also on phones, where the note is otherwise hidden). */
+.settings-actions[data-dirty] {
+  border-color: var(--color-primary);
+}
+
+.settings-actions[data-dirty] span {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.settings-group-title {
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  margin: 12px 0 0;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.settings-group-title:first-child {
+  margin-top: 0;
+}
+
+.settings-nav-group {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 10px 0 0;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+
+.settings-nav-group:first-child {
+  margin-top: 0;
+}
+
 .settings-category-builder {
   display: grid;
   gap: 10px;
@@ -1658,7 +1665,7 @@ button.secondary {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(180px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .settings-library-position-controls {
@@ -1680,12 +1687,42 @@ button.secondary {
   gap: 8px;
 }
 
+.settings-library-filter-label {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 108px;
+}
+
+.settings-library-filter-row .asset-filter-options,
+.settings-library-filter-row .category-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Without JavaScript the editors stay empty: hide their controls and show the plain field. */
+[data-category-label-editor]:not([data-ready]) .settings-category-panel,
+[data-category-label-editor]:not([data-ready]) [data-category-count],
+[data-library-view-editor]:not([data-ready]) [data-library-view-add],
+[data-library-view-editor]:not([data-ready]) [data-library-view-count] {
+  display: none;
+}
+
+[data-library-view-editor]:not([data-ready]) .category-label-source {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
 .settings-category-header {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   font-weight: 700;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px 12px;
 }
 
 .settings-category-header output {
@@ -1696,6 +1733,7 @@ button.secondary {
   font-size: 0.82rem;
   font-weight: 700;
   padding: 3px 9px;
+  white-space: nowrap;
 }
 
 .settings-category-panel {
@@ -7513,6 +7551,18 @@ turbo-frame {
   padding: 0;
 }
 
+/* /user lists a delete button beside each choice; the choice takes the rest of the row. */
+.chat-user-list li {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.chat-user-list li > form:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
 .chat-user-choice {
   align-items: center;
   background: transparent;
@@ -10920,13 +10970,32 @@ a.log-title:hover { color: var(--color-primary); }
 .settings-head { align-items: baseline; display: flex; gap: 12px; justify-content: space-between; margin: 0 0 16px; }
 .settings-head h1 { font-size: 24px; margin: 0; }
 .settings-head-link { color: var(--color-primary); font-size: 14px; font-weight: 700; }
-.settings-stats { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 20px; }
-.settings-stats div { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; min-width: 0; padding: 12px 16px; }
-.settings-stats dt { color: var(--color-text-muted); font-size: 12px; }
-.settings-stats dd { font-size: 24px; font-weight: 800; line-height: 1.2; margin: 2px 0 0; }
-.settings-stats dd small { color: var(--color-text-muted); font-size: 13px; font-weight: 600; }
-.settings-stats .settings-stat-text { font-size: 15px; line-height: 1.5; }
 .settings-hint { color: var(--color-text-muted); font-size: 13px; margin: 0; }
+.settings-hint-row { align-items: flex-start; display: flex; flex-wrap: wrap; gap: 6px 10px; }
+.settings-hint-row .settings-hint { flex: 1 1 0; min-width: 0; }
+.settings-help { flex: 0 0 auto; }
+.settings-help[open] { flex: 1 1 100%; }
+.settings-help summary {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 800;
+  height: 22px;
+  justify-content: center;
+  list-style: none;
+  position: relative;
+  width: 22px;
+}
+.settings-help summary::-webkit-details-marker { display: none; }
+.settings-help summary::after { content: ""; inset: -11px; position: absolute; }
+.settings-help[open] summary { background: var(--color-tint); color: var(--color-primary); }
+.settings-help-body { margin-top: 8px; }
 .settings-total { font-size: 14px; margin: 0; }
 .settings-table-scroll { overflow-x: auto; }
 .settings-table-scroll h3 { font-size: 14px; margin: 16px 0 6px; }
@@ -10956,6 +11025,9 @@ a.log-title:hover { color: var(--color-primary); }
 }
 .settings-fold-card[open] > summary::after { content: "▴"; }
 .settings-fold-card > summary .settings-card-title { margin-right: auto; }
+.settings-fold-card > .settings-library-list,
+.settings-fold-card > [data-library-view-add],
+.settings-fold-card > .category-label-source,
 .settings-fold-card > .settings-hint,
 .settings-fold-card > .settings-checkbox-list { margin-top: 10px; }
 .settings-fold-meta { color: var(--color-text-muted); font-size: 13px; font-weight: 400; }
@@ -10963,17 +11035,21 @@ a.log-title:hover { color: var(--color-primary); }
 .settings-checkbox-option { min-height: 32px; }
 
 @media (max-width: 900px) {
-  .settings-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+  }
 
 @media (max-width: 800px) {
   .settings-nav { margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
   .settings-actions { bottom: calc(72px + var(--tabbar-safe-bottom)); }
   .settings-actions span { display: none; }
+  .settings-actions[data-dirty] span { display: block; }
+  .settings-nav-group { display: none; }
+  .settings-library-filter-label { flex: 1 1 0; min-width: 0; }
+  .settings-library-filter-row .asset-filter-options,
+  .settings-library-filter-row .category-filter-options { flex: 1 1 100%; }
+  .settings-library-position-controls button { min-height: 44px; min-width: 44px; }
   .settings-actions button { flex: 1; min-height: 44px; }
   .settings-card { padding: 16px; }
-  .settings-stats dd { font-size: 20px; }
-}
+  }
 
 /* Stats page (/stats): charts are plain CSS bars, no JS. */
 .stats-grid {
@@ -11547,7 +11623,6 @@ body::before {
 /* Panels and form blocks: same blur-free glass look as the cards above (the
    border keeps its colour so a panel's edge stays readable on the cream). */
 .settings-card,
-.settings-stats div,
 .stats-card,
 .filters-form,
 .download-form,

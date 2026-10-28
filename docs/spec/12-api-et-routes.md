@@ -189,8 +189,8 @@ requete » plus bas) :
   aussitot comme lui ; un nom vide, trop long ou deja pris redirige vers `/`
   avec le message du back.
 - `POST /users/{id}/rename` `name` `next`, `POST /users/{id}/delete` :
-  formulaires de la section Utilisateurs de `/settings` (et « Nom » de `/user`
-  pour le renommage), redirigent vers `next` (par defaut `/settings`) avec un
+  formulaires de `/user` (« Nom » pour le renommage, « Changer d'utilisateur »
+  pour la suppression), redirigent vers `next` (par defaut `/settings`) avec un
   message. Supprimer l'utilisateur courant efface le cookie (retour a
   l'utilisateur par defaut).
 

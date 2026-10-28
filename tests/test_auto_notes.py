@@ -557,8 +557,6 @@ def test_settings_form_saves_the_switch_and_the_exclusions(settings_client):
     client.post(
         "/settings",
         data={
-            "media_root": "/media",
-            "quota_gb": "1.0",
             "auto_notes_excluded_categories": ["Science", "cuisine"],
         },
         follow_redirects=False,

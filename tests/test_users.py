@@ -205,17 +205,16 @@ def test_adding_a_user_from_the_menu_switches_to_them(db):
     assert "set-cookie" not in refused.headers
 
 
-def test_settings_lists_the_users_and_deleting_oneself_goes_back_to_the_default(db):
+def test_user_page_offers_the_deletion_and_deleting_oneself_goes_back_to_the_default(db):
     user_id(db)
     other = add_user(db, "Invité")
     client = site_client()
     client.cookies.set("raton_user", str(other.id))
 
-    page = client.get("/settings").text
+    page = client.get("/user").text
     deleted = client.post(f"/users/{other.id}/delete", follow_redirects=False)
 
-    assert 'id="utilisateurs"' in page
-    assert 'action="/users/1/rename"' in page and f'action="/users/{other.id}/delete"' in page
-    assert '<span class="settings-user-current">vous</span>' in page
+    assert f'action="/users/{other.id}/delete"' in page and 'action="/users/1/delete"' in page
+    assert 'id="utilisateurs"' not in client.get("/settings").text
     assert deleted.headers["location"].startswith("/settings?message=")
     assert 'raton_user=""' in deleted.headers["set-cookie"]

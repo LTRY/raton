@@ -534,7 +534,7 @@ snapshots.
 
 Template : `rag_dashboard.html`, route `GET /rag` (`front/routes/stats.py`),
 donnees dans `back/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
-"Indexation RAG" dans une carte de `/settings` (ancre `#rag`). Page de lecture sans JavaScript,
+"Indexation RAG" dans la navigation de `/settings` (groupe « Autres pages »). Page de lecture sans JavaScript,
 construite avec les cartes et barres CSS de `/stats` ; elle repond a "ou en
 est l'indexation des notes et que va faire le passage de la nuit ?" et sert
 aussi d'explication du fonctionnement (projet educatif). Elle montre, dans
@@ -680,7 +680,7 @@ page), decoupee en un bloc
 `details.dashboard-day-group` repliable par journee de lecture (macro
 partagee `history_day_list` dans `_macros.html`) — regles ci-dessous. Le temps de lecture y figure
 deux fois : le carrousel de cartes « Temps de lecture » (macro
-`playback_time_cards`, memes chiffres que `/settings` et que la barre de limite
+`playback_time_cards`, memes chiffres que la barre de limite
 de Raton) en haut de page, et, dans l'en-tete de chaque journee, le temps total
 regarde ce jour-la (« 1 h 12 de lecture »). Ce total compte toutes les lectures
 de la journee ; il ne depend pas de la pagination.
@@ -727,10 +727,10 @@ pastille de l'initiale et le nom de l'utilisateur courant, puis, en cartes de
 `/settings` sur une colonne de 720 px au plus :
 
 - « Nom » : champ et « Renommer » (`POST /users/{id}/rename`, `next=/user`) ;
-- « Changer d'utilisateur » : rappel de ce qui est propre a chacun (lien vers
-  `/settings#utilisateurs` pour supprimer), une ligne par utilisateur
+- « Changer d'utilisateur » : rappel de ce qui est propre a chacun, une ligne par utilisateur
   (pastille, nom, coche sur le courant, desactive ; `POST /users/switch`
-  recharge l'accueil pour lui avec « Bonjour <nom> ! »), puis « Nouvel
+  recharge l'accueil pour lui avec « Bonjour <nom> ! » ; « Supprimer » avec
+  confirmation, `POST /users/{id}/delete`, quand il en reste plusieurs), puis « Nouvel
   utilisateur » et « Ajouter » (`POST /users`) ;
 - un formulaire (`POST /user`, barre « Enregistrer ») : « Raton et toi »
   (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
@@ -828,16 +828,15 @@ de videos »), pas dans la bibliotheque.
 - Telephone (800px et moins) : miniature de 112px, le ↗ et l'action passent sous
   le texte.
 
-## Parametres : statistiques et temps de lecture
+## Parametres : statistiques
 
 Les statistiques de la bibliotheque (fiches, transcripts, chaines, chaines
-actives, videos, shorts, medias, stockage utilise / quota avec jauge) et le
-carrousel "Temps de lecture" sont des cartes de `/settings` (ancres
-`#library-stats` et `#playback-time`), calculees par `library_stats_context`
+actives, videos, shorts, medias, stockage utilise / quota avec jauge) sont une
+carte de `/settings` (ancre `#library-stats`), calculees par `library_stats_context`
 (`front/routes/settings.py`, compteurs dans `back/services/videos/stats.py`). La carte stockage renvoie vers `/stats` (bouton
 "Voir les graphiques").
 
-Le carrousel "Temps de lecture" (`.screen-time-carousel`, periodes
+Le carrousel "Temps de lecture" de `/dashboard/historique` (`.screen-time-carousel`, periodes
 aujourd'hui/7 jours/30 jours) n'accepte le changement de periode que via les
 boutons precedent/suivant ou le scroll-snap programme (`scrollTo`) ; le
 glisser tactile horizontal est desactive (`touch-action: pan-y`) pour que,
@@ -1760,34 +1759,60 @@ a l'etat actif). De haut en bas :
 
 - titre "Parametres" et lien "Voir tous les logs" vers `/logs` (a droite du
   titre) ;
-- resume en quatre tuiles : quota global, cout LLM cumule, date du dernier
-  scan automatique ("Jamais" sinon), nombre de categories et de
-  sous-bibliotheques ;
-- navigation par ancres (`data-settings-nav`) : colonne a gauche sur grand
-  ecran, barre de pilules defilante sous 800px ;
+- navigation (`data-settings-nav`) : colonne a gauche sur grand ecran, barre de
+  pilules defilante sous 800px (sans les intitules de groupe). Ses liens sont
+  ranges en cinq groupes : « Apercu » (Bibliotheque, Couts LLM, Suivi
+  automatique : lecture seule, sans champ), « Bibliotheque video » (categories,
+  barre de progression, sous-bibliotheques), « Lecture » (segments
+  sponsorises, temps d'ecran), « Automatisation » (notes automatiques) et
+  « Autres pages » (liens vers `/rag` et `/raton/variations`, sans carte) ;
+  les sections de la page suivent le meme ordre, chacune sous un intitule de
+  groupe (`.settings-group-title`) ;
 - cartes de reglages. Les blocs peu consultes sont replies dans un `<details>` :
-  "Categories sans barre de progression", "Notes automatiques" et "Segments sponsorises" (resume du
+  "Categories sans barre de progression", "Notes automatiques", "Sous-bibliotheques" (nombre de vues dans l'en-tete) et "Segments sponsorises" (resume du
   nombre de cases cochees dans l'en-tete ; les cases d'un bloc replie sont
   quand meme envoyees), et le detail des tableaux de "Couts LLM" (le total
   reste visible) ;
 - barre d'enregistrement collante en bas de la page (au-dessus de la tab bar
-  sous 800px).
+  sous 800px). Des qu'un champ differe de son etat au chargement (editeurs de
+  categories et de sous-bibliotheques compris), elle affiche « Modifications
+  non enregistrees » (`data-dirty`, bordure et texte en couleur d'accent, y
+  compris sous 800px) et une confirmation est demandee avant de quitter la
+  page, qu'on la recharge, la ferme (`beforeunload`) ou navigue dans l'app
+  (`turbo:before-visit`) ; l'enregistrement du formulaire lui-meme ne la
+  declenche pas. Un seul formulaire, un seul bouton « Enregistrer ».
+
+Les explications longues (couts LLM, barre de progression, notes
+automatiques, segments sponsorises) sont derriere un « i » rond (macro `hint`
+de `settings.html`, un `<details class="settings-help">` : il marche sans
+JavaScript) ; une phrase d'une ligne reste visible a cote.
+
+Editeurs de categories et de sous-bibliotheques (`app.js`, ils posent
+`data-ready` sur leur conteneur) :
+
+- sous 800px, la ligne d'une sous-bibliotheque passe son intitule (« Types »,
+  « Sauf types », « Categories », « Sauf categories ») et, le cas echeant, son
+  select `||` / `&&` (libelle accessible explicite) sur une ligne, et les
+  cases sur la suivante ; les boutons monter / descendre / supprimer font
+  44px ;
+- sans JavaScript (`data-ready` absent), le panneau de categories est
+  remplace par un champ « un label par ligne » (`video_category_labels`, dans
+  un `<noscript>` ; le champ JSON `video_category_styles` est rendu `disabled`
+  et active par `app.js`) : `POST /settings` garde alors la couleur des
+  labels deja connus et donne la couleur suivante de la palette aux autres ;
+  les sous-bibliotheques s'editent dans leur champ JSON, rendu visible avec un
+  rappel du format. Un JSON invalide n'enregistre rien et revient sur
+  `/settings` avec un message d'erreur (jamais de remise a zero silencieuse).
 
 Les champs, noms de formulaire et attributs `data-*` des editeurs sont
-inchanges.
+inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root et
+quota global, reglables par l'API ou l'environnement, voir
+[04 Configuration et deploiement](04-configuration-et-deploiement.md)), ni
+carte « Utilisateurs » : renommer, changer et supprimer un utilisateur se fait
+dans `/user`.
 
 Permet de modifier :
 
-- les utilisateurs (carte « Utilisateurs », ancre `#utilisateurs`, juste
-  apres « General ») : rappel de ce qui est partage et de ce qui est propre a
-  chacun (et renvoi vers la page de l'utilisateur, ouverte par le bouton rond
-  du tiroir de l'accueil), puis une ligne par utilisateur (son nom dans un champ, « vous » sur
-  l'utilisateur courant, « Renommer », et « Supprimer » avec confirmation
-  quand il en reste plusieurs). Ses champs appartiennent a des formulaires
-  places apres celui des parametres (`form=`), les formulaires ne
-  s'imbriquant pas ;
-- media root ;
-- quota global ;
 - styles des categories de video ;
 - categories sans barre de progression (voir la
   section "Barre de progression de lecture" plus haut) : une case a cocher par label de categorie connu, plus les
@@ -1808,7 +1833,7 @@ Permet de modifier :
   courant) ;
 - limites de temps d'ecran par type (`video`/`short`/`podcast`/`music`) et par
   periode (`today`/`week`/`month`), celles de l'utilisateur courant ;
-- carte "Raton" : simple lien vers la page `/raton/variations` (toutes les
+- le lien « Phrases de Raton » de la navigation ouvre `/raton/variations` (toutes les
   repliques de Raton), voir [18 Raton](18-raton-scenarios.md).
 
 Affiche aussi, en lecture seule (section "Couts LLM", pas de champ de
