@@ -19,7 +19,10 @@ make ci
 
 `make ci` enchaine le CSS, le lint (`make lint` : `ruff check` et
 `ruff format --check`, configuration dans `pyproject.toml`, section
-`[tool.ruff]`), les tests et la validation Compose. Le meme `make ci` tourne
+`[tool.ruff]`), les tests et la validation Compose. `make test` repartit les
+tests sur tous les coeurs (`pytest -n auto`, `pytest-xdist`) : chaque test doit
+donc rester independant des autres (aucun fichier, port ou etat partage hors de
+`tmp_path`) ; un `pytest` lance a la main reste sequentiel. Le meme `make ci` tourne
 sur GitHub a chaque pull request (`.github/workflows/ci.yml`). `make format`
 corrige automatiquement ; `E501` (longueur de ligne) est ignore : c'est le
 formateur qui coupe les lignes, `ruff check` ne signalerait que des

@@ -17,7 +17,7 @@ install:
 	uv sync --python 3.14 --extra dev
 
 test:
-	uv run --python 3.14 --extra dev pytest
+	uv run --python 3.14 --extra dev pytest -n auto
 
 lint:
 	uv run --python 3.14 --extra dev ruff check back front mcp_server ops monitoring scripts tests alembic
