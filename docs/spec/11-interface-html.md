@@ -735,7 +735,7 @@ l'utilisateur courant, puis ses cartes :
   utilisateur » et « Ajouter » (`POST /users`) ;
 - un formulaire (`POST /user`, sa propre barre « Enregistrer ») : « Raton et toi »
   (radios « Il te vouvoie » / « Il te tutoie », champ « Comment il
-  t'appelle »), « Temps d'écran » (ancre `#screen-time` : une ligne par type,
+  t'appelle » ; masquee sur telephone, voir « Parametres »), « Temps d'écran » (ancre `#screen-time` : une ligne par type,
   Vidéos, Shorts, Podcasts, Musique, avec la limite du jour en minutes,
   `screen_time_<kind>_today`) et « Couvre-feu » (interrupteur, heures de debut
   et de fin en `input type="time"`).
@@ -1767,7 +1767,9 @@ changement et suppression d'utilisateur), puis les **parametres
 d'administration** (un formulaire `POST /settings`). Sous 800px (le telephone),
 tout ce qui est d'administration porte `.settings-admin` et est masque
 (`display: none`) : le lien des logs, la navigation et le formulaire
-d'administration ; la page n'y montre que les parametres de l'utilisateur.
+d'administration ; la page n'y montre que les parametres de l'utilisateur,
+sans la carte « Raton et toi » (`.settings-desktop-only`, masquee aussi),
+qui se regle depuis un ordinateur.
 De haut en bas :
 
 - titre "Parametres" et lien "Voir tous les logs" vers `/logs` (a droite du
