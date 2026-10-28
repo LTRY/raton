@@ -1319,7 +1319,8 @@ document.querySelectorAll("[data-screen-time-carousel]").forEach((carousel) => {
 });
 
 function bindSettingsNav(nav) {
-  const links = Array.from(nav.querySelectorAll(".settings-nav-link"));
+  // Links to other pages (`.settings-nav-external`) are not sections of this page.
+  const links = Array.from(nav.querySelectorAll('.settings-nav-link[href^="#"]'));
   const sections = links
     .map((link) => document.querySelector(link.getAttribute("href")))
     .filter(Boolean);
@@ -1351,6 +1352,35 @@ function bindSettingsNav(nav) {
 }
 
 document.querySelectorAll("[data-settings-nav]").forEach(bindSettingsNav);
+
+// Flags unsaved changes of the settings form. The category and sub-library editors write JSON into
+// hidden textareas without firing events, so the form is re-serialized after every click and input
+// and compared with its state at load.
+document.querySelectorAll("[data-unsaved-guard]").forEach((form) => {
+  const bar = form.querySelector("[data-settings-actions]");
+  const note = form.querySelector("[data-settings-actions-note]");
+  if (!bar || !note) return;
+  const idleText = note.textContent;
+  const serialize = () => JSON.stringify(Array.from(new FormData(form).entries()));
+  const initial = serialize();
+  const refresh = () => {
+    const dirty = serialize() !== initial;
+    bar.toggleAttribute("data-dirty", dirty);
+    note.textContent = dirty ? "Modifications non enregistrées" : idleText;
+  };
+  ["input", "change", "click", "keyup"].forEach((type) => form.addEventListener(type, refresh));
+  form.addEventListener("submit", () => { form.dataset.submitting = "true"; });
+  // This file runs again on every Turbo visit: one window listener, reading the current page's bar.
+  if (!window.ratonUnsavedGuard) {
+    window.ratonUnsavedGuard = (event) => {
+      const bar = document.querySelector("[data-settings-actions][data-dirty]");
+      if (!bar || bar.closest("form").dataset.submitting) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", window.ratonUnsavedGuard);
+  }
+});
 
 document.querySelectorAll("[data-csv-dropzone-form]").forEach((form) => {
   const dropzone = form.querySelector("[data-csv-dropzone]");

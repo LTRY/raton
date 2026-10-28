@@ -4506,6 +4506,16 @@ def test_settings_page_renders_custom_category_labels(tmp_path):
     assert 'name="media_root"' not in rendered and 'id="utilisateurs"' not in rendered
     assert 'class="settings-fold settings-fold-card"' in rendered
     assert "data-settings-nav" in rendered
+    # Overview first, then the settings groups; the link-only cards are navigation links now.
+    groups = [
+        rendered.index(f'id="{g}"')
+        for g in ("group-apercu", "group-bibliotheque", "group-lecture", "group-automatisation")
+    ]
+    assert groups == sorted(groups)
+    assert 'href="/rag"' in rendered and 'href="/raton/variations"' in rendered
+    assert 'id="rag"' not in rendered and 'id="raton"' not in rendered
+    assert 'href="#auto-notes"' in rendered
+    assert "data-settings-actions" in rendered and "data-unsaved-guard" in rendered
     assert 'href="/logs"' in rendered
 
 

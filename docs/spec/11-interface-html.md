@@ -534,7 +534,7 @@ snapshots.
 
 Template : `rag_dashboard.html`, route `GET /rag` (`front/routes/stats.py`),
 donnees dans `back/services/rag/dashboard.py` (`rag_dashboard_data`). Lien
-"Indexation RAG" dans une carte de `/settings` (ancre `#rag`). Page de lecture sans JavaScript,
+"Indexation RAG" dans la navigation de `/settings` (groupe « Autres pages »). Page de lecture sans JavaScript,
 construite avec les cartes et barres CSS de `/stats` ; elle repond a "ou en
 est l'indexation des notes et que va faire le passage de la nuit ?" et sert
 aussi d'explication du fonctionnement (projet educatif). Elle montre, dans
@@ -1759,15 +1759,26 @@ a l'etat actif). De haut en bas :
 
 - titre "Parametres" et lien "Voir tous les logs" vers `/logs` (a droite du
   titre) ;
-- navigation par ancres (`data-settings-nav`) : colonne a gauche sur grand
-  ecran, barre de pilules defilante sous 800px ;
+- navigation (`data-settings-nav`) : colonne a gauche sur grand ecran, barre de
+  pilules defilante sous 800px (sans les intitules de groupe). Ses liens sont
+  ranges en cinq groupes : « Apercu » (Bibliotheque, Couts LLM, Suivi
+  automatique : lecture seule, sans champ), « Bibliotheque video » (categories,
+  barre de progression, sous-bibliotheques), « Lecture » (segments
+  sponsorises, temps d'ecran), « Automatisation » (notes automatiques) et
+  « Autres pages » (liens vers `/rag` et `/raton/variations`, sans carte) ;
+  les sections de la page suivent le meme ordre, chacune sous un intitule de
+  groupe (`.settings-group-title`) ;
 - cartes de reglages. Les blocs peu consultes sont replies dans un `<details>` :
   "Categories sans barre de progression", "Notes automatiques" et "Segments sponsorises" (resume du
   nombre de cases cochees dans l'en-tete ; les cases d'un bloc replie sont
   quand meme envoyees), et le detail des tableaux de "Couts LLM" (le total
   reste visible) ;
 - barre d'enregistrement collante en bas de la page (au-dessus de la tab bar
-  sous 800px).
+  sous 800px). Des qu'un champ differe de son etat au chargement (editeurs de
+  categories et de sous-bibliotheques compris), elle affiche « Modifications
+  non enregistrees » (`data-dirty`, bordure et texte en couleur d'accent, y
+  compris sous 800px) et le navigateur demande confirmation avant de quitter
+  la page ; un seul formulaire, un seul bouton « Enregistrer ».
 
 Les champs, noms de formulaire et attributs `data-*` des editeurs sont
 inchanges. La page n'a ni resume en tuiles, ni carte « General » (media root et
@@ -1798,7 +1809,7 @@ Permet de modifier :
   courant) ;
 - limites de temps d'ecran par type (`video`/`short`/`podcast`/`music`) et par
   periode (`today`/`week`/`month`), celles de l'utilisateur courant ;
-- carte "Raton" : simple lien vers la page `/raton/variations` (toutes les
+- le lien « Phrases de Raton » de la navigation ouvre `/raton/variations` (toutes les
   repliques de Raton), voir [18 Raton](18-raton-scenarios.md).
 
 Affiche aussi, en lecture seule (section "Couts LLM", pas de champ de

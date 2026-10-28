@@ -7,21 +7,29 @@
     <a class="settings-head-link" href="/logs">Voir tous les logs</a>
   </div>
 
-  <form class="settings-form" action="/settings" method="post">
+  <form class="settings-form" action="/settings" method="post" data-unsaved-guard>
     <div class="settings-layout">
       <nav class="settings-nav" data-settings-nav aria-label="Sections des paramètres">
+        <p class="settings-nav-group">Aperçu</p>
         <a href="#library-stats" class="settings-nav-link">Bibliothèque</a>
         <a href="#llm-usage" class="settings-nav-link">Coûts LLM</a>
         <a href="#auto-scan" class="settings-nav-link">Suivi automatique</a>
+        <p class="settings-nav-group">Bibliothèque vidéo</p>
         <a href="#categories" class="settings-nav-link">Catégories vidéo</a>
         <a href="#no-progress" class="settings-nav-link">Barre de progression</a>
-        <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
         <a href="#libraries" class="settings-nav-link">Sous-bibliothèques</a>
+        <p class="settings-nav-group">Lecture</p>
+        <a href="#sponsor-segments" class="settings-nav-link">Segments sponsorisés</a>
         <a href="#screen-time" class="settings-nav-link">Temps d’écran</a>
-        <a href="#rag" class="settings-nav-link">Indexation RAG</a>
-        <a href="#raton" class="settings-nav-link">Raton</a>
+        <p class="settings-nav-group">Automatisation</p>
+        <a href="#auto-notes" class="settings-nav-link">Notes automatiques</a>
+        <p class="settings-nav-group">Autres pages</p>
+        <a href="/rag" class="settings-nav-link settings-nav-external">Indexation RAG</a>
+        <a href="/raton/variations" class="settings-nav-link settings-nav-external">Phrases de Raton</a>
       </nav>
       <div class="settings-sections">
+        <h2 class="settings-group-title" id="group-apercu">Aperçu</h2>
+
         <div class="settings-card library-stats" id="library-stats">
           <h2 class="settings-card-title">Bibliothèque</h2>
           <div class="dashboard-stat-group">
@@ -136,6 +144,8 @@
           <button class="secondary" type="button" data-scan-run data-scan-url="/api/scan" data-scan-feed-url="/api/scan/events" data-scan-running="{{ 'true' if scan_running else 'false' }}" data-scan-after="{{ scan_events_last_id }}">Lancer le scan maintenant</button>
         </div>
 
+        <h2 class="settings-group-title" id="group-bibliotheque">Bibliothèque vidéo</h2>
+
         <div class="settings-card" id="categories">
           <div class="settings-category-builder" data-category-label-editor data-initial-labels='{{ video_category_label_styles | tojson }}'>
             <div class="settings-category-header">
@@ -177,6 +187,57 @@
           </details>
         </div>
 
+        <div class="settings-card" id="libraries">
+          <div class="settings-library-builder" data-library-view-editor data-initial-views='{{ video_library_views | tojson }}' data-asset-options='{{ video_library_asset_options | tojson }}' data-category-options='{{ video_category_label_styles | tojson }}'>
+            <div class="settings-category-header">
+              <h2 class="settings-card-title">Sous-bibliothèques</h2>
+              <output data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output>
+            </div>
+            <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
+            <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
+            <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
+          </div>
+        </div>
+
+        <h2 class="settings-group-title" id="group-lecture">Lecture</h2>
+
+        <div class="settings-card" id="sponsor-segments">
+          <details class="settings-fold settings-fold-card">
+          <summary><h2 class="settings-card-title">Segments sponsorisés</h2><span class="settings-fold-meta">{{ sponsor_segment_categories | length }} / {{ sponsor_segment_category_options | length }} catégories{% if sponsor_skip_enabled %} · saut auto{% endif %}</span></summary>
+          <p class="settings-hint">Catégories recherchées via SponsorBlock sur chaque vidéo (bouton "Rechercher les segments sponsors", onglet Segments de la page d'une vidéo). Une catégorie cochée est détectée, affichée et sautée ; décochée, elle ne l'est pour rien.</p>
+          <div class="settings-checkbox-list">
+            {% for option in sponsor_segment_category_options %}
+            <label class="settings-checkbox-option">
+              <input type="checkbox" name="sponsor_segment_categories" value="{{ option.value }}"{% if option.value in sponsor_segment_categories %} checked{% endif %}>
+              <span>{{ option.label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          <div class="settings-checkbox-list">
+            <label class="settings-checkbox-option">
+              <input type="checkbox" name="sponsor_skip_enabled"{% if sponsor_skip_enabled %} checked{% endif %}>
+              <span>Sauter automatiquement les segments détectés</span>
+            </label>
+          </div>
+          </details>
+        </div>
+
+        <div class="settings-card" id="screen-time">
+          <fieldset class="settings-screen-time">
+            <legend class="settings-card-title">Temps d’écran</legend>
+            <div class="settings-screen-time-grid settings-screen-time-header"><span>Type</span><span>Jour</span></div>
+            {% for kind, label in [('video', 'Vidéos'), ('short', 'Shorts'), ('podcast', 'Podcasts'), ('music', 'Musique')] %}
+            <div class="settings-screen-time-grid">
+              <strong>{{ label }}</strong>
+              <label><span class="visually-hidden">{{ label }} · today</span><input name="screen_time_{{ kind }}_today" type="number" min="1" value="{{ screen_time_limits[kind]['today'] }}" required><small>min</small></label>
+            </div>
+            {% endfor %}
+            <small class="settings-hint">Les indicateurs passent progressivement du vert au rouge à mesure que la limite approche.</small>
+          </fieldset>
+        </div>
+
+        <h2 class="settings-group-title" id="group-automatisation">Automatisation</h2>
+
         <div class="settings-card" id="auto-notes">
           <details class="settings-fold settings-fold-card">
           <summary><h2 class="settings-card-title">Notes automatiques</h2><span class="settings-fold-meta">{% if auto_notes_enabled %}activées{% else %}désactivées{% endif %} · {{ auto_notes_excluded_categories | length }} catégorie{{ "s" if auto_notes_excluded_categories | length > 1 else "" }} exclue{{ "s" if auto_notes_excluded_categories | length > 1 else "" }}</span></summary>
@@ -202,67 +263,8 @@
           </details>
         </div>
 
-        <div class="settings-card" id="sponsor-segments">
-          <details class="settings-fold settings-fold-card">
-          <summary><h2 class="settings-card-title">Segments sponsorisés</h2><span class="settings-fold-meta">{{ sponsor_segment_categories | length }} / {{ sponsor_segment_category_options | length }} catégories{% if sponsor_skip_enabled %} · saut auto{% endif %}</span></summary>
-          <p class="settings-hint">Catégories recherchées via SponsorBlock sur chaque vidéo (bouton "Rechercher les segments sponsors", onglet Segments de la page d'une vidéo). Une catégorie cochée est détectée, affichée et sautée ; décochée, elle ne l'est pour rien.</p>
-          <div class="settings-checkbox-list">
-            {% for option in sponsor_segment_category_options %}
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="sponsor_segment_categories" value="{{ option.value }}"{% if option.value in sponsor_segment_categories %} checked{% endif %}>
-              <span>{{ option.label }}</span>
-            </label>
-            {% endfor %}
-          </div>
-          <div class="settings-checkbox-list">
-            <label class="settings-checkbox-option">
-              <input type="checkbox" name="sponsor_skip_enabled"{% if sponsor_skip_enabled %} checked{% endif %}>
-              <span>Sauter automatiquement les segments détectés</span>
-            </label>
-          </div>
-          </details>
-        </div>
-
-        <div class="settings-card" id="libraries">
-          <div class="settings-library-builder" data-library-view-editor data-initial-views='{{ video_library_views | tojson }}' data-asset-options='{{ video_library_asset_options | tojson }}' data-category-options='{{ video_category_label_styles | tojson }}'>
-            <div class="settings-category-header">
-              <h2 class="settings-card-title">Sous-bibliothèques</h2>
-              <output data-library-view-count>{{ video_library_views | length }} sous-bibliothèque{{ 's' if video_library_views | length > 1 else '' }}</output>
-            </div>
-            <div class="settings-library-list" data-library-view-list aria-label="Sous-bibliothèques"></div>
-            <button class="secondary" type="button" data-library-view-add>Ajouter une sous-bibliothèque</button>
-            <textarea class="category-label-source" name="video_library_views" rows="8" data-library-view-source>{{ video_library_views | tojson }}</textarea>
-          </div>
-        </div>
-
-        <div class="settings-card" id="screen-time">
-          <fieldset class="settings-screen-time">
-            <legend class="settings-card-title">Temps d’écran</legend>
-            <div class="settings-screen-time-grid settings-screen-time-header"><span>Type</span><span>Jour</span></div>
-            {% for kind, label in [('video', 'Vidéos'), ('short', 'Shorts'), ('podcast', 'Podcasts'), ('music', 'Musique')] %}
-            <div class="settings-screen-time-grid">
-              <strong>{{ label }}</strong>
-              <label><span class="visually-hidden">{{ label }} · today</span><input name="screen_time_{{ kind }}_today" type="number" min="1" value="{{ screen_time_limits[kind]['today'] }}" required><small>min</small></label>
-            </div>
-            {% endfor %}
-            <small class="settings-hint">Les indicateurs passent progressivement du vert au rouge à mesure que la limite approche.</small>
-          </fieldset>
-        </div>
-
-        <div class="settings-card" id="rag">
-          <h2 class="settings-card-title">Indexation RAG</h2>
-          <p class="settings-hint">Où en est l’indexation des notes et ce que fera le passage de la nuit.</p>
-          <a href="/rag">Voir l’indexation RAG</a>
-        </div>
-
-        <div class="settings-card" id="raton">
-          <h2 class="settings-card-title">Raton</h2>
-          <p class="settings-hint">Raton change de phrase à chaque rechargement de l’accueil.</p>
-          <a href="/raton/variations">Voir toutes les phrases de Raton</a>
-        </div>
-
-        <div class="settings-actions lg">
-          <span>Les changements s’appliquent à l’enregistrement.</span>
+        <div class="settings-actions lg" data-settings-actions>
+          <span data-settings-actions-note>Les changements s’appliquent à l’enregistrement.</span>
           <button type="submit">Enregistrer</button>
         </div>
       </div>

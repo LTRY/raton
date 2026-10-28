@@ -1599,6 +1599,44 @@ button.secondary {
   font-size: 13px;
 }
 
+/* Unsaved changes: the bar says so in the accent colour (also on phones, where the note is otherwise hidden). */
+.settings-actions[data-dirty] {
+  border-color: var(--color-primary);
+}
+
+.settings-actions[data-dirty] span {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.settings-group-title {
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  margin: 12px 0 0;
+  padding-bottom: 6px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.settings-group-title:first-child {
+  margin-top: 0;
+}
+
+.settings-nav-group {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 10px 0 0;
+  padding: 0 14px;
+  text-transform: uppercase;
+}
+
+.settings-nav-group:first-child {
+  margin-top: 0;
+}
+
 .settings-category-builder {
   display: grid;
   gap: 10px;
@@ -10944,6 +10982,8 @@ a.log-title:hover { color: var(--color-primary); }
   .settings-nav { margin: 0 -14px; padding: 0 14px 2px; scrollbar-width: none; }
   .settings-actions { bottom: calc(72px + var(--tabbar-safe-bottom)); }
   .settings-actions span { display: none; }
+  .settings-actions[data-dirty] span { display: block; }
+  .settings-nav-group { display: none; }
   .settings-actions button { flex: 1; min-height: 44px; }
   .settings-card { padding: 16px; }
   }
