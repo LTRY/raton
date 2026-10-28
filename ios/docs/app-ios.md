@@ -14,8 +14,9 @@ regle en Swift.
 
 **Etat : jalon 1.** Le projet se genere et se compile avec Xcode, et tourne
 dans le simulateur iPhone (iOS 18) sur les donnees de demo (`make demo`). La
-lecture d'un vrai fichier video ou audio, l'ecran verrouille et le reseau local
-d'un iPhone reel n'ont pas ete essayes.
+lecture d'un fichier audio (m4a), la reprise, le rapport `/activity` et la
+lecture en arriere-plan y ont ete essayes ; la video, l'ecran verrouille et le
+reseau local d'un iPhone reel ne l'ont pas ete.
 
 ## Construire et lancer
 

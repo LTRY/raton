@@ -649,7 +649,9 @@ Les fichiers d'une fiche ou d'une chaine, lus sur le volume media du back
   elle existe), `Cache-Control: public, max-age=86400`.
 - `GET /api/videos/{id}/subtitles` : le `.vtt`.
 - `GET|HEAD /api/videos/{id}/audio` et `/api/videos/{id}/video` : le flux,
-  avec `Range` (`206`, `416`).
+  avec `Range` (`206`, `416`). Un `.m4a` est servi en `audio/mp4` (pas
+  `audio/mp4a-latm`, que `mimetypes` donne et qu'AVFoundation, donc l'app iOS,
+  refuse de lire).
 - `GET /api/channels/{id}/avatar` et `/api/channels/{id}/banner` : l'image de
   profil (`Cache-Control: public, max-age=86400`) ; `404` si la chaine ou
   l'image n'existe pas, ou si le chemin stocke sort de `_channels/`.

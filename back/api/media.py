@@ -26,6 +26,8 @@ router = APIRouter(prefix="/api", tags=["Médias"])
 
 IMAGE = {200: {"content": {"image/jpeg": {}}, "description": "L'image."}}
 SUBTITLES = {200: {"content": {"text/vtt": {}}, "description": "Les sous-titres WebVTT."}}
+# `mimetypes` names .m4a `audio/mp4a-latm`, which AVFoundation (the iOS app, Safari) refuses to play.
+MEDIA_TYPE_OVERRIDES = {".m4a": "audio/mp4"}
 STREAM = {
     200: {"content": {"application/octet-stream": {}}, "description": "Le fichier entier."},
     206: {"description": "La plage demandée par `Range`."},
@@ -180,7 +182,11 @@ def media_response_context(
         raise HTTPException(status_code=404, detail=missing_detail)
 
     start, end, status_code = parse_range_header(request.headers.get("range"), file_size)
-    media_type = mimetypes.guess_type(media.name)[0] or "application/octet-stream"
+    media_type = (
+        MEDIA_TYPE_OVERRIDES.get(media.suffix.lower())
+        or mimetypes.guess_type(media.name)[0]
+        or "application/octet-stream"
+    )
     headers = {
         "Accept-Ranges": "bytes",
         "Cache-Control": "private, max-age=3600",
