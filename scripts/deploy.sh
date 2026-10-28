@@ -4,13 +4,20 @@
 # (scripts/previews.py).
 # Refuses a checkout that is not on main or has modified tracked files: `make up` builds this
 # directory, so it would ship (or the merge would clobber) someone's uncommitted work.
+# One deploy at a time: it runs under the file lock of scripts/deploy_lock.py, shared with the
+# button, and exits 75 when another deploy holds it.
 # Spec: docs/spec/04-configuration-et-deploiement.md, section "Deploiement de main".
 set -euo pipefail
 
 # Everything runs from a function called on the last line: the merge below may rewrite this
 # very file, and bash reads a script as it executes it.
 deploy() {
-  cd "$(dirname "$0")/.."
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  cd "$(dirname "$self")/.."
+  if [ -z "${DEPLOY_LOCK_HELD:-}" ]; then
+    exec python3 scripts/deploy_lock.py "$self" "$@"
+  fi
   local branch
   branch="$(git rev-parse --abbrev-ref HEAD)"
   if [ "$branch" != "main" ]; then

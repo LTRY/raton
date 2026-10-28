@@ -11,16 +11,21 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from scripts import deploy_lock
 from scripts.ops_config import CONFIG, REPO
 
 PREVIEW_SH = REPO / CONFIG.previews_script
 DEPLOY_SH = REPO / CONFIG.deploy_script
 LOG_DIR = REPO / ".local" / "previews" / "logs"
+# One JSON file per job (pr-<N>.json, prod.json), so a restarted page remembers them.
+JOBS_DIR = REPO / ".local" / "previews" / "jobs"
 # A job that never ends would keep its button disabled forever (ops.toml, [jobs] timeout_minutes).
 JOB_TIMEOUT_SECONDS = CONFIG.job_timeout_minutes * 60
 
@@ -41,6 +46,10 @@ class Job:
     action: str  # "up", "rebase" or "down"; "deploy" for the production
     started: float
     returncode: int | None = None
+    pr: int | None = None  # None for the production deploy
+    pid: int | None = None  # the script's process, also its process group
+    pid_start: str | None = None  # its start time (see process_start), to tell a reused pid
+    interrupted: bool = False  # the page restarted while it ran: returncode is 1, nobody knows more
 
 
 # Running and last finished action of each PR, and of the production deploy; the page reads
@@ -50,23 +59,131 @@ prod_job: Job | None = None
 jobs_lock = threading.Lock()
 
 
-def parse_previews(text: str) -> dict[int, Preview]:
-    previews = {}
+PREVIEW_STATE = re.compile(r"[a-z]+")
+PREVIEW_SHA = re.compile(r"-|[0-9a-f]{7,40}")
+PREVIEW_DB = ("shared", "copy", "-")
+
+
+def parse_preview_line(line: str) -> Preview | None:
+    """A preview from one line of `list` (`<pr> <port> <sha> <state> <db>`), None if it is invalid."""
+    parts = line.split()
+    if len(parts) != 5:
+        return None
+    pr, port, sha, state, db = parts
+    if not (pr.isascii() and pr.isdigit() and port.isascii() and port.isdigit()):
+        return None
+    if not 0 < int(port) < 65536:
+        return None
+    if not (PREVIEW_SHA.fullmatch(sha) and PREVIEW_STATE.fullmatch(state) and db in PREVIEW_DB):
+        return None
+    return Preview(int(pr), int(port), sha, state, db)
+
+
+def parse_previews(text: str) -> tuple[dict[int, Preview], list[str]]:
+    """The previews of a `list` output, and its invalid lines (blank lines are not).
+
+    An invalid line, or a second line for a PR already listed, is skipped but returned, so the
+    caller can report it. Spec: "Contrat du script de previews".
+    """
+    previews: dict[int, Preview] = {}
+    invalid = []
     for line in text.splitlines():
-        parts = line.split()
-        if len(parts) == 5 and parts[0].isdigit():
-            pr = int(parts[0])
-            previews[pr] = Preview(pr, int(parts[1]), parts[2], parts[3], parts[4])
-    return previews
+        if not line.strip():
+            continue
+        preview = parse_preview_line(line)
+        if preview is None or preview.pr in previews:
+            invalid.append(line.strip())
+        else:
+            previews[preview.pr] = preview
+    return previews, invalid
 
 
-def list_previews() -> dict[int, Preview]:
-    result = subprocess.run([str(PREVIEW_SH), "list"], capture_output=True, text=True, check=False)
-    return parse_previews(result.stdout)
+# `list` runs on every refresh of the page: a hung docker must not freeze it.
+LIST_TIMEOUT_SECONDS = 30
+
+
+def run_list_script() -> tuple[int, str, str] | str:
+    """(returncode, stdout, stderr) of `list`, or the French error when it cannot run to the end."""
+    try:
+        # Its own process group, so a timeout stops docker too, which would keep the pipes open.
+        process = subprocess.Popen(
+            [str(PREVIEW_SH), "list"],
+            cwd=REPO,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+    except OSError as error:
+        return f"Impossible de lancer {CONFIG.previews_script} list : {error}"
+    try:
+        stdout, stderr = process.communicate(timeout=LIST_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.communicate()
+        return (
+            f"{CONFIG.previews_script} list n'a pas répondu en {LIST_TIMEOUT_SECONDS} s : arrêté."
+        )
+    return process.returncode, stdout, stderr
+
+
+def list_previews() -> tuple[dict[int, Preview], str | None]:
+    """The previews, and a French warning when `list` failed or printed lines that were skipped."""
+    outcome = run_list_script()
+    if isinstance(outcome, str):
+        print(outcome, file=sys.stderr, flush=True)
+        return {}, outcome
+    returncode, stdout, stderr = outcome
+    previews, invalid = parse_previews(stdout)
+    warnings = []
+    if returncode != 0:
+        detail = stderr.strip().splitlines()[-1:] or [""]
+        warnings.append(
+            f"{CONFIG.previews_script} list a échoué (code {returncode}) : {detail[0]}".rstrip(" :")
+        )
+    if invalid:
+        plural = "s" if len(invalid) > 1 else ""
+        warnings.append(
+            f"{CONFIG.previews_script} list : {len(invalid)} ligne{plural} invalide{plural} "
+            f"ignorée{plural} (première : « {invalid[0][:80]} »)"
+        )
+    warning = " ".join(warnings).strip() or None
+    if warning:
+        print(warning, file=sys.stderr, flush=True)
+    return previews, warning
+
+
+# The page refreshes every 4 s while a job runs: GitHub and Docker are asked at most this often
+# (the "Rafraîchir" link and the end of a job skip the wait).
+CACHE_TTL = 15.0
+_cache: dict[tuple, tuple[float, object]] = {}
+_cache_lock = threading.Lock()
+
+
+def cached(key: tuple, ttl: float, compute: Callable[[], object]) -> object:
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit is not None and time.time() - hit[0] < ttl:
+            return hit[1]
+    value = compute()  # outside the lock: a slow gh must not block the other lookups
+    with _cache_lock:
+        _cache[key] = (time.time(), value)
+    return value
+
+
+def invalidate_caches() -> None:
+    global _origin_cache
+    with _cache_lock:
+        _cache.clear()
+    _origin_cache = (0.0, None)
 
 
 def list_open_prs() -> tuple[list[dict], str | None]:
-    """The open PRs, newest first, and the error to show when `gh` cannot list them."""
+    """The open PRs (cached for CACHE_TTL), and the error to show when `gh` cannot list them."""
+    return cached(("prs",), CACHE_TTL, fetch_open_prs)
+
+
+def fetch_open_prs() -> tuple[list[dict], str | None]:
     fields = "number,title,url,headRefName,headRefOid,isCrossRepository,author"
     try:
         result = subprocess.run(
@@ -95,7 +212,11 @@ def run_text(command: list[str], timeout: float = 15) -> str | None:
 
 
 def deployed_sha() -> str | None:
-    """The commit the deployed container was built from (image label), None if unknown."""
+    """The commit the deployed container was built from (image label, cached), None if unknown."""
+    return cached(("deployed",), CACHE_TTL, read_deployed_sha)
+
+
+def read_deployed_sha() -> str | None:
     if not CONFIG.deploy_container or not CONFIG.deploy_sha_label:
         return None
     label_format = '{{ index .Config.Labels "' + CONFIG.deploy_sha_label + '" }}'
@@ -122,6 +243,10 @@ def origin_main_sha() -> str | None:
 
 def commits_behind(deployed: str, origin: str) -> int | None:
     """How many commits origin/main has that the deployed commit lacks, None if git cannot say."""
+    return cached(("behind", deployed, origin), CACHE_TTL, lambda: count_behind(deployed, origin))
+
+
+def count_behind(deployed: str, origin: str) -> int | None:
     count = run_text(["git", "rev-list", "--count", f"{deployed}..{origin}"])
     return int(count) if count and count.isdigit() else None
 
@@ -133,8 +258,107 @@ def log_path(pr: int) -> Path:
 PROD_LOG = LOG_DIR / "prod.log"
 
 
-def run_logged(command: list[str], log, timeout: float) -> int:
-    """Run `command` with its output in `log`; 127 if it cannot start, 124 if it is stopped on timeout."""
+def job_file(pr: int | None) -> Path:
+    return JOBS_DIR / ("prod.json" if pr is None else f"pr-{pr}.json")
+
+
+def save_job(job: Job) -> None:
+    """Write the job's state; a disk error is reported but never stops the job itself."""
+    path = job_file(job.pr)
+    try:
+        JOBS_DIR.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        temporary.write_text(json.dumps(asdict(job)))
+        os.replace(temporary, path)  # atomic: a reader never sees half a file
+    except OSError as error:
+        print(f"Impossible d'enregistrer {path} : {error}", file=sys.stderr, flush=True)
+
+
+def process_start(pid: int) -> str | None:
+    """The start time of a process (field 22 of /proc/<pid>/stat), None where /proc has none."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    # The command name (field 2) may hold spaces and parentheses: read after the last one.
+    return stat.rpartition(")")[2].split()[19]
+
+
+def process_alive(job: Job) -> bool:
+    """Whether the job's process still runs; a pid reused by another process counts as gone."""
+    if job.pid is None:
+        return False
+    try:
+        os.kill(job.pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass  # exists, belongs to someone else
+    start = process_start(job.pid)
+    return not (job.pid_start and start and start != job.pid_start)
+
+
+def finish_interrupted(job: Job) -> None:
+    """Mark a job nobody is waiting for any more as failed and say so in its log."""
+    with jobs_lock:
+        job.returncode = 1
+        job.interrupted = True
+        save_job(job)
+    log = PROD_LOG if job.pr is None else log_path(job.pr)
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        with log.open("a") as file:
+            file.write("\nInterrompu : la page des previews a redémarré pendant ce job.\n")
+    except OSError:
+        pass
+
+
+def watch_orphan(job: Job, timeout: float) -> None:
+    """A job still running after a restart of the page: wait for its end, stop it on timeout."""
+    deadline = job.started + timeout
+    while process_alive(job):
+        if time.time() > deadline:
+            for sig in (signal.SIGTERM, signal.SIGKILL):
+                if not process_alive(job):
+                    break
+                os.killpg(job.pid, sig)
+                time.sleep(10)
+            break
+        time.sleep(2)
+    finish_interrupted(job)
+
+
+def load_jobs() -> None:
+    """Read the saved jobs at startup. A job saved as running whose process is gone becomes interrupted."""
+    global prod_job
+    for path in sorted(JOBS_DIR.glob("*.json")):
+        try:
+            job = Job(**json.loads(path.read_text()))
+        except (OSError, ValueError, TypeError) as error:
+            print(f"Job ignoré, {path} illisible : {error}", file=sys.stderr, flush=True)
+            continue
+        with jobs_lock:
+            if job.pr is None:
+                prod_job = job
+            else:
+                jobs[job.pr] = job
+        if job.returncode is not None:
+            continue
+        if process_alive(job):
+            threading.Thread(
+                target=watch_orphan, args=(job, JOB_TIMEOUT_SECONDS), daemon=True
+            ).start()
+        else:
+            finish_interrupted(job)
+
+
+def run_logged(
+    command: list[str], log, timeout: float, on_start: Callable[[int], None] | None = None
+) -> int:
+    """Run `command` with its output in `log`; 127 if it cannot start, 124 if it is stopped on timeout.
+
+    `on_start` receives the pid once the process runs.
+    """
     try:
         # Its own process group: on timeout the whole tree (make, docker...) is stopped, not just the shell.
         process = subprocess.Popen(
@@ -145,6 +369,8 @@ def run_logged(command: list[str], log, timeout: float) -> int:
         # page shows it as running forever with an empty log.
         log.write(f"Impossible de lancer {command[0]} : {error}\n")
         return 127
+    if on_start is not None:
+        on_start(process.pid)
     try:
         return process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -167,16 +393,30 @@ def stop_group(process: subprocess.Popen, sig: int) -> None:
 
 
 def run_in_background(
-    job: Job, command: list[str], log_file: Path, timeout: float | None = None
+    job: Job,
+    command: list[str],
+    log_file: Path,
+    timeout: float | None = None,
+    on_change: Callable[[Job], None] | None = None,
 ) -> None:
+    """Run `command` in a thread; `on_change` is called with the job once its pid is known and once it ends."""
     timeout = JOB_TIMEOUT_SECONDS if timeout is None else timeout
+
+    def started(pid: int) -> None:
+        with jobs_lock:
+            job.pid, job.pid_start = pid, process_start(pid)
+            if on_change:
+                on_change(job)
 
     def run() -> None:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         with log_file.open("w") as log:
-            returncode = run_logged(command, log, timeout)
+            returncode = run_logged(command, log, timeout, started)
         with jobs_lock:
             job.returncode = returncode
+            if on_change:
+                on_change(job)
+        invalidate_caches()  # the job changed what the page shows (a PR, a deployed commit)
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -187,21 +427,30 @@ def start_job(pr: int, action: str) -> bool:
         current = jobs.get(pr)
         if current is not None and current.returncode is None:
             return False
-        job = Job(action, time.time())
+        job = Job(action, time.time(), pr=pr)
         jobs[pr] = job
-    run_in_background(job, [str(PREVIEW_SH), action, str(pr)], log_path(pr))
+        save_job(job)
+    run_in_background(job, [str(PREVIEW_SH), action, str(pr)], log_path(pr), on_change=save_job)
     return True
 
 
+def deploy_elsewhere(prod: Job | None) -> bool:
+    """Whether a deploy runs that this page did not start (a hand-run deploy.sh)."""
+    return (prod is None or prod.returncode is not None) and deploy_lock.is_held()
+
+
 def start_prod_deploy() -> bool:
-    """Run `deploy.sh` in the background; False when a deploy is already running."""
+    """Run `deploy.sh` in the background; False when a deploy is already running, here or elsewhere."""
     global prod_job
     with jobs_lock:
         if prod_job is not None and prod_job.returncode is None:
             return False
+        if deploy_lock.is_held():
+            return False
         prod_job = Job("deploy", time.time())
         job = prod_job
-    run_in_background(job, [str(DEPLOY_SH)], PROD_LOG)
+        save_job(job)
+    run_in_background(job, [str(DEPLOY_SH)], PROD_LOG, on_change=save_job)
     return True
 
 

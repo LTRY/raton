@@ -10,7 +10,8 @@ the daily log review (scripts/ops_review.py).
 A small standard-library server, outside Raton (no import of back/ or front/): it reads the
 open PRs with `gh` and runs the project's preview and deploy scripts (scripts/ops_jobs.py), and
 renders the page with scripts/ops_render.py. Each action runs in the background; its output goes
-to .local/previews/logs/ (pr-<N>.log, prod.log), shown by the page.
+to .local/previews/logs/ (pr-<N>.log, prod.log), shown by the page; their state is kept in
+.local/previews/jobs/ so a restart of the page does not forget them.
 Unauthenticated by default, like Raton itself (trusted LAN); with OPS_TOKEN set, every request must
 carry it as the password of HTTP Basic auth. It only ever builds an open PR of this repository
 (preview.sh refuses forks), and refuses a form posted from another site.
@@ -83,22 +84,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         parts = self.path.split("?")[0].strip("/").split("/")
         if parts == [""]:
+            if "refresh=1" in self.path.partition("?")[2].split("&"):
+                ops_jobs.invalidate_caches()
             prs, error = ops_jobs.list_open_prs()
             with ops_jobs.jobs_lock:
                 job_by_pr = dict(ops_jobs.jobs)
                 prod = ops_jobs.prod_job
             deployed, origin = ops_jobs.deployed_sha(), ops_jobs.origin_main_sha()
             behind = ops_jobs.commits_behind(deployed, origin) if deployed and origin else None
+            previews, preview_warning = ops_jobs.list_previews()
             page = ops_render.render_page(
                 self.headers.get("Host"),
                 prs,
-                ops_jobs.list_previews(),
+                previews,
                 job_by_pr,
-                error,
+                " ".join(filter(None, (error, preview_warning))) or None,
                 prod,
                 ops_review.list_reviews(limit=60) if SCHEDULER_ON else None,
                 ops_review.running_since is not None,
                 ops_render.version_status(deployed, origin, behind),
+                ops_jobs.deploy_elsewhere(prod),
             )
             self.send_text(HTTPStatus.OK, page, "text/html")
         elif len(parts) == 3 and parts[0] == "prs" and parts[1].isdigit() and parts[2] == "log":
@@ -156,6 +161,7 @@ def main() -> None:
         help="run the daily log review (scripts/ops_review.py) and show it on the page",
     )
     args = parser.parse_args()
+    ops_jobs.load_jobs()
     if args.scheduler:
         global SCHEDULER_ON
         SCHEDULER_ON = True
