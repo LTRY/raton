@@ -22,8 +22,9 @@ OPEN_PR = {
 
 
 def test_parse_previews_reads_the_lines_of_preview_sh_list():
-    previews = parse_previews(f"31 9031 {'a' * 40} running copy\n7 9007 - exited -\nnoise\n")
+    previews, invalid = parse_previews(f"31 9031 {'a' * 40} running copy\n7 9007 - exited -\n")
 
+    assert invalid == []
     assert previews == {
         31: Preview(31, 9031, "a" * 40, "running", "copy"),
         7: Preview(7, 9007, "-", "exited", "-"),

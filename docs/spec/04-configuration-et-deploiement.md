@@ -250,14 +250,34 @@ lance `scripts/deploy.sh` en tache de fond. Ce script :
   ce travail non commite) ;
 - met `main` a jour sur `origin/main` en avance rapide seulement (refus si
   `main` a diverge) ;
+- prend le **verrou de deploiement** (ci-dessous) avant tout le reste ;
 - lance `make up`, qui retire d'abord les previews branchees sur la DB reelle
   que ce deploiement va migrer (voir « Previews des PR », « DB »).
+
+**Verrou de deploiement** : un seul deploiement a la fois, qu'il vienne du
+bouton ou d'un `scripts/deploy.sh` lance a la main. `deploy.sh` se relance sous
+`scripts/deploy_lock.py`, qui prend sans attendre un `fcntl.flock` exclusif sur
+`.local/previews/deploy.lock` puis execute le script ; le verrou est tenu tant
+que le deploiement (et ses processus fils) tourne, et le noyau le libere si le
+processus meurt. Si un autre deploiement le tient, `deploy.sh` n'a rien fait
+quand il affiche `deploy.sh: un deploiement est deja en cours : rien n'est
+deploye` et sort avec le code 75. La page lit le meme verrou : quand il est tenu
+par un deploiement qu'elle n'a pas lance, la carte **Production** affiche
+« Deploiement deja en cours (lance hors de cette page) », le bouton est grise
+et un POST sur `/prod/deploy` ne lance rien. Un `make up` tape directement,
+sans passer par `deploy.sh`, ne prend pas le verrou. Un flock ne protege que
+les processus d'un meme noyau : le depot monte dans `raton-ops` par bind mount
+et la machine hote partagent le noyau sous Linux, mais pas avec Docker
+Desktop (macOS, Windows), ou le verrou ne croise pas la frontiere de la VM ;
+ce croisement n'est pas verifie par les tests, qui couvrent deux processus
+d'une meme machine (`tests/test_ops_jobs.py`).
 
 Le bouton demande une confirmation, est desactive pendant un deploiement, et la
 sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
 **Production** affiche l'etat du dernier deploiement lance depuis la page
-(« Deploiement en cours… », « Deployee », « Echec du deploiement ») ; il
-s'oublie quand la page redemarre. Elle affiche aussi si la version deployee est
+(« Deploiement en cours… », « Deployee », « Echec du deploiement »,
+« Deploiement interrompu » si la page a redemarre pendant le deploiement : voir
+« Jobs persistes »). Elle affiche aussi si la version deployee est
 a jour : le commit dont l'image `raton-api` a ete construite (label
 `raton.git-sha`, pose par `make up` via l'argument de build `GIT_SHA`, lu par
 `docker inspect`) compare au `origin/main` recupere par `git fetch` (au plus
@@ -320,6 +340,83 @@ projet reutilise l'outil en fournissant son propre `ops.toml` et ses scripts.
 Une cle absente prend la valeur par defaut de `OpsConfig`. Verification :
 `tests/test_ops_config.py`.
 
+### Jobs persistes
+
+L'etat des jobs (un par PR, plus le deploiement de production) est ecrit dans
+`.local/previews/jobs/` : un fichier JSON par job (`pr-<N>.json`, `prod.json`)
+avec `action`, `pr`, `started` (heure de debut), `pid` (le processus du script,
+chef de son groupe), `pid_start` (son heure de demarrage lue dans `/proc`, pour
+reconnaitre un pid reutilise), `returncode` et `interrupted`. Le fichier est
+reecrit (de facon atomique) au lancement, quand le pid est connu et a la fin.
+Au demarrage, la page relit ces fichiers :
+
+- un job termine reste tel quel ;
+- un job « en cours » dont le processus n'existe plus (conteneur redemarre,
+  pid inconnu ou reutilise) devient **interrompu** : `returncode` 1,
+  `interrupted` vrai, une ligne « Interrompu » ajoutee a son journal, et la page
+  montre « Interrompu (la page a redemarre) » / « Deploiement interrompu » en
+  echec, bouton de nouveau actif ;
+- un job dont le processus tourne encore est surveille : il passe a interrompu
+  quand le processus disparait, ou est arrete apres `timeout_minutes`.
+
+Un fichier illisible est ignore et signale sur la sortie du serveur. Le
+journal d'un job (`.local/previews/logs/`) n'est pas touche.
+
+### Contrat du script de previews
+
+`[previews] script` est un executable appele depuis la racine du depot
+(`scripts/ops_jobs.py`) avec l'environnement de la page (`GH_TOKEN`,
+`RATON_REPO`, acces au Docker de l'hote...) ; la page ne lui en fournit pas
+d'autre. Il n'a pas de terminal : il ne lit pas l'entree standard.
+
+| Appel | Role | Sortie |
+|---|---|---|
+| `<script> up <pr>` | construit et lance la preview de la PR | journal du job |
+| `<script> rebase <pr>` | remet la branche de la PR a jour sur la branche principale | journal du job |
+| `<script> down <pr>` | retire la preview de la PR | journal du job |
+| `<script> sweep` | retire les previews des PR qui ne sont plus ouvertes (sans argument) | ignoree |
+| `<script> list` | liste les previews | lue par la page (ci-dessous) |
+
+`<pr>` est un numero de PR, entier decimal. Les sous-commandes `up`, `rebase` et
+`down` tournent comme jobs en arriere-plan (un a la fois par PR), avec stdout et
+stderr dans `.local/previews/logs/pr-<N>.log`.
+
+**Code de retour** : 0 en cas de succes, non nul en cas d'echec, que la page
+montre comme « Echec » (127 : le script n'a pas pu demarrer ; 124 : arrete
+apres `timeout_minutes`). Convention du script fourni : 2 pour un appel
+incorrect (sous-commande inconnue, numero de PR absent ou non numerique), un
+message d'usage sur stderr.
+
+**Format de `list`** : une ligne par preview sur stdout, cinq champs separes
+par des espaces, sans ligne d'entete :
+
+```
+<pr> <port> <commit> <etat> <db>
+31 9031 3f2a9c0d4b1e8a7c6d5e4f3a2b1c0d9e8f7a6b5c running copy
+```
+
+- `pr` : numero de PR, chiffres ASCII ;
+- `port` : port de la preview sur l'hote, de 1 a 65535 ;
+- `commit` : le commit construit, hexadecimal en minuscules (7 a 40 caracteres),
+  ou `-` s'il est inconnu ;
+- `etat` : etat du conteneur (`running`, `exited`, `created`...), minuscules ;
+- `db` : `shared` (DB reelle), `copy` (copie migree) ou `-` si inconnu.
+
+Une sortie vide veut dire aucune preview. Les lignes vides sont ignorees. Toute
+autre ligne qui ne respecte pas ce format, ou qui repete un numero de PR deja
+liste (la premiere est gardee), est **ignoree mais signalee** : la page affiche
+en bandeau « N ligne(s) invalide(s) ignoree(s) (premiere : ... ») et le meme
+texte va sur la sortie du serveur. Un `list` qui sort avec un code non nul ou
+qui ne peut pas demarrer est signale de la meme facon (les lignes valides qu'il
+a imprimees sont gardees). `scripts/ops_jobs.py` : `parse_previews` (retourne
+les previews et les lignes invalides), `list_previews`.
+
+`retire-stale` n'est pas appele par la page : c'est le point d'entree de
+`make up` de ce projet. Verification du contrat : `tests/test_ops_jobs.py`
+appelle `scripts/preview.sh` avec un faux `docker` et un faux `gh` (`list`,
+`sweep`, appels incorrects) et teste `parse_previews` sur des lignes valides
+et invalides.
+
 **Jeton de la page** : la page peut deployer en production depuis un conteneur
 root qui pilote Docker. Par defaut elle est ouverte, comme Raton (LAN de
 confiance). Avec `OPS_TOKEN` dans le `.env`, chaque requete (page, journaux,
@@ -329,7 +426,7 @@ et avec une interface autre que loopback, la page affiche un avertissement au
 demarrage. Le jeton ne vit pas dans `ops.toml` (versionne).
 
 **Code** : `scripts/ops_jobs.py` (PR, previews, lancement des scripts en
-arriere-plan), `scripts/ops_render.py` (HTML et libelles d'etat),
+arriere-plan, jobs persistes), `scripts/deploy_lock.py` (verrou de deploiement), `scripts/ops_render.py` (HTML et libelles d'etat),
 `scripts/previews.py` (serveur, jeton), `scripts/ops_review.py` (revue des
 journaux). Le linter (`make lint`, `make format`) couvre `scripts/`.
 

@@ -20,12 +20,19 @@ def preview_url(host: str | None, port: int) -> str:
     return f"http://{hostname}:{port}/"
 
 
-def prod_status(job: Job | None) -> tuple[str, str]:
-    """(French label, CSS class) of the last production deploy launched from this page."""
+def prod_status(job: Job | None, elsewhere: bool = False) -> tuple[str, str]:
+    """(French label, CSS class) of the last production deploy launched from this page.
+
+    `elsewhere`: a deploy that this page did not start holds the deploy lock.
+    """
+    if job is not None and job.returncode is None:
+        return ("Déploiement en cours…", "busy")
+    if elsewhere:
+        return ("Déploiement déjà en cours (lancé hors de cette page)", "busy")
     if job is None:
         return ("Aucun déploiement lancé depuis cette page", "none")
-    if job.returncode is None:
-        return ("Déploiement en cours…", "busy")
+    if job.interrupted:
+        return ("Déploiement interrompu (la page a redémarré)", "error")
     if job.returncode != 0:
         return ("Échec du déploiement", "error")
     return ("Déployée", "ok")
@@ -60,6 +67,8 @@ def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[
     """(French label, CSS class) of a PR's preview."""
     if job is not None and job.returncode is None:
         return (JOB_BUSY_LABELS[job.action], "busy")
+    if job is not None and job.interrupted:
+        return ("Interrompu (la page a redémarré)", "error")
     if job is not None and job.returncode != 0:
         return (JOB_ERROR_LABELS[job.action], "error")
     if preview is None:
@@ -166,8 +175,10 @@ def render_row(
     )
 
 
-def render_prod(job: Job | None, version: tuple[str, str] | None = None) -> str:
-    label, css = prod_status(job)
+def render_prod(
+    job: Job | None, version: tuple[str, str] | None = None, elsewhere: bool = False
+) -> str:
+    label, css = prod_status(job, elsewhere)
     version_line = ""
     if version is not None:
         version_line = f'<div class="status {version[1]}">{html.escape(version[0])}</div>'
@@ -197,6 +208,7 @@ def render_page(
     reviews: list[ops_review.Review] | None = None,
     review_busy: bool = False,
     prod_version: tuple[str, str] | None = None,
+    deploy_elsewhere: bool = False,
 ) -> str:
     rows = [
         render_row(host, pr["number"], pr, previews.get(pr["number"]), job_by_pr.get(pr["number"]))
@@ -212,6 +224,7 @@ def render_page(
     busy = (
         any(job.returncode is None for job in job_by_pr.values())
         or (prod_job is not None and prod_job.returncode is None)
+        or deploy_elsewhere
         or review_busy
     )
     review_card = "" if reviews is None else ops_review.render_reviews(reviews, review_busy)
@@ -226,7 +239,7 @@ def render_page(
 <div class="top"><div><h1>Previews des PR</h1>
 <p class="lead">Une instance jetable de {html.escape(CONFIG.project_name)} par PR (données de démo), sur le port 9000 + numéro.</p>
 </div><a href="/" class="refresh">Rafraîchir</a></div>
-{render_prod(prod_job, prod_version)}
+{render_prod(prod_job, prod_version, deploy_elsewhere)}
 {review_card}
 {banner}{"".join(rows)}{empty}
 <footer><form method="post" action="/sweep"><button>Retirer les previews des PR fermées</button></form>
