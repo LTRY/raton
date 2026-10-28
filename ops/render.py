@@ -1,15 +1,15 @@
 """The previews page: HTML, CSS and the status labels of the previews, the deploy and the reviews.
 
-Pure functions of their arguments (the server, scripts/previews.py, gathers the data), standard
-library only. Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
+Pure functions of their arguments (the server, ops/server.py, gathers the data), standard
+library only. Spec: ops/docs/outil-ops.md, section "Previews des PR".
 """
 
 import html
 from urllib.parse import urlsplit
 
-from scripts import ops_review
-from scripts.ops_config import CONFIG
-from scripts.ops_jobs import Job, Preview
+from ops import review as ops_review
+from ops.config import CONFIG
+from ops.jobs import Job, Preview
 
 
 def preview_url(host: str | None, port: int) -> str:

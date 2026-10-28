@@ -1,6 +1,6 @@
 ## What
 
-<!-- Every change, one concrete bullet each: the page, button, route or behavior that changes. When the PR spans several areas, group the bullets under the title tags (FRONT, BACK, DB, CI, DOCS). -->
+<!-- Every change, one concrete bullet each: the page, button, route or behavior that changes. When the PR spans several areas, group the bullets under the title tags (FRONT, BACK, DB, CI, OPS, DOCS). -->
 
 ## Why
 

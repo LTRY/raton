@@ -8,7 +8,7 @@ endif
 export MEDIA_HOST_ROOT
 
 # The ops container mounts the repository at this very path (see the `ops` service).
-export RATON_REPO := $(CURDIR)
+export OPS_REPO := $(CURDIR)
 
 # Stamped on the api image (label raton.git-sha): the previews page compares it with origin/main.
 export GIT_SHA := $(shell git rev-parse HEAD 2>/dev/null)
@@ -20,12 +20,12 @@ test:
 	uv run --python 3.14 --extra dev pytest
 
 lint:
-	uv run --python 3.14 --extra dev ruff check back front mcp_server scripts tests alembic
-	uv run --python 3.14 --extra dev ruff format --check back front mcp_server scripts tests alembic
+	uv run --python 3.14 --extra dev ruff check back front mcp_server ops scripts tests alembic
+	uv run --python 3.14 --extra dev ruff format --check back front mcp_server ops scripts tests alembic
 
 format:
-	uv run --python 3.14 --extra dev ruff check --fix back front mcp_server scripts tests alembic
-	uv run --python 3.14 --extra dev ruff format back front mcp_server scripts tests alembic
+	uv run --python 3.14 --extra dev ruff check --fix back front mcp_server ops scripts tests alembic
+	uv run --python 3.14 --extra dev ruff format back front mcp_server ops scripts tests alembic
 
 compose-config:
 	docker compose config
@@ -44,9 +44,9 @@ docs-build:
 ci: css lint test compose-config
 
 # One deploy at a time, the same lock as scripts/deploy.sh and the previews page's button
-# (scripts/deploy_lock.py); a deploy.sh that already holds it runs `make up` without taking it again.
+# (ops/deploy_lock.py); a deploy.sh that already holds it runs `make up` without taking it again.
 up:
-	python3 scripts/deploy_lock.py $(MAKE) --no-print-directory up-locked
+	python3 ops/deploy_lock.py $(MAKE) --no-print-directory up-locked
 
 up-locked:
 	mkdir -p "$(MEDIA_HOST_ROOT)" "$${LOG_HOST_DIR:-.local/logs}"
@@ -76,7 +76,7 @@ demo: css
 	./scripts/demo.sh "$(MEDIA_HOST_ROOT)"
 
 # The raton-ops container (docker-compose.yml, profile `ops`): the page that deploys the PR previews
-# and main (scripts/previews.py, port 8999 on the interface of APP_BIND) and the daily log review.
+# and main (ops/server.py, port 8999 on the interface of APP_BIND) and the daily log review.
 previews:
 	docker compose --profile ops up --build -d ops
 	-docker image prune -f

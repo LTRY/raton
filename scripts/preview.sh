@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The PR previews: one throwaway Raton (back + front, demo data) per pull request, on port
-# 9000 + its number. Driven by hand or by the previews page (scripts/previews.py).
+# 9000 + its number. Driven by hand or by the previews page (ops/server.py).
 #
 #   preview.sh up <pr>     build the PR's current head and (re)start its preview
 #   preview.sh rebase <pr>  rebase the PR's branch on main (GitHub's update-branch, force-pushes it)

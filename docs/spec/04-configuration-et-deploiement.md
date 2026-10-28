@@ -77,8 +77,8 @@ Volumes :
 
 - `postgres_data` pour PostgreSQL ;
 - `${MEDIA_HOST_ROOT:-./.local/media/YouTube}:/media/youtube` ;
-- `/var/run/docker.sock` et le depot lui-meme (`.:${RATON_REPO}`) pour `ops`. Le
-  depot est monte **au meme chemin que sur l'hote** (`RATON_REPO`, positionne
+- `/var/run/docker.sock` et le depot lui-meme (`.:${OPS_REPO}`) pour `ops`. Le
+  depot est monte **au meme chemin que sur l'hote** (`OPS_REPO`, positionne
   par le Makefile) : les montages des fichiers compose qu'`ops` lance sont
   resolus par le Docker de l'hote, les deux cotes doivent donc s'accorder sur
   le chemin. Le journal y est monte en lecture seule ;
@@ -255,24 +255,10 @@ lance `scripts/deploy.sh` en tache de fond. Ce script :
   que ce deploiement va migrer (voir « Previews des PR », « DB »).
 
 **Verrou de deploiement** : un seul deploiement a la fois, qu'il vienne du
-bouton ou d'un `scripts/deploy.sh` lance a la main. `deploy.sh` se relance sous
-`scripts/deploy_lock.py`, qui prend sans attendre un `fcntl.flock` exclusif sur
-`.local/previews/deploy.lock` puis execute le script ; le verrou est tenu tant
-que le deploiement (et ses processus fils) tourne, et le noyau le libere si le
-processus meurt. Si un autre deploiement le tient, `deploy.sh` n'a rien fait
-quand `deploy_lock.py` affiche `Un deploiement est deja en cours : rien n'est
-deploye` et sort avec le code 75. La page lit le meme verrou : quand il est tenu
-par un deploiement qu'elle n'a pas lance, la carte **Production** affiche
-« Deploiement deja en cours (lance hors de cette page) », le bouton est grise
-et un POST sur `/prod/deploy` ne lance rien. `make up` prend le
-meme verrou (sa recette passe par `deploy_lock.py`, cible `up-locked`) ; quand
-`deploy.sh` l'a deja pris, le `make up` qu'il lance le sait par la variable
-`DEPLOY_LOCK_HELD=1` et ne le reprend pas. Un flock ne protege que
-les processus d'un meme noyau : le depot monte dans `raton-ops` par bind mount
-et la machine hote partagent le noyau sous Linux, mais pas avec Docker
-Desktop (macOS, Windows), ou le verrou ne croise pas la frontiere de la VM ;
-ce croisement n'est pas verifie par les tests, qui couvrent deux processus
-d'une meme machine (`tests/test_ops_jobs.py`).
+bouton ou d'un `scripts/deploy.sh` lance a la main ; `make up` prend le meme
+verrou (sa recette passe par `ops/deploy_lock.py`, cible `up-locked`). Le
+fonctionnement est dans `ops/docs/outil-ops.md` (« L'outil ops »), section
+« Verrou de deploiement ».
 
 Le bouton demande une confirmation, est desactive pendant un deploiement, et la
 sortie va dans `.local/previews/logs/prod.log` (lien **Journal**). La carte
@@ -315,129 +301,14 @@ puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make
 
 ## Configuration de l'outil ops
 
-La page des previews, le deploiement de `main` et la revue quotidienne des journaux
-(`scripts/previews.py`, `scripts/ops_review.py`) ne connaissent pas Raton par
-leur code : tout ce qui nomme le projet est lu dans `ops.toml`, a la racine du
-depot (`scripts/ops_config.py`, bibliotheque standard seulement). Un autre
-projet reutilise l'outil en fournissant son propre `ops.toml` et ses scripts.
-
-- `[project] name` : nom affiche dans le titre de la page et la confirmation du
-  deploiement.
-- `[deploy]` : `script` (lance par le bouton **Deployer main en production**),
-  `branch` (suivie pour comparer avec la version deployee), `container` et
-  `sha_label` (conteneur en marche et label de son image qui porte le commit
-  construit ; sans eux, la version deployee reste « inconnue »).
-- `[previews] script` : le script de previews (`up`, `rebase`, `down`, `sweep`,
-  `list`), propre au projet : la base partagee ou copiee, les ports et les
-  reseaux y restent.
-- `[jobs] timeout_minutes` (30 par defaut) : un job de preview ou de deploiement
-  encore en cours apres ce delai est arrete (SIGTERM puis SIGKILL sur tout son
-  groupe de processus), son journal le dit et la page le montre en echec ; sans
-  cela, le bouton resterait grise indefiniment.
-- `[review]` : `skill` (skill Claude Code lance chaque jour), `allowed_tools`
-  (outils en lecture seule), puis les valeurs par defaut `hour`, `hours`,
-  `model`, `max_usd`, que `OPS_REVIEW_HOUR`, `OPS_REVIEW_HOURS`,
-  `OPS_REVIEW_MODEL` et `OPS_REVIEW_MAX_USD` surchargent.
-
-Une cle absente prend la valeur par defaut de `OpsConfig`. Verification :
-`tests/test_ops_config.py`.
-
-### Jobs persistes
-
-L'etat des jobs (un par PR, plus le deploiement de production) est ecrit dans
-`.local/previews/jobs/` : un fichier JSON par job (`pr-<N>.json`, `prod.json`)
-avec `action`, `pr`, `started` (heure de debut), `pid` (le processus du script,
-chef de son groupe), `pid_start` (son heure de demarrage lue dans `/proc`, pour
-reconnaitre un pid reutilise), `returncode` et `interrupted`. Le fichier est
-reecrit (de facon atomique) au lancement, quand le pid est connu et a la fin.
-Au demarrage, la page relit ces fichiers :
-
-- un job termine reste tel quel ;
-- un job « en cours » dont le processus n'existe plus (conteneur redemarre,
-  pid inconnu ou reutilise) devient **interrompu** : `returncode` 1,
-  `interrupted` vrai, une ligne « Interrompu » ajoutee a son journal, et la page
-  montre « Interrompu (la page a redemarre) » / « Deploiement interrompu » en
-  echec, bouton de nouveau actif ;
-- un job dont le processus tourne encore est surveille : il passe a interrompu
-  quand le processus disparait, ou est arrete apres `timeout_minutes`.
-
-Un fichier illisible est ignore et signale sur la sortie du serveur. Le
-journal d'un job (`.local/previews/logs/`) n'est pas touche.
-
-### Contrat du script de previews
-
-`[previews] script` est un executable appele depuis la racine du depot
-(`scripts/ops_jobs.py`) avec l'environnement de la page (`GH_TOKEN`,
-`RATON_REPO`, acces au Docker de l'hote...) ; la page ne lui en fournit pas
-d'autre. Il n'a pas de terminal : il ne lit pas l'entree standard.
-
-| Appel | Role | Sortie |
-|---|---|---|
-| `<script> up <pr>` | construit et lance la preview de la PR | journal du job |
-| `<script> rebase <pr>` | remet la branche de la PR a jour sur la branche principale | journal du job |
-| `<script> down <pr>` | retire la preview de la PR | journal du job |
-| `<script> sweep` | retire les previews des PR qui ne sont plus ouvertes (sans argument) | ignoree |
-| `<script> list` | liste les previews | lue par la page (ci-dessous) |
-
-`<pr>` est un numero de PR, entier decimal. Les sous-commandes `up`, `rebase` et
-`down` tournent comme jobs en arriere-plan (un a la fois par PR), avec stdout et
-stderr dans `.local/previews/logs/pr-<N>.log`.
-
-**Code de retour** : 0 en cas de succes, non nul en cas d'echec, que la page
-montre comme « Echec » (127 : le script n'a pas pu demarrer ; 124 : arrete
-apres `timeout_minutes`). Convention du script fourni : 2 pour un appel
-incorrect (sous-commande inconnue, numero de PR absent ou non numerique), un
-message d'usage sur stderr.
-
-**Format de `list`** : une ligne par preview sur stdout, cinq champs separes
-par des espaces, sans ligne d'entete :
-
-```
-<pr> <port> <commit> <etat> <db>
-31 9031 3f2a9c0d4b1e8a7c6d5e4f3a2b1c0d9e8f7a6b5c running copy
-```
-
-- `pr` : numero de PR, chiffres ASCII ;
-- `port` : port de la preview sur l'hote, de 1 a 65535 ;
-- `commit` : le commit construit, hexadecimal en minuscules (7 a 40 caracteres),
-  ou `-` s'il est inconnu ;
-- `etat` : etat du conteneur (`running`, `exited`, `created`...), minuscules ;
-- `db` : `shared` (DB reelle), `copy` (copie migree) ou `-` si inconnu.
-
-Une sortie vide veut dire aucune preview. Les lignes vides sont ignorees. Toute
-autre ligne qui ne respecte pas ce format, ou qui repete un numero de PR deja
-liste (la premiere est gardee), est **ignoree mais signalee** : la page affiche
-en bandeau « N ligne(s) invalide(s) ignoree(s) (premiere : ... ») et le meme
-texte va sur la sortie du serveur. Un `list` qui sort avec un code non nul,
-qui ne peut pas demarrer ou qui ne repond pas en 30 s (il est alors arrete,
-avec son groupe de processus) est signale de la meme facon (les lignes valides qu'il
-a imprimees sont gardees). `scripts/ops_jobs.py` : `parse_previews` (retourne
-les previews et les lignes invalides), `list_previews`.
-
-`retire-stale` n'est pas appele par la page : c'est le point d'entree de
-`make up` de ce projet. Verification du contrat : `tests/test_ops_jobs.py`
-appelle `scripts/preview.sh` avec un faux `docker` et un faux `gh` (`list`,
-`sweep`, appels incorrects) et teste `parse_previews` sur des lignes valides
-et invalides.
-
-**Cache des lectures** : la page se rafraichit toutes les 4 s pendant un job.
-La liste des PR (`gh`), le commit deploye (`docker inspect`) et le retard sur
-`origin/main` sont gardes 15 s (`CACHE_TTL`), le `git fetch` 30 s ; le lien
-**Rafraichir** (`/?refresh=1`) et la fin d'un job les relisent aussitot. La liste
-des previews (`list`) n'est pas mise en cache.
-
-**Jeton de la page** : la page peut deployer en production depuis un conteneur
-root qui pilote Docker. Par defaut elle est ouverte, comme Raton (LAN de
-confiance). Avec `OPS_TOKEN` dans le `.env`, chaque requete (page, journaux,
-actions) doit porter ce jeton comme mot de passe d'une authentification HTTP
-Basic (nom d'utilisateur libre) ; le navigateur le demande une fois. Sans jeton
-et avec une interface autre que loopback, la page affiche un avertissement au
-demarrage. Le jeton ne vit pas dans `ops.toml` (versionne).
-
-**Code** : `scripts/ops_jobs.py` (PR, previews, lancement des scripts en
-arriere-plan, jobs persistes), `scripts/deploy_lock.py` (verrou de deploiement), `scripts/ops_render.py` (HTML et libelles d'etat),
-`scripts/previews.py` (serveur, jeton), `scripts/ops_review.py` (revue des
-journaux). Le linter (`make lint`, `make format`) couvre `scripts/`.
+La page des previews, le deploiement de `main` et la revue quotidienne des
+journaux sont l'outil `ops/` (`ops/server.py`, `ops/review.py`), decrit dans
+`ops/docs/outil-ops.md` (« L'outil ops ») : configuration `ops.toml`, contrat du
+script de previews, jobs persistes, verrou de deploiement, jeton. Raton fournit le
+contrat : `ops.toml` (a la racine), `scripts/preview.sh`, `scripts/deploy.sh`,
+`docker-compose.preview.yml` et le service `ops` du compose (`make previews`).
+Verification : `tests/test_ops_toml.py` controle que les scripts nommes par
+`ops.toml` existent.
 
 ## Previews des PR
 
@@ -447,7 +318,7 @@ sans jamais migrer la DB reelle. Elle se deploie a la main, depuis une page web 
 le merge ne deploie rien.
 
 - **Page des previews** : `make previews` construit et lance le conteneur
-  `raton-ops` (voir « Docker Compose »), qui sert `scripts/previews.py`
+  `raton-ops` (voir « Docker Compose »), qui sert `ops/server.py`
   (bibliotheque standard Python seulement) sur le port `8999` (`PREVIEWS_PORT`),
   sur l'interface d'`APP_BIND` du `.env`. `gh` y est authentifie par `GH_TOKEN`
   (`.env`), qui sert aussi a git en HTTPS (`git fetch origin main`), avec un
@@ -524,7 +395,7 @@ le merge ne deploie rien.
   donc seules les PR du depot lui-meme ont une preview.
 
 `make compose-config` valide aussi `docker-compose.preview.yml`. Les fonctions
-de la page sont testees dans `tests/test_previews_page.py`.
+de la page sont testees dans `ops/tests/test_previews_page.py`.
 
 ## Conventions de nommage des PR
 
@@ -538,6 +409,7 @@ crochets, puis un resume court a l'imperatif, en anglais :
 | `[BACK]` | routes, services, modeles, scheduler, API JSON, logique metier |
 | `[DB]` | migration Alembic ou changement de schema (souvent avec `[BACK]`) |
 | `[CI]` | workflows GitHub, `scripts/`, Makefile, Docker |
+| `[OPS]` | l'outil `ops/` (page des previews, lancement du deploiement, revue des journaux), son code, ses tests et sa spec ; le contrat que Raton lui donne reste `[CI]` |
 | `[DOCS]` | uniquement `docs/spec/` ou commentaires, sans changement de comportement |
 
 Regles :
@@ -558,7 +430,7 @@ Regles :
 - la description est en anglais (les termes du glossaire restent tels quels),
   suit `.github/pull_request_template.md` et reste concrete : « What »
   (une puce par changement, sans limite : page, bouton, route, comportement ;
-  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `DOCS` quand la PR en
+  groupees par etiquette `FRONT`, `BACK`, `DB`, `CI`, `OPS`, `DOCS` quand la PR en
   touche plusieurs), « Why » (une phrase), « How » (l'approche en quelques
   puces : ou vit la regle, ce qui est deplace ou remplace, les compromis),
   et les captures d'ecran pour tout

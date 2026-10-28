@@ -7,7 +7,7 @@ Usage: scripts/check_pr_title.py "<title>"      (exit 0 = valid, 1 = invalid, re
 import re
 import sys
 
-TAGS = ("FRONT", "BACK", "DB", "CI", "DOCS")
+TAGS = ("FRONT", "BACK", "DB", "CI", "OPS", "DOCS")
 MAX_SUMMARY = 72
 TITLE_RE = re.compile(r"^((?:\[[A-Z]+\])+) (.+)$")
 TYPE_PREFIX_RE = re.compile(

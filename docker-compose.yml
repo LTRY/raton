@@ -95,11 +95,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # The repository at its host path: the bind mounts of the compose files it runs are
-      # resolved by the host's Docker, so both sides must agree on the path (RATON_REPO is set by the Makefile).
-      - .:${RATON_REPO:-/raton}
+      # resolved by the host's Docker, so both sides must agree on the path (OPS_REPO is set by the Makefile).
+      - .:${OPS_REPO:-/project}
       - ${LOG_HOST_DIR:-./.local/logs}:/var/log/raton:ro
     environment:
-      RATON_REPO: ${RATON_REPO:-}
+      OPS_REPO: ${OPS_REPO:-}
       LOG_DIR: /var/log/raton
       TZ: ${TZ:-Europe/Paris}
       # gh and git over HTTPS (previews, fetch of origin/main).

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Deploys main to the real stack: fast-forwards this checkout to origin/main, then `make up`.
 # Driven by hand or by the "Déployer main en production" button of the previews page
-# (scripts/previews.py).
+# (ops/server.py).
 # Refuses a checkout that is not on main or has modified tracked files: `make up` builds this
 # directory, so it would ship (or the merge would clobber) someone's uncommitted work.
-# One deploy at a time: it runs under the file lock of scripts/deploy_lock.py, shared with the
+# One deploy at a time: it runs under the file lock of ops/deploy_lock.py, shared with the
 # button, and exits 75 when another deploy holds it.
 # Spec: docs/spec/04-configuration-et-deploiement.md, section "Deploiement de main".
 set -euo pipefail
@@ -16,7 +16,7 @@ deploy() {
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   cd "$(dirname "$self")/.."
   if [ -z "${DEPLOY_LOCK_HELD:-}" ]; then
-    exec python3 scripts/deploy_lock.py "$self" "$@"
+    exec python3 ops/deploy_lock.py "$self" "$@"
   fi
   local branch
   branch="$(git rev-parse --abbrev-ref HEAD)"

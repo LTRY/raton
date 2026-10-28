@@ -1,14 +1,14 @@
 import time
 
-from scripts.ops_jobs import Job, Preview, parse_previews
-from scripts.ops_render import (
+from ops.jobs import Job, Preview, parse_previews
+from ops.render import (
     preview_status,
     preview_url,
     prod_status,
     render_page,
     version_status,
 )
-from scripts.previews import same_origin
+from ops.server import same_origin
 
 OPEN_PR = {
     "number": 31,
@@ -106,14 +106,14 @@ def test_prod_status_reports_the_last_deploy():
 def test_scripts_run_by_the_previews_page_are_executable():
     import os
 
-    from scripts.ops_jobs import DEPLOY_SH, PREVIEW_SH
+    from ops.jobs import DEPLOY_SH, PREVIEW_SH
 
     for script in (DEPLOY_SH, PREVIEW_SH):
         assert os.access(script, os.X_OK), f"{script} must be executable (git mode 100755)"
 
 
 def test_a_script_that_cannot_start_ends_the_job_with_an_error(tmp_path):
-    from scripts.ops_jobs import run_in_background
+    from ops.jobs import run_in_background
 
     job = Job("deploy", 0.0)
     log_file = tmp_path / "prod.log"
@@ -154,7 +154,7 @@ def test_production_card_shows_the_version_line():
 
 
 def test_a_job_that_never_ends_is_stopped_with_its_children(tmp_path):
-    from scripts.ops_jobs import run_in_background
+    from ops.jobs import run_in_background
 
     script = tmp_path / "slow.sh"
     script.write_text("#!/bin/sh\nsleep 60 &\nwait\n")
@@ -174,7 +174,7 @@ def test_a_job_that_never_ends_is_stopped_with_its_children(tmp_path):
 def test_the_page_asks_for_the_token_only_when_one_is_set():
     from base64 import b64encode
 
-    from scripts.previews import authorized
+    from ops.server import authorized
 
     def basic(user_and_password: str) -> str:
         return "Basic " + b64encode(user_and_password.encode()).decode()

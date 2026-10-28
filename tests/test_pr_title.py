@@ -18,6 +18,7 @@ _SPEC.loader.exec_module(check_pr_title)
         "[BACK][DB] Add the playlist position column",
         "[FRONT][BACK][DB] Add the playlist position",
         "[DOCS] Clarify the glossary",
+        "[OPS] Move the previews page into ops/",
         "[CI] " + "A" * 72,
     ],
 )

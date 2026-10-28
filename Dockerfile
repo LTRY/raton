@@ -68,7 +68,7 @@ RUN apt-get update \
 COPY --chown=raton:raton alembic.ini ./
 COPY --chown=raton:raton alembic ./alembic
 COPY --chown=raton:raton back ./back
-# The commit this image was built from, read by the previews page (scripts/previews.py) to tell
+# The commit this image was built from, read by the previews page (ops/server.py) to tell
 # whether the deployed main is up to date with origin/main. Last, so a new commit only rebuilds this layer.
 ARG GIT_SHA=unknown
 LABEL raton.git-sha=$GIT_SHA
@@ -111,7 +111,7 @@ RUN apt-get update \
 COPY --from=docker:28-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker:28-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
-# Claude Code CLI, for the review-logs skill (scripts/ops_review.py).
+# Claude Code CLI, for the review-logs skill (ops/review.py).
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # The repository belongs to the host user, not to root; GH_TOKEN (env) authenticates git over HTTPS.
@@ -124,4 +124,4 @@ RUN git config --global --add safe.directory '*' \
 
 WORKDIR /app
 EXPOSE 8999
-CMD ["sh", "-c", "[ -n \"$RATON_REPO\" ] || { echo 'RATON_REPO is empty: start it with make previews' >&2; exit 1; }; cd \"$RATON_REPO\" && exec python -m scripts.previews --host 0.0.0.0 --scheduler"]
+CMD ["sh", "-c", "[ -n \"$OPS_REPO\" ] || { echo 'OPS_REPO is empty: start it with make previews' >&2; exit 1; }; cd \"$OPS_REPO\" && exec python -m ops.server --host 0.0.0.0 --scheduler"]

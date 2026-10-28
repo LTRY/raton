@@ -251,7 +251,7 @@ Le conteneur `raton-ops` (voir [04 Configuration et deploiement](04-configuratio
 intervention. Ce n'est pas un job de `api` : le scheduler APScheduler du back
 n'y participe pas, et le journal est lu en lecture seule.
 
-- **Planification** : un fil de `scripts/ops_review.py` verifie l'heure toutes les 30 s
+- **Planification** : un fil de `ops/review.py` verifie l'heure toutes les 30 s
   et lance la revue des qu'il est `OPS_REVIEW_HOUR` (8 par defaut, fuseau `TZ`,
   Europe/Paris par defaut) et qu'aucune revue planifiee n'existe pour la date
   du jour. Comme il regarde l'horloge au lieu de dormir jusqu'a 8 h, il rattrape
@@ -260,7 +260,7 @@ n'y participe pas, et le journal est lu en lecture seule.
 - **Execution** : `claude --bare -p "/review-logs 24"` dans le depot, donc le
   skill `review-logs` (`.claude/skills/review-logs/`) sans copie de ses
   consignes ; le nom du skill, les outils autorises et les valeurs par defaut
-  viennent de `ops.toml` (voir « Configuration de l'outil ops » dans 04). `--bare` ignore les hooks du depot et n'accepte que
+  viennent de `ops.toml` (voir « Configuration de l'outil ops » dans `ops/docs/outil-ops.md`). `--bare` ignore les hooks du depot et n'accepte que
   `ANTHROPIC_API_KEY` ; le skill lit le journal dans `LOG_DIR`. Les outils sont
   limites a la lecture (`Read`, le digest, `jq`, `grep`, `ls`, `head`, `tail`,
   `docker ps`/`docker compose logs`) ; `--max-budget-usd` plafonne une revue
@@ -278,7 +278,7 @@ n'y participe pas, et le journal est lu en lecture seule.
   absente ou un CLI qui echoue est enregistre comme une revue en echec, avec la
   raison.
 
-Verification : `tests/test_ops_review.py`.
+Verification : `ops/tests/test_ops_review.py`.
 
 ## Nombre de vues des videos
 
