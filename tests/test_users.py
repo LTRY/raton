@@ -112,24 +112,24 @@ def test_deleting_a_user_deletes_what_was_theirs_and_keeps_the_fiches(api, db):
     )
 
 
-def test_the_home_drawer_user_button_opens_the_user_page(db):
-    user_id(db)
-    add_user(db, "Invité")
-
-    page = site_client().get("/").text
-
-    assert 'class="chat-user-button" href="/user" aria-label="Paramètres de Moi"' in page
-    # The button sits in the drawer's bottom row, next to "Nouvelle discussion".
-    foot = page[page.index('class="chat-drawer-foot"') :]
-    assert foot.index("chat-user-button") < foot.index("Nouvelle discussion")
-
-
-def test_the_user_page_switches_renames_and_sets_ratons_language(db):
+def test_the_user_settings_are_on_the_settings_page_not_in_the_home_drawer(db):
     user_id(db)
     add_user(db, "Invité")
     site = site_client()
 
-    page = site.get("/user").text
+    assert "/user" not in site.get("/").text.replace("/users", "")
+    page = site.get("/settings").text
+    # The user part comes first and is not admin; the admin part is, hidden on a phone.
+    assert page.index('id="switch"') < page.index('class="settings-form settings-admin"')
+    assert 'id="switch"' not in page[page.index('class="settings-form settings-admin"') :]
+
+
+def test_the_settings_page_switches_renames_and_sets_ratons_language(db):
+    user_id(db)
+    add_user(db, "Invité")
+    site = site_client()
+
+    page = site.get("/settings").text
     assert page.count('action="/users/switch"') == 2
     assert 'aria-current="true" disabled' in page
     assert 'class="chat-user-add" method="post" action="/users"' in page
@@ -137,26 +137,25 @@ def test_the_user_page_switches_renames_and_sets_ratons_language(db):
 
     renamed = site.post(
         f"/users/{user_id(db)}/rename",
-        data={"name": "Léa", "next": "/user"},
+        data={"name": "Léa", "next": "/settings"},
         follow_redirects=False,
     )
-    assert renamed.headers["location"].startswith("/user?")
+    assert renamed.headers["location"].startswith("/settings?")
     saved = site.post(
         "/user", data={"raton_address": "tu", "raton_nickname": " Chef "}, follow_redirects=False
     )
-    assert saved.headers["location"].startswith("/user?")
-    page = site.get("/user").text
-    assert "<h1>Léa</h1>" in page
+    assert saved.headers["location"].startswith("/settings?")
+    page = site.get("/settings").text
+    assert "<h2>Léa</h2>" in page
     assert 'value="tu" checked' in page
     assert 'value="Chef"' in page
 
 
-def test_the_user_page_sets_the_screen_time_limits(db):
+def test_the_settings_page_sets_the_screen_time_limits(db):
     user_id(db)
     site = site_client()
 
-    assert 'name="screen_time_video_today"' in site.get("/user").text
-    assert 'id="screen-time"' not in site.get("/settings").text
+    assert 'name="screen_time_video_today"' in site.get("/settings").text
     saved = site.post(
         "/user",
         data={
@@ -168,7 +167,7 @@ def test_the_user_page_sets_the_screen_time_limits(db):
         follow_redirects=False,
     )
 
-    assert saved.headers["location"].startswith("/user?")
+    assert saved.headers["location"].startswith("/settings?")
     limits = TestClient(app).get("/api/settings").json()["screen_time_limits"]
     assert {kind: limits[kind]["today"] for kind in limits} == {
         "video": 45,
@@ -232,16 +231,15 @@ def test_adding_a_user_from_the_menu_switches_to_them(db):
     assert "set-cookie" not in refused.headers
 
 
-def test_user_page_offers_the_deletion_and_deleting_oneself_goes_back_to_the_default(db):
+def test_the_settings_page_offers_the_deletion_and_deleting_oneself_goes_back_to_the_default(db):
     user_id(db)
     other = add_user(db, "Invité")
     client = site_client()
     client.cookies.set("raton_user", str(other.id))
 
-    page = client.get("/user").text
+    page = client.get("/settings").text
     deleted = client.post(f"/users/{other.id}/delete", follow_redirects=False)
 
     assert f'action="/users/{other.id}/delete"' in page and 'action="/users/1/delete"' in page
-    assert 'id="utilisateurs"' not in client.get("/settings").text
     assert deleted.headers["location"].startswith("/settings?message=")
     assert 'raton_user=""' in deleted.headers["set-cookie"]

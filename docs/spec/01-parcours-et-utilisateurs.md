@@ -17,22 +17,25 @@ d'avant les utilisateurs appartiennent au premier, « Moi ».
 
 ### Changer d'utilisateur
 
-1. Sur l'accueil `/`, l'utilisateur ouvre le tiroir « Discussions » (☰).
-2. En bas a gauche, le bouton rond porte l'initiale de l'utilisateur courant ;
-   il ouvre sa page `/user` (« Paramètres de l'utilisateur »), qui liste les
-   utilisateurs sous « Changer d'utilisateur ».
+1. L'utilisateur ouvre les Parametres `/settings` (lien « Paramètres » de la
+   barre du haut, onglet Reglages du telephone).
+2. En tete de page, sous son initiale et son nom, la carte « Changer
+   d'utilisateur » liste les utilisateurs.
 3. Choisir un nom recharge l'accueil pour lui : ses discussions, sa phrase de
    Raton, et sur les autres pages ses Nouveautes, son historique, ses notes et
    ses playlists. Le choix est garde par le navigateur.
 4. « Nouvel utilisateur » + « Ajouter » cree un utilisateur et le choisit.
-5. Se renommer : carte « Nom » de `/user` ; renommer ou supprimer n'importe
-   quel utilisateur : section « Utilisateurs » de `/settings`.
+5. Se renommer : carte « Nom » ; supprimer un utilisateur : bouton
+   « Supprimer » de sa ligne dans « Changer d'utilisateur ».
 
 ### Paramètres de l'utilisateur
 
-La page `/user` porte ce qui est propre a l'utilisateur courant : son nom, le
-changement d'utilisateur, la facon dont Raton lui parle dans le chat
-bibliotheque (tutoiement ou vouvoiement, surnom) et son couvre-feu.
+Le haut des Parametres `/settings` porte ce qui est propre a l'utilisateur
+courant : son nom, le changement d'utilisateur, la facon dont Raton lui parle
+dans le chat bibliotheque (tutoiement ou vouvoiement, surnom), ses limites de
+temps d'ecran et son couvre-feu. Sur telephone, la page ne montre que cette
+partie ; le reste (reglages de la bibliotheque, couts, scan) est
+d'administration et ne s'affiche que sur ordinateur.
 
 ## Parcours principaux
 

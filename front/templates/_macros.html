@@ -111,10 +111,6 @@
         <p class="chat-drawer-label" data-chat-recent-label>Récents</p>
         <ul class="chat-drawer-list" data-chat-conversations-list></ul>
         <div class="chat-drawer-foot">
-          {% if config.userMenu %}
-          {# Where a chat app puts its account button: the user's own page (front/routes/users.py). #}
-          <a class="chat-user-button" href="/user" aria-label="Paramètres de {{ config.userMenu.current.name }}" title="{{ config.userMenu.current.name }}">{{ config.userMenu.current.initial }}</a>
-          {% endif %}
           <button type="button" class="chat-drawer-new" data-chat-drawer-new>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             <span>Nouvelle discussion</span>
