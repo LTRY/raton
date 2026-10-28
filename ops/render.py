@@ -118,9 +118,12 @@ button.primary, .open { background: var(--accent); border-color: var(--accent); 
 button:disabled { opacity: .5; cursor: default; }
 .log { font-size: 13px; color: var(--muted); }
 .reviews { margin: 6px 0 0; padding-left: 18px; }
-.alert { flex-basis: 100%; background: var(--warn-bg); border: 1px solid var(--warn-line);
-  border-left-width: 5px; border-radius: 10px; padding: 10px 12px; }
-.alert p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.alert { flex-basis: 100%; }
+.alert-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; color: var(--busy); }
+.alert-head strong { font-size: 15px; }
+.alert-count { background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 999px; padding: 0 10px;
+  font-size: 12px; font-weight: 700; }
+.alert p { margin: 4px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 .board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; align-items: start;
   overflow-x: auto; margin-bottom: 18px; padding-bottom: 6px; }
 .col { background: var(--col); border: 1px solid var(--line); border-radius: 12px; padding: 10px;
@@ -314,9 +317,12 @@ def render_behind_alert(
     if version[1] != "stale":
         return ""
     graph = render_graph(pending, deployed, behind, CONFIG.deploy_branch) if pending else ""
+    n = behind or len(pending or [])
+    count = f"{n} commit{'s' if n > 1 else ''} de retard" if n else "version différente"
     return (
-        '<div class="alert"><p><strong>La production est en retard.</strong> '
-        f"Ce qui est mergé sur {html.escape(CONFIG.deploy_branch)} n'est pas encore en ligne "
+        '<div class="alert"><div class="alert-head"><strong>⚠ La production est en retard</strong>'
+        f'<span class="alert-count">{count}</span></div>'
+        f"<p>Ce qui est mergé sur {html.escape(CONFIG.deploy_branch)} n'est pas encore en ligne "
         "tant qu'il n'est pas déployé : utilisez « Déployer main en production ». "
         f"{html.escape(version[0])}</p>{graph}</div>"
     )
