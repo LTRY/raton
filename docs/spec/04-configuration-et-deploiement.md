@@ -339,8 +339,10 @@ le merge ne deploie rien.
   quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
   preview), **Preview deployee** (preview construite ou en construction) et
   **Merger** (les 5 dernieres PR mergees, en lecture seule). Glisser une
-  tuile sur une colonne (ou le menu **Deplacer** de la tuile, sans JavaScript :
-  formulaire `POST /prs/<N>/move`, champ `to`) agit sur la PR avec `gh` :
+  tuile sur une colonne (souris : glisser directement ; tactile : appui long,
+  un balayage plus rapide fait defiler ; evenements `pointer`, car le
+  glisser-deposer HTML5 ne marche pas au doigt ; requete `POST /prs/<N>/move`,
+  champ `to`) agit sur la PR avec `gh` :
   vers **Draft**, `gh pr ready --undo` ; vers **PR a traiter**, sortie du draft
   et retrait de la preview s'il y en a une ; vers **Preview deployee**, sortie
   du draft puis `up` ; vers **Merger**, apres confirmation, `gh pr merge

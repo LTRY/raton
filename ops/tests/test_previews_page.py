@@ -209,7 +209,8 @@ def test_board_sorts_prs_into_draft_todo_and_preview_columns():
     assert "Prête" in column(page, "todo")
     assert "Déployée" in column(page, "preview")
     assert "Déjà mergée" in column(page, "merged")
-    assert 'draggable="true"' not in column(page, "merged")  # a merged PR does not move
+    assert "data-pr=" not in column(page, "merged")  # a merged PR does not move
+    assert 'data-pr="40"' in column(page, "draft")
 
 
 def test_a_building_preview_already_sits_in_the_preview_column():
@@ -218,14 +219,13 @@ def test_a_building_preview_already_sits_in_the_preview_column():
     assert "Une PR &lt;ouverte&gt;" in column(page, "preview")
 
 
-def test_cards_offer_a_no_javascript_move_to_the_other_columns():
-    page = render_page("h", [{**OPEN_PR, "isDraft": True}], {}, {}, None)
+def test_only_cards_of_the_repository_can_be_dragged():
+    page = render_page("h", [{**OPEN_PR, "isCrossRepository": True}], {}, {}, None)
 
-    assert page.count('action="/prs/31/move"') == 3  # every column but the current one
-    assert 'name="to" value="draft"' not in column(page, "draft")
-    assert "confirm(&#39;Merger la PR ?&#39;)" in page  # merging asks first
-    fork = render_page("h", [{**OPEN_PR, "isCrossRepository": True}], {}, {}, None)
-    assert "/prs/31/move" not in fork  # a fork is read-only: no move, no drag
+    assert 'data-pr="31"' not in page  # a fork is read-only: no drag
+    assert "/prs/31/move" not in page
+    assert "Déplacer" not in page  # no menu: moving is dragging only
+    assert "/prs/' + card.dataset.pr + '/move" in render_page("h", [], {}, {}, None)
 
 
 def test_orphan_previews_stay_outside_the_board():

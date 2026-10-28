@@ -138,12 +138,13 @@ button:disabled { opacity: .5; cursor: default; }
 .col h2 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .col .hint { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
 .count { font-size: 12px; font-weight: 600; background: var(--chip); border-radius: 999px; padding: 0 8px; }
-.card { display: block; cursor: grab; margin-bottom: 8px; }
-.card.dragging { opacity: .4; }
+.card { display: block; margin-bottom: 8px; }
+.card[data-pr] { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.card.dragging { opacity: .35; }
+.ghost { position: fixed; z-index: 10; pointer-events: none; margin: 0; box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  transform: rotate(2deg); }
 .card .actions { margin-top: 8px; }
 .card.done { cursor: default; opacity: .8; }
-.move summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-.move .actions { margin-top: 6px; }
 @media (max-width: 760px) { .board { grid-template-columns: repeat(4, 78vw); } }
 footer { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   color: var(--muted); font-size: 13px; }
@@ -167,22 +168,6 @@ def column_of(pr: dict, preview: Preview | None, job: Job | None) -> str:
         return "draft"
     building = job is not None and job.action == "up" and job.returncode is None
     return "preview" if preview is not None or building else "todo"
-
-
-def render_move(number: int, current: str) -> str:
-    """No-JavaScript way to move a card: one button per other column."""
-    buttons = []
-    for key, name, _ in BOARD_COLUMNS:
-        if key == current:
-            continue
-        confirm = ""
-        if key == "merged":
-            confirm = ' onsubmit="return confirm(&#39;Merger la PR ?&#39;)"'
-        buttons.append(
-            f'<form method="post" action="/prs/{number}/move"{confirm}>'
-            f'<input type="hidden" name="to" value="{key}"><button>{html.escape(name)}</button></form>'
-        )
-    return f'<details class="move"><summary>Déplacer</summary><div class="actions">{"".join(buttons)}</div></details>'
 
 
 def render_row(
@@ -234,10 +219,8 @@ def render_row(
     port = f" · port {preview.port}" if preview is not None else ""
     if preview is not None and preview.db in DB_LABELS:
         port += f" · {DB_LABELS[preview.db]}"
-    if column is not None and not pr.get("isCrossRepository"):
-        actions.append(render_move(number, column))
     card = (
-        f'<div class="pr card" draggable="true" data-pr="{number}">'
+        f'<div class="pr card" data-pr="{number}">'
         if column is not None and not pr.get("isCrossRepository")
         else '<div class="pr">'
     )
@@ -259,25 +242,59 @@ def render_merged(pr: dict) -> str:
     )
 
 
-# Drag and drop of a card onto a column posts the same form as the "Déplacer" buttons.
+# Dragging a card onto a column posts to /prs/<N>/move. Pointer events rather than HTML5 drag and
+# drop, which does not work with a finger on a phone: a mouse drags after a few pixels, a finger
+# after a long press (a quicker swipe still scrolls the page or the board).
 BOARD_SCRIPT = """
 (function () {
-  var dragged = null;
-  document.querySelectorAll('.card[draggable]').forEach(function (card) {
-    card.addEventListener('dragstart', function (e) {
-      dragged = card; card.classList.add('dragging'); e.dataTransfer.setData('text/plain', card.dataset.pr);
-    });
-    card.addEventListener('dragend', function () { card.classList.remove('dragging'); });
-  });
-  document.querySelectorAll('.col').forEach(function (col) {
-    col.addEventListener('dragover', function (e) { if (dragged) { e.preventDefault(); col.classList.add('over'); } });
-    col.addEventListener('dragleave', function () { col.classList.remove('over'); });
-    col.addEventListener('drop', function (e) {
-      e.preventDefault(); col.classList.remove('over');
-      if (!dragged || dragged.closest('.col') === col) return;
-      if (col.dataset.col === 'merged' && !confirm('Merger la PR ?')) return;
-      fetch('/prs/' + dragged.dataset.pr + '/move', {method: 'POST', body: new URLSearchParams({to: col.dataset.col})})
-        .then(function () { location.reload(); });
+  var HOLD_MS = 350, SLOP = 8;
+  document.querySelectorAll('.card[data-pr]').forEach(function (card) {
+    card.addEventListener('pointerdown', function (e) {
+      if (e.button || e.target.closest('.actions')) return;
+      var x0 = e.clientX, y0 = e.clientY, touch = e.pointerType !== 'mouse';
+      var ghost = null, over = null, timer = null, offX = x0 - card.getBoundingClientRect().left;
+      var offY = y0 - card.getBoundingClientRect().top;
+      function colAt(x, y) { var el = document.elementFromPoint(x, y); return el && el.closest('.col'); }
+      function start() {
+        ghost = card.cloneNode(true); ghost.classList.add('ghost');
+        ghost.style.width = card.offsetWidth + 'px'; document.body.appendChild(ghost);
+        card.classList.add('dragging'); move(x0, y0);
+      }
+      function move(x, y) {
+        ghost.style.left = (x - offX) + 'px'; ghost.style.top = (y - offY) + 'px';
+        var col = colAt(x, y);
+        if (over && over !== col) over.classList.remove('over');
+        if (col) col.classList.add('over');
+        over = col;
+      }
+      function onMove(ev) {
+        if (!ghost) {
+          if (Math.abs(ev.clientX - x0) + Math.abs(ev.clientY - y0) < SLOP) return;
+          if (touch) return finish(true);
+          start();
+        }
+        move(ev.clientX, ev.clientY);
+      }
+      function blockScroll(ev) { if (ghost) ev.preventDefault(); }
+      function finish(cancel) {
+        clearTimeout(timer);
+        document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onCancel); document.removeEventListener('touchmove', blockScroll);
+        if (!ghost) return;
+        ghost.remove(); card.classList.remove('dragging');
+        if (over) over.classList.remove('over');
+        if (cancel || !over || over === card.closest('.col')) return;
+        if (over.dataset.col === 'merged' && !confirm('Merger la PR ?')) return;
+        fetch('/prs/' + card.dataset.pr + '/move', {method: 'POST', body: new URLSearchParams({to: over.dataset.col})})
+          .then(function () { location.reload(); });
+      }
+      function onUp() { finish(false); }
+      function onCancel() { finish(true); }
+      document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onCancel);
+      document.addEventListener('touchmove', blockScroll, {passive: false});
+      if (touch) timer = setTimeout(start, HOLD_MS);
+      else e.preventDefault();
     });
   });
 })();
