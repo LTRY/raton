@@ -338,7 +338,8 @@ le merge ne deploie rien.
   en retard » quand la PR a recu des commits depuis, « Echec du deploiement »)
   et les boutons **Ouvrir** et **Retirer** (le deploiement se fait en glissant la tuile, ci-dessous). En
   haut de la page : **Rafraichir** et la carte **Production** (« Deploiement de
-  main » ci-dessus). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
+  main » ci-dessus). La page est toujours en **mode sombre** (palette fixe,
+  independante du reglage du systeme). Les PR ouvertes sont des tuiles d'un **tableau kanban** a
   quatre colonnes : **Draft** (PR en draft), **PR a traiter** (prete, sans
   preview), **Preview deployee** (preview construite ou en construction) et
   **Merger** (les 5 dernieres PR mergees, en lecture seule). Glisser une

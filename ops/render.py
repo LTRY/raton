@@ -82,12 +82,9 @@ def preview_status(pr: dict, preview: Preview | None, job: Job | None) -> tuple[
 
 
 STYLE = """
-:root { color-scheme: light dark; --bg: #f7f7f5; --card: #fff; --text: #1d1d1f; --muted: #6b6b70;
-  --line: #e2e2e0; --ok: #1f7a3a; --busy: #8a5a00; --error: #b3261e; --accent: #2457c5;
-  --col: #eeeeea; --warn-bg: #fff4e5; --warn-line: #e8b04a; --chip: #e6ecfa; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161618; --card: #1f1f22; --text: #ececee;
-  --muted: #9a9aa0; --line: #2e2e33; --ok: #5cc27a; --busy: #e0a83a; --error: #f07b72; --accent: #7aa2ff;
-  --col: #1a1a1d; --warn-bg: #2a2114; --warn-line: #8a5a00; --chip: #25324f; } }
+:root { color-scheme: dark; --bg: #0f1115; --card: #181b21; --text: #e8eaf0; --muted: #8b90a0;
+  --line: #272b34; --ok: #5cc27a; --busy: #e0a83a; --error: #f07b72; --accent: #6b93ff; --on-accent: #0b1220;
+  --col: #13161b; --warn-bg: #2a2114; --warn-line: #8a5a00; --chip: #222b44; }
 html, body { overflow-x: clip; }
 body { margin: 0; background: var(--bg); color: var(--text);
   font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -114,7 +111,7 @@ h2 { font-size: 16px; margin: 0; }
 form { margin: 0; }
 button, .open, .refresh { font: inherit; font-size: 14px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
   border: 1px solid var(--line); background: var(--card); color: var(--text); text-decoration: none; }
-button.primary, .open { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary, .open { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 button:disabled { opacity: .5; cursor: default; }
 .log { font-size: 13px; color: var(--muted); }
 .reviews { margin: 6px 0 0; padding-left: 18px; }

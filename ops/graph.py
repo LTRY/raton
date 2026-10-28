@@ -15,7 +15,7 @@ from ops.jobs import Commit
 TITLE_TAGS = re.compile(r"((?:\[[A-Za-z]+\])+)\s*(.*?)(?:\s*\(#(\d+)\))?")
 
 STYLE = """
-.graph { --g-bg: #15171c; --g-line: #2a2d36; --g-text: #e8eaf0; --g-muted: #8b90a0;
+.graph { --g-bg: #0a0c10; --g-line: #272b34; --g-text: #e8eaf0; --g-muted: #8b90a0;
   position: relative; margin-top: 12px; padding: 10px 12px; background: var(--g-bg); color: var(--g-text);
   border: 1px solid var(--g-line); border-radius: 12px; overflow: hidden; }
 .graph::before { content: ""; position: absolute; left: 29px; top: 26px; bottom: 26px; width: 2px;
