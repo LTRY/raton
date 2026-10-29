@@ -206,7 +206,7 @@ struct ChannelView: View {
                 .font(.system(size: 20))
                 .foregroundStyle(isOn ? Theme.primary : Theme.textMuted)
                 .frame(width: 48, height: 48)
-                .glass(in: RoundedRectangle(cornerRadius: 16, style: .continuous),
+                .surface(in: RoundedRectangle(cornerRadius: 16, style: .continuous),
                        tint: isOn ? Theme.primary : nil, interactive: true)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -244,7 +244,7 @@ struct ChannelView: View {
             .accessibilityLabel("Retirer la note")
         }
         .frame(maxWidth: .infinity).frame(height: 48)
-        .glass(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .surface(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func moreMenu(_ api: RatonAPI) -> some View {
@@ -267,7 +267,7 @@ struct ChannelView: View {
             Image(systemName: "ellipsis").font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .frame(width: 48, height: 48)
-                .glass(in: RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true)
+                .surface(in: RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true)
         }
         .accessibilityLabel("Plus d'actions")
     }
@@ -293,13 +293,13 @@ struct ChannelView: View {
                 ForEach(shown, id: \.self) { keyword in
                     Text(keyword).font(.raton(13, .semibold)).foregroundStyle(Theme.textSoft)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .glass(in: Capsule())
+                        .surface(in: Capsule())
                 }
                 if keywords.count > 5 {
                     Button(keywordsOpen ? "Moins" : "+\(keywords.count - 5)") { keywordsOpen.toggle() }
                         .font(.raton(13, .semibold)).foregroundStyle(Theme.primary)
                         .padding(.horizontal, 10).padding(.vertical, 5)
-                        .glass(in: Capsule(), tint: Theme.primary, interactive: true)
+                        .surface(in: Capsule(), tint: Theme.primary, interactive: true)
                 }
             }
             .padding(.horizontal, 16).padding(.bottom, 10)
@@ -357,7 +357,7 @@ struct ChannelView: View {
         }
         .foregroundStyle(active ? Theme.primary : Theme.text)
         .frame(maxWidth: .infinity).frame(height: 46)
-        .glass(in: Capsule(), tint: active ? Theme.primary : nil, interactive: true)
+        .surface(in: Capsule(), tint: active ? Theme.primary : nil, interactive: true)
     }
 
     private var segmented: some View {
@@ -368,12 +368,12 @@ struct ChannelView: View {
                     Text(section.1).font(.raton(16, .bold))
                         .foregroundStyle(active ? Theme.text : Theme.textMuted)
                         .frame(maxWidth: .infinity).frame(height: 38)
-                        .background(Capsule().fill(active ? Color.white.opacity(0.8) : Color.clear))
+                        .background(Capsule().fill(active ? Color.white : Color.clear))
                 }
             }
         }
         .padding(4)
-        .glass(in: Capsule())
+        .sandTrack()
     }
 
     private func searchField(_ api: RatonAPI) -> some View {
@@ -390,7 +390,7 @@ struct ChannelView: View {
             }
         }
         .padding(.horizontal, 14).frame(height: 46)
-        .glass(in: Capsule())
+        .surface(in: Capsule())
     }
 
     private var hideToggle: some View { HideToggle(showAll: $model.filters.showAll) }
@@ -423,7 +423,7 @@ struct ChannelView: View {
                 }
                 .font(.raton(17, .bold)).foregroundStyle(Theme.primary)
                 .frame(maxWidth: .infinity).frame(height: 54)
-                .glass(in: Capsule(), tint: Theme.primary, interactive: true)
+                .surface(in: Capsule(), tint: Theme.primary, interactive: true)
                 .overlay(Capsule().stroke(Theme.primary, lineWidth: 1.5))
             }
             .disabled(exploring)

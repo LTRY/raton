@@ -37,7 +37,7 @@ struct HistoriqueView: View {
                                 Text("\(group.rows.count) média\(group.rows.count > 1 ? "s" : "")")
                                     .font(.raton(13, .bold)).foregroundStyle(Theme.textSoft)
                                     .padding(.horizontal, 10).padding(.vertical, 4)
-                                    .glass(in: Capsule())
+                                    .surface(in: Capsule())
                             }
                             .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 6)
                             ForEach(group.rows) { row in

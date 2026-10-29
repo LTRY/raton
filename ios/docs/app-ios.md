@@ -49,37 +49,36 @@ L'utilisateur est nomme par l'en-tete `X-Raton-User` (son id), que
 
 ## Apparence
 
-L'app est en Liquid Glass. Les couleurs et la police viennent toujours des jetons
-du front (`front/static/css/tailwind.input.css`, copies dans
-`ios/Raton/Theme.swift`) : texte brun `#2b2018`, terracotta `#c2410c` pour
-l'accent, police Plus Jakarta Sans (`ios/Raton/Resources/PlusJakartaSans.ttf`,
-licence OFL), mascotte `raccoon-empty.png`, etoiles ambre. Clair seulement
-(`UIUserInterfaceStyle` = `Light`). Un changement de jeton cote front se reporte
-a la main dans `Theme.swift`.
+L'app reprend le style des pages du front sur telephone, a partir de ses jetons
+(`front/static/css/tailwind.input.css`, `@theme` et `:root`), copies dans
+`ios/Raton/Theme.swift` : fond creme `#fbf6ee`, surfaces blanches a fine
+bordure sable, texte brun `#2b2018`, terracotta `#c2410c` pour l'accent, police
+Plus Jakarta Sans (`ios/Raton/Resources/PlusJakartaSans.ttf`, la police variable
+du front convertie de woff2 en ttf, licence OFL), la mascotte
+`raccoon-empty.png`, etoiles ambre. Clair seulement (`UIUserInterfaceStyle` =
+`Light`). Un changement de jeton cote front se reporte a la main dans
+`Theme.swift`.
 
-- **Fond** : `GlassBackdrop`, un degrade creme avec des lumieres terracotta, ambre
-  et rose, derriere chaque ecran (`ratonPage()`). Le verre a besoin d'une
-  couleur a refracter : sur un fond creme uni il serait invisible.
-- **Verre** : un seul point d'entree, `glass(in:tint:interactive:)` (et
-  `glassCard`), dans `Theme.swift`. Sur iOS 26 c'est le `glassEffect` du systeme ;
-  avant, un materiau flou (`ultraThinMaterial`) avec un liseré clair et une
-  ombre. Tout passe par la : barre d'onglets en pilule flottante, boutons
-  ronds de retour et de menu, boutons Sable (actifs teintes terracotta),
-  champs de saisie, pastilles de categories, lignes de liste et cartes de
-  fiche (`ListRow`, `VideoRow`), bulles de discussion, barre de lecture,
-  lecteur de playlist. Seule la zone du lecteur video reste sombre.
-- Le `glassEffect` est dans un `#if compiler(>=6.2)` : il ne se compile qu'avec
-  Xcode 26. Avec Xcode 16 (la version utilisee pour verifier ce depot) seul le
-  repli en materiau est construit et vu ; le rendu iOS 26 n'a pas ete observe.
+- **Surfaces** : un seul point d'entree, `surface(in:tint:interactive:)` (et
+  `surfaceCard`), dans `Theme.swift` : fond blanc, bordure fine, et pour
+  l'etat actif le lavis terracotta pale avec une bordure terracotta. Les
+  bascules (Video / Audio, Videos / Shorts, tout voir / masquer) ont la piste
+  sable du web (`sandTrack`) avec un segment actif blanc.
+- **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
+  le retour et les menus, lignes de liste pleine largeur a vignette a gauche
+  (duree, barre de progression), cartes blanches pour les chaines et les
+  reglages, champs blancs a bordure fine (`webField`), pile de cartes et pastille
+  de source sur les tuiles de playlist.
+- Le design Liquid Glass essaye avant a ete abandonne ; il n'en reste rien.
 
 ## Ecrans
 
-Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Reglages.
+Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Parametres.
 
 | Ecran | Role | Appels |
 | --- | --- | --- |
-| Adresse du serveur (premier lancement, puis Reglages) | Saisie de l'URL, validee avant d'etre gardee dans `UserDefaults` | `GET /api/users` (200 attendu) |
-| Choix de l'utilisateur | Liste des utilisateurs ; dans Reglages, creer (+) et supprimer (appui long) | `GET/POST /api/users`, `DELETE /api/users/{id}` |
+| Adresse du serveur (premier lancement, puis Parametres) | Saisie de l'URL, validee avant d'etre gardee dans `UserDefaults` | `GET /api/users` (200 attendu) |
+| Choix de l'utilisateur | Liste des utilisateurs ; dans Parametres, creer (+) et supprimer (appui long) | `GET/POST /api/users`, `DELETE /api/users/{id}` |
 | Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique, la barre de discussion ; menu : Nouveautes, Historique, Recherche | `POST /api/raton/visit`, `/static/img/raton/<art>` |
 | Discussion | Discussion avec la bibliotheque : les reponses citent des fiches (toucher ouvre la fiche), choix, nouvelle et suppression de discussion | `GET/POST /api/chat`, `GET/DELETE /api/chat/conversations/{id}`, `GET /api/llm-jobs/{id}` |
 | Nouveautes | Les fiches Nouvelles, une pile par chaine, dix chaines par page ; tirer pour rafraichir ; bouton Historique | `GET /api/nouveautes?page=N`, `GET /api/videos/{id}/thumbnail` |
@@ -91,7 +90,7 @@ Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlist
 | Playlists | Titre avec le nombre, recherche (sur le titre), grille a deux colonnes de tuiles comme le web (pile de cartes, pastille de source, nombre de videos, menu « ⋯ » : dupliquer, supprimer) ; menu « + » : creer, importer une playlist YouTube | `GET/POST /api/playlists`, `POST /api/playlists/import-url`, `POST .../duplicate`, `DELETE` |
 | Playlist | Lecteur de file en tete (voir « Lecteur de playlist »), fiches dans l'ordre : un toucher joue la piste, le « i » ouvre la fiche ; renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
 | Fiche | Lecteur, note, categories, Vu et Indesiree, onglets, menu | voir ci-dessous |
-| Reglages | Nom, changer d'utilisateur, temps d'ecran (minutes par jour, usage du jour), couvre-feu, « Raton et toi », adresse du serveur | `GET/PUT /api/settings`, `GET /api/screen-time`, `PUT /api/users/{id}` |
+| Parametres | Nom, changer d'utilisateur, temps d'ecran (minutes par jour, usage du jour), couvre-feu, « Raton et toi », adresse du serveur | `GET/PUT /api/settings`, `GET /api/screen-time`, `PUT /api/users/{id}` |
 
 La fiche :
 

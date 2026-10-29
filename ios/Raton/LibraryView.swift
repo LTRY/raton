@@ -217,7 +217,7 @@ extension LibraryView {
             }
             .foregroundStyle(Theme.text)
             .padding(.horizontal, 20).frame(height: 48)
-            .glass(in: Capsule(), interactive: true)
+            .surface(in: Capsule(), interactive: true)
         }
         .padding(.horizontal, 16).padding(.bottom, 14)
     }
@@ -238,7 +238,7 @@ extension LibraryView {
                             }
                             .foregroundStyle(Theme.textSoft)
                             .padding(.horizontal, 12).padding(.vertical, 8)
-                            .glass(in: Capsule(), interactive: true)
+                            .surface(in: Capsule(), interactive: true)
                         }
                     }
                     Button("Tout effacer") { model.filters = LibraryFilters() }

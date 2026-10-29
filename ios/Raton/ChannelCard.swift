@@ -30,7 +30,7 @@ struct ChannelCard: View {
                         Spacer(minLength: 0)
                         Text("\(channel.videoCount)").font(.raton(13, .bold)).foregroundStyle(Theme.textSoft)
                             .padding(.horizontal, 10).padding(.vertical, 4)
-                            .glass(in: Capsule())
+                            .surface(in: Capsule())
                     }
                     .padding(.horizontal, 16).padding(.top, 10)
                     if let date = Format.frenchDate(channel.lastPlayedAt) {
@@ -63,7 +63,7 @@ struct ChannelCard: View {
             .padding(.horizontal, 14).padding(.vertical, 12)
         }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .glassCard(radius: 26)
+        .surfaceCard(radius: 26)
         .padding(.horizontal, 16).padding(.vertical, 8)
     }
 
@@ -101,7 +101,7 @@ struct ChannelCard: View {
             Image(systemName: isOn ? "bell.fill" : "bell.slash").font(.system(size: 17))
                 .foregroundStyle(isOn ? Theme.primary : Theme.textMuted)
                 .frame(width: 40, height: 40)
-                .glass(in: RoundedRectangle(cornerRadius: 13, style: .continuous), tint: isOn ? Theme.primary : nil, interactive: true)
+                .surface(in: RoundedRectangle(cornerRadius: 13, style: .continuous), tint: isOn ? Theme.primary : nil, interactive: true)
                 .overlay(
                     RoundedRectangle(cornerRadius: 13, style: .continuous)
                         .stroke(isOn ? Theme.primary : Color.clear, lineWidth: 1.5))

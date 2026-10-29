@@ -141,13 +141,13 @@ struct FicheView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(mode == kind ? Theme.primary : Theme.textMuted)
                         .frame(width: 58, height: 38)
-                        .background(Capsule().fill(mode == kind ? Color.white.opacity(0.75) : Color.clear))
+                        .background(Capsule().fill(mode == kind ? Color.white : Color.clear))
                 }
                 .accessibilityLabel(kind == .video ? "Vidéo" : "Audio")
             }
         }
         .padding(4)
-        .glass(in: Capsule(), interactive: true)
+        .sandTrack()
     }
 
     private func select(_ kind: MediaKind) {
@@ -202,8 +202,6 @@ struct FicheView: View {
             }
         }
         .aspectRatio(16 / 9, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .padding(.horizontal, 12)
     }
 
     // MARK: Info block
@@ -220,7 +218,7 @@ struct FicheView: View {
                     Text("+ Catégories")
                         .font(.raton(14, .semibold)).foregroundStyle(Theme.textFaint)
                         .padding(.horizontal, 12).padding(.vertical, 8)
-                        .glass(in: Capsule(), interactive: true)
+                        .overlay(Capsule().strokeBorder(Theme.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
                 }
                 Spacer(minLength: 0)
             }
@@ -288,7 +286,7 @@ struct FicheView: View {
                         .buttonStyle(SandButtonStyle(active: tab == item, fill: false))
                 }
             }
-            // Room for the glass shadows, which the scroller would clip.
+            // Room for the shadows, which the scroller would clip.
             .padding(.vertical, 14)
         }
         .padding(.vertical, -14)
@@ -455,7 +453,7 @@ struct NowPlayingBar: View {
         if player.track?.kind == .audio || player.queue != nil {
             HStack(spacing: 16) {
                 Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(Color(hex: 0xF3E8D9))
                 Spacer()
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -466,9 +464,9 @@ struct NowPlayingBar: View {
                 }
                 Button { player.stop() } label: { Image(systemName: "xmark") }
             }
-            .foregroundStyle(Theme.text)
+            .foregroundStyle(.white)
             .padding(.horizontal, 18).padding(.vertical, 12)
-            .glass(in: Capsule(), tint: Theme.primary, interactive: true)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.player))
             .padding(.horizontal, 12)
         }
     }

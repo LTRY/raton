@@ -25,7 +25,7 @@ struct PlaylistPlayerPanel: View {
             }
         }
         .padding(16)
-        .glassCard(radius: 28)
+        .surfaceCard(radius: 28)
         .padding(.horizontal, 16).padding(.bottom, 8)
     }
 
@@ -37,12 +37,12 @@ struct PlaylistPlayerPanel: View {
                     Text(kind == .video ? "Vidéo" : "Audio").font(.raton(16, .bold))
                         .foregroundStyle(active ? Theme.primary : Theme.textMuted)
                         .frame(maxWidth: .infinity).frame(height: 40)
-                        .background(Capsule().fill(active ? Color.white.opacity(0.85) : Color.clear))
+                        .background(Capsule().fill(active ? Color.white : Color.clear))
                 }
             }
         }
         .padding(4)
-        .glass(in: Capsule())
+        .sandTrack()
     }
 
     /// The square cover of the audio mode: the track's thumbnail, or the terracotta gradient, with its "Audio" tag.
@@ -109,7 +109,7 @@ struct PlaylistPlayerPanel: View {
             } label: {
                 Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 26)).foregroundStyle(Theme.primary)
-                    .frame(width: 60, height: 60).glass(in: Circle(), tint: Theme.primary, interactive: true)
+                    .frame(width: 60, height: 60).surface(in: Circle(), tint: Theme.primary, interactive: true)
             }
             .disabled(playable == 0)
             .accessibilityLabel(owns && player.isPlaying ? "Pause" : "Lecture")
@@ -124,7 +124,7 @@ struct PlaylistPlayerPanel: View {
         Button(action: action) {
             Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
                 .frame(width: 46, height: 46)
-                .glass(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
+                .surface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
         }
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])

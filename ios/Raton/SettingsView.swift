@@ -24,16 +24,23 @@ struct SettingsView: View {
             if let api = state.api {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        PageHeader(title: "Réglages")
+                        PageHeader(title: "Paramètres")
+                        HStack(spacing: 12) {
+                            AvatarView(path: nil, name: currentName, api: api, size: 52)
+                            Text(currentName).font(.raton(22, .bold)).foregroundStyle(Theme.text)
+                        }
+                        .padding(.horizontal, 16)
                         ErrorMessage(text: errorMessage)
                         if let notice { Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft).padding(.horizontal, 16) }
                         card("Nom") {
-                            TextField("Nom", text: $name).font(.raton(17)).textFieldStyle(.roundedBorder)
-                            Button("Enregistrer") { Task { await rename(api) } }
-                                .buttonStyle(SandButtonStyle(fill: false))
-                                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || name == currentName)
+                            HStack(spacing: 10) {
+                                TextField("Nom", text: $name).font(.raton(17)).webField()
+                                Button("Renommer") { Task { await rename(api) } }
+                                    .buttonStyle(SandButtonStyle(fill: false))
+                                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || name == currentName)
+                            }
                         }
-                        card("Utilisateur") {
+                        card("Changer d'utilisateur") {
                             NavigationLink {
                                 UserPickerView(title: "Utilisateurs", back: true, manage: true)
                             } label: {
@@ -81,7 +88,7 @@ struct SettingsView: View {
                                     Text("Tu").tag("tu")
                                 }
                                 .pickerStyle(.segmented)
-                                TextField("Comment il t'appelle", text: $nickname).font(.raton(17)).textFieldStyle(.roundedBorder)
+                                TextField("Comment il t'appelle", text: $nickname).font(.raton(17)).webField()
                                 Button("Enregistrer") {
                                     Task { await save(api, ["raton_address": address, "raton_nickname": nickname]) }
                                 }
@@ -127,12 +134,12 @@ struct SettingsView: View {
 
     private func card<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.raton(16, .bold)).foregroundStyle(Theme.text)
+            Text(title).font(.raton(19, .bold)).foregroundStyle(Theme.text)
             content()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(radius: 14)
+        .surfaceCard(radius: 22)
         .padding(.horizontal, 16)
     }
 

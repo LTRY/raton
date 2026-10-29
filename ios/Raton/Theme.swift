@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The look of the web front, in Liquid Glass: (`front/static/css/tailwind.input.css`, `@theme` and `:root` tokens):
+/// The look of the web front: (`front/static/css/tailwind.input.css`, `@theme` and `:root` tokens):
 /// warm cream background, terracotta primary, Plus Jakarta Sans. Colors are copied from those
 /// tokens; the app is light only, like the screens the tokens were drawn for.
 enum Theme {
@@ -45,84 +45,46 @@ extension Font {
     }
 }
 
-// MARK: Liquid Glass
+// MARK: Surfaces
 
 extension View {
-    /// Liquid Glass: the system `glassEffect` on iOS 26 (needs the iOS 26 SDK, Xcode 26), a frosted
-    /// material with a light rim before that. One entry point so every screen looks the same.
-    @ViewBuilder
-    func glass<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26, *) {
-            var effect = Glass.regular
-            if let tint { effect = effect.tint(tint) }
-            self.glassEffect(effect.interactive(interactive), in: shape)
-        } else {
-            frostedGlass(in: shape, tint: tint)
-        }
-        #else
-        frostedGlass(in: shape, tint: tint)
-        #endif
+    /// A surface of the web front: white with the thin sand border; `tint` is its "active" look (the
+    /// pale terracotta wash with a terracotta border); `interactive` adds the soft shadow of a button.
+    func surface<S: Shape>(in shape: S, tint: Color? = nil, interactive: Bool = false) -> some View {
+        background(shape.fill(tint == nil ? Theme.surface : Theme.tint))
+            .overlay(shape.stroke(tint == nil ? Theme.border : Theme.primary, lineWidth: tint == nil ? 1 : 1.2))
+            .shadow(color: Theme.shadow.opacity(interactive ? 0.10 : 0), radius: 8, y: 4)
     }
 
-    private func frostedGlass<S: Shape>(in shape: S, tint: Color?) -> some View {
-        background {
-            ZStack {
-                shape.fill(.ultraThinMaterial)
-                if let tint { shape.fill(tint.opacity(0.22)) }
-            }
-        }
-        .overlay(
-            shape.stroke(
-                LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.25), .white.opacity(0.6)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: 1))
-        .shadow(color: Theme.shadow.opacity(0.10), radius: 14, y: 6)
+    /// The sand track of a segmented control (Vidéo / Audio, Vidéos / Shorts), whose active segment is white.
+    func sandTrack() -> some View {
+        background(Capsule().fill(Theme.surfaceMuted)).overlay(Capsule().stroke(Theme.border, lineWidth: 1))
     }
 
-    /// A glass card with rounded corners, the container of rows and panels.
-    func glassCard(radius: CGFloat = 22, tint: Color? = nil) -> some View {
-        glass(in: RoundedRectangle(cornerRadius: radius, style: .continuous), tint: tint)
+    /// A white card with rounded corners and the thin border.
+    func surfaceCard(radius: CGFloat = 22, tint: Color? = nil) -> some View {
+        surface(in: RoundedRectangle(cornerRadius: radius, style: .continuous), tint: tint)
     }
 
-    /// The warm backdrop the glass floats over, under the safe areas too. Glass needs something
-    /// colorful behind it: a flat cream would make it invisible.
+    /// The cream page background, under the safe areas too.
     func ratonPage() -> some View {
-        background(GlassBackdrop().ignoresSafeArea())
+        background(Theme.bg.ignoresSafeArea())
     }
 }
 
-/// Cream gradient with soft terracotta, amber and rose lights, for the glass to refract.
-struct GlassBackdrop: View {
-    var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(colors: [Color(hex: 0xFFF6EA), Color(hex: 0xFCE7D6), Color(hex: 0xF9DCCB)],
-                               startPoint: .top, endPoint: .bottom)
-                Circle().fill(Theme.primary.opacity(0.30)).frame(width: 300)
-                    .blur(radius: 70).position(x: proxy.size.width * 0.05, y: proxy.size.height * 0.12)
-                Circle().fill(Theme.amber.opacity(0.32)).frame(width: 280)
-                    .blur(radius: 70).position(x: proxy.size.width * 0.98, y: proxy.size.height * 0.40)
-                Circle().fill(Color(hex: 0xF08A8A).opacity(0.28)).frame(width: 320)
-                    .blur(radius: 80).position(x: proxy.size.width * 0.15, y: proxy.size.height * 0.88)
-            }
-        }
-    }
-}
-
-/// A round glass button floating over the page (back, menu...).
+/// A round white button floating over the page (back, menu...), as on the web header.
 struct CircleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.raton(17, .semibold))
             .foregroundStyle(Theme.text)
             .frame(width: 46, height: 46)
-            .glass(in: Circle(), interactive: true)
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .surface(in: Circle(), interactive: true)
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
 
-/// The glass buttons under a fiche ("Plus d'informations", "Commentaire"); active ones are tinted.
+/// The sand buttons under a fiche ("Plus d'informations", "Commentaire"); the active one is tinted.
 struct SandButtonStyle: ButtonStyle {
     var active = false
     // False for a button that sits in a horizontal scroller: it keeps its own width.
@@ -134,14 +96,14 @@ struct SandButtonStyle: ButtonStyle {
             .foregroundStyle(active ? Theme.primary : Theme.textSoft)
             .lineLimit(1)
             .frame(maxWidth: fill ? .infinity : nil)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .padding(.vertical, 12)
-            .glass(in: Capsule(), tint: active ? Theme.primary : nil, interactive: true)
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .background(RoundedRectangle(cornerRadius: 8).fill(active ? Theme.tint : Theme.surfaceMuted))
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
 
-/// The primary call to action: a glass pill tinted with the terracotta.
+/// The primary call to action: white pill with terracotta text and a warm shadow.
 struct PillButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -149,8 +111,9 @@ struct PillButtonStyle: ButtonStyle {
             .foregroundStyle(Theme.primary)
             .padding(.horizontal, 24)
             .padding(.vertical, 14)
-            .glass(in: Capsule(), tint: Theme.primary, interactive: true)
-            .opacity(configuration.isPressed ? 0.75 : 1)
+            .background(Capsule().fill(Color.white))
+            .shadow(color: Theme.shadow.opacity(0.15), radius: 10, y: 5)
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
 

@@ -46,7 +46,7 @@ struct CategoryChips: View {
                 Text(label)
                     .font(.raton(13, .semibold)).foregroundStyle(color)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .glass(in: Capsule(), tint: color)
+                    .background(Capsule().fill(color.opacity(0.12)))
             }
         }
         .task { styles = (try? await api.get("/api/categories")) ?? [] }
@@ -331,7 +331,7 @@ struct CommentPanel: View {
                 .frame(minHeight: 140)
                 .scrollContentBackground(.hidden)
                 .padding(10)
-                .glassCard(radius: 10)
+                .surfaceCard(radius: 10)
             Button(saving ? "Enregistrement…" : "Enregistrer") {
                 saving = true
                 Task {
@@ -375,7 +375,7 @@ struct ChatPanel: View {
                 TextField("Poser une question sur cette fiche", text: $question, axis: .vertical)
                     .font(.raton(16))
                     .padding(.horizontal, 14).padding(.vertical, 10)
-                    .glass(in: Capsule())
+                    .surface(in: Capsule())
                 Button {
                     let asked = question
                     question = ""
@@ -394,9 +394,10 @@ struct ChatPanel: View {
 
     private func bubble(_ text: String, mine: Bool) -> some View {
         Text(text)
-            .font(.raton(15)).foregroundStyle(mine ? Color(hex: 0x7C2D12) : Theme.text)
+            .font(.raton(15)).foregroundStyle(mine ? .white : Theme.text)
             .padding(12)
-            .glassCard(radius: 18, tint: mine ? Theme.primary : nil)
+            .background(RoundedRectangle(cornerRadius: 14).fill(mine ? Theme.primary : Color.white))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(mine ? Color.clear : Theme.border, lineWidth: 1))
             .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
     }
 

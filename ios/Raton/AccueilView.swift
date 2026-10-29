@@ -62,7 +62,7 @@ struct AccueilView: View {
                             .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
                         .padding(.horizontal, 18).padding(.vertical, 10)
-                        .glass(in: Capsule())
+                        .surface(in: Capsule())
                         .padding(.horizontal, 16).padding(.bottom, 16)
                     }
                     .frame(minHeight: 640)

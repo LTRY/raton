@@ -94,12 +94,12 @@ struct PlaylistTile: View {
                         Text("\(playlist.itemCount) vidéo\(playlist.itemCount == 1 ? "" : "s")")
                             .font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
                             .padding(.horizontal, 9).padding(.vertical, 4)
-                            .glass(in: Capsule()).padding(8)
+                            .surface(in: Capsule()).padding(8)
                     }
                     .overlay(alignment: .topLeading) {
                         Text(chip).font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
                             .padding(.horizontal, 10).padding(.vertical, 4)
-                            .glass(in: Capsule()).padding(8)
+                            .surface(in: Capsule()).padding(8)
                     }
                     .background(stackLayers)
                     Text(playlist.title).font(.raton(16, .bold)).foregroundStyle(Theme.textSoft)
@@ -112,7 +112,7 @@ struct PlaylistTile: View {
                 Button { Task { await duplicate() } } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.textSoft)
-                    .frame(width: 32, height: 32).glass(in: Circle(), interactive: true)
+                    .frame(width: 32, height: 32).surface(in: Circle(), interactive: true)
             }
             .padding(8)
             .accessibilityLabel("Actions sur \(playlist.title)")
@@ -371,7 +371,7 @@ struct TextPromptSheet: View {
                     .textInputAutocapitalization(keyboardURL ? .never : .sentences)
                     .autocorrectionDisabled(keyboardURL)
                     .padding(.horizontal, 18).padding(.vertical, 14)
-                    .glass(in: Capsule())
+                    .surface(in: Capsule())
                 ErrorMessage(text: errorMessage)
                 Button(busy ? "…" : action) {
                     busy = true

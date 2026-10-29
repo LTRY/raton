@@ -112,7 +112,7 @@ extension ChannelsView {
                     .font(.raton(15, .bold))
                     .foregroundStyle(model.ratedOnly ? Theme.primary : Theme.textSoft)
                     .padding(.horizontal, 14).padding(.vertical, 9)
-                    .glass(in: Capsule(), tint: model.ratedOnly ? Theme.primary : nil, interactive: true)
+                    .surface(in: Capsule(), tint: model.ratedOnly ? Theme.primary : nil, interactive: true)
             }
             Menu {
                 ForEach(Self.sorts, id: \.0) { sort in
@@ -154,7 +154,7 @@ struct AddChannelSheet: View {
                     .font(.raton(17)).keyboardType(.URL)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
                     .padding(.horizontal, 18).padding(.vertical, 14)
-                    .glass(in: Capsule())
+                    .surface(in: Capsule())
                 ErrorMessage(text: errorMessage)
                 Button(busy ? "Ajout…" : "Ajouter") { Task { await add() } }
                     .buttonStyle(PillButtonStyle())

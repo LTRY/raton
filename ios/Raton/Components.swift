@@ -24,7 +24,7 @@ struct SearchField: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
-        .glass(in: Capsule())
+        .surface(in: Capsule())
         .padding(.horizontal, 16).padding(.bottom, 12)
     }
 }
@@ -71,7 +71,7 @@ struct AvatarView: View {
     }
 }
 
-/// A glass card row, floating over the backdrop.
+/// A white edge-to-edge row with the hairline under it, as the web's lists.
 struct ListRow<Content: View>: View {
     var tint: Color? = nil
     @ViewBuilder let content: Content
@@ -79,8 +79,8 @@ struct ListRow<Content: View>: View {
         content
             .padding(.horizontal, 16).padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassCard(radius: 20, tint: tint)
-            .padding(.horizontal, 12).padding(.vertical, 4)
+            .background(tint == nil ? Theme.surface : Theme.tint)
+            .overlay(alignment: .bottom) { Theme.border.frame(height: 1) }
     }
 }
 
@@ -96,12 +96,21 @@ struct HideToggle: View {
                     Image(systemName: option.1).font(.system(size: 17))
                         .foregroundStyle(active ? Theme.primary : Theme.textMuted)
                         .frame(width: 44, height: 38)
-                        .background(Capsule().fill(active ? Color.white.opacity(0.8) : Color.clear))
+                        .background(Capsule().fill(active ? Color.white : Color.clear))
                 }
                 .accessibilityLabel(option.2)
             }
         }
         .padding(4)
-        .glass(in: Capsule())
+        .sandTrack()
+    }
+}
+
+extension View {
+    /// A text field as the web draws it: white, thin border, 10 pt corners.
+    func webField() -> some View {
+        padding(.horizontal, 14).padding(.vertical, 11)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, lineWidth: 1))
     }
 }

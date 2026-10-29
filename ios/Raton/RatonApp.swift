@@ -49,7 +49,7 @@ struct RootView: View {
     }
 }
 
-/// The floating glass pill at the bottom: icons only, the current one on a terracotta wash.
+/// The floating pill at the bottom, as on the web: icons only, the current one on a terracotta wash.
 struct TabPill: View {
     @Binding var tab: Int
     private let items = [
@@ -57,7 +57,7 @@ struct TabPill: View {
         (icon: "tv", label: "Chaînes"),
         (icon: "books.vertical", label: "Bibliothèque"),
         (icon: "text.line.first.and.arrowtriangle.forward", label: "Playlists"),
-        (icon: "slider.horizontal.3", label: "Réglages"),
+        (icon: "slider.horizontal.3", label: "Paramètres"),
     ]
 
     var body: some View {
@@ -70,13 +70,15 @@ struct TabPill: View {
                         .font(.system(size: 22, weight: .regular))
                         .foregroundStyle(tab == index ? Theme.primary : Theme.textMuted)
                         .frame(maxWidth: .infinity).frame(height: 48)
-                        .background(Capsule().fill(tab == index ? Theme.primary.opacity(0.16) : Color.clear))
+                        .background(Capsule().fill(tab == index ? Theme.tint : Color.clear))
                 }
                 .accessibilityLabel(items[index].label)
             }
         }
         .padding(5)
-        .glass(in: Capsule(), interactive: true)
+        .background(Capsule().fill(Color(hex: 0xFFF8EF)))
+        .overlay(Capsule().stroke(Theme.border, lineWidth: 1))
+        .shadow(color: Theme.shadow.opacity(0.14), radius: 12, y: 6)
         .padding(.horizontal, 12)
     }
 }
@@ -108,7 +110,7 @@ struct PageHeader<Trailing: View>: View {
             if let badge {
                 Text("\(badge)").font(.raton(14, .bold)).foregroundStyle(Theme.textSoft)
                     .padding(.horizontal, 10).padding(.vertical, 3)
-                    .glass(in: Capsule())
+                    .surface(in: Capsule())
             }
             Spacer(minLength: 0)
             trailing
