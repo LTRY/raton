@@ -80,7 +80,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   livre qui saute, lignes de la playlist qui se tracent puis triangle qui
   apparait, curseurs des reglages qui se croisent) quand on touche l'onglet ;
   les tuiles de playlist entrent en fondu depuis 14 pt plus bas, decalees de
-  50 ms (jusqu'a la sixieme), comme `pl-card-in`. Rien ne bouge avec
+  50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Le doigt pose sur une tuile rejoue le survol du web (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
   « Reduire les animations ».
 - Le design Liquid Glass essaye avant a ete abandonne ; il n'en reste rien.
 

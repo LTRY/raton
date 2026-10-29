@@ -73,6 +73,16 @@ struct PlaylistsView: View {
     }
 }
 
+/// A plain button style that only reports whether the finger is down on it.
+struct PressReportingStyle: ButtonStyle {
+    @Binding var pressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { pressed = $0 }
+    }
+}
+
 /// A playlist of the grid, like the web's `.pl-card`: two layers behind the cover (the stack), the
 /// source chip, the "⋯" menu, the number of videos, then the title.
 struct PlaylistTile: View {
@@ -83,7 +93,11 @@ struct PlaylistTile: View {
     let onChange: () -> Void
     @State private var confirmDelete = false
     @State private var appeared = false
+    // The finger is down on the tile: the web's hover (`.pl-card:hover`), played on touch.
+    @State private var pressed = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var lifted: Bool { pressed && !reduceMotion }
 
     private var chip: String {
         playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : "Manuelle"
@@ -109,11 +123,16 @@ struct PlaylistTile: View {
                     }
                     .background(stackLayers)
                     .padding(.top, 12)
-                    Text(playlist.title).font(.raton(15, .bold)).foregroundStyle(Theme.text)
+                    // `.pl-card-link:hover .pl-card-title`: the title turns terracotta.
+                    Text(playlist.title).font(.raton(15, .bold)).foregroundStyle(lifted ? Theme.primary : Theme.text)
+                        .animation(.easeOut(duration: 0.2), value: lifted)
                         .lineLimit(2).multilineTextAlignment(.leading)
                 }
+                // translateY(-4px), 200 ms
+                .offset(y: lifted ? -4 : 0)
+                .animation(.easeOut(duration: 0.2), value: lifted)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressReportingStyle(pressed: $pressed))
             Menu {
                 Button(role: .destructive) { confirmDelete = true } label: { Label("Supprimer", systemImage: "trash") }
                 Button { Task { await duplicate() } } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
@@ -138,29 +157,41 @@ struct PlaylistTile: View {
 
     @ViewBuilder
     private var cover: some View {
-        Group {
-            if let id = playlist.coverVideoId, playlist.coverHasThumbnail {
-                AsyncImage(url: api.url("/api/videos/\(id)/thumbnail?w=320")) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: { Theme.surfaceMuted }
-            } else {
-                // The web's empty cover: sand to the warm shadow tint, at 135°.
-                LinearGradient(colors: [Color(hex: 0xE9B98A), Color(hex: 0x7C2D12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        // The 16:9 frame is fixed first and the picture only fills it: a thumbnail with another ratio
+        // (4:3 with black bars) must never change the tile's height.
+        Color.clear
+            .aspectRatio(16 / 9, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if let id = playlist.coverVideoId, playlist.coverHasThumbnail {
+                    AsyncImage(url: api.url("/api/videos/\(id)/thumbnail?w=320")) { image in
+                        image.resizable().scaledToFill()
+                    } placeholder: { Theme.surfaceMuted }
+                } else {
+                    // The web's empty cover: sand to the warm shadow tint, at 135°.
+                    LinearGradient(colors: [Color(hex: 0xE9B98A), Color(hex: 0x7C2D12)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
             }
-        }
-        .frame(maxWidth: .infinity).aspectRatio(16 / 9, contentMode: .fit).clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            // brightness(1.06) saturate(1.08)
+            .brightness(lifted ? 0.04 : 0).saturation(lifted ? 1.08 : 1)
+            .animation(.easeOut(duration: 0.2), value: lifted)
     }
 
     /// The two cards peeking out above the cover.
     private var stackLayers: some View {
         ZStack {
+            // The two layers fan out when lifted: translateY(-5px) rotate(-1.5deg) and translateY(-3px) rotate(1deg), 250 ms.
             RoundedRectangle(cornerRadius: 14).fill(Theme.borderStrong)
-                .padding(.horizontal, 16).offset(y: -10)
+                .padding(.horizontal, 16).offset(y: lifted ? -15 : -10)
+                .rotationEffect(.degrees(lifted ? -1.5 : 0))
             RoundedRectangle(cornerRadius: 14).fill(Theme.surfaceMuted)
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border, lineWidth: 1))
-                .padding(.horizontal, 8).offset(y: -5)
+                .padding(.horizontal, 8).offset(y: lifted ? -8 : -5)
+                .rotationEffect(.degrees(lifted ? 1 : 0))
         }
+        .animation(.easeOut(duration: 0.25), value: lifted)
     }
 
     private func duplicate() async {
