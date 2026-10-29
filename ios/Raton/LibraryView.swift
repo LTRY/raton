@@ -196,7 +196,7 @@ extension LibraryView {
             } label: { Image(systemName: "line.3.horizontal") }
             .buttonStyle(CircleButtonStyle())
             .accessibilityLabel("Vues")
-            Text(viewName).font(.raton(30, .bold)).foregroundStyle(Theme.text).lineLimit(1)
+            Text(viewName).font(.raton(26, .bold)).foregroundStyle(Theme.text).lineLimit(1)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)

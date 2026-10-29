@@ -64,11 +64,24 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   l'etat actif le lavis terracotta pale avec une bordure terracotta. Les
   bascules (Video / Audio, Videos / Shorts, tout voir / masquer) ont la piste
   sable du web (`sandTrack`) avec un segment actif blanc.
+- **Barre d'onglets** (`TabPill`, `ios/Raton/RatonApp.swift`) : pilule flottante
+  a 12 pt des bords, verre depoli leger (flou, voile blanc a 12 %, liseré clair)
+  sous lequel la page defile, icones de 28 pt ; l'onglet actif a le lavis
+  terracotta pale avec un reflet blanc et une ombre chaude ; elle s'efface quand
+  le clavier est ouvert, comme sur le web.
 - **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
   le retour et les menus, lignes de liste pleine largeur a vignette a gauche
   (duree, barre de progression), cartes blanches pour les chaines et les
   reglages, champs blancs a bordure fine (`webField`), pile de cartes et pastille
   de source sur les tuiles de playlist.
+- **Animations du web** : les cinq icones de la barre d'onglets sont celles du
+  front (`ios/Raton/TabIcons.swift`, dessinees a partir des SVG de `base.html`)
+  et rejouent leur animation (saut de la maison, antenne qui se dessine,
+  livre qui saute, lignes de la playlist qui se tracent puis triangle qui
+  apparait, curseurs des reglages qui se croisent) quand on touche l'onglet ;
+  les tuiles de playlist entrent en fondu depuis 14 pt plus bas, decalees de
+  50 ms (jusqu'a la sixieme), comme `pl-card-in`. Rien ne bouge avec
+  « Reduire les animations ».
 - Le design Liquid Glass essaye avant a ete abandonne ; il n'en reste rien.
 
 ## Ecrans

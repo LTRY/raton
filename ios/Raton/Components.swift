@@ -10,7 +10,7 @@ struct SearchField: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass").foregroundStyle(Theme.textMuted)
             TextField(placeholder, text: $text)
-                .font(.raton(17, .medium))
+                .font(.raton(16, .semibold))
                 .submitLabel(.search)
                 .autocorrectionDisabled()
                 .onSubmit(onSubmit)
@@ -23,7 +23,7 @@ struct SearchField: View {
                 }
             }
         }
-        .padding(.horizontal, 16).padding(.vertical, 12)
+        .padding(.horizontal, 16).padding(.vertical, 10)
         .surface(in: Capsule())
         .padding(.horizontal, 16).padding(.bottom, 12)
     }

@@ -29,9 +29,9 @@ struct PlaylistsView: View {
                         }
                         SearchField(placeholder: "Rechercher une playlist", text: $search) {}
                         ErrorMessage(text: errorMessage)
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 22) {
-                            ForEach(shown) { playlist in
-                                PlaylistTile(playlist: playlist, api: api, onChange: { Task { await load(api) } })
+                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 20), GridItem(.flexible(), spacing: 20)], spacing: 28) {
+                            ForEach(Array(shown.enumerated()), id: \.element.id) { index, playlist in
+                                PlaylistTile(playlist: playlist, api: api, index: index, onChange: { Task { await load(api) } })
                             }
                         }
                         .padding(.horizontal, 16).padding(.top, 4)
@@ -78,8 +78,12 @@ struct PlaylistsView: View {
 struct PlaylistTile: View {
     let playlist: PlaylistSummary
     let api: RatonAPI
+    // Rank in the grid: the entrance of the web's `pl-card-in` is staggered by 50 ms, up to the sixth.
+    var index = 0
     let onChange: () -> Void
     @State private var confirmDelete = false
+    @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var chip: String {
         playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : "Manuelle"
@@ -91,18 +95,21 @@ struct PlaylistTile: View {
                 VStack(alignment: .leading, spacing: 10) {
                     ZStack(alignment: .bottomTrailing) {
                         cover
+                        // The web's dark scrim badge: 82 % slate, white text, 6 pt corners.
                         Text("\(playlist.itemCount) vidéo\(playlist.itemCount == 1 ? "" : "s")")
-                            .font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
-                            .padding(.horizontal, 9).padding(.vertical, 4)
-                            .surface(in: Capsule()).padding(8)
+                            .font(.raton(12, .bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 2)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(Color(hex: 0x0F172A).opacity(0.82)))
+                            .padding(8)
                     }
                     .overlay(alignment: .topLeading) {
-                        Text(chip).font(.raton(12, .bold)).foregroundStyle(Theme.textSoft)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .surface(in: Capsule()).padding(8)
+                        Text(chip).font(.raton(12, .semibold)).foregroundStyle(Theme.text)
+                            .padding(.horizontal, 10).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.white.opacity(0.92))).padding(8)
                     }
                     .background(stackLayers)
-                    Text(playlist.title).font(.raton(16, .bold)).foregroundStyle(Theme.textSoft)
+                    .padding(.top, 12)
+                    Text(playlist.title).font(.raton(15, .bold)).foregroundStyle(Theme.text)
                         .lineLimit(2).multilineTextAlignment(.leading)
                 }
             }
@@ -112,14 +119,20 @@ struct PlaylistTile: View {
                 Button { Task { await duplicate() } } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
             } label: {
                 Image(systemName: "ellipsis").font(.system(size: 14, weight: .bold)).foregroundStyle(Theme.textSoft)
-                    .frame(width: 32, height: 32).surface(in: Circle(), interactive: true)
+                    .frame(width: 34, height: 34).background(Circle().fill(Color.white.opacity(0.92)))
             }
-            .padding(8)
+            .padding(.trailing, 8).padding(.top, 20)
             .accessibilityLabel("Actions sur \(playlist.title)")
         }
         .confirmationDialog("Supprimer « \(playlist.title) » ? Les vidéos sont conservées.",
                             isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Supprimer", role: .destructive) { Task { await delete() } }
+        }
+        // pl-card-in: 260 ms ease-out, from 14 pt lower and transparent.
+        .opacity(appeared || reduceMotion ? 1 : 0)
+        .offset(y: appeared || reduceMotion ? 0 : 14)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.26).delay(Double(min(index, 6)) * 0.05)) { appeared = true }
         }
     }
 
@@ -131,21 +144,22 @@ struct PlaylistTile: View {
                     image.resizable().scaledToFill()
                 } placeholder: { Theme.surfaceMuted }
             } else {
-                LinearGradient(colors: [Color(hex: 0xF3E3D0), Color(hex: 0xF0D2BC)], startPoint: .top, endPoint: .bottom)
+                // The web's empty cover: sand to the warm shadow tint, at 135°.
+                LinearGradient(colors: [Color(hex: 0xE9B98A), Color(hex: 0x7C2D12)], startPoint: .topLeading, endPoint: .bottomTrailing)
             }
         }
-        .frame(maxWidth: .infinity).aspectRatio(16 / 10, contentMode: .fit).clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.7), lineWidth: 1))
+        .frame(maxWidth: .infinity).aspectRatio(16 / 9, contentMode: .fit).clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     /// The two cards peeking out above the cover.
     private var stackLayers: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.35))
-                .padding(.horizontal, 14).offset(y: -10)
-            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.white.opacity(0.55))
-                .padding(.horizontal, 7).offset(y: -5)
+            RoundedRectangle(cornerRadius: 14).fill(Theme.borderStrong)
+                .padding(.horizontal, 16).offset(y: -10)
+            RoundedRectangle(cornerRadius: 14).fill(Theme.surfaceMuted)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.border, lineWidth: 1))
+                .padding(.horizontal, 8).offset(y: -5)
         }
     }
 
