@@ -72,6 +72,16 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   l'ecran : l'encart qui la porte descend sous l'indicateur d'accueil au lieu
   d'un padding negatif, qui sur iOS 27 laissait le bas de la pilule sans toucher ;
   la page change avec l'onglet (`.id(tab)`).
+- **Texte, toucher, retour** : les polices suivent le reglage « Taille du texte »
+  d'iOS (`Font.raton`), plafonne a `xxxLarge` a la racine pour que les lignes
+  et pastilles tiennent ; les cibles de toucher font 44 pt au moins (les cinq
+  etoiles se partagent la ligne) ; un retour haptique leger accompagne le
+  changement d'onglet, les cloches, les etoiles et la bascule « tout voir » ;
+  le changement d'onglet se fait en fondu de 0,15 s. Pas de mode sombre : le
+  theme est clair uniquement, comme le front (`docs/spec/11-interface-html.md`).
+- **Chargement et erreurs** : une liste montre une roue (`LoadingRow`) jusqu'a sa
+  premiere reponse, puis « Aucune ... » si elle est vide ; une erreur de reseau
+  ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`).
 - **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
   le retour et les menus, lignes de liste pleine largeur a vignette a gauche
   (duree, barre de progression), cartes blanches pour les chaines et les
@@ -161,6 +171,15 @@ La fiche :
 - les erreurs sont des messages francais : serveur injoignable, acces au
   reseau local refuse (renvoie vers Reglages → Raton → Reseau local), adresse
   invalide, ou le `detail` envoye par le back.
+
+## Tests
+
+`ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
+un doigt (XCUITest). Il lui faut le back et le front de demo (`make demo`, front
+sur `localhost:8000`) ; l'app y est pointee par les arguments de lancement
+`-serverURL` et `-userID`. Lancer :
+`xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`.
+`make ci` ne les lance pas (rien dans ce conteneur ne compile l'app).
 
 ## Lecteur
 

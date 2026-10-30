@@ -108,7 +108,8 @@ struct VideoList: View {
 
     var body: some View {
         LazyVStack(spacing: 0) {
-            ErrorMessage(text: model.errorMessage)
+            ErrorMessage(text: model.errorMessage) { Task { await model.reload(api: api, search: search) } }
+            if !model.loaded && model.errorMessage == nil { LoadingRow() }
             if shorts {
                 ShortsMosaic(cards: model.items, api: api) { card in
                     await model.loadMore(api: api, search: search, after: card)

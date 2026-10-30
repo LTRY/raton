@@ -74,7 +74,8 @@ struct ChannelsView: View {
                             Task { await model.reload(api: api, search: search) }
                         }
                         filterRow(api)
-                        ErrorMessage(text: model.errorMessage)
+                        ErrorMessage(text: model.errorMessage) { Task { await model.reload(api: api, search: search) } }
+                        if !model.loaded && model.errorMessage == nil { LoadingRow() }
                         ForEach(model.items) { channel in
                             ChannelCard(channel: channel, api: api)
                                 .task { await model.loadMore(api: api, search: search, after: channel) }

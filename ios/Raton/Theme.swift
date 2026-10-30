@@ -39,9 +39,10 @@ extension Color {
 }
 
 extension Font {
-    /// Plus Jakarta Sans (variable font bundled in the app), at a fixed size.
+    /// Plus Jakarta Sans (variable font bundled in the app); `size` is the size at the default text size
+    /// and grows with the user's "Text Size" setting (capped at the root, see `RootView`).
     static func raton(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .custom("Plus Jakarta Sans", fixedSize: size).weight(weight)
+        .custom("Plus Jakarta Sans", size: size, relativeTo: .body).weight(weight)
     }
 }
 

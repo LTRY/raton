@@ -37,6 +37,8 @@ struct RootView: View {
                     }
                 }
                 .id(tab)
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.15), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 8) {
                         NowPlayingBar()
@@ -53,6 +55,9 @@ struct RootView: View {
         }
         .ratonPage()
         .tint(Theme.primary)
+        // Past this size the fixed-height rows and pills of the screens no longer fit.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .sensoryFeedback(.selection, trigger: tab)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
     }

@@ -34,7 +34,8 @@ struct PlaylistsView: View {
                             .accessibilityLabel("Ajouter une playlist")
                         }
                         SearchField(placeholder: "Rechercher une playlist", text: $search) {}
-                        ErrorMessage(text: errorMessage)
+                        ErrorMessage(text: errorMessage) { Task { await load(api) } }
+                        if !loaded && errorMessage == nil { LoadingRow() }
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 20), GridItem(.flexible(), spacing: 20)], spacing: 28) {
                             ForEach(Array(shown.enumerated()), id: \.element.id) { index, playlist in
                                 PlaylistTile(playlist: playlist, api: api, index: index, onOpen: { path.append($0) },

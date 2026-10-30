@@ -11,7 +11,8 @@ final class AppState: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         serverURL = defaults.string(forKey: Self.serverKey).flatMap { URL(string: $0) }
-        userID = defaults.object(forKey: Self.userKey) as? Int
+        // A launch argument (`-userID 1`, used by the UI tests) arrives as a string.
+        userID = (defaults.object(forKey: Self.userKey) as? Int) ?? defaults.string(forKey: Self.userKey).flatMap(Int.init)
     }
 
     /// The client for the stored server and user; nil until a server is chosen.

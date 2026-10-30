@@ -23,3 +23,14 @@ targets:
         INFOPLIST_FILE: Raton/Info.plist
         # Set your own team in Xcode (Signing & Capabilities) to build onto a device.
         CODE_SIGN_STYLE: Automatic
+  RatonUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: RatonUITests
+    dependencies:
+      - target: Raton
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.uitests
