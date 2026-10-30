@@ -117,6 +117,7 @@ struct SettingsView: View {
                     }
                     .padding(.bottom, 24)
                 }
+                .barClearance()
                 .task { await load(api) }
             }
         }

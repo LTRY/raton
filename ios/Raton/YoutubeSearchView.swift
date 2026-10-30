@@ -44,6 +44,7 @@ struct YoutubeSearchView: View {
                         }
                     }
                 }
+                .barClearance()
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
             }
         }

@@ -187,6 +187,7 @@ struct LibraryView: View {
                         VideoList(model: model, api: api, search: search)
                     }
                 }
+                .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
                 .task {
                     await model.reload(api: api, search: search)

@@ -85,6 +85,7 @@ struct ChannelsView: View {
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
                 .task { await model.reload(api: api, search: search) }
                 .sheet(isPresented: $showAdd) {

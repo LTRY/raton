@@ -44,12 +44,13 @@ struct PlaylistsView: View {
                             }
                         }
                         // Room under the last row so it scrolls clear of the tab bar.
-                        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 130)
+                        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
                         if loaded && playlists.isEmpty && errorMessage == nil {
                             EmptyMessage(text: "Aucune playlist.")
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await load(api) }
                 .task { await load(api) }
                 .sheet(isPresented: $showNew) {
@@ -336,6 +337,7 @@ struct PlaylistView: View {
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await load(api) }
                 .task { await load(api) }
                 .onAppear {

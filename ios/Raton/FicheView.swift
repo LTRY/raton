@@ -47,8 +47,9 @@ struct FicheView: View {
                 }
             }
             // Room under the last block so it can scroll clear of the tab bar.
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
         }
+        .barClearance()
         // Dragging the page down dismisses the keyboard instead of leaving it over the chat.
         .scrollDismissesKeyboard(.interactively)
         .ratonPage()
@@ -482,6 +483,8 @@ struct NowPlayingBar: View {
     @EnvironmentObject private var player: PlayerController
     /// Called when the title is tapped: the root opens the playlist or the fiche that is playing.
     let open: () -> Void
+    /// The buttons' height: the room the root keeps free under the pages for the bar.
+    static let height: CGFloat = 52
 
     var body: some View {
         if player.track?.kind == .audio || player.queue != nil {

@@ -38,6 +38,7 @@ struct OfflineView: View {
                 }
             }
         }
+        .barClearance()
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
     }

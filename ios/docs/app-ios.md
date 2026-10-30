@@ -75,10 +75,14 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   arrondis du telephone (`ConcentricRectangle`), donc elle est aussi ronde sur un
   iPhone 17e que sur un 18 Pro. La distance se compte depuis le bord de l'ecran
   et non depuis la zone de securite : `RootView` pose la barre dans un `ZStack`
-  qui ignore la zone de securite du bas et reserve sous les pages (encart vide)
-  la hauteur mesuree du mini-lecteur et de la barre. Poser la barre dans
-  un `safeAreaInset` qui ignorait cette zone marchait dans le simulateur iOS 27
-  mais pas sur un iPhone : la barre restait 34 pt plus haut. La page change avec
+  qui ignore la zone de securite du bas, au-dessus des pages. Chaque page defile
+  au-dessus d'elle grace a `barClearance()`, pose sur son `ScrollView` : une marge
+  basse (`contentMargins`) egale a la hauteur de la barre et du mini-lecteur,
+  plus 21 pt, que `RootView` donne par l'environnement (`barClearance`). Un
+  encart de zone de securite pose a la racine (`safeAreaInset`) se comptait
+  autrement dans le simulateur et sur un iPhone : le bas de la page restait
+  derriere le mini-lecteur. Une nouvelle page a defilement l'appelle ; une feuille
+  (`sheet`) n'en a pas besoin. La page change avec
   l'onglet (`.id(tab)`).
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de

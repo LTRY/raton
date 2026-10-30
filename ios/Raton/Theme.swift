@@ -132,3 +132,32 @@ struct StarsView: View {
         }
     }
 }
+
+// MARK: Room for the bottom bar
+
+private struct BarClearanceKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+
+extension EnvironmentValues {
+    /// How far the floating tab bar (and the mini player) reaches up from the bottom of the screen.
+    var barClearance: CGFloat {
+        get { self[BarClearanceKey.self] }
+        set { self[BarClearanceKey.self] = newValue }
+    }
+}
+
+private struct BarClearance: ViewModifier {
+    @Environment(\.barClearance) private var clearance
+
+    func body(content: Content) -> some View {
+        // On the scroll view itself, so that its last row can be scrolled clear of the bar. The system's own
+        // safe-area inset from the root was counted differently on the simulator and on a phone.
+        content
+            .contentMargins(.bottom, clearance, for: .scrollContent)
+            .contentMargins(.bottom, clearance, for: .scrollIndicators)
+    }
+}
+
+extension View {
+    /// For the main scroll view of a screen shown above the tab bar.
+    func barClearance() -> some View { modifier(BarClearance()) }
+}

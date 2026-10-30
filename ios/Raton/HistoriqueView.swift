@@ -51,6 +51,7 @@ struct HistoriqueView: View {
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await reload(api) }
                 .task { await reload(api) }
             }

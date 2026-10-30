@@ -27,6 +27,10 @@ struct RootView: View {
     @State private var libraryPath = NavigationPath()
     @State private var playlistsPath = NavigationPath()
     @EnvironmentObject private var player: PlayerController
+    /// What the bar and the mini player take when the measure is not there yet (see `TabPill.height`).
+    private var expectedBarHeight: CGFloat {
+        TabPill.height + (player.track?.kind == .audio || player.queue != nil ? NowPlayingBar.height + 6 : 0)
+    }
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -49,10 +53,8 @@ struct RootView: View {
                     .id(tab)
                     .transition(.opacity)
                     .animation(.easeInOut(duration: 0.15), value: tab)
-                    // Room under the pages for the bar, which floats over them.
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        Color.clear.frame(height: barHeight + (keyboardUp ? 0 : TabPill.bottomGap))
-                    }
+                    // The bar floats over the pages: each one scrolls clear of it (`barClearance`).
+                    .environment(\.barClearance, keyboardUp ? 0 : max(barHeight, expectedBarHeight) + TabPill.bottomGap)
 
                     VStack(spacing: 6) {
                         NowPlayingBar(open: openPlayer)
@@ -103,6 +105,8 @@ struct TabPill: View {
     /// The gap to the phone's sides, and to the bottom edge of the screen (Apple's floating bars: about 14 and 21 pt).
     static let margin: CGFloat = 14
     static let bottomGap: CGFloat = 21
+    /// The buttons' 52 pt and the 5 pt of padding around them.
+    static let height: CGFloat = 62
     /// Concentric with the phone's rounded corners, down to a full capsule.
     static let shape = ConcentricRectangle(corners: .concentric(minimum: 31), isUniform: true)
     @State private var plays = [0, 0, 0, 0, 0]

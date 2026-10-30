@@ -74,6 +74,7 @@ struct ChannelView: View {
                         explore(api)
                     }
                 }
+                .barClearance()
                 .refreshable { await reload(api) }
                 .task {
                     await loadDetail(api)
