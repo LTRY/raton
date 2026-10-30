@@ -236,7 +236,8 @@ front (`front/static/js/playlist-player.js`, `docs/spec/08-medias-et-lecteurs.md
 « File d'une playlist »), presente comme celui d'une fiche : le bouton video /
 audio est dans la barre du haut, la video et la carte audio (vignette de la piste)
 sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
-barre de progression est sous la carte audio, puis vient le titre de la piste
+barre de progression est dans la vignette de la scene audio (blanche, au bas,
+avec le temps ecoule et la duree ; la fiche garde la sienne sous la pochette), puis vient le titre de la piste
 (il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
 file (aleatoire, precedent, lecture, suivant, boucle) sont sur la scene audio en
 mode audio : la vignette de la piste remplit toute la scene (pas de pochette

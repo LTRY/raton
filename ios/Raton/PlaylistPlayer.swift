@@ -25,9 +25,6 @@ struct PlaylistPlayerPanel: View {
             } audio: {
                 audioStage
             }
-            if player.queueMode == .audio {
-                AudioSeekBar(videoID: owns ? (player.track?.videoID ?? -1) : -1).transition(.opacity)
-            }
             nowPlaying
             // On the audio stage the controls are over the cover; the video stage has the native player's own.
             if player.queueMode == .video { controls(onStage: false).padding(.top, 8) }
@@ -71,7 +68,8 @@ struct PlaylistPlayerPanel: View {
         }
     }
 
-    /// The audio: the track's thumbnail fills the stage, under a dark veil, with the queue controls centered on it.
+    /// The audio: the track's thumbnail fills the stage, under a dark veil, with the queue controls centered
+    /// and the progress bar at its foot.
     private var audioStage: some View {
         ZStack {
             AudioStageBackground()
@@ -81,7 +79,15 @@ struct PlaylistPlayerPanel: View {
                     .clipped()
                     .overlay(Color.black.opacity(playable > 0 ? 0.5 : 0.25))
             }
-            if playable > 0 { controls(onStage: true) }
+            if playable > 0 {
+                controls(onStage: true)
+                // The progress bar sits at the foot of the thumbnail.
+                VStack {
+                    Spacer()
+                    AudioSeekBar(videoID: owns ? (player.track?.videoID ?? -1) : -1, onStage: true)
+                        .padding(.bottom, 8)
+                }
+            }
         }
     }
 

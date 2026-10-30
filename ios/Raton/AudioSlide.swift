@@ -129,6 +129,8 @@ struct GlassDiscButton: View {
 /// a time bubble while dragging and the two times below. Inert until this audio is the loaded track.
 struct AudioSeekBar: View {
     let videoID: Int
+    /// On a stage (over a thumbnail): white track, fill and times instead of the terracotta on cream.
+    var onStage = false
     @EnvironmentObject private var player: PlayerController
     @State private var dragging = false
     @State private var dragPosition = 0.0
@@ -143,11 +145,11 @@ struct AudioSeekBar: View {
             GeometryReader { proxy in
                 let width = proxy.size.width - 32
                 ZStack(alignment: .topLeading) {
-                    Capsule().fill(Color(hex: 0x2B2018).opacity(0.18))
+                    Capsule().fill(onStage ? Color.white.opacity(0.3) : Color(hex: 0x2B2018).opacity(0.18))
                         .frame(width: width, height: 6).offset(x: 16, y: 19)
-                    Capsule().fill(Theme.primary)
+                    Capsule().fill(onStage ? Color.white : Theme.primary)
                         .frame(width: width * progress, height: 6).offset(x: 16, y: 19)
-                    RoundedRectangle(cornerRadius: 2).fill(Theme.text)
+                    RoundedRectangle(cornerRadius: 2).fill(onStage ? Color.white : Theme.text)
                         .frame(width: 4, height: 22)
                         .scaleEffect(x: dragging ? 1.5 : 1, y: dragging ? 1.25 : 1)
                         .offset(x: 16 + width * progress - 2, y: 11)
@@ -179,10 +181,10 @@ struct AudioSeekBar: View {
                 Spacer()
                 Text(active && duration > 0 ? Format.clock(duration) : "--:--")
             }
-            .font(.raton(13, .semibold)).monospacedDigit().foregroundStyle(Color(hex: 0x5C4D3C))
+            .font(.raton(13, .semibold)).monospacedDigit().foregroundStyle(onStage ? Color.white.opacity(0.9) : Color(hex: 0x5C4D3C))
             .padding(.horizontal, 16).padding(.top, -10)
         }
         .opacity(active ? 1 : 0.55)
-        .padding(.top, 6)
+        .padding(.top, onStage ? 0 : 6)
     }
 }
