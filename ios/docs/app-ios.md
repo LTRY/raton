@@ -68,7 +68,10 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   a 12 pt des bords, verre depoli leger (flou, voile blanc a 12 %, liseré clair)
   sous lequel la page defile, icones de 28 pt ; l'onglet actif a le lavis
   terracotta pale avec un reflet blanc et une ombre chaude ; elle s'efface quand
-  le clavier est ouvert, comme sur le web.
+  le clavier est ouvert, comme sur le web. Elle est a 14 pt du bord bas de
+  l'ecran : l'encart qui la porte descend sous l'indicateur d'accueil au lieu
+  d'un padding negatif, qui sur iOS 27 laissait le bas de la pilule sans toucher ;
+  la page change avec l'onglet (`.id(tab)`).
 - **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
   le retour et les menus, lignes de liste pleine largeur a vignette a gauche
   (duree, barre de progression), cartes blanches pour les chaines et les

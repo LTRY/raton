@@ -20,12 +20,6 @@ struct RootView: View {
     @State private var tab = 0
     @State private var keyboardUp = false
 
-    private static var barBottomPadding: CGFloat {
-        let safe = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-            .first?.keyWindow?.safeAreaInsets.bottom ?? 0
-        return safe > 14 ? 14 - safe : 14
-    }
-
     var body: some View {
         Group {
             if state.serverURL == nil {
@@ -42,15 +36,18 @@ struct RootView: View {
                     default: NavigationStack { SettingsView() }
                     }
                 }
+                .id(tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 8) {
                         NowPlayingBar()
                         // The web hides the bar while a text field has the keyboard.
                         if !keyboardUp { TabPill(tab: $tab) }
                     }
-                    // Lower than the safe area, so the pill sits 14 pt from the screen's edge, following
-                    // the phone's rounded corners (just above the home indicator).
-                    .padding(.bottom, Self.barBottomPadding)
+                    // The pill sits 14 pt from the screen's edge, following the phone's rounded corners
+                    // (just above the home indicator): the inset reaches under the home indicator so the
+                    // whole bar stays inside its own bounds and receives taps.
+                    .padding(.bottom, 14)
+                    .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
         }
