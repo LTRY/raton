@@ -136,7 +136,8 @@ demarrage. Le jeton ne vit pas dans `ops.toml` (versionne).
 
 Un seul deploiement a la fois, qu'il vienne du
 bouton ou d'un `scripts/deploy.sh` lance a la main. `deploy.sh` se relance sous
-`ops/deploy_lock.py`, qui prend sans attendre un `fcntl.flock` exclusif sur
+`ops/deploy_lock.py` (bibliotheque standard seule, lance par le `python3` de
+l'hote, donc compatible Python 3.9), qui prend sans attendre un `fcntl.flock` exclusif sur
 `.local/previews/deploy.lock` puis execute le script ; le verrou est tenu tant
 que le deploiement (et ses processus fils) tourne, et le noyau le libere si le
 processus meurt. Si un autre deploiement le tient, `deploy.sh` n'a rien fait

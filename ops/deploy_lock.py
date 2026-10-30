@@ -9,6 +9,9 @@ lock is already held by its own tree and does not take it again.
 Spec: ops/docs/outil-ops.md, section "Verrou de deploiement".
 """
 
+# Run by the host's `python3` (3.9 on macOS), which predates `X | None` at runtime.
+from __future__ import annotations
+
 import fcntl
 import os
 import sys
