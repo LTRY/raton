@@ -26,7 +26,7 @@ Sur un Mac avec Xcode et [XcodeGen](https://github.com/yonaskolb/XcodeGen) :
 cd ios && xcodegen && open Raton.xcodeproj
 ```
 
-`ios/project.yml` decrit le projet (cible iOS 16, `ios/Raton/` en sources) ;
+`ios/project.yml` decrit le projet (cible iOS 26 minimum, `ios/Raton/` en sources) ;
 `*.xcodeproj` n'est pas versionne. Choisir son equipe de signature dans Xcode
 (Signing & Capabilities) pour installer l'app sur un iPhone.
 

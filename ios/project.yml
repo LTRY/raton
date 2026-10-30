@@ -2,7 +2,7 @@ name: Raton
 options:
   bundleIdPrefix: fr.raton
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 settings:
   base:
