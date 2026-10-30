@@ -71,20 +71,17 @@ struct PlaylistPlayerPanel: View {
         }
     }
 
-    /// The audio: the web's phone card, the cover of the track with the queue controls under it.
+    /// The audio: the track's thumbnail fills the stage, under a dark veil, with the queue controls centered on it.
     private var audioStage: some View {
         ZStack {
             AudioStageBackground()
-            // The cover up top, the controls under it across the whole width of the phone.
-            VStack(spacing: 0) {
-                AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api,
-                           size: playable > 0 ? 124 : 168)
-                    .padding(.top, playable > 0 ? 14 : 0)
-                if playable > 0 {
-                    Spacer(minLength: 0)
-                    controls(onStage: true).padding(.bottom, 6)
-                }
+            if let shown, shown.hasThumbnail {
+                Color.clear
+                    .overlay { Thumbnail(videoID: shown.videoID, hasThumbnail: true, api: api) }
+                    .clipped()
+                    .overlay(Color.black.opacity(playable > 0 ? 0.5 : 0.25))
             }
+            if playable > 0 { controls(onStage: true) }
         }
     }
 

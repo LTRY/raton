@@ -234,15 +234,17 @@ visionnage). Le Vu a 90 % est decide par le back. Si `sponsor_skip_enabled`, le 
 Le haut d'une playlist est un lecteur de file, avec les regles du lecteur du
 front (`front/static/js/playlist-player.js`, `docs/spec/08-medias-et-lecteurs.md`,
 « File d'une playlist »), presente comme celui d'une fiche : le bouton video /
-audio est dans la barre du haut, la video et la carte audio (pochette de la piste)
+audio est dans la barre du haut, la video et la carte audio (vignette de la piste)
 sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
 barre de progression est sous la carte audio, puis vient le titre de la piste
 (il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
 file (aleatoire, precedent, lecture, suivant, boucle) sont sur la scene audio en
-mode audio : en blanc, repartis sur toute la largeur de l'ecran (24 pt de marge,
-boutons de 44 pt), sous la pochette qui est ramenee a 124 pt et remontee ; le
-bouton lecture est un disque en Liquid Glass, un seul bouton lecture. Sans piste
-lisible, la pochette reprend ses 168 pt et la rangee disparait. En mode video, la video a ses
+mode audio : la vignette de la piste remplit toute la scene (pas de pochette
+carree dans une playlist), sous un voile sombre, et la rangee est centree dessus,
+en blanc, repartie sur toute la largeur de l'ecran (24 pt de marge, boutons de
+44 pt) ; le bouton lecture est un disque en Liquid Glass, un seul bouton lecture.
+Sans vignette, c'est le degrade brun de la scene ; sans piste lisible, la rangee
+disparait. La fiche garde sa pochette carree de 168 pt. En mode video, la video a ses
 commandes natives et la rangee de boutons reste sous l'image :
 
 - le format par defaut se choisit par playlist dans le menu « ⋯ » (« Format par
