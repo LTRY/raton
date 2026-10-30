@@ -123,12 +123,31 @@ struct VideoList: View {
                     .buttonStyle(.plain)
                     rowMenu(card)
                 }
+                .swipeActions(edge: .trailing) {
+                    Button { Task { await setState(card, card.shownState == "watched" ? "unwatched" : "watched") } } label: {
+                        Label(card.shownState == "watched" ? "Non vu" : "Vu",
+                              systemImage: card.shownState == "watched" ? "eye.slash" : "checkmark.circle")
+                    }
+                    .tint(Theme.primary)
+                    Button { Task { await setState(card, card.shownState == "hidden" ? "clear" : "hidden") } } label: {
+                        Label(card.shownState == "hidden" ? "Démasquer" : "Indésirée", systemImage: "eye.slash")
+                    }
+                    .tint(Theme.textSoft)
+                }
                 .task { await model.loadMore(api: api, search: search, after: card) }
             }
             if model.loaded && model.items.isEmpty && model.errorMessage == nil {
                 EmptyMessage(text: "Aucune fiche.")
             }
         }
+        .rowSwipeContainer()
+    }
+}
+
+extension View {
+    /// Lets the rows of a scrolling stack be swiped (iOS 27); before that the row's "⋮" menu is the only way.
+    @ViewBuilder fileprivate func rowSwipeContainer() -> some View {
+        if #available(iOS 27, *) { swipeActionsContainer() } else { self }
     }
 }
 
