@@ -19,7 +19,7 @@ final class NavigationTests: XCTestCase {
 
     func testEveryTabOpensItsPage() {
         openTab("Chaînes", shows: "Chaînes")
-        openTab("Bibliothèque", shows: "Exploration")
+        openTab("Bibliothèque", shows: "Bibliothèque")
         openTab("Playlists", shows: "Playlists")
         openTab("Paramètres", shows: "Paramètres")
         // Raton's line changes at each visit: the Accueil is told by the previous page going away.
@@ -28,7 +28,7 @@ final class NavigationTests: XCTestCase {
     }
 
     func testLibraryMenuOpensTheHistorique() {
-        openTab("Bibliothèque", shows: "Exploration")
+        openTab("Bibliothèque", shows: "Bibliothèque")
         app.buttons["Vues"].tap()
         app.buttons["Historique"].tap()
         XCTAssertTrue(app.staticTexts["Historique"].waitForExistence(timeout: 5))
