@@ -89,6 +89,8 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
 
 Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Parametres.
 
+Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` qui leve un etat lu par `navigationDestination(isPresented:)` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher.
+
 | Ecran | Role | Appels |
 | --- | --- | --- |
 | Adresse du serveur (premier lancement, puis Parametres) | Saisie de l'URL, validee avant d'etre gardee dans `UserDefaults` | `GET /api/users` (200 attendu) |

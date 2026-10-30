@@ -138,6 +138,9 @@ struct LibraryView: View {
     fileprivate let followed: Bool
     @State fileprivate var search = ""
     @State fileprivate var showFilters = false
+    // A NavigationLink inside a Menu does nothing when tapped, so the ☰ entries set these instead.
+    @State fileprivate var showNouveautes = false
+    @State fileprivate var showHistorique = false
 
     init(followed: Bool = false) {
         self.followed = followed
@@ -170,6 +173,8 @@ struct LibraryView: View {
                 }
                 .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
+                .navigationDestination(isPresented: $showNouveautes) { NouveautesView(back: true) }
+                .navigationDestination(isPresented: $showHistorique) { HistoriqueView() }
                 .sheet(isPresented: $showFilters) {
                     // Changing `filters` reloads the list (see `onChange` above).
                     LibraryFiltersSheet(api: api, filters: model.filters) { chosen in
@@ -194,8 +199,8 @@ extension LibraryView {
                     Button { model.filters = LibraryFilters() } label: {
                         Label("Exploration", systemImage: "checkmark")
                     }
-                    NavigationLink { NouveautesView(back: true) } label: { Label("Nouveautés", systemImage: "sparkles") }
-                    NavigationLink { HistoriqueView() } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                    Button { showNouveautes = true } label: { Label("Nouveautés", systemImage: "sparkles") }
+                    Button { showHistorique = true } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
                 } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(CircleButtonStyle())
                 .accessibilityLabel("Vues")
