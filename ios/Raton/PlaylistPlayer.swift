@@ -29,7 +29,8 @@ struct PlaylistPlayerPanel: View {
                 AudioSeekBar(videoID: owns ? (player.track?.videoID ?? -1) : -1).transition(.opacity)
             }
             nowPlaying
-            controls.padding(.top, 8)
+            // On the audio stage the controls are over the cover; the video stage has the native player's own.
+            if player.queueMode == .video { controls(onStage: false).padding(.top, 8) }
             if detail.freeListening {
                 Text("Écoute libre : rien n'est ajouté à l'historique").font(.raton(13)).foregroundStyle(Theme.textMuted)
                     .padding(.top, 10)
@@ -75,6 +76,14 @@ struct PlaylistPlayerPanel: View {
         ZStack {
             AudioStageBackground()
             AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api)
+                .offset(y: -12)
+            VStack {
+                Spacer()
+                controls(onStage: true)
+                    .padding(.bottom, 8).padding(.top, 18)
+                    .frame(maxWidth: .infinity)
+                    .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
+            }
         }
     }
 
@@ -90,38 +99,46 @@ struct PlaylistPlayerPanel: View {
                 Text("Aucune piste lisible").font(.raton(18, .bold)).foregroundStyle(Theme.text)
                 Text("Aucune fiche n'a de fichier \(player.queueMode == .audio ? "audio" : "vidéo").")
                     .font(.raton(14)).foregroundStyle(Theme.textMuted)
-            } else {
-                Text("\(playable) piste\(playable > 1 ? "s" : "") à lire").font(.raton(18, .bold))
-                    .foregroundStyle(Theme.text)
             }
         }
-        .padding(.horizontal, 20).padding(.top, 8)
+        .padding(.horizontal, 20).padding(.top, owns || playable == 0 ? 8 : 0)
     }
 
-    private var controls: some View {
-        HStack(spacing: 22) {
-            toggle("shuffle", on: player.shuffle, label: "Aléatoire") { player.shuffle.toggle() }
+    /// Shuffle, previous, play-pause, next, loop. On the stage they are white over the cover, the play button
+    /// a glass disc; under the video they are the sand and terracotta ones of the fiche.
+    private func controls(onStage: Bool) -> some View {
+        HStack(spacing: onStage ? 20 : 22) {
+            toggle("shuffle", on: player.shuffle, label: "Aléatoire", onStage: onStage) { player.shuffle.toggle() }
             Button { player.previous() } label: { Image(systemName: "backward.fill") }
                 .disabled(!owns).accessibilityLabel("Piste précédente")
             Button(action: playPause) {
                 Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 26)).foregroundStyle(Theme.primary)
-                    .frame(width: 60, height: 60).surface(in: Circle(), tint: Theme.primary, interactive: true)
+                    .font(.system(size: onStage ? 22 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
+                    .frame(width: onStage ? 52 : 60, height: onStage ? 52 : 60)
+                    .modifier(PlayDisc(onStage: onStage))
             }
             .disabled(playable == 0)
             .accessibilityLabel(owns && player.isPlaying ? "Pause" : "Lecture")
             Button { player.next() } label: { Image(systemName: "forward.fill") }
                 .disabled(!owns).accessibilityLabel("Piste suivante")
-            toggle("repeat", on: player.loop, label: "Boucle") { player.loop.toggle() }
+            toggle("repeat", on: player.loop, label: "Boucle", onStage: onStage) { player.loop.toggle() }
         }
-        .font(.system(size: 20)).foregroundStyle(Theme.textSoft)
+        .font(.system(size: onStage ? 18 : 20)).foregroundStyle(onStage ? Color.white : Theme.textSoft)
     }
 
-    private func toggle(_ icon: String, on: Bool, label: String, action: @escaping () -> Void) -> some View {
+    private func toggle(_ icon: String, on: Bool, label: String, onStage: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
-                .frame(width: 46, height: 46)
-                .surface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
+            Group {
+                if onStage {
+                    // Over the cover: a white icon, lit up in a warm tone when on.
+                    Image(systemName: icon).foregroundStyle(on ? Color(hex: 0xFFB48A) : Color.white)
+                        .frame(width: 40, height: 44)
+                } else {
+                    Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
+                        .frame(width: 46, height: 46)
+                        .surface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
+                }
+            }
         }
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])
@@ -152,5 +169,18 @@ struct PlaylistTitleBlock: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20).padding(.vertical, 12)
+    }
+}
+
+/// The play-pause disc: terracotta ring under the video, Liquid Glass over the audio cover.
+private struct PlayDisc: ViewModifier {
+    let onStage: Bool
+
+    func body(content: Content) -> some View {
+        if onStage {
+            content.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            content.surface(in: Circle(), tint: Theme.primary, interactive: true)
+        }
     }
 }

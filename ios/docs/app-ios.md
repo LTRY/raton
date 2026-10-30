@@ -234,11 +234,14 @@ visionnage). Le Vu a 90 % est decide par le back. Si `sponsor_skip_enabled`, le 
 Le haut d'une playlist est un lecteur de file, avec les regles du lecteur du
 front (`front/static/js/playlist-player.js`, `docs/spec/08-medias-et-lecteurs.md`,
 « File d'une playlist »), presente comme celui d'une fiche : le bouton video /
-audio est dans la barre du haut, la video et la carte audio (pochette de la piste,
-bouton lecture en verre) sont cote a cote dans le meme carrousel (`MediaPager`) et
-suivent le doigt, la barre de progression est sous la carte audio, puis viennent
-le titre de la piste et les boutons de la file (aleatoire, precedent, lecture,
-suivant, boucle) :
+audio est dans la barre du haut, la video et la carte audio (pochette de la piste)
+sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
+barre de progression est sous la carte audio, puis vient le titre de la piste
+(il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
+file (aleatoire, precedent, lecture, suivant, boucle) sont sur la vignette en
+mode audio : en blanc au bas de la carte, sur un degrade sombre, avec le bouton
+lecture en Liquid Glass, un seul bouton lecture. En mode video, la video a ses
+commandes natives et la rangee de boutons reste sous l'image :
 
 - le format par defaut se choisit par playlist dans le menu « ⋯ » (« Format par
   defaut »), garde sur l'iPhone (`UserDefaults`, une cle par playlist) : la page
