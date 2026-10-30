@@ -1,3 +1,4 @@
+import AVKit
 import SwiftUI
 
 /// The rounded search field of the web's list pages.
@@ -112,5 +113,48 @@ extension View {
         padding(.horizontal, 14).padding(.vertical, 11)
             .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.border, lineWidth: 1))
+    }
+}
+
+/// The system's own video player (AVPlayerViewController), with its native controls: play, seek,
+/// Picture in Picture and the full-screen button, which rotates to landscape.
+struct NativeVideoPlayer: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = true
+        controller.videoGravity = .resizeAspect
+        controller.allowsPictureInPicturePlayback = true
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        if controller.player !== player { controller.player = player }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Entering or leaving full screen moves the player view to another controller, which makes
+    /// `AVPlayerViewController` pause; a video that was playing carries on once the transition ends.
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        func playerViewController(_ controller: AVPlayerViewController,
+                                  willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            keepPlaying(controller, through: coordinator)
+        }
+
+        func playerViewController(_ controller: AVPlayerViewController,
+                                  willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            keepPlaying(controller, through: coordinator)
+        }
+
+        private func keepPlaying(_ controller: AVPlayerViewController, through coordinator: UIViewControllerTransitionCoordinator) {
+            let wasPlaying = controller.player?.timeControlStatus != .paused
+            coordinator.animate(alongsideTransition: nil) { _ in
+                if wasPlaying { controller.player?.play() }
+            }
+        }
     }
 }

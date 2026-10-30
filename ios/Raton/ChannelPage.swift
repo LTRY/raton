@@ -69,7 +69,7 @@ struct ChannelView: View {
                                 .font(.raton(15, .bold)).foregroundStyle(Theme.textSoft)
                                 .padding(.horizontal, 16).padding(.bottom, 8)
                         }
-                        VideoList(model: model, api: api, search: search, dateLine: true)
+                        VideoList(model: model, api: api, search: search, dateLine: true, shorts: inShorts)
                         if model.loaded && model.items.isEmpty { emptyState(api) }
                         explore(api)
                     }
@@ -236,12 +236,6 @@ struct ChannelView: View {
                 }
                 .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
             }
-            Button { Task { await setRating(api, 0) } } label: {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Theme.textFaint)
-            }
-            .padding(.leading, 2)
-            .accessibilityLabel("Retirer la note")
         }
         .frame(maxWidth: .infinity).frame(height: 48)
         .surface(in: RoundedRectangle(cornerRadius: 16, style: .continuous))

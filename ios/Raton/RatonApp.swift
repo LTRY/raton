@@ -38,7 +38,7 @@ struct RootView: View {
                     case 0: AccueilView()
                     case 1: NavigationStack { ChannelsView() }
                     case 2: NavigationStack { LibraryView() }
-                    case 3: NavigationStack { PlaylistsView() }
+                    case 3: PlaylistsView()
                     default: NavigationStack { SettingsView() }
                     }
                 }
@@ -142,5 +142,14 @@ struct PageHeader<Trailing: View>: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 12)
+    }
+}
+
+// Only vertical scrolling moves a page: the swipe from the left edge that carries the page back is
+// switched off (every screen has its own back button).
+extension UINavigationController {
+    open override func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.isEnabled = false
     }
 }

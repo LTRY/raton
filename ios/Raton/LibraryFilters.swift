@@ -47,16 +47,6 @@ struct LibraryFilters: Equatable {
         items.append(URLQueryItem(name: "category_filter_mode", value: categoryMode))
         return items
     }
-
-    mutating func apply(_ view: SavedView) {
-        assets = Set(view.assets)
-        excludedAssets = Set(view.excludedAssets)
-        categories = Set(view.categories)
-        excludedCategories = Set(view.excludedCategories)
-        rated = view.rated
-        assetMode = view.assetFilterMode
-        categoryMode = view.categoryFilterMode
-    }
 }
 
 /// A chip that goes unset → included → excluded as it is tapped, like the web's three-state chips.
@@ -89,7 +79,6 @@ struct LibraryFiltersSheet: View {
     @State var filters: LibraryFilters
     let onApply: (LibraryFilters) -> Void
     @State private var styles: [CategoryStyle] = []
-    @State private var views: [SavedView] = []
     @Environment(\.dismiss) private var dismiss
 
     private static let sorts = [
@@ -105,18 +94,6 @@ struct LibraryFiltersSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    if !views.isEmpty {
-                        section("Vues enregistrées") {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack {
-                                    ForEach(views, id: \.name) { view in
-                                        Button(view.name) { filters.apply(view) }
-                                            .buttonStyle(SandButtonStyle(fill: false))
-                                    }
-                                }
-                            }
-                        }
-                    }
                     section("Trier") {
                         Picker("", selection: $filters.sort) {
                             ForEach(Self.sorts, id: \.0) { Text($0.1).tag($0.0) }
@@ -171,7 +148,6 @@ struct LibraryFiltersSheet: View {
         }
         .task {
             styles = (try? await api.get("/api/categories")) ?? []
-            views = (try? await api.get("/api/library/views")) ?? []
         }
     }
 

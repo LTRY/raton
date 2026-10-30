@@ -73,7 +73,8 @@ def purge_watched_media(db: Session, now: datetime | None = None) -> int:
     """Delete the media files of videos first watched (by anyone) more than RETENTION ago.
 
     Videos a user rated ARCHIVE_MIN_RATING or more are archived and never touched: the files
-    are shared, so one user's stars keep them for everyone. The row, thumbnail, metadata,
+    are shared, so one user's stars keep them for everyone. Shorts (their URL holds `/shorts/`)
+    are never purged either: only the user deletes them, by hand. The row, thumbnail, metadata,
     transcript and notes stay. Each file is committed separately so a failure leaves the
     database matching what is on disk.
     """
@@ -83,6 +84,7 @@ def purge_watched_media(db: Session, now: datetime | None = None) -> int:
             Video.watched_at.is_not(None),
             Video.watched_at < cutoff,
             ~_archived(Video.id),
+            ~Video.url.contains("/shorts/", autoescape=True),
             or_(Video.video_path.is_not(None), Video.audio_path.is_not(None)),
         )
     ).all()

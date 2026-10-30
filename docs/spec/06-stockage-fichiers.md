@@ -128,6 +128,8 @@ sont partages par tous les utilisateurs : la purge vaut pour tous.
   supprimes. Une baisse de note a 3 ou moins ne change pas `watched_at` ; si
   la date a plus de 7 jours et qu'aucun autre utilisateur ne la note 4+, la
   purge a lieu au passage suivant ;
+- un short (son URL contient `/shorts/`) n'est jamais purge : ses fichiers ne
+  partent que par la suppression a la main de l'utilisateur ;
 - les deux formats (`video_path` et `audio_path`) sont supprimes ensemble, des
   que l'un des deux a atteint 90 % ; la verification `is_relative_to(folder)`
   s'applique a chaque suppression ;

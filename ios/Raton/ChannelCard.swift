@@ -54,10 +54,6 @@ struct ChannelCard: View {
                         }
                         .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
                     }
-                    Button { Task { await setRating(0) } } label: {
-                        Image(systemName: "xmark").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.textFaint)
-                    }
-                    .padding(.leading, 2).accessibilityLabel("Retirer la note")
                 }
             }
             .padding(.horizontal, 14).padding(.vertical, 12)

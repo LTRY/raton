@@ -3,10 +3,7 @@ import SwiftUI
 
 enum FicheTab: String, CaseIterable {
     case info = "Plus d'informations"
-    case segments = "Segments"
-    case transcript = "Transcript"
     case notes = "Notes structurées"
-    case comment = "Commentaire"
     case chat = "Discussion"
 }
 
@@ -20,7 +17,6 @@ struct FicheView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var detail: VideoDetail?
     @State private var mode: MediaKind = .video
-    @State private var tab: FicheTab = .info
     @State private var errorMessage: String?
     @State private var notice: String?
     @State private var busy = false
@@ -28,6 +24,7 @@ struct FicheView: View {
     @State private var choosingQuality = false
     @State private var showCategories = false
     @State private var showPlaylists = false
+    @State private var showComment = false
     @State private var generating = false
 
     private var isLoaded: Bool { player.track?.videoID == videoID }
@@ -37,9 +34,9 @@ struct FicheView: View {
             VStack(spacing: 0) {
                 topBar
                 if let detail, let api = state.api {
-                    playerArea(detail, api: api)
-                    if isLoaded, player.track?.kind == .audio, mode == .audio {
-                        AudioControls().padding(.horizontal, 16).padding(.top, 12)
+                    mediaPager(detail, api: api)
+                    if mode == .audio {
+                        AudioSeekBar(videoID: detail.id).transition(.opacity)
                     }
                     infoBlock(detail, api: api)
                 } else if let message = errorMessage {
@@ -48,7 +45,11 @@ struct FicheView: View {
                     ProgressView().padding(.top, 80)
                 }
             }
+            // Room under the last block so it can scroll clear of the tab bar.
+            .padding(.bottom, 130)
         }
+        // Dragging the page down dismisses the keyboard instead of leaving it over the chat.
+        .scrollDismissesKeyboard(.interactively)
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
@@ -61,6 +62,21 @@ struct FicheView: View {
                 CategoryPickerSheet(api: api, selected: detail.categories) { chosen in
                     await save(api, "/api/videos/\(detail.id)/categories", ["categories": chosen])
                 }
+            }
+        }
+        .sheet(isPresented: $showComment) {
+            if let detail, let api = state.api {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Commentaire personnel").font(.raton(20, .bold)).foregroundStyle(Theme.text)
+                    CommentPanel(initial: detail.comment ?? "") { text in
+                        await save(api, "/api/videos/\(detail.id)/comment", ["comment": text])
+                        showComment = false
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(20)
+                .ratonPage()
+                .presentationDetents([.medium, .large])
             }
         }
         .sheet(isPresented: $showPlaylists) {
@@ -91,7 +107,7 @@ struct FicheView: View {
                 Spacer()
                 if let detail, let api = state.api { moreMenu(detail, api: api) }
             }
-            if let detail { modePill(detail) }
+            if detail != nil { MediaModePill(mode: mode, onSelect: select) }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -100,7 +116,23 @@ struct FicheView: View {
     /// The "⋮" menu: playlists, notes by the LLM, files, link to the source.
     private func moreMenu(_ detail: VideoDetail, api: RatonAPI) -> some View {
         Menu {
+            // The same two toggles as the front: Vu <-> unwatched, Indésirée <-> back to automatic.
+            Button {
+                Task { await save(api, "/api/videos/\(detail.id)/list-state",
+                                  ["state": detail.shownState == "watched" ? "unwatched" : "watched"]) }
+            } label: {
+                Label(detail.shownState == "watched" ? "Marquer comme non vu" : "Marquer comme vu",
+                      systemImage: detail.shownState == "watched" ? "eye.slash" : "checkmark.circle")
+            }
+            Button {
+                Task { await save(api, "/api/videos/\(detail.id)/list-state",
+                                  ["state": detail.shownState == "hidden" ? "clear" : "hidden"]) }
+            } label: {
+                Label(detail.shownState == "hidden" ? "Ne plus masquer" : "Marquer indésirée", systemImage: "eye.slash")
+            }
+            Divider()
             Button { showPlaylists = true } label: { Label("Playlists", systemImage: "text.badge.plus") }
+            Button { showComment = true } label: { Label("Écrire un commentaire personnel", systemImage: "square.and.pencil") }
             Button { generateNotes(api) } label: {
                 Label("Générer notes et résumé", systemImage: "sparkles")
             }
@@ -130,24 +162,13 @@ struct FicheView: View {
         .accessibilityLabel("Plus d'options")
     }
 
-    /// Video / audio switch, as on the web (the two files can coexist).
-    private func modePill(_ detail: VideoDetail) -> some View {
-        HStack(spacing: 4) {
-            ForEach([MediaKind.video, MediaKind.audio], id: \.self) { kind in
-                Button {
-                    select(kind)
-                } label: {
-                    Image(systemName: kind == .video ? "video" : "waveform")
-                        .font(.system(size: 18))
-                        .foregroundStyle(mode == kind ? Theme.primary : Theme.textMuted)
-                        .frame(width: 58, height: 38)
-                        .background(Capsule().fill(mode == kind ? Color.white : Color.clear))
-                }
-                .accessibilityLabel(kind == .video ? "Vidéo" : "Audio")
-            }
+    private func mediaPager(_ detail: VideoDetail, api: RatonAPI) -> some View {
+        MediaPager(mode: mode, onSelect: select) {
+            playerArea(detail, api: api)
+        } audio: {
+            AudioSlide(detail: detail, api: api, downloading: downloading,
+                       onDownload: { download(api, .audio, quality: nil) })
         }
-        .padding(4)
-        .sandTrack()
     }
 
     private func select(_ kind: MediaKind) {
@@ -163,8 +184,15 @@ struct FicheView: View {
     private func playerArea(_ detail: VideoDetail, api: RatonAPI) -> some View {
         ZStack {
             Theme.player
+            // The thumbnail fills the player until the video plays (audio keeps it behind the controls).
+            if detail.mediaUrls.thumbnail != nil {
+                Color.clear
+                    .overlay { Thumbnail(videoID: detail.id, hasThumbnail: true, api: api) }
+                    .clipped()
+                    .overlay(Color.black.opacity(0.25))
+            }
             if isLoaded, player.track?.kind == .video, mode == .video, let avPlayer = player.player {
-                VideoPlayer(player: avPlayer)
+                NativeVideoPlayer(player: avPlayer)
             } else if filePath(detail) != nil {
                 let playing = isLoaded && player.track?.kind == mode && player.isPlaying
                 Button {
@@ -208,16 +236,17 @@ struct FicheView: View {
 
     private func infoBlock(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(detail.title).font(.raton(28, .bold)).foregroundStyle(Theme.text)
+            Text(detail.title).font(.raton(21, .bold)).foregroundStyle(Theme.text)
             if let channel = detail.channel {
                 Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
             }
-            HStack(alignment: .top) {
+            HStack(alignment: .center, spacing: 6) {
                 CategoryChips(categories: detail.categories, api: api)
+                // Same size as the labels on its line.
                 Button { showCategories = true } label: {
                     Text("+ Catégories")
-                        .font(.raton(14, .semibold)).foregroundStyle(Theme.textFaint)
-                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .font(.raton(9, .semibold)).foregroundStyle(Theme.textFaint)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
                         .overlay(Capsule().strokeBorder(Theme.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
                 }
                 Spacer(minLength: 0)
@@ -237,30 +266,11 @@ struct FicheView: View {
             }
             .disabled(busy)
             Theme.border.frame(height: 1)
-            // Same toggles as the front: Vu <-> unwatched, Indésirée <-> back to automatic.
-            HStack(spacing: 8) {
-                Button {
-                    Task { await save(api, "/api/videos/\(detail.id)/list-state",
-                                      ["state": detail.shownState == "watched" ? "unwatched" : "watched"]) }
-                } label: {
-                    Label("Vu", systemImage: detail.shownState == "watched" ? "checkmark.circle.fill" : "checkmark.circle")
-                }
-                .buttonStyle(SandButtonStyle(active: detail.shownState == "watched"))
-                Button {
-                    Task { await save(api, "/api/videos/\(detail.id)/list-state",
-                                      ["state": detail.shownState == "hidden" ? "clear" : "hidden"]) }
-                } label: {
-                    Label("Indésirée", systemImage: detail.shownState == "hidden" ? "eye.slash.fill" : "eye.slash")
-                }
-                .buttonStyle(SandButtonStyle(active: detail.shownState == "hidden"))
-            }
-            .disabled(busy)
             if let notice { Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft) }
             if let message = errorMessage {
                 Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
             }
-            tabBar(detail)
-            panel(detail, api: api)
+            sections(detail, api: api)
         }
         .padding(16)
         .padding(.top, 8)
@@ -269,40 +279,37 @@ struct FicheView: View {
     private func tabs(_ detail: VideoDetail) -> [FicheTab] {
         FicheTab.allCases.filter { item in
             switch item {
-            case .transcript: return detail.hasTranscript || !detail.transcriptLines.isEmpty
             case .notes: return detail.documents.notes != nil || detail.documents.shortSummary != nil
             default: return true
             }
         }
     }
 
-    private func tabBar(_ detail: VideoDetail) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(tabs(detail), id: \.self) { item in
-                    let title = item == .segments && !detail.sponsorSegments.isEmpty
-                        ? "Segments (\(detail.sponsorSegments.count))" : item.rawValue
-                    Button(title) { tab = item }
-                        .buttonStyle(SandButtonStyle(active: tab == item, fill: false))
+    private func sectionTitle(_ item: FicheTab, _ detail: VideoDetail) -> String {
+        item.rawValue
+    }
+
+    /// The sections one under the other, in the order of `FicheTab`: no tabs to switch between.
+    private func sections(_ detail: VideoDetail, api: RatonAPI) -> some View {
+        VStack(alignment: .leading, spacing: 26) {
+            ForEach(tabs(detail), id: \.self) { item in
+                VStack(alignment: .leading, spacing: 10) {
+                    // The description (behind its own chevron) and the chat (a plain input) have no title.
+                    if item != .info && item != .chat {
+                        Text(sectionTitle(item, detail)).font(.raton(20, .bold)).foregroundStyle(Theme.text)
+                    }
+                    section(item, detail, api: api)
                 }
             }
-            // Room for the shadows, which the scroller would clip.
-            .padding(.vertical, 14)
         }
-        .padding(.vertical, -14)
+        .padding(.top, 6)
     }
 
     @ViewBuilder
-    private func panel(_ detail: VideoDetail, api: RatonAPI) -> some View {
-        switch tab {
+    private func section(_ item: FicheTab, _ detail: VideoDetail, api: RatonAPI) -> some View {
+        switch item {
         case .info: InfoPanel(detail: detail, seek: { seek($0, detail, api) })
-        case .segments: SegmentsPanel(detail: detail, seek: { seek($0, detail, api) })
-        case .transcript: TranscriptPanel(detail: detail, seek: { seek($0, detail, api) })
         case .notes: NotesPanel(detail: detail, generating: generating) { generateNotes(api) }
-        case .comment:
-            CommentPanel(initial: detail.comment ?? "") { text in
-                await save(api, "/api/videos/\(detail.id)/comment", ["comment": text])
-            }
         case .chat: ChatPanel(api: api, detail: detail) { await reload(api) }
         }
     }
@@ -399,7 +406,6 @@ struct FicheView: View {
                 _ = try await api.waitForLLMJob(job.jobId)
                 await reload(api)
                 notice = nil
-                tab = .notes
             } catch {
                 notice = nil
                 errorMessage = error.localizedDescription

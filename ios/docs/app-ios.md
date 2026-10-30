@@ -80,8 +80,9 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   livre qui saute, lignes de la playlist qui se tracent puis triangle qui
   apparait, curseurs des reglages qui se croisent) quand on touche l'onglet ;
   les tuiles de playlist entrent en fondu depuis 14 pt plus bas, decalees de
-  50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Le doigt pose sur une tuile rejoue le survol du web (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
+  50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Un toucher joue d'abord le survol du web (260 ms) puis ouvre la playlist ; un doigt qui reste pose le joue aussi, apres 90 ms ; un doigt qui glisse pour defiler ne le declenche pas. Ce survol (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
   « Reduire les animations ».
+- **Defilement vertical seulement** : le balayage depuis le bord gauche qui ramene en arriere en emportant la page est coupe (`UINavigationController`, `RatonApp.swift`) ; chaque ecran a son bouton de retour.
 - Le design Liquid Glass essaye avant a ete abandonne ; il n'en reste rien.
 
 ## Ecrans
@@ -92,16 +93,15 @@ Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlist
 | --- | --- | --- |
 | Adresse du serveur (premier lancement, puis Parametres) | Saisie de l'URL, validee avant d'etre gardee dans `UserDefaults` | `GET /api/users` (200 attendu) |
 | Choix de l'utilisateur | Liste des utilisateurs ; dans Parametres, creer (+) et supprimer (appui long) | `GET/POST /api/users`, `DELETE /api/users/{id}` |
-| Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique, la barre de discussion ; menu : Nouveautes, Historique, Recherche | `POST /api/raton/visit`, `/static/img/raton/<art>` |
-| Discussion | Discussion avec la bibliotheque : les reponses citent des fiches (toucher ouvre la fiche), choix, nouvelle et suppression de discussion | `GET/POST /api/chat`, `GET/DELETE /api/chat/conversations/{id}`, `GET /api/llm-jobs/{id}` |
-| Nouveautes | Les fiches Nouvelles, une pile par chaine, dix chaines par page ; tirer pour rafraichir ; bouton Historique | `GET /api/nouveautes?page=N`, `GET /api/videos/{id}/thumbnail` |
+| Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique (rien d'autre : ni menu ni barre de discussion) | `POST /api/raton/visit`, `/static/img/raton/<art>` |
+| Nouveautes | Comme sur le web, la page d'Exploration sur les chaines suivies : une seule liste de fiches, les plus recentes d'abord (pas de pile par chaine), avec la recherche, les filtres et la bascule « tout voir » ; fleche de retour et bouton Historique | `GET /api/library?followed=true`, `GET /api/videos/{id}/thumbnail` |
 | Historique | Ce qui a ete lu, par jour | `GET /api/historique?page=N` |
 | Recherche | Videos et chaines YouTube ; importer une video (video ou audio) ou ajouter une chaine | `GET /api/youtube/videos\|channels`, `POST /api/videos/import`, `POST /api/channels` |
 | Chaines | Titre avec le nombre de chaines, recherche, « ★ Notees » (actif par defaut) et tri (dernier media joue par defaut) ; chaque chaine est une carte comme sur le web : banniere avec l'avatar par-dessus, nom, nombre de fiches, derniere activite, cloches et note qui s'utilisent depuis la liste ; menu « + » vers l'ajout par adresse et la Recherche | `GET /api/channels?q=&page=&sort=&rated=`, `PUT .../bells/{section}`, `PUT .../rating`, `POST /api/channels` |
-| Chaine | Comme la page du front : banniere (degrade terracotta sans banniere) avec l'avatar par-dessus, nom qui ouvre YouTube, cloches videos et shorts avec leur pastille, note (et × pour la retirer), menu « ⋯ » (statistiques, categories, rafraichir le profil, supprimer) ; description (« Voir plus ») et mots-cles (+N) ; bascule Videos / Shorts, bouton de recherche des nouveautes sur YouTube, recherche, bascule « tout voir » / « masquer les vues », tri (publication recente par defaut) et Filtres ; ses fiches avec la date de publication ; « Explorer la suite » | `GET /api/channels/{id}`, `PUT /api/channels/{id}/bells/{section}`, `.../rating`, `.../categories`, `POST .../refresh-profile`, `POST .../import-metadata` puis `GET /api/jobs/{id}`, `DELETE`, `GET /api/library?channel_id=` (`counts`, `explore_next_page`, `explore_page_size`) |
-| Bibliotheque | Comme la page « Exploration » du front : bouton ☰ (vues enregistrees, Nouveautes, Historique) et titre de la vue en cours, bascule « tout voir » / « masquer les vues », recherche, « Filtres » avec le nombre de filtres actifs et leurs pastilles (retirer une pastille ou « Tout effacer ») ; chaque fiche a un menu « ⋮ » (Vu, Indesiree) ; feuille de filtres : tri, section, types de fichier et categories a trois etats, notees, sans categorie | `GET /api/library` (`sort`, `section`, `asset`, `exclude_asset`, `category`, `exclude_category`, `rated`, `uncategorized`, `hide`, modes, `q`), `GET /api/library/views`, `GET /api/categories`, `PUT /api/videos/{id}/list-state` |
-| Playlists | Titre avec le nombre, recherche (sur le titre), grille a deux colonnes de tuiles comme le web (pile de cartes, pastille de source, nombre de videos, menu « ⋯ » : dupliquer, supprimer) ; menu « + » : creer, importer une playlist YouTube | `GET/POST /api/playlists`, `POST /api/playlists/import-url`, `POST .../duplicate`, `DELETE` |
-| Playlist | Lecteur de file en tete (voir « Lecteur de playlist »), fiches dans l'ordre : un toucher joue la piste, le « i » ouvre la fiche ; renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
+| Chaine | Comme la page du front : banniere (degrade terracotta sans banniere) avec l'avatar par-dessus, nom qui ouvre YouTube, cloches videos et shorts avec leur pastille, note (toucher l'etoile deja choisie remet 0, pas de ×), menu « ⋯ » (statistiques, categories, rafraichir le profil, supprimer) ; description (« Voir plus ») et mots-cles (+N) ; bascule Videos / Shorts, bouton de recherche des nouveautes sur YouTube, recherche, bascule « tout voir » / « masquer les vues », tri (publication recente par defaut) et Filtres ; ses fiches avec la date de publication (les shorts en mosaique de tuiles portrait : 3 colonnes, grande tuile 2×2 avec le titre pour un short nouveau ou note 5, comme le front ; toucher une tuile lit le short en plein ecran dans le lecteur natif, apres l'avoir telecharge en 1080p s'il n'a pas de fichier, avec un cercle de chargement sans texte sur la tuile ; la petite fleche de la tuile ouvre la fiche) ; « Explorer la suite » | `GET /api/channels/{id}`, `PUT /api/channels/{id}/bells/{section}`, `.../rating`, `.../categories`, `POST .../refresh-profile`, `POST .../import-metadata` puis `GET /api/jobs/{id}`, `DELETE`, `GET /api/library?channel_id=` (`counts`, `explore_next_page`, `explore_page_size`) |
+| Bibliotheque | Comme la page « Exploration » du front : bouton ☰ (Exploration, Nouveautes, Historique : les vues enregistrees du web n'y figurent pas, ni dans la feuille « Filtres », ce serait la meme chose qu'Exploration) et titre « Exploration » suivi du nombre de fiches dans une pastille (pas de titre « Bibliotheque » ni de compteur plus bas), recherche, « Filtres » avec le nombre de filtres actifs et, a sa droite sur la meme ligne, la bascule « tout voir » / « masquer les vues » (pas de pastilles sous le bouton : les filtres se retrouvent et s'effacent dans la feuille « Filtres ») ; chaque fiche a un menu « ⋮ » (Vu, Indesiree) ; feuille de filtres : tri, section, types de fichier et categories a trois etats, notees, sans categorie | `GET /api/library` (`sort`, `section`, `asset`, `exclude_asset`, `category`, `exclude_category`, `rated`, `uncategorized`, `hide`, modes, `q`), `GET /api/categories`, `PUT /api/videos/{id}/list-state` |
+| Playlists | Titre avec le nombre, recherche (sur le titre), grille a deux colonnes de tuiles comme le web (le titre reserve toujours deux lignes, pour que les tuiles d'une rangee restent alignees ; marge sous la derniere rangee pour passer au-dessus de la barre d'onglets ; pile de cartes, pastille de source, nombre de videos, menu « ⋯ » : dupliquer, supprimer) ; menu « + » : creer, importer une playlist YouTube | `GET/POST /api/playlists`, `POST /api/playlists/import-url`, `POST .../duplicate`, `DELETE` |
+| Playlist | Barre du haut comme celle d'une fiche (retour, bouton video / audio, menu « ⋯ »), lecteur de file en tete (voir « Lecteur de playlist »), fiches dans l'ordre : un toucher joue la piste, le « i » ouvre la fiche ; menu « ⋯ » : format par defaut (video ou audio), telecharger tout l'audio, telecharger toute la video, renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `POST .../download/{audio|video}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
 | Fiche | Lecteur, note, categories, Vu et Indesiree, onglets, menu | voir ci-dessous |
 | Parametres | Nom, changer d'utilisateur, temps d'ecran (minutes par jour, usage du jour), couvre-feu, « Raton et toi », adresse du serveur | `GET/PUT /api/settings`, `GET /api/screen-time`, `PUT /api/users/{id}` |
 
@@ -112,17 +112,44 @@ La fiche :
 - le selecteur video / audio suit `media_urls` (les deux fichiers peuvent
   coexister) ; sans fichier, un bouton de telechargement (qualite au choix pour
   la video) lance `POST .../media/{type}/download` puis relit la fiche jusqu'a
-  l'arrivee du fichier ; le menu supprime un fichier ;
-- les boutons Vu et Indesiree basculent comme ceux du front, a partir de
-  `shown_state` (l'etat affiche, calcule par le back) ; apres chaque action
-  l'app relit la fiche au lieu de deviner le nouvel etat ;
+  l'arrivee du fichier ; le menu supprime un fichier ; la video et la carte audio
+  sont cote a cote dans un carrousel, comme sur le web : elles suivent le doigt, avec un
+  effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
+  ou un geste rapide suffit) ; le bouton video / audio du haut anime le meme
+  deplacement ; sur la video seule la moitie haute lance le glissement, pour laisser la
+  barre de progression native au sien ;
+- cote audio (`AudioSlide.swift`), la fiche reprend la carte du front sur telephone :
+  carte 16:9 sur un degrade radial terracotta vers brun, sans pastille ni bouton
+  « Supprimer » (la suppression est dans le menu « ⋯ »), pochette carree de 168 pt au centre (la vignette, ou un
+  carre brun sans vignette), bouton lecture / pause (ou telechargement) en verre au
+  milieu, ±15 s de chaque cote et « Telechargement… » dessous ; sous la carte, la barre
+  de progression du front (piste fine, remplissage terracotta, curseur 4×22, bulle
+  du temps pendant le glissement, temps courant et duree), grisee tant que cet audio
+  n'est pas la piste chargee ;
+- Vu et Indesiree sont les deux premieres entrees du menu « ⋯ » en haut a droite
+  (« Marquer comme vu / non vu », « Marquer indesiree / Ne plus masquer ») ; elles
+  basculent comme celles du front, a partir de `shown_state` (l'etat affiche,
+  calcule par le back) ; apres chaque action l'app relit la fiche au lieu de
+  deviner le nouvel etat ;
+- avant la lecture, la zone du lecteur montre la vignette de la fiche (assombrie) derriere le bouton lecture ;
+- le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait, la lecture reprend a la fin de la transition) ; un balayage vers le bas quitte le plein ecran ;
+- « + Categories » a la taille des etiquettes de sa ligne ;
+- plus d'onglets : les sections sont les unes sous les autres, chacune avec son
+  titre, dans l'ordre : « Description » (depliant), Notes structurees (si elles
+  existent), Discussion ; ni segments ni transcript n'y figurent (le
+  lecteur saute toujours les segments sponsors quand le back l'active)
 - les etoiles envoient `rating` (0 a 5) ; toucher l'etoile deja choisie remet 0 ;
 - categories : feuille de choix parmi celles du back (`PUT .../categories`) ;
-- onglets : Plus d'informations (description, tags, chapitres qui font
-  avancer le lecteur, playlists), Segments (segments sponsors), Transcript
-  (lignes horodatees qui font avancer le lecteur), Notes structurees (resume et
-  notes, rendu Markdown simple), Commentaire (`PUT .../comment`), Discussion
-  sur la fiche (`POST .../chat`, la reponse est attendue en relisant
+- sections : « Description » d'abord, un depliant ferme par defaut (chevron) qui contient
+  la description et ses hashtags ; ni vues, ni j'aime, ni nombre de commentaires, ni nom
+  de la chaine, deja sous le titre ; les chapitres dans ce meme depliant, apres les hashtags (un chapitre fait
+  avancer le lecteur), puis les playlists, Notes structurees (resume et notes, rendu
+  Markdown simple), le commentaire personnel n'est plus une section : « Ecrire un commentaire personnel » est une entree du menu « ⋯ » qui ouvre une feuille (`PUT .../comment`), Discussion
+  sur la fiche, sans titre, dans l'esprit de l'app Claude : le message de l'utilisateur dans une bulle sable
+  a droite, la reponse de Raton en texte simple sur la page avec une petite etincelle
+  terracotta dessous (elle tourne pendant qu'il repond), questions suggerees en pastilles
+  a contour fin, saisie sur une seule ligne dans une capsule blanche avec le bouton d'envoi rond a droite (Retour envoie aussi et ferme le clavier ; faire glisser la page ferme le clavier ; la fiche garde de la marge sous le dernier bloc pour passer au-dessus de la barre d'onglets),
+  « Effacer la conversation » en lien discret (`POST .../chat`, la reponse est attendue en relisant
   `GET /api/llm-jobs/{id}`) ;
 - menu : playlists (ajouter, retirer, creer), generer les notes
   (`POST .../notes/generate`), telecharger le transcript, ouvrir sur YouTube ;
@@ -152,7 +179,18 @@ visionnage). Le Vu a 90 % est decide par le back. Si `sponsor_skip_enabled`, le 
 
 Le haut d'une playlist est un lecteur de file, avec les regles du lecteur du
 front (`front/static/js/playlist-player.js`, `docs/spec/08-medias-et-lecteurs.md`,
-« File d'une playlist ») :
+« File d'une playlist »), presente comme celui d'une fiche : le bouton video /
+audio est dans la barre du haut, la video et la carte audio (pochette de la piste,
+bouton lecture en verre) sont cote a cote dans le meme carrousel (`MediaPager`) et
+suivent le doigt, la barre de progression est sous la carte audio, puis viennent
+le titre de la piste et les boutons de la file (aleatoire, precedent, lecture,
+suivant, boucle) :
+
+- le format par defaut se choisit par playlist dans le menu « ⋯ » (« Format par
+  defaut »), garde sur l'iPhone (`UserDefaults`, une cle par playlist) : la page
+  s'ouvre sur ce format, sauf si une file joue deja ; « Telecharger tout l'audio »
+  et « Telecharger toute la video » appellent `POST /api/playlists/{id}/download/{type}`
+  (un telechargement par fiche qui n'a pas le fichier) et disent combien sont lances ;
 
 - le choix Video / Audio, l'aleatoire et la boucle sont gardes d'un lancement a
   l'autre (`UserDefaults`) ; une fiche sans le fichier du mode choisi est
@@ -175,7 +213,7 @@ la fiche d'une video en cours de lecture la coupe en la quittant.
 
 ## Pas encore
 
-Ce que le front a et pas l'app : la periodicite d'une chaine et la mosaique des shorts, les reglages d'administration (racine des
+Ce que le front a et pas l'app : la periodicite d'une chaine, les reglages d'administration (racine des
 medias, quota, categories et sous-bibliotheques, segments sponsors, notes
 automatiques), les pages Statistiques, Journaux et RAG, les imports CSV
 (abonnements, playlists), l'envoi d'un fichier video, les pages de variations

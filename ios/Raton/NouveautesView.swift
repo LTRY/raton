@@ -1,100 +1,12 @@
 import SwiftUI
 
-/// `GET /api/nouveautes`: the user's Nouveautés, one stack of fiches per channel, ten channels per page.
-final class NouveautesModel: ObservableObject {
-    @Published var stacks: [NouveautesStack] = []
-    @Published var loading = false
-    @Published var errorMessage: String?
-    private var page = 0
-    private var totalPages = 1
-
-    /// Reloads from the first page; the current list stays on screen until the answer comes.
-    func reload(api: RatonAPI) async {
-        do {
-            let reply: NouveautesReply = try await api.get("/api/nouveautes", query: ["page": "1"])
-            stacks = reply.stacks
-            page = reply.page
-            totalPages = reply.totalPages
-            errorMessage = nil
-        } catch {
-            if !(error is CancellationError) { errorMessage = error.localizedDescription }
-        }
-    }
-
-    func loadMoreIfNeeded(api: RatonAPI, lastStack: NouveautesStack) async {
-        guard lastStack.id == stacks.last?.id, page < totalPages, !loading else { return }
-        loading = true
-        defer { loading = false }
-        do {
-            let reply: NouveautesReply = try await api.get(
-                "/api/nouveautes", query: ["page": String(page + 1)])
-            let known = Set(stacks.map(\.id))
-            stacks += reply.stacks.filter { !known.contains($0.id) }
-            page = reply.page
-            totalPages = reply.totalPages
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-}
-
+/// The Nouveautés, as the web shows them: Exploration's list and filters on the fiches of the followed
+/// channels (`GET /api/library?followed=true`), newest publication first, not grouped by channel.
 struct NouveautesView: View {
     var back = false
-    @EnvironmentObject private var state: AppState
-    @StateObject private var model = NouveautesModel()
-    @State private var firstLoadDone = false
 
     var body: some View {
-        Group {
-            if let api = state.api {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "Nouveautés", back: back) {
-                            NavigationLink {
-                                HistoriqueView()
-                            } label: {
-                                Image(systemName: "clock.arrow.circlepath")
-                            }
-                            .buttonStyle(CircleButtonStyle())
-                            .accessibilityLabel("Historique")
-                        }
-                        if let message = model.errorMessage {
-                            Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
-                                .padding(16)
-                        }
-                        ForEach(model.stacks) { stack in
-                            Text(stack.channel.name)
-                                .font(.raton(20, .bold)).foregroundStyle(Theme.text)
-                                .padding(.horizontal, 16).padding(.top, 16).padding(.bottom, 8)
-                            ForEach(stack.items) { card in
-                                NavigationLink(value: card.id) {
-                                    VideoRow(card: card, api: api)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            Color.clear.frame(height: 0)
-                                .task { await model.loadMoreIfNeeded(api: api, lastStack: stack) }
-                        }
-                        if firstLoadDone && model.stacks.isEmpty && model.errorMessage == nil {
-                            Text("Aucune nouveauté")
-                                .font(.raton(16)).foregroundStyle(Theme.textMuted)
-                                .frame(maxWidth: .infinity).padding(.top, 60)
-                        }
-                    }
-                }
-                .refreshable { await model.reload(api: api) }
-                // Also runs when coming back from a fiche, which left the Nouveautés.
-                .task {
-                    await model.reload(api: api)
-                    firstLoadDone = true
-                }
-                .navigationDestination(for: Int.self) { videoID in
-                    FicheView(videoID: videoID)
-                }
-            }
-        }
-        .ratonPage()
-        .toolbar(.hidden, for: .navigationBar)
+        LibraryView(followed: true)
     }
 }
 

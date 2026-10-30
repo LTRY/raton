@@ -44,7 +44,7 @@ struct CategoryChips: View {
             ForEach(categories, id: \.self) { label in
                 let color = styles.first { $0.label == label }.map { Color(hexString: $0.color) } ?? Theme.textMuted
                 Text(label)
-                    .font(.raton(13, .semibold)).foregroundStyle(color)
+                    .font(.raton(9, .semibold)).foregroundStyle(color)
                     .padding(.horizontal, 10).padding(.vertical, 5)
                     .background(Capsule().fill(color.opacity(0.12)))
             }
@@ -196,103 +196,68 @@ struct PlaylistsSheet: View {
 
 // MARK: Panels
 
+/// A section behind a title with a chevron, closed until tapped.
+struct Collapsible<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+            } label: {
+                HStack {
+                    Text(title).font(.raton(18, .bold)).foregroundStyle(Theme.text)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down").font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Theme.textMuted)
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(expanded ? "Dépliée" : "Repliée")
+            if expanded { content() }
+        }
+    }
+}
+
 struct InfoPanel: View {
     let detail: VideoDetail
     let seek: (Double) -> Void
 
-    private func count(_ value: Int?, _ label: String) -> String? {
-        value.map { "\($0.formatted(.number.locale(Locale(identifier: "fr_FR")))) \(label)" }
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let uploader = detail.metadata.uploader {
-                Text(uploader).font(.raton(15, .semibold)).foregroundStyle(Theme.textSoft)
-            }
-            let figures = [count(detail.metadata.viewCount, "vues"), count(detail.metadata.likeCount, "j'aime"),
-                           count(detail.metadata.commentCount, "commentaires")].compactMap { $0 }
-            if !figures.isEmpty {
-                Text(figures.joined(separator: " · ")).font(.raton(14)).foregroundStyle(Theme.textMuted)
-            }
-            Text(detail.metadata.description ?? "Pas de description.")
-                .font(.raton(15)).foregroundStyle(Theme.textSoft)
-            if !detail.metadata.tags.isEmpty {
-                Text(detail.metadata.tags.map { "#\($0)" }.joined(separator: " "))
-                    .font(.raton(13)).foregroundStyle(Theme.textMuted)
-            }
-            if !detail.metadata.chapters.isEmpty {
-                Text("Chapitres").font(.raton(16, .bold)).foregroundStyle(Theme.text).padding(.top, 4)
-                ForEach(Array(detail.metadata.chapters.enumerated()), id: \.offset) { _, chapter in
-                    Button {
-                        if let start = chapter.startSeconds { seek(start) }
-                    } label: {
-                        HStack {
-                            Text(Format.clock(chapter.startSeconds ?? 0)).monospacedDigit()
-                                .foregroundStyle(Theme.primary)
-                            Text(chapter.title).foregroundStyle(Theme.textSoft)
-                            Spacer(minLength: 0)
+            Collapsible(title: "Description") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(detail.metadata.description ?? "Pas de description.")
+                        .font(.raton(15)).foregroundStyle(Theme.textSoft)
+                    if !detail.metadata.tags.isEmpty {
+                        Text(detail.metadata.tags.map { "#\($0)" }.joined(separator: " "))
+                            .font(.raton(13)).foregroundStyle(Theme.textMuted)
+                    }
+                    if !detail.metadata.chapters.isEmpty {
+                        Text("Chapitres").font(.raton(16, .bold)).foregroundStyle(Theme.text).padding(.top, 4)
+                        ForEach(Array(detail.metadata.chapters.enumerated()), id: \.offset) { _, chapter in
+                            Button {
+                                if let start = chapter.startSeconds { seek(start) }
+                            } label: {
+                                HStack {
+                                    Text(Format.clock(chapter.startSeconds ?? 0)).monospacedDigit()
+                                        .foregroundStyle(Theme.primary)
+                                    Text(chapter.title).foregroundStyle(Theme.textSoft)
+                                    Spacer(minLength: 0)
+                                }
+                                .font(.raton(15))
+                            }
                         }
-                        .font(.raton(15))
                     }
                 }
             }
             if !detail.playlists.isEmpty {
                 Text("Playlists : " + detail.playlists.map(\.title).joined(separator: ", "))
                     .font(.raton(14)).foregroundStyle(Theme.textMuted)
-            }
-        }
-    }
-}
-
-struct SegmentsPanel: View {
-    let detail: VideoDetail
-    let seek: (Double) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(detail.sponsorSkipEnabled
-                ? "Le lecteur saute ces segments."
-                : "Le saut automatique est désactivé dans les paramètres de Raton.")
-                .font(.raton(14)).foregroundStyle(Theme.textMuted)
-            if detail.sponsorSegments.isEmpty {
-                Text("Aucun segment détecté.").font(.raton(15)).foregroundStyle(Theme.textSoft)
-            }
-            ForEach(Array(detail.sponsorSegments.enumerated()), id: \.offset) { _, segment in
-                Button { seek(segment.startSeconds) } label: {
-                    HStack {
-                        Text(segment.category).font(.raton(15, .semibold)).foregroundStyle(Theme.text)
-                        Spacer()
-                        Text("\(Format.clock(segment.startSeconds)) – \(Format.clock(segment.endSeconds))")
-                            .font(.raton(14)).monospacedDigit().foregroundStyle(Theme.textMuted)
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct TranscriptPanel: View {
-    let detail: VideoDetail
-    let seek: (Double) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if !detail.transcriptLines.isEmpty {
-                ForEach(Array(detail.transcriptLines.enumerated()), id: \.offset) { _, line in
-                    Button { seek(line.startSeconds) } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Text(Format.clock(line.startSeconds)).monospacedDigit()
-                                .foregroundStyle(Theme.primary)
-                            Text(line.text).foregroundStyle(Theme.textSoft).multilineTextAlignment(.leading)
-                            Spacer(minLength: 0)
-                        }
-                        .font(.raton(15))
-                    }
-                }
-            } else if let transcript = detail.documents.transcript {
-                Text(transcript).font(.raton(15)).foregroundStyle(Theme.textSoft)
-            } else {
-                Text("Transcript indisponible.").font(.raton(15)).foregroundStyle(Theme.textMuted)
             }
         }
     }
@@ -355,50 +320,106 @@ struct ChatPanel: View {
     @State private var pending: String?
     @State private var errorMessage: String?
 
+    @FocusState private var focused: Bool
+
+    private var messages: [ChatMessage] { detail.documents.chatMessages }
+    private var canSend: Bool { !question.trimmingCharacters(in: .whitespaces).isEmpty && pending == nil }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(detail.documents.chatMessages.enumerated()), id: \.offset) { _, message in
-                bubble(message.content, mine: message.role == "user")
+        VStack(alignment: .leading, spacing: 22) {
+            ForEach(Array(messages.enumerated()), id: \.offset) { _, message in
+                if message.role == "user" { userMessage(message.content) } else { reply(message.content) }
             }
             if let pending {
-                bubble(pending, mine: true)
-                Text("Raton réfléchit…").font(.raton(14)).foregroundStyle(Theme.textMuted)
-            }
-            if detail.documents.chatMessages.isEmpty && pending == nil {
-                ForEach(detail.documents.suggestedQuestions, id: \.self) { suggestion in
-                    Button(suggestion) { Task { await ask(suggestion) } }
-                        .buttonStyle(SandButtonStyle())
-                }
+                userMessage(pending)
+                Spark(thinking: true)
             }
             ErrorMessage(text: errorMessage)
-            HStack {
-                TextField("Poser une question sur cette fiche", text: $question, axis: .vertical)
-                    .font(.raton(16))
-                    .padding(.horizontal, 14).padding(.vertical, 10)
-                    .surface(in: Capsule())
-                Button {
-                    let asked = question
-                    question = ""
-                    Task { await ask(asked) }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill").font(.system(size: 32)).foregroundStyle(Theme.primary)
-                }
-                .disabled(question.trimmingCharacters(in: .whitespaces).isEmpty || pending != nil)
+            if messages.isEmpty && pending == nil && !detail.documents.suggestedQuestions.isEmpty {
+                suggestions
             }
-            if !detail.documents.chatMessages.isEmpty {
-                Button("Effacer la discussion") { Task { await clear() } }
-                    .font(.raton(14)).foregroundStyle(Theme.textMuted)
+            composer
+            if !messages.isEmpty {
+                Button { Task { await clear() } } label: {
+                    Label("Effacer la conversation", systemImage: "trash").font(.raton(13, .semibold))
+                        .foregroundStyle(Theme.textMuted)
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: messages.count)
+    }
+
+    /// The user's message: a soft sand bubble on the right, like the Claude app.
+    private func userMessage(_ text: String) -> some View {
+        Text(text)
+            .font(.raton(16)).foregroundStyle(Theme.text)
+            .padding(.horizontal, 16).padding(.vertical, 11)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.surfaceMuted))
+            .padding(.leading, 56)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    /// Raton's answer: plain text on the page, no bubble, with the little spark under it.
+    private func reply(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(text)
+                .font(.raton(16)).lineSpacing(5).foregroundStyle(Theme.text)
+                .textSelection(.enabled)
+            Spark(thinking: false)
+        }
+    }
+
+    private var suggestions: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(detail.documents.suggestedQuestions, id: \.self) { suggestion in
+                Button { Task { await ask(suggestion) } } label: {
+                    Text(suggestion).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft)
+                        .multilineTextAlignment(.leading)
+                        .padding(.horizontal, 14).padding(.vertical, 9)
+                        .overlay(Capsule().stroke(Theme.borderStrong, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private func bubble(_ text: String, mine: Bool) -> some View {
-        Text(text)
-            .font(.raton(15)).foregroundStyle(mine ? .white : Theme.text)
-            .padding(12)
-            .background(RoundedRectangle(cornerRadius: 14).fill(mine ? Theme.primary : Color.white))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(mine ? Color.clear : Theme.border, lineWidth: 1))
-            .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
+    /// One line: the field and the round send button inside a white capsule. Return sends too.
+    private var composer: some View {
+        HStack(spacing: 8) {
+            TextField("Poser une question à Raton", text: $question)
+                .font(.raton(17)).focused($focused)
+                .submitLabel(.send)
+                .onSubmit(send)
+                .padding(.leading, 8)
+            Button(action: send) {
+                Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(Circle().fill(canSend ? Theme.primary : Theme.textFaint.opacity(0.7)))
+            }
+            .disabled(!canSend)
+            .accessibilityLabel("Envoyer")
+        }
+        .padding(.leading, 12).padding(.trailing, 9).frame(height: 54)
+        // Frosted glass like the tab bar: blur, a white veil and a bright rim, lit from the top.
+        .background(.ultraThinMaterial, in: Capsule())
+        .background(Capsule().fill(Color.white.opacity(0.55)))
+        .overlay(
+            Capsule().stroke(
+                LinearGradient(colors: [Color.white.opacity(0.95), Color.white.opacity(0.25)],
+                               startPoint: .top, endPoint: .bottom), lineWidth: 1.2)
+        )
+        .overlay(Capsule().stroke(Theme.border.opacity(0.7), lineWidth: 0.5).padding(-0.5))
+        .shadow(color: Theme.shadow.opacity(0.12), radius: 18, y: 8)
+        .id("chat-composer")
+    }
+
+    private func send() {
+        guard canSend else { return }
+        let asked = question
+        question = ""
+        // The keyboard goes away with the question: the answer is read, not typed over.
+        focused = false
+        Task { await ask(asked) }
     }
 
     private func ask(_ text: String) async {
@@ -421,5 +442,21 @@ struct ChatPanel: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+/// Raton's mark under an answer; it turns slowly while an answer is being written.
+private struct Spark: View {
+    let thinking: Bool
+    @State private var turning = false
+
+    var body: some View {
+        Image(systemName: "sparkle").font(.system(size: 16, weight: .bold)).foregroundStyle(Theme.primary)
+            .rotationEffect(.degrees(turning ? 360 : 0))
+            .scaleEffect(thinking && turning ? 1.15 : 1)
+            .onAppear {
+                guard thinking else { return }
+                withAnimation(.linear(duration: 2.4).repeatForever(autoreverses: false)) { turning = true }
+            }
     }
 }

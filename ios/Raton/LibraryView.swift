@@ -15,8 +15,14 @@ final class LibraryModel: ObservableObject {
     private var totalPages = 1
     private var loading = false
     let channelID: Int?
+    // The Nouveautés: the fiches of the followed channels, newest publication first.
+    let followed: Bool
 
-    init(channelID: Int? = nil) { self.channelID = channelID }
+    init(channelID: Int? = nil, followed: Bool = false) {
+        self.channelID = channelID
+        self.followed = followed
+        if followed { filters.sort = "published" }
+    }
 
     @Published var filters = LibraryFilters()
 
@@ -24,6 +30,7 @@ final class LibraryModel: ObservableObject {
         var items = [URLQueryItem(name: "page", value: String(page))]
         if !search.isEmpty { items.append(URLQueryItem(name: "q", value: search)) }
         if let channelID { items.append(URLQueryItem(name: "channel_id", value: String(channelID))) }
+        if followed { items.append(URLQueryItem(name: "followed", value: "true")) }
         return items + filters.queryItems
     }
 
@@ -68,6 +75,8 @@ struct VideoList: View {
     let search: String
     // A channel page shows the publication date under the title, not the channel's name.
     var dateLine = false
+    // The shorts of a channel page are tiles, not rows.
+    var shorts = false
 
     /// The "⋮" of a row: Vu and Indésirée, the same two toggles as the fiche, then the list is read again.
     private func rowMenu(_ card: VideoCard) -> some View {
@@ -100,7 +109,12 @@ struct VideoList: View {
     var body: some View {
         LazyVStack(spacing: 0) {
             ErrorMessage(text: model.errorMessage)
-            ForEach(model.items) { card in
+            if shorts {
+                ShortsMosaic(cards: model.items, api: api) { card in
+                    await model.loadMore(api: api, search: search, after: card)
+                }
+            }
+            ForEach(shorts ? [] : model.items) { card in
                 ZStack(alignment: .topTrailing) {
                     NavigationLink(value: card.id) {
                         VideoRow(card: card, api: api, dateLine: dateLine, menu: true)
@@ -119,11 +133,16 @@ struct VideoList: View {
 
 struct LibraryView: View {
     @EnvironmentObject private var state: AppState
-    @StateObject fileprivate var model = LibraryModel()
+    @StateObject fileprivate var model: LibraryModel
+    // True for the Nouveautés: the same list on the followed channels, with a back button.
+    fileprivate let followed: Bool
     @State fileprivate var search = ""
     @State fileprivate var showFilters = false
-    @State fileprivate var views: [SavedView] = []
-    @State fileprivate var viewName = "Exploration"
+
+    init(followed: Bool = false) {
+        self.followed = followed
+        _model = StateObject(wrappedValue: LibraryModel(followed: followed))
+    }
 
     var body: some View {
         Group {
@@ -131,31 +150,22 @@ struct LibraryView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         libraryHeader(api)
-                        HStack(spacing: 10) {
-                            HideToggle(showAll: $model.filters.showAll)
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 16).padding(.bottom, 12)
-                        SearchField(placeholder: "Rechercher une fiche", text: $search) {
+                        SearchField(placeholder: "Rechercher", text: $search) {
                             Task { await model.reload(api: api, search: search) }
                         }
-                        filtersButton
-                        activePills
-                        HStack {
-                            Text("Bibliothèque").font(.raton(22, .bold)).foregroundStyle(Theme.text)
-                            Spacer()
-                            if model.loaded {
-                                Text("\(model.total) fiche\(model.total > 1 ? "s" : "")")
-                                    .font(.raton(15)).foregroundStyle(Theme.textMuted)
-                            }
+                        // "Filtres" and the see-all / hide-seen switch share one line.
+                        HStack(spacing: 10) {
+                            filtersButton
+                            Spacer(minLength: 0)
+                            HideToggle(showAll: $model.filters.showAll)
                         }
-                        .padding(.horizontal, 16).padding(.top, 6).padding(.bottom, 8)
+                        .padding(.horizontal, 16).padding(.bottom, 14)
+                        Color.clear.frame(height: 4)
                         VideoList(model: model, api: api, search: search)
                     }
                 }
                 .refreshable { await model.reload(api: api, search: search) }
                 .task {
-                    views = (try? await api.get("/api/library/views")) ?? []
                     await model.reload(api: api, search: search)
                 }
                 .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
@@ -174,30 +184,36 @@ struct LibraryView: View {
 }
 
 extension LibraryView {
-    /// The ☰ button lists the saved views; the title is the one in use ("Exploration" when none).
+    /// The ☰ button goes to Exploration, the Nouveautés or the Historique; the saved views of the web are not listed.
     fileprivate func libraryHeader(_ api: RatonAPI) -> some View {
         HStack(spacing: 14) {
-            Menu {
-                Button { viewName = "Exploration"; model.filters = LibraryFilters() } label: {
-                    Label("Exploration", systemImage: viewName == "Exploration" ? "checkmark" : "magnifyingglass")
-                }
-                ForEach(views, id: \.name) { view in
-                    Button {
-                        viewName = view.name
-                        var next = LibraryFilters()
-                        next.apply(view)
-                        model.filters = next
-                    } label: {
-                        Label(view.name, systemImage: viewName == view.name ? "checkmark" : "bookmark")
+            if followed {
+                NouveautesBackButton()
+            } else {
+                Menu {
+                    Button { model.filters = LibraryFilters() } label: {
+                        Label("Exploration", systemImage: "checkmark")
                     }
-                }
-                NavigationLink { NouveautesView(back: true) } label: { Label("Nouveautés", systemImage: "sparkles") }
-                NavigationLink { HistoriqueView() } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
-            } label: { Image(systemName: "line.3.horizontal") }
-            .buttonStyle(CircleButtonStyle())
-            .accessibilityLabel("Vues")
-            Text(viewName).font(.raton(26, .bold)).foregroundStyle(Theme.text).lineLimit(1)
+                    NavigationLink { NouveautesView(back: true) } label: { Label("Nouveautés", systemImage: "sparkles") }
+                    NavigationLink { HistoriqueView() } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                } label: { Image(systemName: "line.3.horizontal") }
+                .buttonStyle(CircleButtonStyle())
+                .accessibilityLabel("Vues")
+            }
+            Text(followed ? "Nouveautés" : "Exploration").font(.raton(26, .bold)).foregroundStyle(Theme.text).lineLimit(1)
+            // The number of fiches, in the little pill of the other list pages.
+            if model.loaded {
+                Text("\(model.total)").font(.raton(13, .semibold)).foregroundStyle(Theme.textMuted)
+                    .padding(.horizontal, 10).padding(.vertical, 3)
+                    .background(Capsule().fill(Theme.surfaceMuted))
+                    .accessibilityLabel("\(model.total) fiche\(model.total > 1 ? "s" : "")")
+            }
             Spacer(minLength: 0)
+            if followed {
+                NavigationLink { HistoriqueView() } label: { Image(systemName: "clock.arrow.circlepath") }
+                    .buttonStyle(CircleButtonStyle())
+                    .accessibilityLabel("Historique")
+            }
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)
     }
@@ -219,35 +235,16 @@ extension LibraryView {
             .padding(.horizontal, 20).frame(height: 48)
             .surface(in: Capsule(), interactive: true)
         }
-        .padding(.horizontal, 16).padding(.bottom, 14)
     }
+}
 
-    /// The removable pills of the active filters, with "Tout effacer".
-    @ViewBuilder
-    fileprivate var activePills: some View {
-        let pills = model.filters.activePills
-        if !pills.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(pills.indices, id: \.self) { index in
-                        let pill = pills[index]
-                        Button { pill.remove(&model.filters) } label: {
-                            HStack(spacing: 6) {
-                                Text((pill.excluded ? "≠ " : "") + pill.label).font(.raton(14, .semibold))
-                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundStyle(Theme.textSoft)
-                            .padding(.horizontal, 12).padding(.vertical, 8)
-                            .surface(in: Capsule(), interactive: true)
-                        }
-                    }
-                    Button("Tout effacer") { model.filters = LibraryFilters() }
-                        .font(.raton(14, .bold)).foregroundStyle(Theme.primary)
-                }
-                .padding(.horizontal, 16).padding(.vertical, 14)
-            }
-            .padding(.vertical, -14)
-            .padding(.bottom, 6)
-        }
+/// The round back arrow of a pushed page.
+struct NouveautesBackButton: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Button { dismiss() } label: { Image(systemName: "arrow.left") }
+            .buttonStyle(CircleButtonStyle())
+            .accessibilityLabel("Retour")
     }
 }

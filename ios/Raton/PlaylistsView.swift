@@ -2,6 +2,8 @@ import SwiftUI
 
 struct PlaylistsView: View {
     @EnvironmentObject private var state: AppState
+    // The tiles open their playlist from code, after their press animation.
+    @State private var path = NavigationPath()
     @State private var playlists: [PlaylistSummary] = []
     @State private var loaded = false
     @State private var errorMessage: String?
@@ -15,6 +17,10 @@ struct PlaylistsView: View {
     }
 
     var body: some View {
+        NavigationStack(path: $path) { content }
+    }
+
+    private var content: some View {
         Group {
             if let api = state.api {
                 ScrollView {
@@ -31,10 +37,12 @@ struct PlaylistsView: View {
                         ErrorMessage(text: errorMessage)
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 20), GridItem(.flexible(), spacing: 20)], spacing: 28) {
                             ForEach(Array(shown.enumerated()), id: \.element.id) { index, playlist in
-                                PlaylistTile(playlist: playlist, api: api, index: index, onChange: { Task { await load(api) } })
+                                PlaylistTile(playlist: playlist, api: api, index: index, onOpen: { path.append($0) },
+                                             onChange: { Task { await load(api) } })
                             }
                         }
-                        .padding(.horizontal, 16).padding(.top, 4)
+                        // Room under the last row so it scrolls clear of the tab bar.
+                        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 130)
                         if loaded && playlists.isEmpty && errorMessage == nil {
                             EmptyMessage(text: "Aucune playlist.")
                         }
@@ -90,14 +98,18 @@ struct PlaylistTile: View {
     let api: RatonAPI
     // Rank in the grid: the entrance of the web's `pl-card-in` is staggered by 50 ms, up to the sixth.
     var index = 0
+    let onOpen: (PlaylistSummary) -> Void
     let onChange: () -> Void
     @State private var confirmDelete = false
     @State private var appeared = false
     // The finger is down on the tile: the web's hover (`.pl-card:hover`), played on touch.
     @State private var pressed = false
+    @State private var raised = false
+    @State private var opening = false
+    @State private var holdTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var lifted: Bool { pressed && !reduceMotion }
+    private var lifted: Bool { raised && !reduceMotion }
 
     private var chip: String {
         playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : "Manuelle"
@@ -105,7 +117,7 @@ struct PlaylistTile: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            NavigationLink(value: playlist) {
+            Button { open() } label: {
                 VStack(alignment: .leading, spacing: 10) {
                     ZStack(alignment: .bottomTrailing) {
                         cover
@@ -126,13 +138,26 @@ struct PlaylistTile: View {
                     // `.pl-card-link:hover .pl-card-title`: the title turns terracotta.
                     Text(playlist.title).font(.raton(15, .bold)).foregroundStyle(lifted ? Theme.primary : Theme.text)
                         .animation(.easeOut(duration: 0.2), value: lifted)
-                        .lineLimit(2).multilineTextAlignment(.leading)
+                        .lineLimit(2, reservesSpace: true).multilineTextAlignment(.leading)
                 }
                 // translateY(-4px), 200 ms
                 .offset(y: lifted ? -4 : 0)
                 .animation(.easeOut(duration: 0.2), value: lifted)
             }
             .buttonStyle(PressReportingStyle(pressed: $pressed))
+            // A finger resting on the tile lifts it; one that moves to scroll never does, because the
+            // scroll cancels the press before the short wait is over.
+            .onChange(of: pressed) { down in
+                holdTask?.cancel()
+                if down {
+                    holdTask = Task {
+                        try? await Task.sleep(nanoseconds: 90_000_000)
+                        if !Task.isCancelled { raised = true }
+                    }
+                } else if !opening {
+                    raised = false
+                }
+            }
             Menu {
                 Button(role: .destructive) { confirmDelete = true } label: { Label("Supprimer", systemImage: "trash") }
                 Button { Task { await duplicate() } } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
@@ -194,6 +219,21 @@ struct PlaylistTile: View {
         .animation(.easeOut(duration: 0.25), value: lifted)
     }
 
+    /// A tap plays the lift first, then opens the playlist.
+    private func open() {
+        holdTask?.cancel()
+        guard !reduceMotion else { onOpen(playlist); return }
+        opening = true
+        raised = true
+        Task {
+            try? await Task.sleep(nanoseconds: 260_000_000)
+            onOpen(playlist)
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            opening = false
+            raised = false
+        }
+    }
+
     private func duplicate() async {
         let _: PlaylistSummary? = try? await api.post("/api/playlists/\(playlist.id)/duplicate")
         onChange()
@@ -213,6 +253,8 @@ struct PlaylistView: View {
     @EnvironmentObject private var player: PlayerController
     @State private var detail: PlaylistDetail?
     @State private var errorMessage: String?
+    @State private var notice: String?
+    @State private var defaultMode: MediaKind?
     @State private var showRename = false
     @State private var showCategories = false
     @State private var confirmDelete = false
@@ -223,38 +265,12 @@ struct PlaylistView: View {
             if let api = state.api {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        PageHeader(title: "", back: true) {
-                            Menu {
-                                Button { showRename = true } label: { Label("Renommer", systemImage: "pencil") }
-                                Button { showCategories = true } label: { Label("Catégories", systemImage: "tag") }
-                                Button {
-                                    Task { await act(api) { let _: PlaylistSummary = try await api.put(
-                                        "/api/playlists/\(playlist.id)/free-listening",
-                                        body: ["enabled": !(detail?.freeListening ?? false)]) } }
-                                } label: {
-                                    Label(detail?.freeListening == true ? "Désactiver l'écoute libre" : "Activer l'écoute libre",
-                                          systemImage: "infinity")
-                                }
-                                Menu("Trier") {
-                                    ForEach([("added", "Date d'ajout"), ("duration", "Durée"), ("title", "Titre"), ("reverse", "Inverser")], id: \.0) { sort in
-                                        Button(sort.1) {
-                                            Task { await act(api) { let _: PlaylistDetail = try await api.post(
-                                                "/api/playlists/\(playlist.id)/sort", body: ["by": sort.0]) } }
-                                        }
-                                    }
-                                }
-                                Button {
-                                    Task { await act(api) { let _: PlaylistSummary = try await api.post(
-                                        "/api/playlists/\(playlist.id)/duplicate") } }
-                                } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
-                                Button(role: .destructive) { confirmDelete = true } label: {
-                                    Label("Supprimer la playlist", systemImage: "trash")
-                                }
-                            } label: { Image(systemName: "ellipsis") }
-                            .buttonStyle(CircleButtonStyle())
-                            .accessibilityLabel("Plus d'options")
-                        }
+                        topBar(api)
                         ErrorMessage(text: errorMessage)
+                        if let notice {
+                            Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft)
+                                .padding(.horizontal, 16).padding(.bottom, 8)
+                        }
                         if let detail {
                             PlaylistPlayerPanel(detail: detail, api: api)
                             PlaylistTitleBlock(detail: detail)
@@ -319,6 +335,11 @@ struct PlaylistView: View {
                 }
                 .refreshable { await load(api) }
                 .task { await load(api) }
+                .onAppear {
+                    defaultMode = PlaylistDefaultMode.get(playlist.id)
+                    // The page opens on the playlist's own format, unless something else is already playing.
+                    if player.queue == nil, let defaultMode { player.queueMode = defaultMode }
+                }
                 // The next track ends up Vu: read the rows again to show it.
                 .onChange(of: player.track) { _ in Task { await load(api) } }
                 .sheet(isPresented: $showRename) {
@@ -342,6 +363,91 @@ struct PlaylistView: View {
         }
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
+    }
+
+    /// The top bar of a fiche: back, the Vidéo / Audio switch in the middle, the "⋯" menu.
+    private func topBar(_ api: RatonAPI) -> some View {
+        ZStack {
+            HStack {
+                Button { dismiss() } label: { Image(systemName: "arrow.left") }
+                    .buttonStyle(CircleButtonStyle())
+                    .accessibilityLabel("Retour")
+                Spacer()
+                moreMenu(api)
+            }
+            MediaModePill(mode: player.queueMode, onSelect: { player.setQueueMode($0) })
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+    }
+
+    private func moreMenu(_ api: RatonAPI) -> some View {
+        Menu {
+                        Menu {
+                ForEach([MediaKind.video, MediaKind.audio], id: \.self) { kind in
+                    Button {
+                        PlaylistDefaultMode.set(playlist.id, kind)
+                        defaultMode = kind
+                        // Nothing else is playing: the player switches now, not only the next time.
+                        if player.queue == nil { player.queueMode = kind }
+                    } label: {
+                        Label(kind == .video ? "Vidéo" : "Audio",
+                              systemImage: defaultMode == kind ? "checkmark" : (kind == .video ? "video" : "waveform"))
+                    }
+                }
+            } label: { Label("Format par défaut", systemImage: "play.rectangle") }
+            Button { Task { await downloadAll(api, "audio") } } label: {
+                Label("Télécharger tout l'audio", systemImage: "arrow.down.circle")
+            }
+            Button { Task { await downloadAll(api, "video") } } label: {
+                Label("Télécharger toute la vidéo", systemImage: "arrow.down.circle")
+            }
+            Divider()
+            Button { showRename = true } label: { Label("Renommer", systemImage: "pencil") }
+                        Button { showCategories = true } label: { Label("Catégories", systemImage: "tag") }
+                        Button {
+                            Task { await act(api) { let _: PlaylistSummary = try await api.put(
+                                "/api/playlists/\(playlist.id)/free-listening",
+                                body: ["enabled": !(detail?.freeListening ?? false)]) } }
+                        } label: {
+                            Label(detail?.freeListening == true ? "Désactiver l'écoute libre" : "Activer l'écoute libre",
+                                  systemImage: "infinity")
+                        }
+                        Menu("Trier") {
+                            ForEach([("added", "Date d'ajout"), ("duration", "Durée"), ("title", "Titre"), ("reverse", "Inverser")], id: \.0) { sort in
+                                Button(sort.1) {
+                                    Task { await act(api) { let _: PlaylistDetail = try await api.post(
+                                        "/api/playlists/\(playlist.id)/sort", body: ["by": sort.0]) } }
+                                }
+                            }
+                        }
+                        Button {
+                            Task { await act(api) { let _: PlaylistSummary = try await api.post(
+                                "/api/playlists/\(playlist.id)/duplicate") } }
+                        } label: { Label("Dupliquer", systemImage: "plus.square.on.square") }
+                        Button(role: .destructive) { confirmDelete = true } label: {
+                            Label("Supprimer la playlist", systemImage: "trash")
+                        }
+        } label: { Image(systemName: "ellipsis") }
+        .buttonStyle(CircleButtonStyle())
+        .accessibilityLabel("Plus d'options")
+    }
+
+    /// Queues the download of the files the videos of the playlist still lack (`audio` or `video`).
+    private func downloadAll(_ api: RatonAPI, _ type: String) async {
+        errorMessage = nil
+        do {
+            let queued: PlaylistDownloads = try await api.post("/api/playlists/\(playlist.id)/download/\(type)")
+            let count = queued.jobs.count
+            if type == "audio" {
+                notice = count == 0 ? "Tout l'audio est déjà téléchargé."
+                    : "\(count) téléchargement\(count > 1 ? "s" : "") audio lancé\(count > 1 ? "s" : "")."
+            } else {
+                notice = count == 0 ? "Toute la vidéo est déjà téléchargée."
+                    : "\(count) téléchargement\(count > 1 ? "s" : "") vidéo lancé\(count > 1 ? "s" : "")."
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     /// Runs a change on the playlist, then reads it back.
@@ -441,4 +547,22 @@ struct TextPromptSheet: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Annuler") { dismiss() } } }
         }
     }
+}
+
+/// What the playlist player opens on, remembered for each playlist on this iPhone.
+enum PlaylistDefaultMode {
+    private static func key(_ id: Int) -> String { "playlistDefaultMode.\(id)" }
+
+    static func get(_ id: Int) -> MediaKind? {
+        UserDefaults.standard.string(forKey: key(id)).flatMap(MediaKind.init(rawValue:))
+    }
+
+    static func set(_ id: Int, _ kind: MediaKind) {
+        UserDefaults.standard.set(kind.rawValue, forKey: key(id))
+    }
+}
+
+/// `POST /api/playlists/{id}/download/{type}`: one job per video that lacks that file.
+struct PlaylistDownloads: Codable {
+    let jobs: [QueuedJob]
 }

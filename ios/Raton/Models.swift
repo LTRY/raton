@@ -39,18 +39,6 @@ struct VideoCard: Codable, Identifiable, Hashable {
     let publishedAt: String?
 }
 
-struct NouveautesStack: Codable, Identifiable, Hashable {
-    let channel: ChannelRef
-    let items: [VideoCard]
-    var id: Int { channel.id }
-}
-
-struct NouveautesReply: Codable {
-    let stacks: [NouveautesStack]
-    let page: Int
-    let totalPages: Int
-}
-
 struct MediaURLs: Codable, Hashable {
     let video: String?
     let audio: String?
@@ -404,18 +392,6 @@ struct YoutubeChannel: Codable, Identifiable, Hashable {
     let thumbnailUrl: String?
     let existing: ChannelRef?
     var id: String { ytChannelId }
-}
-
-/// A vue enregistrée (`GET /api/library/views`).
-struct SavedView: Codable, Hashable {
-    let name: String
-    let assets: [String]
-    let categories: [String]
-    let excludedAssets: [String]
-    let excludedCategories: [String]
-    let rated: Bool
-    let assetFilterMode: String
-    let categoryFilterMode: String
 }
 
 // MARK: Réglages
