@@ -172,6 +172,10 @@ La fiche :
   reseau local refuse (renvoie vers Reglages → Raton → Reseau local), adresse
   invalide, ou le `detail` envoye par le back.
 
+## Pret pour l'App Store
+
+Deja la : l'icone (`Raton/Assets.xcassets/AppIcon.appiconset`, le Raton au pop-corn sur le fond creme, 1024 px), le manifeste de confidentialite (`PrivacyInfo.xcprivacy` : pas de suivi, aucune donnee collectee, `UserDefaults` pour l'URL du serveur et l'utilisateur) et les commandes de l'ecran de verrouillage. `NSAllowsArbitraryLoads` reste actif parce que le serveur est une adresse libre du reseau local, souvent en `http` : a revoir avant une soumission (equipe de signature, captures, politique de confidentialite).
+
 ## Tests
 
 `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
