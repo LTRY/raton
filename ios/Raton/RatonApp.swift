@@ -43,15 +43,15 @@ struct RootView: View {
                 .transition(.opacity)
                 .animation(.easeInOut(duration: 0.15), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 6) {
                         NowPlayingBar()
                         // The web hides the bar while a text field has the keyboard.
                         if !keyboardUp { TabPill(tab: $tab) }
                     }
-                    // The pill sits 14 pt from the screen's edge, following the phone's rounded corners
+                    // The pill sits `TabPill.margin` from the screen's edge, following the phone's rounded corners
                     // (just above the home indicator): the inset reaches under the home indicator so the
                     // whole bar stays inside its own bounds and receives taps.
-                    .padding(.bottom, 14)
+                    .padding(.bottom, TabPill.margin)
                     .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
@@ -72,6 +72,11 @@ struct RootView: View {
 /// The icons are the web's own, and each plays its animation when tapped.
 struct TabPill: View {
     @Binding var tab: Int
+    /// The gap to the phone's edges, the same on the sides and at the bottom. 8 pt puts the home indicator
+    /// (8 to 13 pt from the bottom) inside the pill's own 5 pt of padding under the icons, not on its edge.
+    static let margin: CGFloat = 8
+    /// Concentric with the phone's rounded corners, down to a full capsule.
+    static let shape = ConcentricRectangle(corners: .concentric(minimum: 27), isUniform: true)
     @State private var plays = [0, 0, 0, 0, 0]
     private let items: [(kind: TabIconKind, label: String)] = [
         (.home, "Accueil"), (.channels, "Chaînes"), (.library, "Bibliothèque"), (.playlists, "Playlists"), (.settings, "Paramètres"),
@@ -103,12 +108,12 @@ struct TabPill: View {
         }
         .padding(5)
         // The web's bar is a light frosted glass (blur 8 px, 12 % white fill, light rim) over the page.
-        .background(Capsule().fill(.ultraThinMaterial))
-        .background(Capsule().fill(Color.white.opacity(0.12)))
-        .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 1))
-        .overlay(Capsule().stroke(LinearGradient(colors: [.white.opacity(0.6), .clear], startPoint: .top, endPoint: .center), lineWidth: 1))
+        .background(Self.shape.fill(.ultraThinMaterial))
+        .background(Self.shape.fill(Color.white.opacity(0.12)))
+        .overlay(Self.shape.stroke(Color.white.opacity(0.5), lineWidth: 1))
+        .overlay(Self.shape.stroke(LinearGradient(colors: [.white.opacity(0.6), .clear], startPoint: .top, endPoint: .center), lineWidth: 1))
         .shadow(color: Theme.shadow.opacity(0.10), radius: 12, y: 8)
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Self.margin)
         // The active tab plays its icon when the bar first shows.
         .onAppear { plays[tab] += 1 }
     }

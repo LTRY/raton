@@ -70,15 +70,11 @@ struct PlaylistPlayerPanel: View {
         }
     }
 
-    /// The audio: the web's phone card, the cover of the track with the glass play disc on it.
+    /// The audio: the web's phone card, the cover of the track. Play and pause are the controls row's button.
     private var audioStage: some View {
         ZStack {
             AudioStageBackground()
             AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api)
-            if playable > 0 {
-                GlassDiscButton(symbol: playing ? "pause.fill" : "play.fill",
-                                label: playing ? "Pause" : "Lecture", action: playPause)
-            }
         }
     }
 

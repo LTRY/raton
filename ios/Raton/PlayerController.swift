@@ -33,7 +33,8 @@ final class PlayerController: ObservableObject {
     }
 
     private var api: RatonAPI?
-    private var artist: String?
+    /// The channel of the loaded track, shown under its title in the mini player.
+    @Published private(set) var artist: String?
     private var fallbackDuration: Double = 0
     private var timeObserver: Any?
     private var statusObserver: AnyCancellable?

@@ -65,13 +65,21 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   bascules (Video / Audio, Videos / Shorts, tout voir / masquer) ont la piste
   sable du web (`sandTrack`) avec un segment actif blanc.
 - **Barre d'onglets** (`TabPill`, `ios/Raton/RatonApp.swift`) : pilule flottante
-  a 12 pt des bords, verre depoli leger (flou, voile blanc a 12 %, liseré clair)
+  a 8 pt des bords (`TabPill.margin`, les memes sur les cotes et en bas), verre depoli leger (flou, voile blanc a 12 %, liseré clair)
   sous lequel la page defile, icones de 28 pt ; l'onglet actif a le lavis
   terracotta pale avec un reflet blanc et une ombre chaude ; elle s'efface quand
-  le clavier est ouvert, comme sur le web. Elle est a 14 pt du bord bas de
-  l'ecran : l'encart qui la porte descend sous l'indicateur d'accueil au lieu
-  d'un padding negatif, qui sur iOS 27 laissait le bas de la pilule sans toucher ;
-  la page change avec l'onglet (`.id(tab)`).
+  le clavier est ouvert, comme sur le web. Sa forme suit les coins
+  arrondis du telephone (`ConcentricRectangle`), donc elle est aussi basse et
+  aussi ronde sur un iPhone 17e que sur un 18 Pro. 8 pt place l'indicateur
+  d'accueil (de 8 a 13 pt du bas) dans les 5 pt de marge interieure sous les
+  icones, et non a cheval sur son bord. L'encart qui la porte descend sous
+  l'indicateur au lieu d'un padding negatif, qui sur iOS 27 laissait le bas de la
+  pilule sans toucher ; la page change avec l'onglet (`.id(tab)`).
+- **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
+  audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
+  la forme et de la largeur de la barre d'onglets, avec pause/lecture a gauche,
+  le titre au-dessus de sa chaine, puis « suivant » (dans une playlist) et
+  fermer.
 - **Texte, toucher, retour** : les polices suivent le reglage « Taille du texte »
   d'iOS (`Font.raton`), plafonne a `xxxLarge` a la racine pour que les lignes
   et pastilles tiennent ; les cibles de toucher font 44 pt au moins (les cinq
@@ -257,5 +265,5 @@ medias, quota, categories et sous-bibliotheques, segments sponsors, notes
 automatiques), les pages Statistiques, Journaux et RAG, les imports CSV
 (abonnements, playlists), l'envoi d'un fichier video, les pages de variations
 de Raton, la banniere du couvre-feu (l'app affiche simplement le refus du back),
-le mini-lecteur persistant du web (l'app a la barre audio sous les onglets), la
+le mini-lecteur persistant du web (l'app a le mini-lecteur audio sous les onglets), la
 publication sur l'App Store.

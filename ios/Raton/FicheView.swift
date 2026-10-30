@@ -475,29 +475,48 @@ struct AudioControls: View {
     }
 }
 
-/// The bar shown above the tabs while audio is loaded, so it can be paused after leaving its fiche.
+/// The mini player above the tab bar while audio is loaded, so it can be paused after leaving its fiche:
+/// a smoked-glass pill of the tab bar's width and shape, play-pause on the left, the title over its
+/// channel, then next (in a playlist) and close.
 struct NowPlayingBar: View {
     @EnvironmentObject private var player: PlayerController
 
     var body: some View {
         if player.track?.kind == .audio || player.queue != nil {
-            HStack(spacing: 16) {
-                Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
-                    .foregroundStyle(Color(hex: 0xF3E8D9))
-                Spacer()
+            HStack(spacing: 6) {
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 24)).frame(width: 52, height: 52).contentShape(Rectangle())
                 }
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Lecture")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(player.title).font(.raton(16, .bold)).lineLimit(1)
+                    if let artist = player.artist {
+                        Text(artist).font(.raton(14)).lineLimit(1).opacity(0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 if player.queue != nil {
-                    Button { player.next() } label: { Image(systemName: "forward.fill") }
-                        .accessibilityLabel("Piste suivante")
+                    Button { player.next() } label: {
+                        Image(systemName: "forward.end.fill").font(.system(size: 22))
+                            .frame(width: 48, height: 52).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Piste suivante")
                 }
-                Button { player.stop() } label: { Image(systemName: "xmark") }
+                Button { player.stop() } label: {
+                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 52).contentShape(Rectangle())
+                }
+                .accessibilityLabel("Fermer le lecteur")
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18).padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.player))
-            .padding(.horizontal, 12)
+            .foregroundStyle(Color(hex: 0xF3E8D9))
+            .padding(.leading, 8).padding(.trailing, 6)
+            // The first background is the one on top: the smoke over the blur of the page behind.
+            .background(TabPill.shape.fill(Theme.player.opacity(0.9)))
+            .background(TabPill.shape.fill(.ultraThinMaterial))
+            .overlay(TabPill.shape.stroke(Color.white.opacity(0.16), lineWidth: 1))
+            .shadow(color: Theme.shadow.opacity(0.18), radius: 12, y: 6)
+            .padding(.horizontal, TabPill.margin)
         }
     }
 }
