@@ -183,6 +183,10 @@ Depuis Safari ou l'app YouTube, la feuille de partage propose « Raton » (exten
 
 L'extension lit l'adresse du serveur dans l'App Group `group.fr.raton.app` ; l'app l'y recopie a chaque lancement et a chaque changement de serveur (`AppState`). Il faut donc avoir ouvert l'app une fois. Pour un iPhone reel, l'equipe de signature de l'app et celle de l'extension doivent avoir la capacite « App Groups » (Xcode la cree avec la signature automatique).
 
+## Widget Nouveautes
+
+Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Raton et le nombre de fiches des chaines suivies (`total` de `GET /api/library?followed=true`, l'en-tete `X-Raton-User` portant l'utilisateur), en creme et terracotta comme l'app. « Ouvrez Raton » tant qu'aucun serveur n'est choisi, « Hors ligne » quand il ne repond pas. Il lit l'adresse du serveur et l'utilisateur dans l'App Group `group.fr.raton.app` (comme l'extension de partage) ; l'app demande son rechargement quand elle passe en arriere-plan et quand le serveur ou l'utilisateur change, et iOS le rafraichit seul toutes les 30 minutes environ.
+
 ## Tests
 
 `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
@@ -253,5 +257,5 @@ medias, quota, categories et sous-bibliotheques, segments sponsors, notes
 automatiques), les pages Statistiques, Journaux et RAG, les imports CSV
 (abonnements, playlists), l'envoi d'un fichier video, les pages de variations
 de Raton, la banniere du couvre-feu (l'app affiche simplement le refus du back),
-le mini-lecteur persistant du web (l'app a la barre audio sous les onglets), le
-widget et la publication sur l'App Store.
+le mini-lecteur persistant du web (l'app a la barre audio sous les onglets), la
+publication sur l'App Store.

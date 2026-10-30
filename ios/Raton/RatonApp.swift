@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 @main
 struct RatonApp: App {
@@ -20,6 +21,7 @@ struct RootView: View {
     @EnvironmentObject private var state: AppState
     @State private var tab = 0
     @State private var keyboardUp = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -59,6 +61,8 @@ struct RootView: View {
         // Past this size the fixed-height rows and pills of the screens no longer fit.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .sensoryFeedback(.selection, trigger: tab)
+        // The Nouveautés widget counts what the app has just shown.
+        .onChange(of: scenePhase) { phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
     }

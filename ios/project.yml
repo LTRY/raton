@@ -27,6 +27,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Raton/Raton.entitlements
     dependencies:
       - target: RatonShare
+      - target: RatonWidget
   RatonUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -50,3 +51,16 @@ targets:
         INFOPLIST_FILE: RatonShare/Info.plist
         CODE_SIGN_ENTITLEMENTS: RatonShare/RatonShare.entitlements
         CODE_SIGN_STYLE: Automatic
+  RatonWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RatonWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.widget
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RatonWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RatonWidget/RatonWidget.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
