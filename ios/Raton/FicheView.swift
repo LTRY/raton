@@ -14,6 +14,7 @@ struct FicheView: View {
 
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var player: PlayerController
+    @EnvironmentObject private var offline: OfflineStore
     @Environment(\.dismiss) private var dismiss
     @State private var detail: VideoDetail?
     @State private var mode: MediaKind = .video
@@ -137,6 +138,18 @@ struct FicheView: View {
                 Label("Générer notes et résumé", systemImage: "sparkles")
             }
             .disabled(generating || !detail.hasTranscript)
+            if detail.mediaUrls.audio != nil {
+                Button { toggleOffline(detail, api: api) } label: {
+                    if offline.item(detail.id) != nil {
+                        Label("Retirer de l'écoute hors ligne", systemImage: "icloud.slash")
+                    } else if offline.downloading.contains(detail.id) {
+                        Label("Téléchargement hors ligne…", systemImage: "arrow.down.circle")
+                    } else {
+                        Label("Écouter hors ligne", systemImage: "arrow.down.circle")
+                    }
+                }
+                .disabled(offline.downloading.contains(detail.id))
+            }
             if detail.mediaUrls.video != nil {
                 Button(role: .destructive) { deleteMedia(api, .video) } label: {
                     Label("Supprimer la vidéo", systemImage: "trash")
@@ -160,6 +173,17 @@ struct FicheView: View {
         }
         .buttonStyle(CircleButtonStyle())
         .accessibilityLabel("Plus d'options")
+    }
+
+    /// Keeps the fiche's audio on the phone, or lets it go.
+    private func toggleOffline(_ detail: VideoDetail, api: RatonAPI) {
+        if offline.item(detail.id) != nil {
+            offline.remove(detail.id)
+            return
+        }
+        Task {
+            do { try await offline.download(detail: detail, api: api) } catch { errorMessage = error.localizedDescription }
+        }
     }
 
     private func mediaPager(_ detail: VideoDetail, api: RatonAPI) -> some View {

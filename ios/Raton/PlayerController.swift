@@ -63,6 +63,7 @@ final class PlayerController: ObservableObject {
         stop()
         let path = kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio
         guard let path else { return }
+        let local = kind == .audio ? OfflineStore.shared.localAudio(for: detail.id) : nil
         var start = startAt
         if start == nil, let resume = detail.resumePositions[kind.rawValue]?.positionSeconds, resume >= 3 {
             start = resume
@@ -70,13 +71,23 @@ final class PlayerController: ObservableObject {
         begin(Track(videoID: detail.id, kind: kind), path: path, title: detail.title,
               artist: detail.channel?.name, duration: detail.durationSeconds ?? 0,
               thumbnail: detail.mediaUrls.thumbnail, api: api, startAt: start,
-              skipSegments: detail.sponsorSkipEnabled ? detail.skipSegments : [], reports: true)
+              skipSegments: detail.sponsorSkipEnabled ? detail.skipSegments : [], reports: true, localURL: local)
+    }
+
+    /// Plays a downloaded audio from the phone, with no call to the server (no history either).
+    func playOffline(_ item: OfflineItem, api: RatonAPI) {
+        let newTrack = Track(videoID: item.id, kind: .audio)
+        if track == newTrack { resume(); return }
+        stop()
+        begin(newTrack, path: "", title: item.title, artist: item.channel, duration: item.duration,
+              thumbnail: nil, api: api, startAt: nil, skipSegments: [], reports: false,
+              localURL: OfflineStore.shared.fileURL(item))
     }
 
     /// Loads a file into a fresh `AVPlayer` and starts it.
     private func begin(_ newTrack: Track, path: String, title: String, artist: String?, duration: Int,
                        thumbnail: String?, api: RatonAPI, startAt: Double?,
-                       skipSegments: [SkipSegment], reports: Bool) {
+                       skipSegments: [SkipSegment], reports: Bool, localURL: URL? = nil) {
         release()
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
@@ -96,7 +107,7 @@ final class PlayerController: ObservableObject {
         lastTrackedTime = nil
         reportsActivity = reports
 
-        let player = AVPlayer(url: api.url(path))
+        let player = AVPlayer(url: localURL ?? api.url(path))
         self.player = player
         observe(player)
         self.skipSegments = skipSegments

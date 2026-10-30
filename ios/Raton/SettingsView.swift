@@ -40,6 +40,15 @@ struct SettingsView: View {
                                     .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || name == currentName)
                             }
                         }
+                        card("Écoute hors ligne") {
+                            NavigationLink { OfflineView() } label: {
+                                HStack {
+                                    Text("Audios sur ce téléphone").font(.raton(16, .semibold)).foregroundStyle(Theme.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundStyle(Theme.textFaint)
+                                }
+                            }
+                        }
                         card("Changer d'utilisateur") {
                             NavigationLink {
                                 UserPickerView(title: "Utilisateurs", back: true, manage: true)
