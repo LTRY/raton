@@ -25,13 +25,11 @@ struct PlaylistPlayerPanel: View {
             } audio: {
                 audioStage
             }
-            if player.queueMode == .audio {
-                AudioSeekBar(videoID: owns ? (player.track?.videoID ?? -1) : -1).transition(.opacity)
-            }
             nowPlaying
-            controls.padding(.top, 8)
+            // On the audio stage the controls are over the cover; the video stage has the native player's own.
+            if player.queueMode == .video { controls(onStage: false).padding(.top, 8) }
             if detail.freeListening {
-                Text("Écoute libre : rien n'est compté comme vu").font(.raton(13)).foregroundStyle(Theme.textMuted)
+                Text("Écoute libre : rien n'est ajouté à l'historique").font(.raton(13)).foregroundStyle(Theme.textMuted)
                     .padding(.top, 10)
             }
         }
@@ -70,14 +68,25 @@ struct PlaylistPlayerPanel: View {
         }
     }
 
-    /// The audio: the web's phone card, the cover of the track with the glass play disc on it.
+    /// The audio: the track's thumbnail fills the stage, under a dark veil, with the queue controls centered
+    /// and the progress bar at its foot.
     private var audioStage: some View {
         ZStack {
             AudioStageBackground()
-            AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api)
+            if let shown, shown.hasThumbnail {
+                Color.clear
+                    .overlay { Thumbnail(videoID: shown.videoID, hasThumbnail: true, api: api) }
+                    .clipped()
+                    .overlay(Color.black.opacity(playable > 0 ? 0.5 : 0.25))
+            }
             if playable > 0 {
-                GlassDiscButton(symbol: playing ? "pause.fill" : "play.fill",
-                                label: playing ? "Pause" : "Lecture", action: playPause)
+                controls(onStage: true)
+                // The progress bar sits at the foot of the thumbnail.
+                VStack {
+                    Spacer()
+                    AudioSeekBar(videoID: owns ? (player.track?.videoID ?? -1) : -1, onStage: true)
+                        .padding(.bottom, 8)
+                }
             }
         }
     }
@@ -94,67 +103,97 @@ struct PlaylistPlayerPanel: View {
                 Text("Aucune piste lisible").font(.raton(18, .bold)).foregroundStyle(Theme.text)
                 Text("Aucune fiche n'a de fichier \(player.queueMode == .audio ? "audio" : "vidéo").")
                     .font(.raton(14)).foregroundStyle(Theme.textMuted)
-            } else {
-                Text("\(playable) piste\(playable > 1 ? "s" : "") à lire").font(.raton(18, .bold))
-                    .foregroundStyle(Theme.text)
             }
         }
-        .padding(.horizontal, 20).padding(.top, 8)
+        .padding(.horizontal, 20).padding(.top, owns || playable == 0 ? 8 : 0)
     }
 
-    private var controls: some View {
-        HStack(spacing: 22) {
-            toggle("shuffle", on: player.shuffle, label: "Aléatoire") { player.shuffle.toggle() }
-            Button { player.previous() } label: { Image(systemName: "backward.fill") }
-                .disabled(!owns).accessibilityLabel("Piste précédente")
+    /// Shuffle, previous, play-pause, next, loop. On the stage they are white over the cover, the play button
+    /// a glass disc; under the video they are the sand and terracotta ones of the fiche.
+    private func controls(onStage: Bool) -> some View {
+        HStack(spacing: onStage ? 0 : 22) {
+            toggle("shuffle", on: player.shuffle, label: "Aléatoire", onStage: onStage) { player.shuffle.toggle() }
+            if onStage { Spacer(minLength: 0) }
+            Button { player.previous() } label: {
+                Image(systemName: "backward.fill").frame(width: onStage ? 44 : nil, height: onStage ? 44 : nil).contentShape(Rectangle())
+            }
+            .disabled(!owns).accessibilityLabel("Piste précédente")
+            if onStage { Spacer(minLength: 0) }
             Button(action: playPause) {
                 Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: 26)).foregroundStyle(Theme.primary)
-                    .frame(width: 60, height: 60).surface(in: Circle(), tint: Theme.primary, interactive: true)
+                    .font(.system(size: onStage ? 22 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
+                    .frame(width: onStage ? 52 : 60, height: onStage ? 52 : 60)
+                    .modifier(PlayDisc(onStage: onStage))
             }
             .disabled(playable == 0)
             .accessibilityLabel(owns && player.isPlaying ? "Pause" : "Lecture")
-            Button { player.next() } label: { Image(systemName: "forward.fill") }
-                .disabled(!owns).accessibilityLabel("Piste suivante")
-            toggle("repeat", on: player.loop, label: "Boucle") { player.loop.toggle() }
+            if onStage { Spacer(minLength: 0) }
+            Button { player.next() } label: {
+                Image(systemName: "forward.fill").frame(width: onStage ? 44 : nil, height: onStage ? 44 : nil).contentShape(Rectangle())
+            }
+            .disabled(!owns).accessibilityLabel("Piste suivante")
+            if onStage { Spacer(minLength: 0) }
+            toggle("repeat", on: player.loop, label: "Boucle", onStage: onStage) { player.loop.toggle() }
         }
-        .font(.system(size: 20)).foregroundStyle(Theme.textSoft)
+        .font(.system(size: onStage ? 18 : 20)).foregroundStyle(onStage ? Color.white : Theme.textSoft)
+        .padding(.horizontal, onStage ? 24 : 0)
     }
 
-    private func toggle(_ icon: String, on: Bool, label: String, action: @escaping () -> Void) -> some View {
+    private func toggle(_ icon: String, on: Bool, label: String, onStage: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
-                .frame(width: 46, height: 46)
-                .surface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
+            Group {
+                if onStage {
+                    // Over the cover: a white icon, lit up in a warm tone when on.
+                    Image(systemName: icon).foregroundStyle(on ? Color(hex: 0xFFB48A) : Color.white)
+                        .frame(width: 44, height: 44)
+                } else {
+                    Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
+                        .frame(width: 46, height: 46)
+                        .surface(in: RoundedRectangle(cornerRadius: 14, style: .continuous), tint: on ? Theme.primary : nil, interactive: true)
+                }
+            }
         }
         .accessibilityLabel(label)
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 
-/// The title block under the player: name, kind and the figures of the playlist, like the web's.
+/// The title block under the player: name, where an imported playlist comes from, and its figures.
+/// A manual playlist has no kind line, and a playlist has no Vu count.
 struct PlaylistTitleBlock: View {
     let detail: PlaylistDetail
 
-    private var kind: String {
-        detail.source == "url" ? "Playlist YouTube" : detail.source == "csv" ? "Playlist CSV Takeout" : "Playlist manuelle"
+    private var kind: String? {
+        detail.source == "url" ? "Playlist YouTube" : detail.source == "csv" ? "Playlist CSV Takeout" : nil
     }
 
     private var figures: String {
         guard let stats = detail.stats else { return "" }
         let minutes = Int((Double(stats.totalDurationSeconds) / 60).rounded())
         let duration = minutes >= 60 ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
-        let seen = detail.freeListening ? "écoute libre" : "\(stats.seenCount) vue\(stats.seenCount > 1 ? "s" : "") sur \(stats.count)"
-        return "\(duration) · \(stats.count) vidéo\(stats.count > 1 ? "s" : "") · \(seen)"
+        return "\(duration) · \(stats.count) vidéo\(stats.count > 1 ? "s" : "")"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(detail.title).font(.raton(30, .bold)).foregroundStyle(Theme.text)
-            Text(kind).font(.raton(16)).foregroundStyle(Theme.textMuted)
+            if let kind { Text(kind).font(.raton(16)).foregroundStyle(Theme.textMuted) }
             if !figures.isEmpty { Text(figures).font(.raton(16)).foregroundStyle(Theme.textMuted) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20).padding(.vertical, 12)
+    }
+}
+
+/// The play-pause disc: terracotta ring under the video, Liquid Glass over the audio cover.
+private struct PlayDisc: ViewModifier {
+    let onStage: Bool
+
+    func body(content: Content) -> some View {
+        if onStage {
+            content.glassEffect(.regular.interactive(), in: Circle())
+        } else {
+            content.surface(in: Circle(), tint: Theme.primary, interactive: true)
+        }
     }
 }

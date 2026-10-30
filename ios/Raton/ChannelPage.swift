@@ -74,6 +74,7 @@ struct ChannelView: View {
                         explore(api)
                     }
                 }
+                .barClearance()
                 .refreshable { await reload(api) }
                 .task {
                     await loadDetail(api)
@@ -197,6 +198,9 @@ struct ChannelView: View {
             moreMenu(api)
         }
         .padding(.horizontal, 16).padding(.top, 14).padding(.bottom, 14)
+        .sensoryFeedback(.selection, trigger: videosBell)
+        .sensoryFeedback(.selection, trigger: shortsBell)
+        .sensoryFeedback(.selection, trigger: rating)
     }
 
     /// A cloche is the user's follow switch; its badge tells the videos' cloche (▶) from the shorts' one.
@@ -233,6 +237,8 @@ struct ChannelView: View {
                 Button { Task { await setRating(api, star) } } label: {
                     Image(systemName: "star.fill").font(.system(size: 22))
                         .foregroundStyle(star <= rating ? Theme.amber : Theme.textFaint.opacity(0.55))
+                        // 44 pt wide at least: the five stars share the row.
+                        .frame(maxWidth: .infinity).frame(height: 48).contentShape(Rectangle())
                 }
                 .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
             }

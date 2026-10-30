@@ -28,7 +28,8 @@ struct HistoriqueView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         PageHeader(title: "Historique", back: true)
-                        ErrorMessage(text: errorMessage)
+                        ErrorMessage(text: errorMessage) { Task { await reload(api) } }
+                        if !loaded && errorMessage == nil { LoadingRow() }
                         ForEach(days, id: \.day) { group in
                             HStack(alignment: .firstTextBaseline, spacing: 8) {
                                 Text(Self.dayTitle(group.day))
@@ -50,6 +51,7 @@ struct HistoriqueView: View {
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await reload(api) }
                 .task { await reload(api) }
             }

@@ -39,12 +39,30 @@ struct EmptyMessage: View {
     }
 }
 
+/// The error of a failed call; with `retry`, a button tries the call again.
 struct ErrorMessage: View {
     let text: String?
+    var retry: (() -> Void)? = nil
+
     var body: some View {
         if let text {
-            Text(text).font(.raton(15, .medium)).foregroundStyle(Theme.danger).padding(16)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(text).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                if let retry {
+                    Button("Réessayer", action: retry).buttonStyle(SandButtonStyle(fill: false))
+                }
+            }
+            .padding(16)
         }
+    }
+}
+
+/// What a list shows until its first load has answered, so the page never looks empty or frozen.
+struct LoadingRow: View {
+    var body: some View {
+        ProgressView().tint(Theme.primary)
+            .frame(maxWidth: .infinity).padding(.top, 60)
+            .accessibilityLabel("Chargement")
     }
 }
 
@@ -104,6 +122,7 @@ struct HideToggle: View {
         }
         .padding(4)
         .sandTrack()
+        .sensoryFeedback(.selection, trigger: showAll)
     }
 }
 

@@ -1,9 +1,13 @@
 import Foundation
+import WidgetKit
 
 /// What the app remembers between launches: the server URL and the user, in UserDefaults.
 final class AppState: ObservableObject {
     private static let serverKey = "serverURL"
     private static let userKey = "userID"
+
+    /// The App Group the share extension (`RatonShare`) reads the server address from.
+    private static let sharedDefaults = UserDefaults(suiteName: "group.fr.raton.app")
 
     @Published private(set) var serverURL: URL?
     @Published private(set) var userID: Int?
@@ -11,7 +15,11 @@ final class AppState: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         serverURL = defaults.string(forKey: Self.serverKey).flatMap { URL(string: $0) }
-        userID = defaults.object(forKey: Self.userKey) as? Int
+        // A launch argument (`-userID 1`, used by the UI tests) arrives as a string.
+        userID = (defaults.object(forKey: Self.userKey) as? Int) ?? defaults.string(forKey: Self.userKey).flatMap(Int.init)
+        // Also for an address saved before the extension existed.
+        Self.sharedDefaults?.set(serverURL?.absoluteString, forKey: Self.serverKey)
+        Self.sharedDefaults?.set(userID, forKey: Self.userKey)
     }
 
     /// The client for the stored server and user; nil until a server is chosen.
@@ -20,6 +28,7 @@ final class AppState: ObservableObject {
     }
 
     func setServer(_ url: URL) {
+        let oldServer = serverURL
         if url != serverURL {
             // Another server has other users.
             userID = nil
@@ -27,11 +36,16 @@ final class AppState: ObservableObject {
         }
         serverURL = url
         UserDefaults.standard.set(url.absoluteString, forKey: Self.serverKey)
+        Self.sharedDefaults?.set(url.absoluteString, forKey: Self.serverKey)
+        if url != oldServer { Self.sharedDefaults?.removeObject(forKey: Self.userKey) }
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     func setUser(_ id: Int) {
         userID = id
         UserDefaults.standard.set(id, forKey: Self.userKey)
+        Self.sharedDefaults?.set(id, forKey: Self.userKey)
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     /// Back to the first-launch screen (a wrong server).

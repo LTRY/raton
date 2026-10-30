@@ -40,6 +40,7 @@ struct AccueilView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 640)
                 }
+                .barClearance()
                 .task { await visit(api) }
                 .navigationDestination(for: Route.self) { route in
                     switch route {

@@ -39,9 +39,10 @@ extension Color {
 }
 
 extension Font {
-    /// Plus Jakarta Sans (variable font bundled in the app), at a fixed size.
+    /// Plus Jakarta Sans (variable font bundled in the app); `size` is the size at the default text size
+    /// and grows with the user's "Text Size" setting (capped at the root, see `RootView`).
     static func raton(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .custom("Plus Jakarta Sans", fixedSize: size).weight(weight)
+        .custom("Plus Jakarta Sans", size: size, relativeTo: .body).weight(weight)
     }
 }
 
@@ -130,4 +131,33 @@ struct StarsView: View {
             }
         }
     }
+}
+
+// MARK: Room for the bottom bar
+
+private struct BarClearanceKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
+
+extension EnvironmentValues {
+    /// How far the floating tab bar (and the mini player) reaches up from the bottom of the screen.
+    var barClearance: CGFloat {
+        get { self[BarClearanceKey.self] }
+        set { self[BarClearanceKey.self] = newValue }
+    }
+}
+
+private struct BarClearance: ViewModifier {
+    @Environment(\.barClearance) private var clearance
+
+    func body(content: Content) -> some View {
+        // On the scroll view itself, so that its last row can be scrolled clear of the bar. The system's own
+        // safe-area inset from the root was counted differently on the simulator and on a phone.
+        content
+            .contentMargins(.bottom, clearance, for: .scrollContent)
+            .contentMargins(.bottom, clearance, for: .scrollIndicators)
+    }
+}
+
+extension View {
+    /// For the main scroll view of a screen shown above the tab bar.
+    func barClearance() -> some View { modifier(BarClearance()) }
 }
