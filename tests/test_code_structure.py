@@ -1,6 +1,7 @@
 """Structure rules that used to live in CLAUDE.md as prose."""
 
 import ast
+import plistlib
 import re
 from pathlib import Path
 
@@ -10,6 +11,7 @@ FRONT = ROOT / "front"
 MCP = ROOT / "mcp_server"
 OPS = ROOT / "ops"
 MONITORING = ROOT / "monitoring"
+IOS = ROOT / "ios"
 ROUTE_METHODS = {"get", "post", "put", "patch", "delete", "head", "options", "api_route"}
 
 
@@ -261,3 +263,18 @@ def test_monitoring_tool_is_independent_of_the_project_and_of_ops():
 def test_project_code_does_not_import_the_monitoring_tool():
     for root in (APP, FRONT, MCP):
         assert not imports_of(root, "monitoring"), imports_of(root, "monitoring")
+
+
+def test_ios_app_is_a_swift_client_without_python_or_server_secrets():
+    # ios/ talks to the front's URL only (docs ios/docs/app-ios.md): no Python, no copy of a server
+    # rule, and its Info.plist keeps the settings a LAN HTTP client and a background player need.
+    assert not list(IOS.rglob("*.py")), "ios/ is Swift only"
+    plist = plistlib.loads((IOS / "Raton" / "Info.plist").read_bytes())
+    assert plist["UIBackgroundModes"] == ["audio"]
+    assert plist["NSAppTransportSecurity"]["NSAllowsLocalNetworking"] is True
+    assert plist["NSAppTransportSecurity"]["NSAllowsArbitraryLoads"] is True
+    assert plist["NSLocalNetworkUsageDescription"]
+    sources = "\n".join(
+        path.read_text(encoding="utf-8") for path in (IOS / "Raton").glob("*.swift")
+    )
+    assert "X-Raton-User" in sources

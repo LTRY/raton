@@ -144,6 +144,18 @@ def test_purge_keeps_recently_watched_unwatched_and_archived(tmp_path):
         assert (tmp_path / video.yt_video_id / "video.mp4").exists()
 
 
+def test_purge_keeps_shorts(tmp_path):
+    db = make_session()
+    short = add_video(db, tmp_path / "short", watched_days_ago=30)
+    short.url = "https://www.youtube.com/shorts/short"
+    db.commit()
+
+    assert purge_watched_media(db) == 0
+    db.refresh(short)
+    assert short.video_path is not None
+    assert (tmp_path / short.yt_video_id / "video.mp4").exists()
+
+
 def test_purge_keeps_a_video_any_user_rated_four_or_more(tmp_path):
     db = make_session()
     video = add_video(db, tmp_path / "vid", watched_days_ago=30, rating=1)

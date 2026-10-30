@@ -20,6 +20,8 @@ _SPEC.loader.exec_module(check_pr_title)
         "[DOCS] Clarify the glossary",
         "[OPS] Move the previews page into ops/",
         "[OPS][MONITORING] Split the log review out of ops/",
+        "[IOS] Add the native iOS app: server URL, Nouveautés, player",
+        "[BACK][IOS] Add a field the iOS app reads",
         "[CI] " + "A" * 72,
     ],
 )

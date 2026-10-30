@@ -1471,6 +1471,30 @@ def test_video_audio_supports_range_requests_for_safari(tmp_path):
     assert asyncio.run(collect_streaming_body(response)) == b"2345"
 
 
+def test_m4a_audio_is_served_as_audio_mp4(tmp_path):
+    # `audio/mp4a-latm` (the mimetypes default) makes AVPlayer fail to become ready.
+    db = make_session()
+    folder = tmp_path / "fiche"
+    folder.mkdir()
+    (folder / "audio.m4a").write_bytes(b"0123456789")
+    video = Video(
+        yt_video_id="m4a",
+        title="M4a",
+        url="https://youtube.com/watch?v=m4a",
+        folder_path=str(folder),
+        audio_path=str(folder / "audio.m4a"),
+    )
+    db.add(video)
+    db.commit()
+    request = Request(
+        {"type": "http", "method": "GET", "path": "/", "headers": [], "scheme": "http"}
+    )
+
+    response = api_media.video_audio(video.id, request, db)
+
+    assert response.media_type == "audio/mp4"
+
+
 def test_video_file_supports_range_requests_for_safari(tmp_path):
     db = make_session()
     folder = tmp_path / "video"

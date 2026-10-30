@@ -14,12 +14,17 @@ from back.models.playlist import Playlist
 from back.models.user import UserVideo
 from back.models.video import Video
 from back.models.video_sponsor_segment import VideoSponsorSegment
-from back.services.common.settings import get_sponsor_skip_enabled, get_video_category_label_styles
+from back.services.common.settings import (
+    get_no_progress_category_labels,
+    get_sponsor_skip_enabled,
+    get_video_category_label_styles,
+)
 from back.services.common.user_state import video_states
 from back.services.media.media_storage import is_archived
 from back.services.videos.documents import read_transcript_documents, read_video_metadata
 from back.services.videos.editing import mark_video_opened
-from back.services.videos.playback import latest_playback_positions
+from back.services.videos.list_state import card_list_states
+from back.services.videos.playback import latest_playback_by_video, latest_playback_positions
 from back.services.youtube.sponsor_segments import active_sponsor_segments, normalize_skip_segments
 from back.services.youtube.subtitles import TranscriptLine, read_transcript_lines
 
@@ -51,6 +56,10 @@ class VideoDetail:
     # The user's playlists, those the fiche can be added to.
     all_playlists: list[Playlist]
     category_label_styles: list[dict[str, str]]
+    # How the fiche's card is greyed out for the user, and the state deduced from playback alone
+    # (`card_list_states`): what the Vu and Indésirée buttons toggle from.
+    shown_state: str
+    auto_state: str
 
 
 def read_timed_transcript(video: Video) -> list[TranscriptLine]:
@@ -93,9 +102,16 @@ def find_video(db: Session, video_id: int) -> Video:
 def video_detail(db: Session, user_id: int, video: Video) -> VideoDetail:
     """Everything the page of a fiche shows the user, read only."""
     segments = active_sponsor_segments(db, video.id)
+    state = video_states(db, user_id, [video.id])[video.id]
+    shown_state, auto_state, _ = card_list_states(
+        video,
+        state,
+        latest_playback_by_video(db, user_id, [video.id]).get(video.id),
+        set(get_no_progress_category_labels(db)),
+    )
     return VideoDetail(
         video=video,
-        state=video_states(db, user_id, [video.id])[video.id],
+        state=state,
         documents=read_transcript_documents(video, user_id),
         transcript_lines=read_timed_transcript(video),
         metadata=detail_metadata(read_video_metadata(video)),
@@ -111,6 +127,8 @@ def video_detail(db: Session, user_id: int, video: Video) -> VideoDetail:
             db.scalars(select(Playlist).where(Playlist.user_id == user_id).order_by(Playlist.title))
         ),
         category_label_styles=get_video_category_label_styles(db),
+        shown_state=shown_state,
+        auto_state=auto_state,
     )
 
 

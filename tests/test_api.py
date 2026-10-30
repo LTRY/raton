@@ -220,6 +220,7 @@ def test_api_video_detail_returns_the_fiche_as_raw_values(db, tmp_path):
     payload = response.json()
     assert payload["title"] == "Fiche"
     assert payload["is_new"] is True
+    assert (payload["shown_state"], payload["auto_state"]) == ("normal", "normal")
     assert payload["media_urls"] == {
         "video": None,
         "audio": f"/api/videos/{video.id}/audio",
