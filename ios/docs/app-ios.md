@@ -175,7 +175,7 @@ La fiche :
 
 ## Pret pour l'App Store
 
-Deja la : l'icone (`Raton/Assets.xcassets/AppIcon.appiconset`, le Raton au pop-corn sur le fond creme, 1024 px), le manifeste de confidentialite (`PrivacyInfo.xcprivacy` : pas de suivi, aucune donnee collectee, `UserDefaults` pour l'URL du serveur et l'utilisateur) et les commandes de l'ecran de verrouillage. `NSAllowsArbitraryLoads` reste actif parce que le serveur est une adresse libre du reseau local, souvent en `http` : a revoir avant une soumission (equipe de signature, captures, politique de confidentialite).
+Deja la : l'icone (`Raton/Assets.xcassets/AppIcon.appiconset`, le Raton au pop-corn sur le fond creme, 1024 px), le manifeste de confidentialite (`PrivacyInfo.xcprivacy` : pas de suivi, aucune donnee collectee, `UserDefaults` pour l'URL du serveur et l'utilisateur) et les commandes de l'ecran de verrouillage. la politique de confidentialite a publier est dans `ios/docs/confidentialite.md` (les captures d'ecran se refont depuis le simulateur avec la base de demo, dans `ios/appstore/`, hors git) ; `NSAllowsArbitraryLoads` reste actif parce que le serveur est une adresse libre du reseau local, souvent en `http` : a revoir avant une soumission (equipe de signature, captures, politique de confidentialite).
 
 ## Partager vers Raton
 
