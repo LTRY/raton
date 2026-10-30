@@ -159,8 +159,9 @@ Videos :
 - `GET /videos/import` : renvoie (303) vers `/videos?import=video`, qui ouvre la feuille d'import de la Bibliotheque ; garde `message`/`level`. `GET /import/categories` : fragment `turbo-frame` des pastilles de categories de la feuille.
 - `POST /videos/download` : telechargement manuel ; `subtitle_language` vide (defaut, le formulaire n'en envoie plus) laisse `choose_subtitle_track` choisir la piste originale.
 - `POST /videos/upload` : import d'un fichier video ou audio depose sur la page d'import (champ multipart `file`). Extensions acceptees : celles de `VIDEO_EXTENSIONS`/`AUDIO_EXTENSIONS` (`back/services/youtube/downloads.py`), sinon 400. Le fichier va dans `Local/<YYYY-MM-DD> - <nom>/`, la video est rattachee a la chaine `Fichiers locaux` (`url` `local://files`, cloches desactivees) avec `yt_video_id` = `local:<sha1 du contenu>` (un meme contenu n'est pas importe deux fois). Redirige vers la fiche ; repli sans JavaScript de `POST /api/videos/upload`, qu'appelle la page d'import. Pas de transcript ni de metadonnees YouTube.
-- `POST /videos/share-import` : point d'entree du raccourci iOS de la feuille de
-  partage (Safari/YouTube). Champ de formulaire `url` ; seuls les liens
+- `POST /videos/share-import` : point d'entree de la feuille de partage iOS
+  (Safari/YouTube) : l'extension « Raton » de l'app (`ios/docs/app-ios.md`, « Partager vers Raton »)
+  ou un raccourci iOS. Champ de formulaire `url` ; seuls les liens
   YouTube (`youtube.com`, `m.`/`music.`, `youtu.be`) sont acceptes (400 JSON
   sinon). Meme import que le formulaire par defaut (metadonnees + transcript,
   aucun fichier media), mais **synchrone** : la requete attend la fin de

@@ -5,6 +5,9 @@ final class AppState: ObservableObject {
     private static let serverKey = "serverURL"
     private static let userKey = "userID"
 
+    /// The App Group the share extension (`RatonShare`) reads the server address from.
+    private static let sharedDefaults = UserDefaults(suiteName: "group.fr.raton.app")
+
     @Published private(set) var serverURL: URL?
     @Published private(set) var userID: Int?
 
@@ -13,6 +16,8 @@ final class AppState: ObservableObject {
         serverURL = defaults.string(forKey: Self.serverKey).flatMap { URL(string: $0) }
         // A launch argument (`-userID 1`, used by the UI tests) arrives as a string.
         userID = (defaults.object(forKey: Self.userKey) as? Int) ?? defaults.string(forKey: Self.userKey).flatMap(Int.init)
+        // Also for an address saved before the extension existed.
+        Self.sharedDefaults?.set(serverURL?.absoluteString, forKey: Self.serverKey)
     }
 
     /// The client for the stored server and user; nil until a server is chosen.
@@ -28,6 +33,7 @@ final class AppState: ObservableObject {
         }
         serverURL = url
         UserDefaults.standard.set(url.absoluteString, forKey: Self.serverKey)
+        Self.sharedDefaults?.set(url.absoluteString, forKey: Self.serverKey)
     }
 
     func setUser(_ id: Int) {

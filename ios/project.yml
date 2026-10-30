@@ -24,6 +24,9 @@ targets:
         # Set your own team in Xcode (Signing & Capabilities) to build onto a device.
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Raton/Raton.entitlements
+    dependencies:
+      - target: RatonShare
   RatonUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -35,3 +38,15 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.uitests
+  RatonShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RatonShare
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.share
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RatonShare/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RatonShare/RatonShare.entitlements
+        CODE_SIGN_STYLE: Automatic

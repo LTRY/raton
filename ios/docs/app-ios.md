@@ -177,6 +177,12 @@ La fiche :
 
 Deja la : l'icone (`Raton/Assets.xcassets/AppIcon.appiconset`, le Raton au pop-corn sur le fond creme, 1024 px), le manifeste de confidentialite (`PrivacyInfo.xcprivacy` : pas de suivi, aucune donnee collectee, `UserDefaults` pour l'URL du serveur et l'utilisateur) et les commandes de l'ecran de verrouillage. `NSAllowsArbitraryLoads` reste actif parce que le serveur est une adresse libre du reseau local, souvent en `http` : a revoir avant une soumission (equipe de signature, captures, politique de confidentialite).
 
+## Partager vers Raton
+
+Depuis Safari ou l'app YouTube, la feuille de partage propose « Raton » (extension `ios/RatonShare/`, cible `app-extension`). Elle envoie le lien a `POST /api/videos/share-import` (le back importe la fiche, sans fichier media, et repond quand c'est fait), puis affiche « Ajoutee a Raton » ou le message du serveur (lien qui n'est pas YouTube, import en echec, serveur injoignable). C'est ce que faisait le raccourci iOS decrit dans `docs/spec/12-api-et-routes.md`, sans rien a construire a la main.
+
+L'extension lit l'adresse du serveur dans l'App Group `group.fr.raton.app` ; l'app l'y recopie a chaque lancement et a chaque changement de serveur (`AppState`). Il faut donc avoir ouvert l'app une fois. Pour un iPhone reel, l'equipe de signature de l'app et celle de l'extension doivent avoir la capacite « App Groups » (Xcode la cree avec la signature automatique).
+
 ## Tests
 
 `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
