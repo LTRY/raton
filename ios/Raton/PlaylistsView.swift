@@ -2,8 +2,9 @@ import SwiftUI
 
 struct PlaylistsView: View {
     @EnvironmentObject private var state: AppState
-    // The tiles open their playlist from code, after their press animation.
-    @State private var path = NavigationPath()
+    // The tiles open their playlist from code, after their press animation; the root also fills it
+    // when the mini player is tapped.
+    @Binding var path: NavigationPath
     @State private var playlists: [PlaylistSummary] = []
     @State private var loaded = false
     @State private var errorMessage: String?

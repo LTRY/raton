@@ -79,7 +79,9 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
   la forme et de la largeur de la barre d'onglets, avec pause/lecture a gauche,
   le titre au-dessus de sa chaine, puis « suivant » (dans une playlist) et
-  fermer.
+  fermer. Un toucher sur le titre ouvre la page de la playlist qui joue, sinon la
+  fiche du media (`RootView.openPlayer` remplace la pile de l'onglet Playlists ou
+  Bibliotheque et y bascule).
 - **Texte, toucher, retour** : les polices suivent le reglage « Taille du texte »
   d'iOS (`Font.raton`), plafonne a `xxxLarge` a la racine pour que les lignes
   et pastilles tiennent ; les cibles de toucher font 44 pt au moins (les cinq

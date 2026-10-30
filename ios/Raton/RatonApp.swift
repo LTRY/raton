@@ -21,6 +21,10 @@ struct RootView: View {
     @EnvironmentObject private var state: AppState
     @State private var tab = 0
     @State private var keyboardUp = false
+    // The pages pushed on the Bibliothèque and Playlists tabs, kept here so that the mini player can open one.
+    @State private var libraryPath = NavigationPath()
+    @State private var playlistsPath = NavigationPath()
+    @EnvironmentObject private var player: PlayerController
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -34,8 +38,8 @@ struct RootView: View {
                     switch tab {
                     case 0: AccueilView()
                     case 1: NavigationStack { ChannelsView() }
-                    case 2: NavigationStack { LibraryView() }
-                    case 3: PlaylistsView()
+                    case 2: NavigationStack(path: $libraryPath) { LibraryView() }
+                    case 3: PlaylistsView(path: $playlistsPath)
                     default: NavigationStack { SettingsView() }
                     }
                 }
@@ -44,7 +48,7 @@ struct RootView: View {
                 .animation(.easeInOut(duration: 0.15), value: tab)
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     VStack(spacing: 6) {
-                        NowPlayingBar()
+                        NowPlayingBar(open: openPlayer)
                         // The web hides the bar while a text field has the keyboard.
                         if !keyboardUp { TabPill(tab: $tab) }
                     }
@@ -65,6 +69,22 @@ struct RootView: View {
         .onChange(of: scenePhase) { phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
+    }
+}
+
+extension RootView {
+    /// A tap on the mini player's title: the playlist page when a playlist is playing, else the fiche.
+    fileprivate func openPlayer() {
+        if let queue = player.queue {
+            let playlist = PlaylistSummary(id: queue.playlistID, title: queue.title, source: "", categories: [],
+                                           freeListening: queue.free, itemCount: queue.tracks.count,
+                                           coverVideoId: nil, coverHasThumbnail: false)
+            playlistsPath = NavigationPath([playlist])
+            tab = 3
+        } else if let videoID = player.track?.videoID {
+            libraryPath = NavigationPath([videoID])
+            tab = 2
+        }
     }
 }
 

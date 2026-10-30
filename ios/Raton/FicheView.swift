@@ -480,6 +480,8 @@ struct AudioControls: View {
 /// channel, then next (in a playlist) and close.
 struct NowPlayingBar: View {
     @EnvironmentObject private var player: PlayerController
+    /// Called when the title is tapped: the root opens the playlist or the fiche that is playing.
+    let open: () -> Void
 
     var body: some View {
         if player.track?.kind == .audio || player.queue != nil {
@@ -489,13 +491,18 @@ struct NowPlayingBar: View {
                         .font(.system(size: 24)).frame(width: 52, height: 52).contentShape(Rectangle())
                 }
                 .accessibilityLabel(player.isPlaying ? "Pause" : "Lecture")
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(player.title).font(.raton(16, .bold)).lineLimit(1)
-                    if let artist = player.artist {
-                        Text(artist).font(.raton(14)).lineLimit(1).opacity(0.7)
+                Button(action: open) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(player.title).font(.raton(16, .bold)).lineLimit(1)
+                        if let artist = player.artist {
+                            Text(artist).font(.raton(14)).lineLimit(1).opacity(0.7)
+                        }
                     }
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ouvrir \(player.title)")
                 if player.queue != nil {
                     Button { player.next() } label: {
                         Image(systemName: "forward.end.fill").font(.system(size: 22))
