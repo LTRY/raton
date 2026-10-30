@@ -71,19 +71,14 @@ struct PlaylistPlayerPanel: View {
         }
     }
 
-    /// The audio: the web's phone card, the cover of the track. Play and pause are the controls row's button.
+    /// The audio: the web's phone card, the cover of the track, with the queue controls centered over it.
     private var audioStage: some View {
         ZStack {
             AudioStageBackground()
-            AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api)
-                .offset(y: -12)
-            VStack {
-                Spacer()
-                controls(onStage: true)
-                    .padding(.bottom, 8).padding(.top, 18)
-                    .frame(maxWidth: .infinity)
-                    .background(LinearGradient(colors: [.clear, .black.opacity(0.55)], startPoint: .top, endPoint: .bottom))
-            }
+            AudioCover(videoID: shown?.videoID, hasThumbnail: shown?.hasThumbnail ?? false, api: api,
+                       dimmed: playable > 0)
+            // Centered on the cover, both ways: the stage centers the cover and this row alike.
+            if playable > 0 { controls(onStage: true) }
         }
     }
 
@@ -107,23 +102,27 @@ struct PlaylistPlayerPanel: View {
     /// Shuffle, previous, play-pause, next, loop. On the stage they are white over the cover, the play button
     /// a glass disc; under the video they are the sand and terracotta ones of the fiche.
     private func controls(onStage: Bool) -> some View {
-        HStack(spacing: onStage ? 20 : 22) {
+        HStack(spacing: onStage ? 0 : 22) {
             toggle("shuffle", on: player.shuffle, label: "Aléatoire", onStage: onStage) { player.shuffle.toggle() }
-            Button { player.previous() } label: { Image(systemName: "backward.fill") }
+            Button { player.previous() } label: {
+                Image(systemName: "backward.fill").frame(width: onStage ? 30 : nil, height: onStage ? 44 : nil).contentShape(Rectangle())
+            }
                 .disabled(!owns).accessibilityLabel("Piste précédente")
             Button(action: playPause) {
                 Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: onStage ? 22 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
-                    .frame(width: onStage ? 52 : 60, height: onStage ? 52 : 60)
+                    .font(.system(size: onStage ? 20 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
+                    .frame(width: onStage ? 46 : 60, height: onStage ? 46 : 60)
                     .modifier(PlayDisc(onStage: onStage))
             }
             .disabled(playable == 0)
             .accessibilityLabel(owns && player.isPlaying ? "Pause" : "Lecture")
-            Button { player.next() } label: { Image(systemName: "forward.fill") }
+            Button { player.next() } label: {
+                Image(systemName: "forward.fill").frame(width: onStage ? 30 : nil, height: onStage ? 44 : nil).contentShape(Rectangle())
+            }
                 .disabled(!owns).accessibilityLabel("Piste suivante")
             toggle("repeat", on: player.loop, label: "Boucle", onStage: onStage) { player.loop.toggle() }
         }
-        .font(.system(size: onStage ? 18 : 20)).foregroundStyle(onStage ? Color.white : Theme.textSoft)
+        .font(.system(size: onStage ? 15 : 20)).foregroundStyle(onStage ? Color.white : Theme.textSoft)
     }
 
     private func toggle(_ icon: String, on: Bool, label: String, onStage: Bool, action: @escaping () -> Void) -> some View {
@@ -132,7 +131,7 @@ struct PlaylistPlayerPanel: View {
                 if onStage {
                     // Over the cover: a white icon, lit up in a warm tone when on.
                     Image(systemName: icon).foregroundStyle(on ? Color(hex: 0xFFB48A) : Color.white)
-                        .frame(width: 40, height: 44)
+                        .frame(width: 26, height: 44)
                 } else {
                     Image(systemName: icon).foregroundStyle(on ? Theme.primary : Theme.textSoft)
                         .frame(width: 46, height: 46)

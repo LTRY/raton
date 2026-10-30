@@ -239,8 +239,10 @@ sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
 barre de progression est sous la carte audio, puis vient le titre de la piste
 (il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
 file (aleatoire, precedent, lecture, suivant, boucle) sont sur la vignette en
-mode audio : en blanc au bas de la carte, sur un degrade sombre, avec le bouton
-lecture en Liquid Glass, un seul bouton lecture. En mode video, la video a ses
+mode audio : en blanc, centres sur la pochette (horizontalement et verticalement,
+dans ses 168 pt), qui est assombrie dessous, avec le bouton lecture en Liquid
+Glass, un seul bouton lecture. Les boutons precedent et suivant y font 30 pt de
+large (44 de haut), faute de place pour 44. En mode video, la video a ses
 commandes natives et la rangee de boutons reste sous l'image :
 
 - le format par defaut se choisit par playlist dans le menu « ⋯ » (« Format par

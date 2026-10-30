@@ -89,6 +89,8 @@ struct AudioCover: View {
     let videoID: Int?
     let hasThumbnail: Bool
     let api: RatonAPI
+    /// A darker veil over the cover, for controls laid over it.
+    var dimmed = false
 
     var body: some View {
         ZStack {
@@ -99,6 +101,7 @@ struct AudioCover: View {
             } else {
                 Color(hex: 0x3A2A1E)
             }
+            if dimmed { Color.black.opacity(0.34) }
         }
         .frame(width: 168, height: 168)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
