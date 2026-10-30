@@ -55,7 +55,7 @@ struct RootView: View {
                     // The pill sits `TabPill.margin` from the screen's edge, following the phone's rounded corners
                     // (just above the home indicator): the inset reaches under the home indicator so the
                     // whole bar stays inside its own bounds and receives taps.
-                    .padding(.bottom, TabPill.margin)
+                    .padding(.bottom, TabPill.bottomMargin)
                     .ignoresSafeArea(.container, edges: .bottom)
                 }
             }
@@ -92,9 +92,10 @@ extension RootView {
 /// The icons are the web's own, and each plays its animation when tapped.
 struct TabPill: View {
     @Binding var tab: Int
-    /// The gap to the phone's edges, the same on the sides and at the bottom. 8 pt puts the home indicator
-    /// (8 to 13 pt from the bottom) inside the pill's own 5 pt of padding under the icons, not on its edge.
+    /// The gap to the phone's sides, and (smaller) to its bottom edge: the pill hugs the bottom, with the home
+    /// indicator (8 to 13 pt from the bottom) at the lower edge of its buttons, not on the pill's border.
     static let margin: CGFloat = 8
+    static let bottomMargin: CGFloat = 4
     /// Concentric with the phone's rounded corners, down to a full capsule.
     static let shape = ConcentricRectangle(corners: .concentric(minimum: 27), isUniform: true)
     @State private var plays = [0, 0, 0, 0, 0]
@@ -112,7 +113,7 @@ struct TabPill: View {
                 } label: {
                     TabIcon(kind: items[index].kind, color: active ? Theme.primary : Theme.textMuted,
                             knob: active ? Color(hex: 0xFFF1E8) : Color(hex: 0xF6EFE6), trigger: plays[index], size: 28)
-                        .frame(maxWidth: .infinity).frame(height: 48)
+                        .frame(maxWidth: .infinity).frame(height: 46)
                         .background {
                             if active {
                                 // The web's active tab: pale terracotta wash, white top highlight, warm shadow.
@@ -126,7 +127,7 @@ struct TabPill: View {
                 .accessibilityLabel(items[index].label)
             }
         }
-        .padding(5)
+        .padding(4)
         // The web's bar is a light frosted glass (blur 8 px, 12 % white fill, light rim) over the page.
         .background(Self.shape.fill(.ultraThinMaterial))
         .background(Self.shape.fill(Color.white.opacity(0.12)))

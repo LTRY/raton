@@ -65,14 +65,14 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   bascules (Video / Audio, Videos / Shorts, tout voir / masquer) ont la piste
   sable du web (`sandTrack`) avec un segment actif blanc.
 - **Barre d'onglets** (`TabPill`, `ios/Raton/RatonApp.swift`) : pilule flottante
-  a 8 pt des bords (`TabPill.margin`, les memes sur les cotes et en bas), verre depoli leger (flou, voile blanc a 12 %, liseré clair)
+  a 8 pt des cotes et 4 pt du bas (`TabPill.margin`, `TabPill.bottomMargin`), 54 pt de haut, verre depoli leger (flou, voile blanc a 12 %, liseré clair)
   sous lequel la page defile, icones de 28 pt ; l'onglet actif a le lavis
   terracotta pale avec un reflet blanc et une ombre chaude ; elle s'efface quand
   le clavier est ouvert, comme sur le web. Sa forme suit les coins
   arrondis du telephone (`ConcentricRectangle`), donc elle est aussi basse et
-  aussi ronde sur un iPhone 17e que sur un 18 Pro. 8 pt place l'indicateur
-  d'accueil (de 8 a 13 pt du bas) dans les 5 pt de marge interieure sous les
-  icones, et non a cheval sur son bord. L'encart qui la porte descend sous
+  aussi ronde sur un iPhone 17e que sur un 18 Pro. A 4 pt du bas, l'indicateur
+  d'accueil (de 8 a 13 pt du bas) passe sur la pilule, au ras du bas des boutons,
+  et non a cheval sur son bord. L'encart qui la porte descend sous
   l'indicateur au lieu d'un padding negatif, qui sur iOS 27 laissait le bas de la
   pilule sans toucher ; la page change avec l'onglet (`.id(tab)`).
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
