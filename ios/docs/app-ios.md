@@ -83,7 +83,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
   la forme et de la largeur de la barre d'onglets, posee 6 pt au-dessus, avec pause/lecture a gauche,
-  le titre au-dessus de sa chaine, puis « suivant » (dans une playlist) et
+  le titre au-dessus de sa chaine (ou du nom de la playlist quand une playlist joue), puis « suivant » (dans une playlist) et
   fermer. Un toucher sur le titre ouvre la page de la playlist qui joue, sinon la
   fiche du media (`RootView.openPlayer` remplace la pile de l'onglet Playlists ou
   Bibliotheque et y bascule).

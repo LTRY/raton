@@ -494,8 +494,9 @@ struct NowPlayingBar: View {
                 Button(action: open) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(player.title).font(.raton(16, .bold)).lineLimit(1)
-                        if let artist = player.artist {
-                            Text(artist).font(.raton(14)).lineLimit(1).opacity(0.7)
+                        // In a playlist the line under the title is the playlist's name, else the channel's.
+                        if let subtitle = player.queue?.title ?? player.artist {
+                            Text(subtitle).font(.raton(14)).lineLimit(1).opacity(0.7)
                         }
                     }
                     .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
