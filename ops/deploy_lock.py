@@ -9,6 +9,8 @@ lock is already held by its own tree and does not take it again.
 Spec: ops/docs/outil-ops.md, section "Verrou de deploiement".
 """
 
+from __future__ import annotations
+
 import fcntl
 import os
 import sys

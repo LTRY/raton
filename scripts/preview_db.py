@@ -12,6 +12,8 @@ Standard library only: it runs in the raton-ops container, without the app's vir
 Spec: docs/spec/04-configuration-et-deploiement.md, section "Previews des PR".
 """
 
+from __future__ import annotations
+
 import ast
 import sys
 from pathlib import Path
