@@ -31,7 +31,7 @@ struct PlaylistPlayerPanel: View {
             nowPlaying
             controls.padding(.top, 8)
             if detail.freeListening {
-                Text("Écoute libre : rien n'est compté comme vu").font(.raton(13)).foregroundStyle(Theme.textMuted)
+                Text("Écoute libre : rien n'est ajouté à l'historique").font(.raton(13)).foregroundStyle(Theme.textMuted)
                     .padding(.top, 10)
             }
         }
@@ -128,26 +128,26 @@ struct PlaylistPlayerPanel: View {
     }
 }
 
-/// The title block under the player: name, kind and the figures of the playlist, like the web's.
+/// The title block under the player: name, where an imported playlist comes from, and its figures.
+/// A manual playlist has no kind line, and a playlist has no Vu count.
 struct PlaylistTitleBlock: View {
     let detail: PlaylistDetail
 
-    private var kind: String {
-        detail.source == "url" ? "Playlist YouTube" : detail.source == "csv" ? "Playlist CSV Takeout" : "Playlist manuelle"
+    private var kind: String? {
+        detail.source == "url" ? "Playlist YouTube" : detail.source == "csv" ? "Playlist CSV Takeout" : nil
     }
 
     private var figures: String {
         guard let stats = detail.stats else { return "" }
         let minutes = Int((Double(stats.totalDurationSeconds) / 60).rounded())
         let duration = minutes >= 60 ? "\(minutes / 60) h \(String(format: "%02d", minutes % 60))" : "\(minutes) min"
-        let seen = detail.freeListening ? "écoute libre" : "\(stats.seenCount) vue\(stats.seenCount > 1 ? "s" : "") sur \(stats.count)"
-        return "\(duration) · \(stats.count) vidéo\(stats.count > 1 ? "s" : "") · \(seen)"
+        return "\(duration) · \(stats.count) vidéo\(stats.count > 1 ? "s" : "")"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(detail.title).font(.raton(30, .bold)).foregroundStyle(Theme.text)
-            Text(kind).font(.raton(16)).foregroundStyle(Theme.textMuted)
+            if let kind { Text(kind).font(.raton(16)).foregroundStyle(Theme.textMuted) }
             if !figures.isEmpty { Text(figures).font(.raton(16)).foregroundStyle(Theme.textMuted) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
