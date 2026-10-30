@@ -238,11 +238,11 @@ audio est dans la barre du haut, la video et la carte audio (pochette de la pist
 sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
 barre de progression est sous la carte audio, puis vient le titre de la piste
 (il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
-file (aleatoire, precedent, lecture, suivant, boucle) sont sur la vignette en
-mode audio : en blanc, centres sur la pochette (horizontalement et verticalement,
-dans ses 168 pt), qui est assombrie dessous, avec le bouton lecture en Liquid
-Glass, un seul bouton lecture. Les boutons precedent et suivant y font 30 pt de
-large (44 de haut), faute de place pour 44. En mode video, la video a ses
+file (aleatoire, precedent, lecture, suivant, boucle) sont sur la scene audio en
+mode audio : en blanc, repartis sur toute la largeur de l'ecran (24 pt de marge,
+boutons de 44 pt), sous la pochette qui est ramenee a 124 pt et remontee ; le
+bouton lecture est un disque en Liquid Glass, un seul bouton lecture. Sans piste
+lisible, la pochette reprend ses 168 pt et la rangee disparait. En mode video, la video a ses
 commandes natives et la rangee de boutons reste sous l'image :
 
 - le format par defaut se choisit par playlist dans le menu « ⋯ » (« Format par

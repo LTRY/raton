@@ -89,8 +89,8 @@ struct AudioCover: View {
     let videoID: Int?
     let hasThumbnail: Bool
     let api: RatonAPI
-    /// A darker veil over the cover, for controls laid over it.
-    var dimmed = false
+    /// 168 pt on a fiche; a playlist's stage shrinks it to leave a row of controls under it.
+    var size: CGFloat = 168
 
     var body: some View {
         ZStack {
@@ -101,10 +101,9 @@ struct AudioCover: View {
             } else {
                 Color(hex: 0x3A2A1E)
             }
-            if dimmed { Color.black.opacity(0.34) }
         }
-        .frame(width: 168, height: 168)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 22 * size / 168, style: .continuous))
         .shadow(color: Color(hex: 0x2B2018).opacity(0.35), radius: 14, y: 12)
     }
 }
