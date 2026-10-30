@@ -64,20 +64,25 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   l'etat actif le lavis terracotta pale avec une bordure terracotta. Les
   bascules (Video / Audio, Videos / Shorts, tout voir / masquer) ont la piste
   sable du web (`sandTrack`) avec un segment actif blanc.
-- **Barre d'onglets** (`TabPill`, `ios/Raton/RatonApp.swift`) : pilule flottante
-  a 8 pt des cotes et 4 pt du bas (`TabPill.margin`, `TabPill.bottomMargin`), 54 pt de haut, verre depoli leger (flou, voile blanc a 12 %, liseré clair)
-  sous lequel la page defile, icones de 28 pt ; l'onglet actif a le lavis
-  terracotta pale avec un reflet blanc et une ombre chaude ; elle s'efface quand
-  le clavier est ouvert, comme sur le web. Sa forme suit les coins
-  arrondis du telephone (`ConcentricRectangle`), donc elle est aussi basse et
-  aussi ronde sur un iPhone 17e que sur un 18 Pro. A 4 pt du bas, l'indicateur
-  d'accueil (de 8 a 13 pt du bas) passe sur la pilule, au ras du bas des boutons,
-  et non a cheval sur son bord. L'encart qui la porte descend sous
-  l'indicateur au lieu d'un padding negatif, qui sur iOS 27 laissait le bas de la
-  pilule sans toucher ; la page change avec l'onglet (`.id(tab)`).
+- **Barre d'onglets** (`TabPill`, `ios/Raton/RatonApp.swift`) : une capsule en
+  vrai Liquid Glass d'iOS 26 (`glassEffect`), comme les barres d'Apple et celle
+  de Deezer, qui flotte sur les pages. Une bulle de verre teintee de terracotta
+  est sous l'onglet actif et glisse vers l'onglet touche ; icones de 28 pt, sans
+  libelle comme sur le web ; elle s'efface quand le clavier est ouvert. Elle est
+  a 14 pt des cotes et a 21 pt du bord bas de l'ecran (`TabPill.margin`,
+  `TabPill.bottomGap`), soit la distance des barres flottantes d'Apple : au-dessus
+  de l'indicateur d'accueil, qui reste visible en dessous. Sa forme suit les coins
+  arrondis du telephone (`ConcentricRectangle`), donc elle est aussi ronde sur un
+  iPhone 17e que sur un 18 Pro. La distance se compte depuis le bord de l'ecran
+  et non depuis la zone de securite : `RootView` pose la barre dans un `ZStack`
+  qui ignore la zone de securite du bas et reserve sous les pages (encart vide)
+  la hauteur mesuree du mini-lecteur et de la barre. Poser la barre dans
+  un `safeAreaInset` qui ignorait cette zone marchait dans le simulateur iOS 27
+  mais pas sur un iPhone : la barre restait 34 pt plus haut. La page change avec
+  l'onglet (`.id(tab)`).
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
-  la forme et de la largeur de la barre d'onglets, avec pause/lecture a gauche,
+  la forme et de la largeur de la barre d'onglets, posee 6 pt au-dessus, avec pause/lecture a gauche,
   le titre au-dessus de sa chaine, puis « suivant » (dans une playlist) et
   fermer. Un toucher sur le titre ouvre la page de la playlist qui joue, sinon la
   fiche du media (`RootView.openPlayer` remplace la pile de l'onglet Playlists ou
@@ -106,7 +111,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Un toucher joue d'abord le survol du web (260 ms) puis ouvre la playlist ; un doigt qui reste pose le joue aussi, apres 90 ms ; un doigt qui glisse pour defiler ne le declenche pas. Ce survol (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
   « Reduire les animations ».
 - **Defilement vertical seulement** : le balayage depuis le bord gauche qui ramene en arriere en emportant la page est coupe (`UINavigationController`, `RatonApp.swift`) ; chaque ecran a son bouton de retour.
-- Le design Liquid Glass essaye avant a ete abandonne ; il n'en reste rien.
+- Le Liquid Glass sert a la barre d'onglets seulement (voir « Barre d'onglets ») ; les cartes, boutons et feuilles gardent les surfaces blanches du web.
 
 ## Ecrans
 
