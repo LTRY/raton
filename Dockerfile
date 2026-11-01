@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/app/.local/bin ./scripts/build_css.sh
 
 # Resolves the Python dependencies from uv.lock into /app/.venv. Only the
 # virtualenv is copied to the final images: uv and the build caches stay here.
-FROM python:3.14-slim AS deps
+FROM python:3.15-slim AS deps
 
 ENV UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never
@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
 # What both images share: the virtualenv and an unprivileged user.
-FROM python:3.14-slim AS base
+FROM python:3.15-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -98,7 +98,7 @@ CMD ["python", "-m", "mcp_server"]
 # mounted socket (previews, deploy of main).
 # It carries no Raton dependency: the repository is mounted at the host's own path (see the `ops`
 # service of docker-compose.yml), and the page uses the standard library only.
-FROM python:3.14-slim AS ops
+FROM python:3.15-slim AS ops
 
 ENV PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH"
@@ -126,7 +126,7 @@ CMD ["sh", "-c", "[ -n \"$OPS_REPO\" ] || { echo 'OPS_REPO is empty: start it wi
 # The monitoring container: the daily log review (Claude Code on the Anthropic API) and its page.
 # No Docker socket, no Raton dependency: the repository is mounted on /project (see the `monitoring`
 # service of docker-compose.yml), the journal read-only, and the tool uses the standard library only.
-FROM python:3.14-slim AS monitoring
+FROM python:3.15-slim AS monitoring
 
 ENV PYTHONUNBUFFERED=1 \
     PATH="/root/.local/bin:$PATH"
