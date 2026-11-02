@@ -27,6 +27,7 @@ struct FicheView: View {
     @State private var showPlaylists = false
     @State private var showComment = false
     @State private var generating = false
+    @State private var openedChannel: ChannelItem?
 
     private var isLoaded: Bool { player.track?.videoID == videoID }
 
@@ -60,6 +61,7 @@ struct FicheView: View {
         .onDisappear {
             if player.track?.videoID == videoID && player.track?.kind == .video { player.pause() }
         }
+        .navigationDestination(item: $openedChannel) { ChannelView(channel: $0) }
         .sheet(isPresented: $showCategories) {
             if let detail, let api = state.api {
                 CategoryPickerSheet(api: api, selected: detail.categories) { chosen in
@@ -258,13 +260,30 @@ struct FicheView: View {
         .aspectRatio(16 / 9, contentMode: .fit)
     }
 
+    private func openChannel(_ id: Int, api: RatonAPI) async {
+        do {
+            let loaded: ChannelDetail = try await api.get("/api/channels/\(id)")
+            openedChannel = ChannelItem(
+                id: loaded.id, name: loaded.name, rating: loaded.rating, categories: loaded.categories,
+                autoMetadataEnabled: loaded.autoMetadataEnabled, autoShortsEnabled: loaded.autoShortsEnabled,
+                avatarUrl: loaded.avatarUrl, bannerUrl: loaded.bannerUrl, videoCount: 0, lastPlayedAt: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     // MARK: Info block
 
     private func infoBlock(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(detail.title).font(.raton(21, .bold)).foregroundStyle(Theme.text)
             if let channel = detail.channel {
-                Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
+                // Opens the channel's page in the app, never YouTube.
+                Button { Task { await openChannel(channel.id, api: api) } } label: {
+                    Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
             }
             HStack(alignment: .center, spacing: 6) {
                 CategoryChips(categories: detail.categories, api: api)
