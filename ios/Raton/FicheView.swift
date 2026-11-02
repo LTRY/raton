@@ -330,21 +330,12 @@ struct FicheView: View {
         }
     }
 
-    private func sectionTitle(_ item: FicheTab, _ detail: VideoDetail) -> String {
-        item.rawValue
-    }
-
     /// The sections one under the other, in the order of `FicheTab`: no tabs to switch between.
     private func sections(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 26) {
             ForEach(tabs(detail), id: \.self) { item in
-                VStack(alignment: .leading, spacing: 10) {
-                    // The description (behind its own chevron) and the chat (a plain input) have no title.
-                    if item != .info && item != .chat {
-                        Text(sectionTitle(item, detail)).font(.raton(20, .bold)).foregroundStyle(Theme.text)
-                    }
-                    section(item, detail, api: api)
-                }
+                // The description and the notes sit behind their own chevron, the chat is a plain input: no titles.
+                section(item, detail, api: api)
             }
         }
         .padding(.top, 6)

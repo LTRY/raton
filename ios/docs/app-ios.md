@@ -170,7 +170,7 @@ La fiche :
 - le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait et que le lecteur se met en pause pendant la transition ou la seconde qui suit, la lecture repart) ; un balayage vers le bas quitte le plein ecran ;
 - « + Categories » a la taille des etiquettes de sa ligne ;
 - plus d'onglets : les sections sont les unes sous les autres, chacune avec son
-  titre, dans l'ordre : « Description » (depliant), Notes structurees (si elles
+  titre, dans l'ordre : « Description » (depliant), « Notes » (depliant ferme, si elles
   existent), Discussion ; ni segments ni transcript n'y figurent (le
   lecteur saute toujours les segments sponsors quand le back l'active)
 - les etoiles envoient `rating` (0 a 5) ; toucher l'etoile deja choisie remet 0 ;
@@ -178,8 +178,8 @@ La fiche :
 - sections : « Description » d'abord, un depliant ferme par defaut (chevron) qui contient
   la description et ses hashtags ; ni vues, ni j'aime, ni nombre de commentaires, ni nom
   de la chaine, deja sous le titre ; les chapitres dans ce meme depliant, apres les hashtags (un chapitre fait
-  avancer le lecteur), puis les playlists, Notes structurees (resume et notes, rendu
-  Markdown simple), le commentaire personnel n'est plus une section : « Ecrire un commentaire personnel » est une entree du menu « ⋯ » qui ouvre une feuille (`PUT .../comment`), Discussion
+  avancer le lecteur), puis les playlists, « Notes » (depliant ferme : resume et notes, rendu
+  Markdown simple, sans les titres « Extraction exhaustive du transcript » ni « Faits verifiables »), le commentaire personnel n'est plus une section : « Ecrire un commentaire personnel » est une entree du menu « ⋯ » qui ouvre une feuille (`PUT .../comment`), Discussion
   sur la fiche, sans titre, dans l'esprit de l'app Claude : le message de l'utilisateur dans une bulle sable
   a droite, la reponse de Raton en texte simple sur la page avec une petite etincelle
   terracotta dessous (elle tourne pendant qu'il repond), questions suggerees en pastilles
