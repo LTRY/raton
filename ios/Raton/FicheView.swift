@@ -55,9 +55,10 @@ struct FicheView: View {
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
-        // The video is tied to this screen; audio goes on.
+        // The video is tied to this screen: leaving pauses it, and it stays loaded so that coming back shows
+        // the frame where it stopped and playing goes on from there. Audio goes on.
         .onDisappear {
-            if player.track?.videoID == videoID && player.track?.kind == .video { player.stop() }
+            if player.track?.videoID == videoID && player.track?.kind == .video { player.pause() }
         }
         .sheet(isPresented: $showCategories) {
             if let detail, let api = state.api {

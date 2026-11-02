@@ -167,7 +167,7 @@ La fiche :
   calcule par le back) ; apres chaque action l'app relit la fiche au lieu de
   deviner le nouvel etat ;
 - avant la lecture, la zone du lecteur montre la vignette de la fiche (assombrie) derriere le bouton lecture ;
-- le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait, la lecture reprend a la fin de la transition) ; un balayage vers le bas quitte le plein ecran ;
+- le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait et que le lecteur se met en pause pendant la transition ou la seconde qui suit, la lecture repart) ; un balayage vers le bas quitte le plein ecran ;
 - « + Categories » a la taille des etiquettes de sa ligne ;
 - plus d'onglets : les sections sont les unes sous les autres, chacune avec son
   titre, dans l'ordre : « Description » (depliant), Notes structurees (si elles
@@ -223,7 +223,7 @@ continue quand on quitte la fiche ou qu'on verrouille l'ecran
 commandes de l'ecran verrouille (`MPNowPlayingInfoCenter`,
 `MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Une barre sous
 les onglets permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
-Une video s'arrete en quittant sa fiche.
+Une video se met en pause en quittant sa fiche, sans etre dechargee : en revenant on voit l'image ou elle s'est arretee (pas la vignette) et la lecture repart de cet endroit.
 
 Il rapporte sa progression comme le JavaScript du front
 (`reportPlayback` dans `front/static/js/app.js`) : `POST
@@ -275,7 +275,7 @@ commandes natives et la rangee de boutons reste sous l'image :
   a jour sans couper la piste.
 
 La barre ne ramene pas a la page de la playlist, et ouvrir depuis la playlist
-la fiche d'une video en cours de lecture la coupe en la quittant.
+la fiche d'une video en cours de lecture la met en pause en la quittant.
 
 ## Pas encore
 
