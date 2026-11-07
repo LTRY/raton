@@ -243,8 +243,7 @@ chaque modification du code.
 
 A chaque pull request et a chaque push sur `main`, `make ci` tourne sur un
 runner GitHub (`ubuntu-latest`) : CSS, lint `ruff`, tests et validation
-Compose. Un second job construit l'image du site de documentation
-(`make docs-build`), un troisieme scanne l'historique a la recherche de
+Compose. Un second job scanne l'historique a la recherche de
 secrets (gitleaks). Le deploiement se fait a la main (voir « Deploiement de
 main » ci-dessous).
 
@@ -300,22 +299,6 @@ Un workflow separe, `pr-title.yml`, valide le titre de chaque PR avec
 `scripts/check_pr_title.py` (regles de « Conventions de nommage des PR »
 ci-dessous ; les PR de Dependabot sont ignorees). Les regles sont testees dans
 `tests/test_pr_title.py`.
-
-### Site de documentation (`docker-compose.docs.yml`, `scripts/docs.sh`)
-
-Les specs de `docs/spec/` sont publiees sur le LAN par un site
-[Starlight](https://starlight.astro.build/) (`docs-site/`, Astro), sur le port
-`8091` (`DOCS_PORT`), dans son propre projet compose `raton-docs` : ni
-`make up` ni `make down` n'y touchent. `docs/spec/` reste la seule source, lue
-en place (aucune copie) : chaque fichier commence par un frontmatter
-`title` egal a son premier `# ...` (verifie par `tests/test_docs_spec.py`), et
-`README.md` porte `slug: index`. Un plugin rehype (`docs-site/plugins/`)
-convertit les liens `xx-nom.md` en URL du site et retire le `# ...` en double.
-
-`docs-site/Dockerfile` construit le site avec Node (contexte = racine du depot)
-puis le sert avec nginx. `scripts/docs.sh` le (re)construit et le relance. `make docs-dev` lance le serveur Astro local, joignable depuis le LAN (`0.0.0.0`)
-(Node >= 22.22 requis), `make docs-build` construit l'image comme le fait la CI
-(job `docs` de `ci.yml`).
 
 ## Configuration de l'outil ops
 

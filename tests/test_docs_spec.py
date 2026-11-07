@@ -1,4 +1,4 @@
-"""Every spec file carries the frontmatter the Starlight site (docs-site/) needs."""
+"""Every spec file carries a frontmatter `title` equal to its first heading."""
 
 import json
 import re
@@ -8,7 +8,7 @@ import pytest
 
 SPEC_DIR = Path(__file__).resolve().parent.parent / "docs" / "spec"
 # ops/docs/, monitoring/docs/ and ios/docs/ are the units' own specs (ops/CLAUDE.md, monitoring/CLAUDE.md): same
-# frontmatter rule, not published on the site.
+# frontmatter rule.
 OPS_SPEC_FILES = sorted(
     path
     for tool in ("ops", "monitoring", "ios")
@@ -35,19 +35,6 @@ def test_spec_files_are_found():
 
 @pytest.mark.parametrize("path", SPEC_FILES + OPS_SPEC_FILES, ids=lambda p: p.name)
 def test_title_matches_first_heading(path):
-    # The site renders the title itself and drops the markdown '# ' line, so they must not drift apart.
     match = re.search(r'^title: (".+")$', frontmatter(path), re.MULTILINE)
     assert match, f"{path.name}: frontmatter needs a quoted title"
     assert json.loads(match.group(1)) == first_heading(path)
-
-
-def test_readme_is_the_site_home():
-    assert re.search(r"^slug: index$", frontmatter(SPEC_DIR / "README.md"), re.MULTILINE)
-
-
-@pytest.mark.parametrize("path", SPEC_FILES, ids=lambda p: p.name)
-def test_file_name_is_sidebar_safe(path):
-    # docs-site/astro.config.mjs builds the sidebar from these file names; one that does not slugify to itself breaks the build.
-    assert path.name == "README.md" or re.fullmatch(r"[0-9]{2}-[a-z0-9-]+\.md", path.name), (
-        f"{path.name}: spec file names must match NN-lowercase-words.md"
-    )

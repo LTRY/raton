@@ -1,4 +1,4 @@
-.PHONY: uninstall install test lint format compose-config ci up up-locked down logs migrate demo css docs-dev docs-build upgrade-ytdlp previews monitoring
+.PHONY: uninstall install test lint format compose-config ci up up-locked down logs migrate demo css upgrade-ytdlp previews monitoring
 
 # Shell environment first, then MEDIA_HOST_ROOT from .env, then the default.
 MEDIA_HOST_ROOT ?= $(shell sed -n 's/^MEDIA_HOST_ROOT=//p' .env 2>/dev/null | tail -n1 | tr -d "\"'")
@@ -29,17 +29,10 @@ format:
 
 compose-config:
 	docker compose config
-	docker compose -f docker-compose.docs.yml config
 	PREVIEW_PR=0 PREVIEW_PORT=9000 PREVIEW_SRC=. PREVIEW_DB_NAME=raton PREVIEW_DB_NETWORK=raton_default docker compose -f docker-compose.preview.yml config
 
 css:
 	./scripts/build_css.sh
-
-docs-dev:
-	cd docs-site && npm ci && npm run dev
-
-docs-build:
-	docker build -f docs-site/Dockerfile -t raton-docs:latest .
 
 ci: css lint test compose-config
 
