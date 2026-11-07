@@ -1,6 +1,5 @@
 ---
 title: "Cahier des charges Raton"
-slug: index
 ---
 # Cahier des charges Raton
 
@@ -22,9 +21,8 @@ LLM qui modifie le depot doit :
    GitHub. Le changement n'est pas deploye a cette etape.
 
 Chaque fichier de ce dossier commence par un frontmatter YAML avec un `title`
-egal a son premier `# ...` (le site de documentation en depend) : une nouvelle
-spec sans `title` fait echouer `tests/test_docs_spec.py`. Le site est decrit
-dans [04 Configuration et deploiement](04-configuration-et-deploiement.md).
+egal a son premier `# ...` : une nouvelle spec sans `title` fait echouer
+`tests/test_docs_spec.py`.
 
 Une modification du code qui rend cette specification fausse est incomplete.
 Une modification de specification qui n'est pas refletee dans le code est aussi

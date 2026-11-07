@@ -30,9 +30,7 @@ commentaires et des chaines. `B008` reste actif : les appels FastAPI
 (`Depends`, `Query`, `Form`, `File`, `Path`) sont declares immuables dans
 `pyproject.toml`.
 
-`make docs-build` construit l'image du site de documentation (comme le job
-`docs` de la CI) ; `tests/test_docs_spec.py` verifie le frontmatter `title` de
-chaque spec.
+`tests/test_docs_spec.py` verifie le frontmatter `title` de chaque spec.
 
 `scripts/screenshot.sh [chemin] [dossier]` sert a verifier une page a la main :
 il lance l'application sur une DB sqlite jetable remplie par

@@ -1,6 +1,0 @@
-*
-!docs-site
-!docs/spec
-docs-site/node_modules
-docs-site/dist
-docs-site/.astro

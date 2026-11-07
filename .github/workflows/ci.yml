@@ -1,6 +1,5 @@
 # Runs `make ci` (CSS build, ruff, tests, Compose validation) on every pull
-# request and on main, and a `docs` job that builds the docs site image
-# (`make docs-build`).
+# request and on main.
 name: ci
 
 on:
@@ -26,13 +25,6 @@ jobs:
         run: make install
       - name: Run make ci
         run: make ci
-  docs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - name: Build the docs site image
-        run: make docs-build
   secrets:
     runs-on: ubuntu-latest
     timeout-minutes: 10

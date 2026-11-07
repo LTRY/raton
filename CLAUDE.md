@@ -10,7 +10,7 @@ Before changing Raton, read the relevant files under `docs/spec/`. Every behavio
 
 ## Workflow: branch, `make ci`, pull request
 
-Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`); `.github/workflows/ci.yml` runs `make ci`, the docs image build and a secret scan on each one. Agents do not deploy: merging a PR deploys nothing, the user deploys by hand with `make up`. Spec: `docs/spec/04-configuration-et-deploiement.md`.
+Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`); `.github/workflows/ci.yml` runs `make ci` and a secret scan on each one. Agents do not deploy: merging a PR deploys nothing, the user deploys by hand with `make up`. Spec: `docs/spec/04-configuration-et-deploiement.md`.
 
 1. Work on a dedicated branch, never directly on `main`. Start every new task from an up-to-date `origin/main`: `git fetch origin main` first, then branch from (or fast-forward to) `origin/main`. The `SessionStart` hook in `.claude/settings.json` (`.claude/hooks/sync-origin-main.sh`) does this automatically at session start when the branch has no commits of its own and no modified tracked files; when a new task starts mid-session and the session has not opened its PR yet, do it by hand (once the PR is open, follow-up work stays on its branch: see the one-PR-per-session rule below).
 2. Do the task: implement it and commit on the branch.
@@ -19,7 +19,7 @@ Changes reach `main` only through pull requests on the GitHub repo (`LTRY/raton`
 
 One pull request per session. A session opens at most one PR; follow-up work in the same session goes on that PR's branch. When a new request is a very different subject from the session's PR, don't open a second PR: propose two options to the user — (1) do it anyway in this session, on the same PR (add its title tag if needed), or (2) do it in a separate session, and in that case show a self-contained prompt, ready to copy and paste into a new session (goal, files involved, context, what done looks like). Right after opening the PR, rename the session with the PR number then its title, e.g. `#80 [BACK] Fix ...` (the number only goes in the session name, never in the PR title; `set_session_title`, from the claude-code-remote MCP server; cloud sessions only).
 
-Do **not** run `make up`, `make uninstall`, `make previews`, `make monitoring`, `scripts/preview.sh`, `scripts/deploy.sh` or `scripts/docs.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
+Do **not** run `make up`, `make uninstall`, `make previews`, `make monitoring`, `scripts/preview.sh` or `scripts/deploy.sh` as part of a task: they act on the user's Docker stack. Deployment is done by the user by hand.
 
 Migrations: write the revision by hand in `alembic/versions/`, named `NNNN_short_slug` (`down_revision` = the previous id, working `downgrade()`), id of 32 characters at most (`tests/test_migration_revisions.py`). The PR title takes `[DB]`.
 
@@ -82,7 +82,7 @@ make previews       # starts the raton-ops container (root, Docker socket): page
 make monitoring     # starts the raton-monitoring container (no Docker socket): page (:8998) with the daily 8:00 log review (Claude Code, billed on ANTHROPIC_API_KEY)
 ```
 
-Other targets (`install`, `test`, `lint`, `css`, `migrate`, `docs-dev`, `docs-build`, `up`...) are in the Makefile; `make up` is the deploy and is not part of the task workflow.
+Other targets (`install`, `test`, `lint`, `css`, `migrate`, `up`...) are in the Makefile; `make up` is the deploy and is not part of the task workflow.
 
 Single test: `uv run --python 3.14 pytest tests/test_videos.py::test_name -v`
 

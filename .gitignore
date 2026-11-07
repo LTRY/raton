@@ -10,9 +10,6 @@ __pycache__/
 .DS_Store
 
 .worktrees/
-docs-site/node_modules/
-docs-site/dist/
-docs-site/.astro/
 
 # Secrets and local data: never commit
 .env.*
