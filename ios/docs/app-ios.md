@@ -169,8 +169,8 @@ La fiche :
   basculent comme celles du front, a partir de `shown_state` (l'etat affiche,
   calcule par le back) ; apres chaque action l'app relit la fiche au lieu de
   deviner le nouvel etat ;
-- avant la lecture, la zone du lecteur montre la vignette de la fiche (assombrie) derriere le bouton lecture ;
-- le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait et que le lecteur se met en pause pendant la transition ou la seconde qui suit, la lecture repart) ; un balayage vers le bas quitte le plein ecran ;
+- avant la lecture, la zone du lecteur montre la vignette de la fiche (assombrie) derriere le bouton lecture ; en mode video, si la fiche a deja ete regardee (au moins 3 s), une fine barre en bas de la zone et deux temps (position de reprise, duree) montrent tout de suite ou l'on s'est arrete, sans attendre le premier toucher (les controles natifs n'existent qu'une fois la video chargee) ;
+- le lecteur video est celui du systeme (`AVPlayerViewController`, `NativeVideoPlayer` dans `Components.swift`) avec ses controles natifs : lecture, ±10 s, curseur, AirPlay, sourdine et le bouton plein ecran (agrandir ou reduire la video ne la met pas en pause : si elle jouait, la lecture reprend a la fin de la transition) ; un balayage vers le bas quitte le plein ecran ;
 - « + Categories » a la taille des etiquettes de sa ligne ;
 - plus d'onglets : les sections sont les unes sous les autres, chacune avec son
   titre, dans l'ordre : « Description » (depliant), « Notes » (depliant ferme, si elles

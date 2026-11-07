@@ -236,6 +236,30 @@ struct FicheView: View {
                         .background(Circle().fill(Theme.primary))
                 }
                 .accessibilityLabel(playing ? "Pause" : "Lecture")
+                // Nothing is loaded yet, so the native controls are not there: show where playback stopped.
+                if !(isLoaded && player.track?.kind == mode), mode == .video,
+                   let resume = detail.resumePositions[mode.rawValue]?.positionSeconds, resume >= 3,
+                   let total = detail.durationSeconds, total > 0 {
+                    VStack(spacing: 4) {
+                        Spacer()
+                        GeometryReader { bar in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.3))
+                                Capsule().fill(Color.white)
+                                    .frame(width: bar.size.width * min(resume / Double(total), 1))
+                            }
+                        }
+                        .frame(height: 4)
+                        HStack {
+                            Text(Format.clock(resume))
+                            Spacer()
+                            Text(Format.clock(Double(total)))
+                        }
+                        .font(.raton(12, .semibold)).monospacedDigit().foregroundStyle(.white.opacity(0.9))
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 10)
+                    .allowsHitTesting(false)
+                }
             } else if downloading {
                 VStack(spacing: 10) {
                     ProgressView().tint(.white)
