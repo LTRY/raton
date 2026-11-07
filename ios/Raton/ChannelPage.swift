@@ -502,3 +502,43 @@ struct ChannelView: View {
         }
     }
 }
+
+/// A channel to open from a fiche. A value pushed on the stack (not a flag on the fiche) so that the
+/// videos of the channel page can push their own fiche on the same stack.
+struct ChannelRoute: Hashable {
+    let id: Int
+}
+
+/// Reads the channel, then shows its page.
+struct ChannelLoader: View {
+    let channelID: Int
+    @EnvironmentObject private var state: AppState
+    @State private var channel: ChannelItem?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Group {
+            if let channel {
+                ChannelView(channel: channel)
+            } else if let errorMessage {
+                Text(errorMessage).font(.raton(15, .medium)).foregroundStyle(Theme.danger).padding()
+            } else {
+                ProgressView()
+            }
+        }
+        .ratonPage()
+        .toolbar(.hidden, for: .navigationBar)
+        .task {
+            guard channel == nil, let api = state.api else { return }
+            do {
+                let loaded: ChannelDetail = try await api.get("/api/channels/\(channelID)")
+                channel = ChannelItem(
+                    id: loaded.id, name: loaded.name, rating: loaded.rating, categories: loaded.categories,
+                    autoMetadataEnabled: loaded.autoMetadataEnabled, autoShortsEnabled: loaded.autoShortsEnabled,
+                    avatarUrl: loaded.avatarUrl, bannerUrl: loaded.bannerUrl, videoCount: 0, lastPlayedAt: nil)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
