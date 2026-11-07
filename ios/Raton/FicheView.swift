@@ -22,6 +22,8 @@ struct FicheView: View {
     @State private var notice: String?
     @State private var busy = false
     @State private var downloading = false
+    // False once the fiche is left: a finished download then plays nothing.
+    @State private var onScreen = false
     @State private var choosingQuality = false
     @State private var showCategories = false
     @State private var showPlaylists = false
@@ -56,10 +58,11 @@ struct FicheView: View {
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
-        // The video is tied to this screen: leaving pauses it, and it stays loaded so that coming back shows
-        // the frame where it stopped and playing goes on from there. Audio goes on.
+        .onAppear { onScreen = true }
+        // The video is tied to this screen; audio goes on.
         .onDisappear {
-            if player.track?.videoID == videoID && player.track?.kind == .video { player.pause() }
+            onScreen = false
+            if player.track?.videoID == videoID && player.track?.kind == .video { player.stop() }
         }
         .navigationDestination(item: $openedChannel) { ChannelView(channel: $0) }
         .sheet(isPresented: $showCategories) {
@@ -436,7 +439,12 @@ struct FicheView: View {
                 for _ in 0..<150 {
                     try await Task.sleep(nanoseconds: 4_000_000_000)
                     await reload(api)
-                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil { break }
+                    if !onScreen { break }
+                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
+                        // Still on the fiche, on the side that was downloaded: play it straight away.
+                        if mode == kind { player.play(detail: detail, kind: kind, api: api) }
+                        break
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription

@@ -147,7 +147,8 @@ La fiche :
 - le selecteur video / audio suit `media_urls` (les deux fichiers peuvent
   coexister) ; sans fichier, un bouton de telechargement (qualite au choix pour
   la video) lance `POST .../media/{type}/download` puis relit la fiche jusqu'a
-  l'arrivee du fichier ; le menu supprime un fichier ; la video et la carte audio
+  l'arrivee du fichier, puis le lance tout de suite s'il est encore sur la fiche et du
+  bon cote (video ou audio) ; si l'on a quitte la fiche, la lecture ne demarre pas ; le menu supprime un fichier ; la video et la carte audio
   sont cote a cote dans un carrousel, comme sur le web : elles suivent le doigt, avec un
   effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
   ou un geste rapide suffit) ; le bouton video / audio du haut anime le meme
