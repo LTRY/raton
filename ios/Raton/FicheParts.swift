@@ -268,17 +268,31 @@ struct NotesPanel: View {
     let generating: Bool
     let generate: () -> Void
 
+    /// The LLM wraps its notes in these two scaffold headings; they say nothing to the reader.
+    private static let scaffoldHeadings = ["extraction exhaustive", "faits verifiables"]
+
+    private var cleanedNotes: String? {
+        detail.documents.notes?.components(separatedBy: "\n").filter { line in
+            guard line.hasPrefix("#") else { return true }
+            let title = line.drop(while: { $0 == "#" || $0 == " " })
+                .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            return !Self.scaffoldHeadings.contains { title.hasPrefix($0) }
+        }.joined(separator: "\n")
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let summary = detail.documents.shortSummary {
-                Text(summary).font(.raton(16, .semibold)).foregroundStyle(Theme.text)
+        Collapsible(title: "Notes") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let summary = detail.documents.shortSummary {
+                    Text(summary).font(.raton(16, .semibold)).foregroundStyle(Theme.text)
+                }
+                if let notes = cleanedNotes {
+                    MarkdownText(text: notes)
+                }
+                Button(generating ? "Génération…" : "Régénérer les notes", action: generate)
+                    .buttonStyle(SandButtonStyle())
+                    .disabled(generating || !detail.hasTranscript)
             }
-            if let notes = detail.documents.notes {
-                MarkdownText(text: notes)
-            }
-            Button(generating ? "Génération…" : "Régénérer les notes", action: generate)
-                .buttonStyle(SandButtonStyle())
-                .disabled(generating || !detail.hasTranscript)
         }
     }
 }

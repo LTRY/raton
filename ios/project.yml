@@ -2,7 +2,7 @@ name: Raton
 options:
   bundleIdPrefix: fr.raton
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 settings:
   base:
@@ -23,3 +23,44 @@ targets:
         INFOPLIST_FILE: Raton/Info.plist
         # Set your own team in Xcode (Signing & Capabilities) to build onto a device.
         CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Raton/Raton.entitlements
+    dependencies:
+      - target: RatonShare
+      - target: RatonWidget
+  RatonUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: RatonUITests
+    dependencies:
+      - target: Raton
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.uitests
+  RatonShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RatonShare
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.share
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RatonShare/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RatonShare/RatonShare.entitlements
+        CODE_SIGN_STYLE: Automatic
+  RatonWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: RatonWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.widget
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: RatonWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: RatonWidget/RatonWidget.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor

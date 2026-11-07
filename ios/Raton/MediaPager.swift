@@ -26,7 +26,7 @@ struct MediaModePill: View {
 }
 
 /// Video and audio side by side like the web's carousel: the slides follow the finger, then settle on the
-/// nearer one. On the video only the upper part starts a swipe, so the native player keeps its seek bar.
+/// nearer one. On the video only the upper part starts a swipe, so the native player keeps its seek bar; on the audio the foot is left to the progress bar.
 struct MediaPager<Video: View, Audio: View>: View {
     let mode: MediaKind
     let onSelect: (MediaKind) -> Void
@@ -53,6 +53,8 @@ struct MediaPager<Video: View, Audio: View>: View {
                                 guard abs(dx) > abs(value.translation.height) || dragging else { return }
                                 if !dragging {
                                     guard mode == .audio || value.startLocation.y < 160 else { return }
+                                    // The audio slide's progress bar sits at its foot: scrubbing it must not swipe to the video.
+                                    guard mode == .video || value.startLocation.y < proxy.size.height - 64 else { return }
                                     dragging = true
                                 }
                                 // Rubber band past the first and last slides.

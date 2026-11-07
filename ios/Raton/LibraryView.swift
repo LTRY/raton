@@ -108,7 +108,8 @@ struct VideoList: View {
 
     var body: some View {
         LazyVStack(spacing: 0) {
-            ErrorMessage(text: model.errorMessage)
+            ErrorMessage(text: model.errorMessage) { Task { await model.reload(api: api, search: search) } }
+            if !model.loaded && model.errorMessage == nil { LoadingRow() }
             if shorts {
                 ShortsMosaic(cards: model.items, api: api) { card in
                     await model.loadMore(api: api, search: search, after: card)
@@ -122,12 +123,31 @@ struct VideoList: View {
                     .buttonStyle(.plain)
                     rowMenu(card)
                 }
+                .swipeActions(edge: .trailing) {
+                    Button { Task { await setState(card, card.shownState == "watched" ? "unwatched" : "watched") } } label: {
+                        Label(card.shownState == "watched" ? "Non vu" : "Vu",
+                              systemImage: card.shownState == "watched" ? "eye.slash" : "checkmark.circle")
+                    }
+                    .tint(Theme.primary)
+                    Button { Task { await setState(card, card.shownState == "hidden" ? "clear" : "hidden") } } label: {
+                        Label(card.shownState == "hidden" ? "Démasquer" : "Indésirée", systemImage: "eye.slash")
+                    }
+                    .tint(Theme.textSoft)
+                }
                 .task { await model.loadMore(api: api, search: search, after: card) }
             }
             if model.loaded && model.items.isEmpty && model.errorMessage == nil {
                 EmptyMessage(text: "Aucune fiche.")
             }
         }
+        .rowSwipeContainer()
+    }
+}
+
+extension View {
+    /// Lets the rows of a scrolling stack be swiped (iOS 27); before that the row's "⋮" menu is the only way.
+    @ViewBuilder fileprivate func rowSwipeContainer() -> some View {
+        if #available(iOS 27, *) { swipeActionsContainer() } else { self }
     }
 }
 
@@ -138,6 +158,10 @@ struct LibraryView: View {
     fileprivate let followed: Bool
     @State fileprivate var search = ""
     @State fileprivate var showFilters = false
+    // A NavigationLink inside a Menu does nothing when tapped, so the ☰ entries set these instead.
+    @State fileprivate var showNouveautes = false
+    @State fileprivate var showHistorique = false
+    @State fileprivate var showYoutubeSearch = false
 
     init(followed: Bool = false) {
         self.followed = followed
@@ -164,12 +188,16 @@ struct LibraryView: View {
                         VideoList(model: model, api: api, search: search)
                     }
                 }
+                .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
                 .task {
                     await model.reload(api: api, search: search)
                 }
                 .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
+                .navigationDestination(isPresented: $showNouveautes) { NouveautesView(back: true) }
+                .navigationDestination(isPresented: $showHistorique) { HistoriqueView() }
+                .navigationDestination(isPresented: $showYoutubeSearch) { YoutubeSearchView() }
                 .sheet(isPresented: $showFilters) {
                     // Changing `filters` reloads the list (see `onChange` above).
                     LibraryFiltersSheet(api: api, filters: model.filters) { chosen in
@@ -184,23 +212,48 @@ struct LibraryView: View {
 }
 
 extension LibraryView {
-    /// The ☰ button goes to Exploration, the Nouveautés or the Historique; the saved views of the web are not listed.
+    /// The lists of the ☰ menu: the whole Bibliothèque, then the fiches of one category label.
+    private static let lists = [("Bibliothèque", "books.vertical", ""), ("Podcasts", "mic", "podcasts"),
+                                ("Musique", "music.note", "musique")]
+
+    /// The list the filters amount to, when they are exactly one of `lists`.
+    fileprivate var currentList: (String, String, String)? {
+        Self.lists.first { list in
+            var expected = LibraryFilters()
+            if !list.2.isEmpty { expected.categories = [list.2] }
+            expected.showAll = model.filters.showAll
+            return model.filters == expected
+        }
+    }
+
+    /// The ☰ button goes to the Bibliothèque, the Podcasts or the Musique list, the Nouveautés, the
+    /// Historique or the YouTube search; the saved views of the web are not listed.
     fileprivate func libraryHeader(_ api: RatonAPI) -> some View {
         HStack(spacing: 14) {
             if followed {
                 NouveautesBackButton()
             } else {
                 Menu {
-                    Button { model.filters = LibraryFilters() } label: {
-                        Label("Exploration", systemImage: "checkmark")
+                    ForEach(Self.lists, id: \.0) { list in
+                        Button {
+                            var chosen = LibraryFilters()
+                            if !list.2.isEmpty { chosen.categories = [list.2] }
+                            chosen.showAll = model.filters.showAll
+                            model.filters = chosen
+                        } label: {
+                            Label(list.0, systemImage: currentList?.0 == list.0 ? "checkmark" : list.1)
+                        }
                     }
-                    NavigationLink { NouveautesView(back: true) } label: { Label("Nouveautés", systemImage: "sparkles") }
-                    NavigationLink { HistoriqueView() } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                    Button { showNouveautes = true } label: { Label("Nouveautés", systemImage: "sparkles") }
+                    Button { showHistorique = true } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                    Button { showYoutubeSearch = true } label: {
+                        Label("Recherche YouTube", systemImage: "magnifyingglass")
+                    }
                 } label: { Image(systemName: "line.3.horizontal") }
                 .buttonStyle(CircleButtonStyle())
                 .accessibilityLabel("Vues")
             }
-            Text(followed ? "Nouveautés" : "Exploration").font(.raton(26, .bold)).foregroundStyle(Theme.text).lineLimit(1)
+            Text(followed ? "Nouveautés" : (currentList?.0 ?? "Bibliothèque")).font(.raton(26, .bold)).foregroundStyle(Theme.text).lineLimit(1)
             // The number of fiches, in the little pill of the other list pages.
             if model.loaded {
                 Text("\(model.total)").font(.raton(13, .semibold)).foregroundStyle(Theme.textMuted)

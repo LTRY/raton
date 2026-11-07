@@ -32,3 +32,6 @@ cookies*.txt
 *.xcodeproj
 DerivedData/
 xcuserdata/
+
+# App Store captures taken from the simulator (large, regenerated on demand)
+ios/appstore/

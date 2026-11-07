@@ -2,8 +2,9 @@ import SwiftUI
 
 struct PlaylistsView: View {
     @EnvironmentObject private var state: AppState
-    // The tiles open their playlist from code, after their press animation.
-    @State private var path = NavigationPath()
+    // The tiles open their playlist from code, after their press animation; the root also fills it
+    // when the mini player is tapped.
+    @Binding var path: NavigationPath
     @State private var playlists: [PlaylistSummary] = []
     @State private var loaded = false
     @State private var errorMessage: String?
@@ -34,7 +35,8 @@ struct PlaylistsView: View {
                             .accessibilityLabel("Ajouter une playlist")
                         }
                         SearchField(placeholder: "Rechercher une playlist", text: $search) {}
-                        ErrorMessage(text: errorMessage)
+                        ErrorMessage(text: errorMessage) { Task { await load(api) } }
+                        if !loaded && errorMessage == nil { LoadingRow() }
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 20), GridItem(.flexible(), spacing: 20)], spacing: 28) {
                             ForEach(Array(shown.enumerated()), id: \.element.id) { index, playlist in
                                 PlaylistTile(playlist: playlist, api: api, index: index, onOpen: { path.append($0) },
@@ -42,12 +44,13 @@ struct PlaylistsView: View {
                             }
                         }
                         // Room under the last row so it scrolls clear of the tab bar.
-                        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 130)
+                        .padding(.horizontal, 16).padding(.top, 4).padding(.bottom, 24)
                         if loaded && playlists.isEmpty && errorMessage == nil {
                             EmptyMessage(text: "Aucune playlist.")
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await load(api) }
                 .task { await load(api) }
                 .sheet(isPresented: $showNew) {
@@ -111,8 +114,9 @@ struct PlaylistTile: View {
 
     private var lifted: Bool { raised && !reduceMotion }
 
-    private var chip: String {
-        playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : "Manuelle"
+    /// Where an imported playlist comes from; a manual one has no chip.
+    private var chip: String? {
+        playlist.source == "url" ? "URL YouTube" : playlist.source == "csv" ? "CSV Takeout" : nil
     }
 
     var body: some View {
@@ -129,9 +133,11 @@ struct PlaylistTile: View {
                             .padding(8)
                     }
                     .overlay(alignment: .topLeading) {
-                        Text(chip).font(.raton(12, .semibold)).foregroundStyle(Theme.text)
-                            .padding(.horizontal, 10).padding(.vertical, 3)
-                            .background(Capsule().fill(Color.white.opacity(0.92))).padding(8)
+                        if let chip {
+                            Text(chip).font(.raton(12, .semibold)).foregroundStyle(Theme.text)
+                                .padding(.horizontal, 10).padding(.vertical, 3)
+                                .background(Capsule().fill(Color.white.opacity(0.92))).padding(8)
+                        }
                     }
                     .background(stackLayers)
                     .padding(.top, 12)
@@ -307,8 +313,6 @@ struct PlaylistView: View {
                                         if isCurrent {
                                             Image(systemName: player.isPlaying ? "speaker.wave.2.fill" : "pause.fill")
                                                 .foregroundStyle(Theme.primary)
-                                        } else if item.seen && !(detail?.freeListening ?? false) {
-                                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.textFaint)
                                         }
                                         NavigationLink(value: item.videoId) {
                                             Image(systemName: "info.circle").font(.system(size: 22))
@@ -333,6 +337,7 @@ struct PlaylistView: View {
                         }
                     }
                 }
+                .barClearance()
                 .refreshable { await load(api) }
                 .task { await load(api) }
                 .onAppear {
@@ -340,8 +345,6 @@ struct PlaylistView: View {
                     // The page opens on the playlist's own format, unless something else is already playing.
                     if player.queue == nil, let defaultMode { player.queueMode = defaultMode }
                 }
-                // The next track ends up Vu: read the rows again to show it.
-                .onChange(of: player.track) { _ in Task { await load(api) } }
                 .sheet(isPresented: $showRename) {
                     TextPromptSheet(title: "Renommer", placeholder: "Titre", action: "Enregistrer", initial: detail?.title ?? playlist.title) { title in
                         let _: PlaylistSummary = try await api.put("/api/playlists/\(playlist.id)/title", body: ["title": title])

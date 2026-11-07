@@ -39,12 +39,30 @@ struct EmptyMessage: View {
     }
 }
 
+/// The error of a failed call; with `retry`, a button tries the call again.
 struct ErrorMessage: View {
     let text: String?
+    var retry: (() -> Void)? = nil
+
     var body: some View {
         if let text {
-            Text(text).font(.raton(15, .medium)).foregroundStyle(Theme.danger).padding(16)
+            VStack(alignment: .leading, spacing: 10) {
+                Text(text).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                if let retry {
+                    Button("Réessayer", action: retry).buttonStyle(SandButtonStyle(fill: false))
+                }
+            }
+            .padding(16)
         }
+    }
+}
+
+/// What a list shows until its first load has answered, so the page never looks empty or frozen.
+struct LoadingRow: View {
+    var body: some View {
+        ProgressView().tint(Theme.primary)
+            .frame(maxWidth: .infinity).padding(.top, 60)
+            .accessibilityLabel("Chargement")
     }
 }
 
@@ -104,6 +122,7 @@ struct HideToggle: View {
         }
         .padding(4)
         .sandTrack()
+        .sensoryFeedback(.selection, trigger: showAll)
     }
 }
 
@@ -138,8 +157,14 @@ struct NativeVideoPlayer: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     /// Entering or leaving full screen moves the player view to another controller, which makes
-    /// `AVPlayerViewController` pause; a video that was playing carries on once the transition ends.
+    /// `AVPlayerViewController` pause, sometimes after the transition has ended. A video that was playing
+    /// is started again whenever it pauses during the transition and the second after it; a pause the
+    /// user asks for later is left alone.
     final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        private var observation: NSKeyValueObservation?
+        private var guardUntil = Date.distantPast
+        private var wasPlaying = false
+
         func playerViewController(_ controller: AVPlayerViewController,
                                   willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
             keepPlaying(controller, through: coordinator)
@@ -151,9 +176,21 @@ struct NativeVideoPlayer: UIViewControllerRepresentable {
         }
 
         private func keepPlaying(_ controller: AVPlayerViewController, through coordinator: UIViewControllerTransitionCoordinator) {
-            let wasPlaying = controller.player?.timeControlStatus != .paused
-            coordinator.animate(alongsideTransition: nil) { _ in
-                if wasPlaying { controller.player?.play() }
+            guard let player = controller.player else { return }
+            wasPlaying = wasPlaying || player.timeControlStatus != .paused
+            guardUntil = .distantFuture
+            observation = player.observe(\.timeControlStatus) { [weak self] player, _ in
+                guard let self, self.wasPlaying, Date() < self.guardUntil, player.timeControlStatus == .paused else { return }
+                DispatchQueue.main.async { player.play() }
+            }
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+                guard let self else { return }
+                if self.wasPlaying { player.play() }
+                self.guardUntil = Date().addingTimeInterval(1)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) {
+                    self.observation = nil
+                    self.wasPlaying = false
+                }
             }
         }
     }

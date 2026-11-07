@@ -14,6 +14,7 @@ struct FicheView: View {
 
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var player: PlayerController
+    @EnvironmentObject private var offline: OfflineStore
     @Environment(\.dismiss) private var dismiss
     @State private var detail: VideoDetail?
     @State private var mode: MediaKind = .video
@@ -21,6 +22,8 @@ struct FicheView: View {
     @State private var notice: String?
     @State private var busy = false
     @State private var downloading = false
+    // False once the fiche is left: a finished download then plays nothing.
+    @State private var onScreen = false
     @State private var choosingQuality = false
     @State private var showCategories = false
     @State private var showPlaylists = false
@@ -46,17 +49,21 @@ struct FicheView: View {
                 }
             }
             // Room under the last block so it can scroll clear of the tab bar.
-            .padding(.bottom, 130)
+            .padding(.bottom, 24)
         }
+        .barClearance()
         // Dragging the page down dismisses the keyboard instead of leaving it over the chat.
         .scrollDismissesKeyboard(.interactively)
         .ratonPage()
         .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
+        .onAppear { onScreen = true }
         // The video is tied to this screen; audio goes on.
         .onDisappear {
+            onScreen = false
             if player.track?.videoID == videoID && player.track?.kind == .video { player.stop() }
         }
+        .navigationDestination(for: ChannelRoute.self) { ChannelLoader(channelID: $0.id) }
         .sheet(isPresented: $showCategories) {
             if let detail, let api = state.api {
                 CategoryPickerSheet(api: api, selected: detail.categories) { chosen in
@@ -137,6 +144,18 @@ struct FicheView: View {
                 Label("Générer notes et résumé", systemImage: "sparkles")
             }
             .disabled(generating || !detail.hasTranscript)
+            if detail.mediaUrls.audio != nil {
+                Button { toggleOffline(detail, api: api) } label: {
+                    if offline.item(detail.id) != nil {
+                        Label("Retirer de l'écoute hors ligne", systemImage: "icloud.slash")
+                    } else if offline.downloading.contains(detail.id) {
+                        Label("Téléchargement hors ligne…", systemImage: "arrow.down.circle")
+                    } else {
+                        Label("Écouter hors ligne", systemImage: "arrow.down.circle")
+                    }
+                }
+                .disabled(offline.downloading.contains(detail.id))
+            }
             if detail.mediaUrls.video != nil {
                 Button(role: .destructive) { deleteMedia(api, .video) } label: {
                     Label("Supprimer la vidéo", systemImage: "trash")
@@ -160,6 +179,17 @@ struct FicheView: View {
         }
         .buttonStyle(CircleButtonStyle())
         .accessibilityLabel("Plus d'options")
+    }
+
+    /// Keeps the fiche's audio on the phone, or lets it go.
+    private func toggleOffline(_ detail: VideoDetail, api: RatonAPI) {
+        if offline.item(detail.id) != nil {
+            offline.remove(detail.id)
+            return
+        }
+        Task {
+            do { try await offline.download(detail: detail, api: api) } catch { errorMessage = error.localizedDescription }
+        }
     }
 
     private func mediaPager(_ detail: VideoDetail, api: RatonAPI) -> some View {
@@ -208,6 +238,30 @@ struct FicheView: View {
                         .background(Circle().fill(Theme.primary))
                 }
                 .accessibilityLabel(playing ? "Pause" : "Lecture")
+                // Nothing is loaded yet, so the native controls are not there: show where playback stopped.
+                if !(isLoaded && player.track?.kind == mode), mode == .video,
+                   let resume = detail.resumePositions[mode.rawValue]?.positionSeconds, resume >= 3,
+                   let total = detail.durationSeconds, total > 0 {
+                    VStack(spacing: 4) {
+                        Spacer()
+                        GeometryReader { bar in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.3))
+                                Capsule().fill(Color.white)
+                                    .frame(width: bar.size.width * min(resume / Double(total), 1))
+                            }
+                        }
+                        .frame(height: 4)
+                        HStack {
+                            Text(Format.clock(resume))
+                            Spacer()
+                            Text(Format.clock(Double(total)))
+                        }
+                        .font(.raton(12, .semibold)).monospacedDigit().foregroundStyle(.white.opacity(0.9))
+                    }
+                    .padding(.horizontal, 16).padding(.bottom, 10)
+                    .allowsHitTesting(false)
+                }
             } else if downloading {
                 VStack(spacing: 10) {
                     ProgressView().tint(.white)
@@ -238,7 +292,12 @@ struct FicheView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(detail.title).font(.raton(21, .bold)).foregroundStyle(Theme.text)
             if let channel = detail.channel {
-                Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
+                // Opens the channel's page in the app, never YouTube.
+                NavigationLink(value: ChannelRoute(id: channel.id)) {
+                    Text(channel.name).font(.raton(18)).foregroundStyle(Theme.primary)
+                        .multilineTextAlignment(.leading)
+                }
+                .buttonStyle(.plain)
             }
             HStack(alignment: .center, spacing: 6) {
                 CategoryChips(categories: detail.categories, api: api)
@@ -285,21 +344,12 @@ struct FicheView: View {
         }
     }
 
-    private func sectionTitle(_ item: FicheTab, _ detail: VideoDetail) -> String {
-        item.rawValue
-    }
-
     /// The sections one under the other, in the order of `FicheTab`: no tabs to switch between.
     private func sections(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 26) {
             ForEach(tabs(detail), id: \.self) { item in
-                VStack(alignment: .leading, spacing: 10) {
-                    // The description (behind its own chevron) and the chat (a plain input) have no title.
-                    if item != .info && item != .chat {
-                        Text(sectionTitle(item, detail)).font(.raton(20, .bold)).foregroundStyle(Theme.text)
-                    }
-                    section(item, detail, api: api)
-                }
+                // The description and the notes sit behind their own chevron, the chat is a plain input: no titles.
+                section(item, detail, api: api)
             }
         }
         .padding(.top, 6)
@@ -376,7 +426,12 @@ struct FicheView: View {
                 for _ in 0..<150 {
                     try await Task.sleep(nanoseconds: 4_000_000_000)
                     await reload(api)
-                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil { break }
+                    if !onScreen { break }
+                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
+                        // Still on the fiche, on the side that was downloaded: play it straight away.
+                        if mode == kind { player.play(detail: detail, kind: kind, api: api) }
+                        break
+                    }
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -451,29 +506,58 @@ struct AudioControls: View {
     }
 }
 
-/// The bar shown above the tabs while audio is loaded, so it can be paused after leaving its fiche.
+/// The mini player above the tab bar while audio is loaded, so it can be paused after leaving its fiche:
+/// a smoked-glass pill of the tab bar's width and shape, play-pause on the left, the title over its
+/// channel, then next (in a playlist) and close.
 struct NowPlayingBar: View {
     @EnvironmentObject private var player: PlayerController
+    /// Called when the title is tapped: the root opens the playlist or the fiche that is playing.
+    let open: () -> Void
+    /// The buttons' height: the room the root keeps free under the pages for the bar.
+    static let height: CGFloat = 52
 
     var body: some View {
         if player.track?.kind == .audio || player.queue != nil {
-            HStack(spacing: 16) {
-                Text(player.title).font(.raton(14, .semibold)).lineLimit(1)
-                    .foregroundStyle(Color(hex: 0xF3E8D9))
-                Spacer()
+            HStack(spacing: 6) {
                 Button { player.togglePlayPause() } label: {
                     Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 24)).frame(width: 52, height: 52).contentShape(Rectangle())
                 }
+                .accessibilityLabel(player.isPlaying ? "Pause" : "Lecture")
+                Button(action: open) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(player.title).font(.raton(16, .bold)).lineLimit(1)
+                        // In a playlist the line under the title is the playlist's name, else the channel's.
+                        if let subtitle = player.queue?.title ?? player.artist {
+                            Text(subtitle).font(.raton(14)).lineLimit(1).opacity(0.7)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ouvrir \(player.title)")
                 if player.queue != nil {
-                    Button { player.next() } label: { Image(systemName: "forward.fill") }
-                        .accessibilityLabel("Piste suivante")
+                    Button { player.next() } label: {
+                        Image(systemName: "forward.end.fill").font(.system(size: 22))
+                            .frame(width: 48, height: 52).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Piste suivante")
                 }
-                Button { player.stop() } label: { Image(systemName: "xmark") }
+                Button { player.stop() } label: {
+                    Image(systemName: "xmark").font(.system(size: 17, weight: .semibold))
+                        .frame(width: 44, height: 52).contentShape(Rectangle())
+                }
+                .accessibilityLabel("Fermer le lecteur")
             }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 18).padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.player))
-            .padding(.horizontal, 12)
+            .foregroundStyle(Color(hex: 0xF3E8D9))
+            .padding(.leading, 8).padding(.trailing, 6)
+            // The first background is the one on top: the smoke over the blur of the page behind.
+            .background(TabPill.shape.fill(Theme.player.opacity(0.9)))
+            .background(TabPill.shape.fill(.ultraThinMaterial))
+            .overlay(TabPill.shape.stroke(Color.white.opacity(0.16), lineWidth: 1))
+            .shadow(color: Theme.shadow.opacity(0.18), radius: 12, y: 6)
+            .padding(.horizontal, TabPill.margin)
         }
     }
 }
