@@ -117,7 +117,10 @@ La fiche :
   effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
   ou un geste rapide suffit) ; le bouton video / audio du haut anime le meme
   deplacement ; sur la video seule la moitie haute lance le glissement, pour laisser la
-  barre de progression native au sien ;
+  barre de progression native au sien, et sur l'audio d'une playlist le pied de la
+  carte (la barre de progression) ne lance jamais le glissement : regler l'audio ne
+  bascule pas vers la video ;
+- au bout du fichier, le bouton lecture (de la fiche, de l'ecran verrouille ou de la playlist) relit le fichier depuis le debut ;
 - cote audio (`AudioSlide.swift`), la fiche reprend la carte du front sur telephone :
   carte 16:9 sur un degrade radial terracotta vers brun, sans pastille ni bouton
   « Supprimer » (la suppression est dans le menu « ⋯ »), pochette carree de 168 pt au centre (la vignette, ou un

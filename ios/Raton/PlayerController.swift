@@ -135,7 +135,12 @@ final class PlayerController: ObservableObject {
 
     // MARK: Controls
 
-    func resume() { player?.play() }
+    /// Play at the very end of the file starts it over: `AVPlayer.play()` alone does nothing there.
+    func resume() {
+        guard let player else { return }
+        if duration > 0, position >= duration - 0.5 { seek(to: 0) }
+        player.play()
+    }
     func pause() { player?.pause() }
 
     func togglePlayPause() {
