@@ -304,7 +304,9 @@ Navigation principale :
   **Raton**, n'est pas affichee : seule la barre d'onglets reste
 - Chaines `/channels`
 - Playlists `/playlists`
-- Bibliotheque : menu deroulant **Bibliotheque** avec Nouveautes `/dashboard/nouveautes`,
+- Bibliotheque : menu deroulant **Bibliotheque** (le libelle est un lien vers la page par
+  defaut, Nouveautes, quelle que soit la page de la Bibliotheque ouverte ; le menu s'ouvre
+  au clic sur la fleche) avec Nouveautes `/dashboard/nouveautes`,
   Historique `/dashboard/historique`, Exploration `/videos` et Recherche
   `/videos/recherche` (quatre liens, ni
   sous-bibliotheques ni Indexation RAG ; l'import est dans la feuille d'import, voir plus bas).
@@ -1085,7 +1087,9 @@ Contenu :
   telephone) ; chaque carte montre une bande de banniere de 84 px (la banniere
   de la chaine, ou le meme degrade de repli que la page de la chaine), l'avatar
   de 64 px qui la chevauche (ou, sans avatar, une pastille avec l'initiale du
-  nom) avec les categories a sa droite, sous la banniere, puis le nom (lien
+  nom) ; les images sont les copies reduites (`?w=640` banniere, `?w=320`
+  avatar), et celles des six premieres cartes ne sont pas en chargement
+  differe (`loading="lazy"` seulement ensuite), pour s'afficher des l'ouverture avec les categories a sa droite, sous la banniere, puis le nom (lien
   vers la bibliotheque filtree) suivi du nombre de fiches en pastille (comme
   le compteur du titre de la page), puis « Derniere activite : date » (date
   seule, sans l'heure) ; la carte monte de 4 px au

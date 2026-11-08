@@ -580,8 +580,8 @@ def test_channels_list_shows_the_banner_and_avatar_but_not_the_profile_text(tmp_
     finally:
         app.dependency_overrides.clear()
 
-    assert f'src="/api/channels/{channel.id}/avatar?v=' in html
-    assert f'src="/api/channels/{channel.id}/banner?v=' in html
+    assert f'src="/api/channels/{channel.id}/avatar?w=320&v=' in html
+    assert f'src="/api/channels/{channel.id}/banner?w=640&v=' in html
     assert "High-intensity" not in html
     assert ">angular<" not in html
     assert "refresh-profile" not in html

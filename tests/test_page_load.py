@@ -225,3 +225,33 @@ def test_playlists_page_cost_does_not_grow_with_the_playlists(db):
     assert response.status_code == 200
     assert response.text.count("/thumbnail?w=320") == 8
     assert len(db.statements) == one
+
+
+def test_channels_page_cost_does_not_grow_with_the_channels(db):
+    def add_channels(start: int, stop: int) -> None:
+        for index in range(start, stop):
+            db.add(
+                Channel(
+                    name=f"Chan {index}",
+                    url=f"https://youtube.com/@c{index}",
+                    yt_channel_id=f"UC-{index}",
+                    avatar_path=f"channels/{index}/avatar.jpg",
+                    banner_path=f"channels/{index}/banner.jpg",
+                )
+            )
+        db.commit()
+
+    add_channels(0, 1)
+    site_client().get("/channels")  # warms the one-off user and settings rows
+    db.expunge_all()
+    db.statements.clear()
+    site_client().get("/channels")
+    one = len(db.statements)
+    add_channels(1, 40)
+    db.expunge_all()
+    db.statements.clear()
+
+    response = site_client().get("/channels")
+
+    assert response.status_code == 200
+    assert len(db.statements) == one

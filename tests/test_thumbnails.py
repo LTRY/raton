@@ -16,6 +16,7 @@ from back.models.video import Video
 from back.services.media.thumbnails import (
     THUMBNAIL_WIDTHS,
     backfill_video_thumbnails,
+    channel_image_variant,
     ensure_video_thumbnails,
     thumbnail_variant_path,
 )
@@ -195,3 +196,21 @@ def test_short_tiles_use_the_original_thumbnail(db, tmp_path):
 
     assert f'class="video-row-thumb-img" src="/api/videos/{video.id}/thumbnail" alt=""' in page
     assert "srcset=" not in page
+
+
+@needs_ffmpeg
+def test_channel_image_copy_is_made_once_and_smaller(db, tmp_path):
+    _, folder = make_video(db, tmp_path, width=2560, height=424, key="banner")
+    banner = folder / "cover.jpg"
+
+    copy = channel_image_variant(banner, 640)
+
+    assert copy == folder / "thumbs" / "cover-640.jpg"
+    assert copy.is_file() and copy.stat().st_size < banner.stat().st_size
+    made_at = copy.stat().st_mtime_ns
+    assert channel_image_variant(banner, 640) == copy
+    assert copy.stat().st_mtime_ns == made_at
+
+
+def test_channel_image_copy_failure_gives_none(tmp_path):
+    assert channel_image_variant(tmp_path / "missing.jpg", 640) is None

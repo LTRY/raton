@@ -44,7 +44,8 @@
         <a href="/channels" {% if current_path.startswith('/channels') %}aria-current="page"{% endif %}>Chaînes</a>
         <a href="/playlists" {% if current_path.startswith('/playlists') %}aria-current="page"{% endif %}>Playlists</a>
         <details class="nav-library-menu">
-          <summary>Bibliothèque</summary>
+          {# The label leads to the default page (Nouveautés); the caret and the hover panel list the others. #}
+          <summary><a href="/dashboard/nouveautes" {% if current_path.startswith('/videos') or current_path.startswith('/dashboard') %}aria-current="page"{% endif %}>Bibliothèque</a></summary>
           <div class="nav-library-panel">
             <a href="/dashboard/nouveautes">Nouveautés</a>
             <a href="/dashboard/historique">Historique</a>

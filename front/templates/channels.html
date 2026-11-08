@@ -119,14 +119,14 @@
     {% set asset_version = channel.metadata_fetched_at.timestamp()|int if channel.metadata_fetched_at else 0 %}
     <article class="channel-card">
       {% if channel.banner_url %}
-      <img class="channel-card-banner" src="{{ channel.banner_url }}?v={{ asset_version }}" alt="" loading="lazy">
+      <img class="channel-card-banner" src="{{ channel.banner_url }}?w=640&v={{ asset_version }}" alt="" decoding="async" {% if loop.index > 6 %}loading="lazy"{% else %}fetchpriority="high"{% endif %}>
       {% else %}
       <div class="channel-card-banner channel-banner-fallback" aria-hidden="true"></div>
       {% endif %}
       <div class="channel-card-body">
         <div class="channel-card-identity">
           {% if channel.avatar_url %}
-          <img class="channel-avatar channel-card-avatar" src="{{ channel.avatar_url }}?v={{ asset_version }}" alt="" loading="lazy">
+          <img class="channel-avatar channel-card-avatar" src="{{ channel.avatar_url }}?w=320&v={{ asset_version }}" alt="" decoding="async" {% if loop.index > 6 %}loading="lazy"{% endif %}>
           {% else %}
           <span class="channel-avatar channel-card-avatar channel-avatar-initial" aria-hidden="true">{{ channel.name[:1]|upper }}</span>
           {% endif %}

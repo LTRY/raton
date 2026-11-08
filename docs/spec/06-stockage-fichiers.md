@@ -42,6 +42,11 @@ L'extension suit le type de l'image recue (`.jpg`, `.png`, `.webp`, `.gif`) ;
 `MEDIA_ROOT`. Le dossier est supprime avec la chaine (la suppression des
 fichiers video, elle, reste decrite plus bas) et n'entre pas dans le quota, qui additionne `Video.file_size_bytes`.
 
+`GET /api/channels/{id}/avatar?w=320|640` (et `/banner`) sert une copie reduite,
+creee a la premiere demande dans `thumbs/<avatar|banner>-<w>.jpg` du meme
+dossier (refaite si l'image est plus recente) ; sans `w` valide, ou si ffmpeg
+echoue, l'image d'origine (jusqu'a 2560 px de large) est servie.
+
 Si la date de publication est inconnue, le nom doit rester stable et lisible.
 Les noms doivent etre sanifies pour eviter les caracteres invalides.
 
