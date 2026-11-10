@@ -554,10 +554,11 @@ arriere-plan ; le client interroge `status_url` (`GET /api/llm-jobs/{id}`).
 - `GET /api/llm-jobs/{id}` : `{id, kind, video_id, status}` avec `status`
   `pending`, `done` ou `failed`. En attente : `partial_short_summary` (job
   `generate`, le resume deja ecrit) ou `tool_calls` (job `library_chat`).
-  Le premier poll apres la fin ecrit le resultat (une seule fois, comme le
-  poll de la page) et repond `documents` (`generate`, avec les nouvelles
-  notes), `chat_messages` (`chat`) ou `library_chat` (`library_chat`) ;
-  apres une generation, l'indexation des notes part en arriere-plan. Un job
+  Le resultat est ecrit par `run_llm_job` des la fin du job, sans attendre un
+  poll (un poll qui trouve un job encore `done` l'ecrit, une seule fois) ; le
+  poll repond `documents` (`generate`, avec les nouvelles notes),
+  `chat_messages` (`chat`) ou `library_chat` (`library_chat`) ; apres une
+  generation, l'indexation des notes part en arriere-plan. Un job
   echoue repond `200` avec `status: failed` et `message` (`Génération
   impossible : …`, `Réponse impossible : …`). `404 Tâche introuvable`.
 

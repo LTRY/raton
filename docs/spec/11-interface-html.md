@@ -170,7 +170,10 @@ temps de chargement ne doit pas croitre avec la taille de la bibliotheque.
   n'est jamais lue en entier pour un calcul qui ne regarde qu'une periode :
   `recent_played_jobs` (`back/services/videos/playback.py`) borne la lecture aux 30 jours
   des temps de lecture (aujourd'hui/7 jours/30 jours) et charge les videos
-  d'un coup. `/settings` et `/dashboard/historique` l'utilisent.
+  d'un coup. `/settings` et `/dashboard/historique` l'utilisent. L'Historique
+  lit tous les rapports de sa fenetre, `HISTORY_WINDOW_DAYS` (90 jours,
+  `back/services/videos/history.py`), et la position de reprise d'une fiche
+  les `POSITION_REPORTS_SCANNED` (100) plus recents : rien n'est lu au-dela.
 - Un fichier du disque (`metadata.json`, transcript) n'est pas relu pour chaque
   ligne d'une liste. Une carte (`downloaded_video_card`, `back/services/videos/library_view.py`) ne lit aucun fichier :
   sa duree vient de `videos.duration_seconds`. Le media est parfois monte depuis une VM
@@ -692,7 +695,9 @@ La vue `Historique` ne liste pas les lectures a plat : elle les regroupe
 par jour de lecture (`DownloadJob.created_at`, ramene au fuseau des
 utilisateurs, `Europe/Paris`, comme les stats de temps de lecture — et non
 a celui du conteneur, en UTC ; voir `back/services/common/local_time.py`).
-Le front ne lit pas d'horloge : « Aujourd'hui » et « Hier » se calculent
+La liste couvre les 90 derniers jours (`HISTORY_WINDOW_DAYS`) : une lecture
+plus ancienne n'y figure plus, ses autres traces (Vu, note, notes de la
+fiche) restent. Le front ne lit pas d'horloge : « Aujourd'hui » et « Hier » se calculent
 depuis le `today` de `GET /api/historique` (`history_days` dans
 `front/cards.py`). Chaque journee est un bloc repliable a part entiere qui
 porte, dans son en-tete, le libelle du jour et le nombre de medias. Le rendu

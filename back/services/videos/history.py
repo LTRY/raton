@@ -6,7 +6,7 @@ Days are cut in the server's local timezone, like the screen-time totals of
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, load_only, selectinload
@@ -25,6 +25,9 @@ from back.services.videos.playback import (
 )
 
 HISTORY_PAGE_SIZE = 50
+# The Historique reads every playback report of its window on each page, parsing their JSON: the
+# window keeps that bounded while `download_jobs` grows with every report.
+HISTORY_WINDOW_DAYS = 90
 # The Historique is mostly finished playbacks: hiding the Vu by default would empty it.
 HISTORY_DEFAULT_HIDE = "none"
 
@@ -77,7 +80,11 @@ def _day_entries(
     seconds_by_day: dict[date, float] = {}
     jobs = db.scalars(
         select(DownloadJob)
-        .where(DownloadJob.status == "played", DownloadJob.user_id == user_id)
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.user_id == user_id,
+            DownloadJob.created_at >= (now - timedelta(days=HISTORY_WINDOW_DAYS)).astimezone(UTC),
+        )
         .order_by(desc(DownloadJob.created_at), desc(DownloadJob.id))
     )
     for job in jobs:

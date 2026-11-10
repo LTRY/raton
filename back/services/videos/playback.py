@@ -23,6 +23,9 @@ from back.services.videos.filters import video_category_labels
 
 DASHBOARD_ACTIVITY_STATUSES = {"played", "prompt"}
 WATCHED_RATIO = 0.9
+# The newest reports of a fiche that tell its last position of each media type: far more than
+# needed, so a fiche replayed for years never loads all its reports.
+POSITION_REPORTS_SCANNED = 100
 
 
 PLAYBACK_STATS_KINDS = [
@@ -215,6 +218,7 @@ def latest_playback_positions(
             DownloadJob.user_id == user_id,
         )
         .order_by(desc(DownloadJob.created_at), desc(DownloadJob.id))
+        .limit(POSITION_REPORTS_SCANNED)
     )
     for job in jobs:
         try:

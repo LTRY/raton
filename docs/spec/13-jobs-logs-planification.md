@@ -193,7 +193,8 @@ crash) tue ceux qui etaient en cours, et plus rien ne les ferait sortir de
 
 - les `download_jobs` `queued` ou `running`, avec le message « Interrompu par
   un redemarrage de Raton. » ;
-- les `llm_jobs` `queued` ou `running`, avec ce message dans `error` et
+- les `llm_jobs` `queued`, `running` ou `applying` (le resultat etait en cours
+  d'ecriture), avec ce message dans `error` et
   `completed_at` renseigne — sauf ceux de type `auto_notes`, dont le lot
   tourne chez Anthropic et sera collecte par le prochain balayage.
 

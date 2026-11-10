@@ -15,6 +15,8 @@ from back.services.rag.auto_notes import AUTO_NOTES_KIND
 logger = logging.getLogger(__name__)
 
 UNFINISHED_STATUSES = ("queued", "running")
+# An LLM job also stops half-way while its result is being written.
+UNFINISHED_LLM_STATUSES = (*UNFINISHED_STATUSES, "applying")
 INTERRUPTED_MESSAGE = "Interrompu par un redémarrage de Raton."
 
 
@@ -32,7 +34,7 @@ def fail_interrupted_jobs(db: Session) -> tuple[int, int]:
     llm = db.execute(
         update(LlmJob)
         .where(
-            LlmJob.status.in_(UNFINISHED_STATUSES),
+            LlmJob.status.in_(UNFINISHED_LLM_STATUSES),
             # A `running` auto-notes job waits for its Message Batch, which outlives the process:
             # the next sweep collects it.
             LlmJob.kind != AUTO_NOTES_KIND,
