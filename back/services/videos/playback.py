@@ -71,6 +71,57 @@ class InvalidPlaybackMediaError(ValueError):
     pass
 
 
+# Reports of one continuous listening (the players send one every 30 s, and on pause) that follow
+# each other within this delay are one row: `download_jobs` would otherwise get a row per report.
+PLAYBACK_MERGE_WINDOW = timedelta(minutes=2)
+
+
+def _playback_payload(job: DownloadJob) -> dict | None:
+    try:
+        payload = json.loads(job.message)
+    except TypeError, json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) and payload.get("type") == "playback" else None
+
+
+def _merge_into_latest_report(
+    db: Session, user_id: int, video: Video, payload: dict, now: datetime
+) -> DownloadJob | None:
+    """Fold `payload` into the user's latest report of this media when it is the same listening:
+    the seconds add up, the position and duration are the new ones, the date moves to now."""
+    latest = db.scalars(
+        select(DownloadJob)
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.user_id == user_id,
+            DownloadJob.video_id == video.id,
+        )
+        .order_by(desc(DownloadJob.created_at), desc(DownloadJob.id))
+        .limit(1)
+    ).first()
+    if latest is None or now - local_datetime(latest.created_at, UTC) > PLAYBACK_MERGE_WINDOW:
+        return None
+    previous = _playback_payload(latest)
+    if previous is None or previous.get("media_label") != payload["media_label"]:
+        return None
+    try:
+        watched_before = max(float(previous.get("watched_seconds", 0)), 0)
+    except TypeError, ValueError:
+        return None
+    latest.message = json.dumps(
+        {
+            **payload,
+            # The first report says how the listening began.
+            "action": previous.get("action") or payload["action"],
+            "watched_seconds": watched_before + payload["watched_seconds"],
+        },
+        ensure_ascii=False,
+    )
+    latest.created_at = now
+    db.commit()
+    return latest
+
+
 def record_playback_activity(
     db: Session,
     user_id: int,
@@ -80,8 +131,8 @@ def record_playback_activity(
     duration_seconds: float,
     watched_seconds: float,
 ) -> DownloadJob:
-    """Record one playback report of the user's players: the Vu mark, then a `played` job, in one
-    commit.
+    """Record one playback report of the user's players: the Vu mark, then a `played` job (or the
+    seconds added to the one of the listening already under way), in one commit.
 
     The JSON shape of the job is the one `playback_activity_payload_view` reads back.
     """
@@ -95,21 +146,22 @@ def record_playback_activity(
     watched_seconds = max(watched_seconds, 0)
     action = "Reprise" if position_seconds >= 3 else "Lecture"
     media_label = "audio" if media_type == "audio" else "vidéo"
+    payload = {
+        "type": "playback",
+        "action": action,
+        "media_label": media_label,
+        "position_seconds": position_seconds,
+        "duration_seconds": duration_seconds,
+        "watched_seconds": watched_seconds,
+        "title": video.title,
+    }
+    merged = _merge_into_latest_report(db, user_id, video, payload, datetime.now(UTC))
+    if merged is not None:
+        return merged
     return log_job(
         db,
         "played",
-        json.dumps(
-            {
-                "type": "playback",
-                "action": action,
-                "media_label": media_label,
-                "position_seconds": position_seconds,
-                "duration_seconds": duration_seconds,
-                "watched_seconds": watched_seconds,
-                "title": video.title,
-            },
-            ensure_ascii=False,
-        ),
+        json.dumps(payload, ensure_ascii=False),
         channel_id=video.channel_id,
         video_id=video.id,
         user_id=user_id,

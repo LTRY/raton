@@ -233,6 +233,7 @@ Evenements :
 | `job.start` / `job.end` | INFO | tout job de fond ou planifie (`logged_job`) | `job`, `job_id`/`channel_id`/`video_id`/`playlist_id`, `duration_ms`, `result` |
 | `job.error` | ERROR | un job leve | idem + `error`, `exc` |
 | `job.record` | INFO / WARNING / ERROR | chaque ligne ecrite dans `download_jobs` (page Logs), selon son statut | `status`, `message`, `channel_id`, `video_id` |
+| `ytdlp.waited` | INFO | un appel yt-dlp a attendu plus d'une seconde une place libre (voir [07](07-youtube-et-telechargements.md), « Limites de debit ») | `op`, `waited_ms` |
 | `ext.call` / `ext.error` | INFO / ERROR | appel yt-dlp, Voyage, Anthropic (duree, tokens) ; un 429 YouTube ou une video pas encore disponible est WARNING | `service`, `op`, `duration_ms`, `error` |
 | `scheduler.started`, `scheduler.catchup_check`, `scheduler.disabled`, `scheduler.stopped` | INFO | cycle de vie du scheduler | |
 | `setting.set` | INFO | ecriture d'un reglage | `key` (jamais la valeur) |

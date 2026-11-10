@@ -120,6 +120,18 @@ borne donc sa charge :
   imports, `PAUSE_BETWEEN_CHANNELS` (10 a 30 s) entre deux chaines du scan
   planifie quand la precedente a importe quelque chose,
   `PAUSE_AFTER_LISTING_ONLY` (1 a 3 s) quand elle n'a demande qu'un listing ;
+- **appels simultanes plafonnes** : chaque appel a `yt-dlp` passe par
+  `ytdlp_call` (`back/services/youtube/yt.py`), qui prend une place avant de
+  partir et la rend a la fin, echec compris. Au plus `MAX_CONCURRENT_REQUESTS`
+  (3) appels de metadonnees, listings, recherches et sous-titres tournent en
+  meme temps, et au plus `MAX_CONCURRENT_DOWNLOADS` (2) telechargements de
+  fichier video ou audio, qui ont leurs places a eux pour qu'ils ne fassent pas
+  attendre un import de metadonnees. Un telechargement manuel, un import de
+  playlist et une exploration de chaine ne s'ajoutent donc plus les uns aux
+  autres a la charge du scan. Un appel qui attend plus d'une seconde ecrit un
+  evenement `ytdlp.waited` (`op`, `waited_ms`) au journal. Les telechargements
+  en attente occupent chacun un thread du pool de FastAPI, partage avec les
+  requetes : ne pas en mettre en file par centaines ;
 - **arret au premier 429** : `is_rate_limit_error` reconnait l'erreur dans le
   listing, l'extraction et la miniature ; `import_video_metadata` leve alors
   `RateLimitedError` (la video n'est pas creee) et le scan s'arrete au lieu de

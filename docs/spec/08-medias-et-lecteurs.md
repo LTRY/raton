@@ -328,6 +328,30 @@ la position de lecture" ci-dessus, cle
 pour les lecteurs video/audio classiques (`front/static/js/app.js`,
 `initMiniPlayer`).
 
+## Rapports d'activite et lignes `played`
+
+Un lecteur (video ou audio de la fiche, barre mini-lecteur) envoie un rapport
+`POST /api/videos/{id}/activity` : a la pause, a la fin, a la sortie de la page,
+et **toutes les 30 s** pendant la lecture (`ACTIVITY_REPORT_INTERVAL_MS` dans
+`front/static/js/app.js` ; le lecteur de playlist envoie le sien toutes les
+15 s). Sans cet envoi periodique, un onglet que iOS tue en arriere-plan perdait
+la position et le temps regarde depuis le dernier rapport. Chaque rapport ne
+porte que les secondes regardees depuis le precedent.
+
+Pour que `download_jobs` ne recoive pas une ligne par rapport,
+`record_playback_activity` (`back/services/videos/playback.py`) **fusionne** un
+rapport dans la ligne `played` la plus recente de l'utilisateur sur cette fiche
+quand elle est du meme type de media (`video` ou `audio`) et date de moins de
+`PLAYBACK_MERGE_WINDOW` (2 minutes) : les secondes s'ajoutent, la position et
+la duree sont celles du nouveau rapport, `action` reste celle du premier
+(« Lecture » ou « Reprise »), et `created_at` passe a l'instant du rapport. Une
+ecoute continue, pauses courtes comprises, tient donc dans une seule ligne ; une
+pause de plus de 2 minutes, un autre type de media ou un autre utilisateur en
+ouvre une nouvelle. Une fusion n'ecrit pas de ligne `job.record` au journal
+applicatif. L'Historique, le temps d'ecran et la position de reprise lisent ces
+lignes comme avant (voir « Historique groupe par journee » dans
+[11 Interface HTML](11-interface-html.md)).
+
 ## Video vue et fichiers retires
 
 Le seuil de 90 % de lecture est evalue cote serveur par

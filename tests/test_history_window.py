@@ -13,7 +13,7 @@ from back.models.job import DownloadJob
 from back.models.video import Video
 from back.services.common.users import default_user
 from back.services.videos import playback
-from back.services.videos.history import HISTORY_WINDOW_DAYS, history_page
+from back.services.videos.history import history_page
 
 NOW = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
 
@@ -39,7 +39,8 @@ def report(position: float, media_label: str = "vidéo") -> str:
     )
 
 
-def test_the_historique_only_lists_its_window():
+def test_the_historique_only_lists_its_window(real_history_window_days):
+    HISTORY_WINDOW_DAYS = real_history_window_days
     db, _ = make_session()
     user = default_user(db)
     for days_ago in (1, HISTORY_WINDOW_DAYS - 1, HISTORY_WINDOW_DAYS + 5):
