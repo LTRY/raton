@@ -183,6 +183,27 @@ enregistre date de plus de 24h (ou n'existe pas) ; si oui, un job unique
 possible, sur le thread de fond d'APScheduler, sans bloquer le demarrage de
 FastAPI) est ajoute en plus du cron quotidien normal.
 
+## Jobs interrompus par un redemarrage
+
+Les jobs tournent dans le processus du back : un redemarrage (deploiement,
+crash) tue ceux qui etaient en cours, et plus rien ne les ferait sortir de
+`queued` ou `running`. Au lifespan, avant `start_scheduler()`,
+`fail_interrupted_jobs` (`back/services/jobs/interrupted.py`) passe donc en
+`failed` :
+
+- les `download_jobs` `queued` ou `running`, avec le message « Interrompu par
+  un redemarrage de Raton. » ;
+- les `llm_jobs` `queued` ou `running`, avec ce message dans `error` et
+  `completed_at` renseigne — sauf ceux de type `auto_notes`, dont le lot
+  tourne chez Anthropic et sera collecte par le prochain balayage.
+
+Une page qui suivait un tel job recoit ainsi un echec au lieu d'attendre sans
+fin, et le filtre « en cours » de `/logs` ne garde pas de job fantome. Rien
+n'est relance : la personne redemande l'action. Le passage ecrit l'evenement
+`jobs.interrupted` au journal quand il a trouve des jobs. Il n'a pas lieu
+quand `APP_SCHEDULER_ENABLED=false` : une instance inerte qui partage la DB
+(preview, PC de dev) declarerait morts des jobs qui tournent ailleurs.
+
 ## Journal applicatif
 
 `docker compose logs` ne suffit pas : le conteneur est recree a chaque

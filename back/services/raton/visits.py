@@ -13,6 +13,7 @@ from back.models.channel import Channel
 from back.models.job import DownloadJob
 from back.models.user import UserChannel, UserVideo
 from back.models.video import Video
+from back.services.common.local_time import local_now
 from back.services.common.settings import (
     SCREEN_TIME_KINDS,
     get_screen_time_limits,
@@ -111,7 +112,7 @@ def screen_time_today(
 def build_context(db: Session, user_id: int, now: datetime | None = None) -> RatonContext:
     """Facts about the user's library and day; no visit bookkeeping, so it is safe to call from a
     test page."""
-    now = now or datetime.now().astimezone()
+    now = now or local_now()
     ratio, _, minutes_left, played_seconds = screen_time_today(db, user_id, now)
     new_count = (
         db.scalar(

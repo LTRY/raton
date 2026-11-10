@@ -7,12 +7,12 @@ The scheduled jobs run in-process and never go through `/api`, so they are not a
 
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from back.models.user import UserSetting
+from back.services.common.local_time import LOCAL_TIMEZONE
 
 CURFEW_ENABLED_KEY = "curfew_enabled"
 CURFEW_START_KEY = "curfew_start"
@@ -21,8 +21,8 @@ CURFEW_END_KEY = "curfew_end"
 CURFEW_SKIP_UNTIL_KEY = "curfew_skip_until"
 DEFAULT_CURFEW_START = "22:00"
 DEFAULT_CURFEW_END = "10:00"
-# The person's clock, the scheduler's too: the hours are typed in this time zone.
-CURFEW_TIMEZONE = ZoneInfo("Europe/Paris")
+# The hours are typed in the person's time zone.
+CURFEW_TIMEZONE = LOCAL_TIMEZONE
 
 # (method, route path) still answered during the couvre-feu: the state itself so a client can say
 # why; the home page (Raton, the library chat and its discussions, the user menu); the Historique

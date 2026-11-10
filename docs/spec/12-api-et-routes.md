@@ -617,7 +617,10 @@ watched_at}`.
   l'utilisent plus (`/dashboard/nouveautes` lit `GET /api/library?followed=true`) ;
   le serveur MCP l'expose encore.
 - `GET /api/historique?page=N` : une ligne par media et par jour local, la plus
-  recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds}` ;
+  recente d'abord, 50 par page : `{rows, page, total_pages, day_seconds, today}`
+  (`today` : le jour local courant, pour qu'un client libelle « Aujourd'hui »
+  sans sa propre horloge ; « local » = `Europe/Paris`,
+  `back/services/common/local_time.py`) ;
   chaque ligne `{job_id, created_at, day, video, channel, playback,
   watched_seconds, rewatch, shown_state, auto_state, replay_category}`, `day`
   etant le jour local sous lequel elle se range, `job_id`/`created_at`/`playback`
@@ -644,7 +647,10 @@ watched_at}`.
 
 Les fichiers d'une fiche ou d'une chaine, lus sur le volume media du back
 (`back/api/media.py`) ; voir « Reponses media » plus bas et
-[15 Securite](15-securite.md).
+[15 Securite](15-securite.md). Ces routes rendent la connexion DB de la
+requete des que la route a repondu, avant l'envoi du fichier
+(`release_db_before_body`) : un flux dure tant que le lecteur le garde ouvert
+et ne doit pas occuper une connexion du pool pendant ce temps.
 
 - `GET /api/videos/{id}/thumbnail[?w=320|640]` : la vignette (copie reduite si
   elle existe), `Cache-Control: public, max-age=86400`.

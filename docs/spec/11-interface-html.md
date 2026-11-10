@@ -689,8 +689,11 @@ de la journee ; il ne depend pas de la pagination.
 ### Historique groupe par journee
 
 La vue `Historique` ne liste pas les lectures a plat : elle les regroupe
-par jour de lecture (`DownloadJob.created_at`, ramene au fuseau local du
-serveur comme les stats de temps de lecture — voir `history_days` dans
+par jour de lecture (`DownloadJob.created_at`, ramene au fuseau des
+utilisateurs, `Europe/Paris`, comme les stats de temps de lecture — et non
+a celui du conteneur, en UTC ; voir `back/services/common/local_time.py`).
+Le front ne lit pas d'horloge : « Aujourd'hui » et « Hier » se calculent
+depuis le `today` de `GET /api/historique` (`history_days` dans
 `front/cards.py`). Chaque journee est un bloc repliable a part entiere qui
 porte, dans son en-tete, le libelle du jour et le nombre de medias. Le rendu
 est la macro `history_day_list` (`_macros.html`).

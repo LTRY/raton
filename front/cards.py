@@ -1,6 +1,6 @@
 """What the cards and rows of the lists show, from the API's raw values."""
 
-from datetime import date, datetime
+from datetime import date
 
 from front.formatting import format_compact_duration, format_duration, format_french_date
 
@@ -83,7 +83,3 @@ def screen_time_rings(screen_time) -> dict:
                 "color": f"hsl({hue} 72% 42%)",
             }
     return rings
-
-
-def local_today() -> date:
-    return datetime.now().astimezone().date()

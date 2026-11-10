@@ -68,6 +68,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
 | `raton_language` | Langage de Raton d'un utilisateur : tutoiement ou vouvoiement, surnom ; lu par le prompt du chat bibliothèque |
 | `curfew` | Couvre-feu d'un utilisateur : heures stockées, état à un instant donné, routes `/api` qu'il laisse ouvertes (`ensure_open`) |
+| `local_time` | Fuseau des utilisateurs (`Europe/Paris`) : l'heure qu'il est pour eux (`local_now`) et une date de la DB ramenée à ce fuseau (`local_datetime`) ; lu par le temps d'écran, l'Historique, les visites de Raton, le couvre-feu et le planificateur |
 | `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/jobs`) et les statuts après lesquels un job ne change plus |
 
 ### `youtube/`
@@ -197,6 +198,7 @@ web ; chacune ouvre sa propre session DB.
 | `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
 | `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
+| `interrupted` | Au démarrage, passe en `failed` les jobs qu'un redémarrage a coupés (`fail_interrupted_jobs`) |
 | `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques ; scan lancé à la main depuis `/settings` |
 
 Voir [13 Jobs, logs et planification](13-jobs-logs-planification.md).

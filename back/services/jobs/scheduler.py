@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from back.core.config import get_settings
 from back.core.logging import log_event, logged_job
 from back.db.session import SessionLocal
+from back.services.common.local_time import LOCAL_TIMEZONE_NAME
 from back.services.common.settings import get_setting, set_setting
 from back.services.ingest import scan_events
 from back.services.ingest.scanner import run_scan, scan_lock
@@ -29,7 +30,7 @@ from back.services.rag.auto_notes import (
 
 logger = logging.getLogger(__name__)
 
-scheduler = BackgroundScheduler(timezone="Europe/Paris")
+scheduler = BackgroundScheduler(timezone=LOCAL_TIMEZONE_NAME)
 SCAN_JOB_ID = "scan_channels"
 SCAN_CATCHUP_JOB_ID = "scan_channels_catchup"
 DAILY_SCAN_HOUR = 3
@@ -156,19 +157,19 @@ def start_scheduler() -> None:
         return
     scheduler.add_job(
         scheduled_scan,
-        CronTrigger(hour=DAILY_SCAN_HOUR, minute=0, timezone="Europe/Paris"),
+        CronTrigger(hour=DAILY_SCAN_HOUR, minute=0, timezone=LOCAL_TIMEZONE_NAME),
         id=SCAN_JOB_ID,
         replace_existing=True,
     )
     scheduler.add_job(
         scheduled_media_purge,
-        CronTrigger(hour=DAILY_MEDIA_PURGE_HOUR, minute=0, timezone="Europe/Paris"),
+        CronTrigger(hour=DAILY_MEDIA_PURGE_HOUR, minute=0, timezone=LOCAL_TIMEZONE_NAME),
         id=MEDIA_PURGE_JOB_ID,
         replace_existing=True,
     )
     scheduler.add_job(
         scheduled_auto_notes,
-        CronTrigger(hour=DAILY_AUTO_NOTES_HOUR, minute=0, timezone="Europe/Paris"),
+        CronTrigger(hour=DAILY_AUTO_NOTES_HOUR, minute=0, timezone=LOCAL_TIMEZONE_NAME),
         id=AUTO_NOTES_JOB_ID,
         replace_existing=True,
     )

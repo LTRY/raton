@@ -17,6 +17,7 @@ from back.services.common.durations import (
     parse_duration_label,
 )
 from back.services.common.job_log import log_job
+from back.services.common.local_time import local_datetime, local_now
 from back.services.common.user_state import video_state
 from back.services.videos.filters import video_category_labels
 
@@ -236,12 +237,6 @@ def latest_playback_positions(
     return positions
 
 
-def local_datetime(value: datetime, timezone) -> datetime:
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone)
-    return value.astimezone(timezone)
-
-
 def playback_stats_kind(job: DownloadJob, playback: dict[str, str | float]) -> str:
     if playback["media_label"] == "vidéo":
         if job.video and "/shorts/" in job.video.url:
@@ -282,7 +277,7 @@ def recent_played_jobs(db: Session, user_id: int, now: datetime | None = None) -
     video, and the table grows with every playback. The longest period is 30 days; two days of margin
     absorb the naive-vs-local timezone cut, which `playback_time_stats` redoes exactly.
     """
-    now = now or datetime.now().astimezone()
+    now = now or local_now()
     month_start = playback_stats_periods(now)["month"]
     cutoff = month_start.replace(tzinfo=None) - timedelta(days=2)
     return list(
@@ -302,7 +297,7 @@ def recent_played_jobs(db: Session, user_id: int, now: datetime | None = None) -
 def playback_time_stats(
     jobs: list[DownloadJob], now: datetime | None = None
 ) -> dict[str, dict[str, dict[str, str | float]]]:
-    now = now or datetime.now().astimezone()
+    now = now or local_now()
     periods = playback_stats_periods(now)
     stats = empty_playback_stats()
     seen_media_keys = {
@@ -334,7 +329,7 @@ def playback_seconds_by_day(
     jobs: list[DownloadJob], now: datetime | None = None
 ) -> dict[date, float]:
     """Seconds watched per local day, over every "played" job (not just the latest per media)."""
-    now = now or datetime.now().astimezone()
+    now = now or local_now()
     seconds_by_day: dict[date, float] = {}
     for job in jobs:
         playback = playback_activity_view(job)
