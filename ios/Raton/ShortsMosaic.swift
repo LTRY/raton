@@ -188,7 +188,8 @@ private struct ShortTile: View {
 
     var body: some View {
         Color.clear
-            .overlay { Thumbnail(videoID: card.id, hasThumbnail: card.hasThumbnail, api: api) }
+            // A big tile is two thirds of the screen wide: it keeps the original.
+            .overlay { Thumbnail(videoID: card.id, hasThumbnail: card.hasThumbnail, api: api, width: feature ? nil : 640) }
             .clipped()
             .overlay {
                 LinearGradient(colors: [.clear, Color(hex: 0x0A0603).opacity(0.8)],

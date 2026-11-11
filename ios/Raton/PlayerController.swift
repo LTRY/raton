@@ -3,10 +3,17 @@ import Combine
 import MediaPlayer
 import UIKit
 
+/// Where playback is. Apart from the rest of the player's state because it moves twice a second:
+/// only the views that draw it (the seek bars) observe it, not every screen that reads the player.
+final class PlaybackClock: ObservableObject {
+    @Published fileprivate(set) var position: Double = 0
+    @Published fileprivate(set) var duration: Double = 0
+}
+
 /// The one player of the app (video or audio), kept alive above the screens so that audio goes on
 /// when the fiche is left or the screen is locked. It reports its progress to
-/// `POST /api/videos/{id}/activity` the way the front's JS does: on pause, at the end and when the
-/// player is torn down, with the seconds actually watched since the last report.
+/// `POST /api/videos/{id}/activity` with the seconds actually watched since the last report: on
+/// pause, at the end, when the player is torn down, and every `reportInterval` while it plays.
 final class PlayerController: ObservableObject {
     struct Track: Equatable {
         let videoID: Int
@@ -16,8 +23,15 @@ final class PlayerController: ObservableObject {
     @Published private(set) var track: Track?
     @Published private(set) var title = ""
     @Published private(set) var isPlaying = false
-    @Published private(set) var position: Double = 0
-    @Published private(set) var duration: Double = 0
+    let clock = PlaybackClock()
+    private var position: Double {
+        get { clock.position }
+        set { clock.position = newValue }
+    }
+    private var duration: Double {
+        get { clock.duration }
+        set { clock.duration = newValue }
+    }
     @Published private(set) var player: AVPlayer?
     /// The playlist being played, if any; a single fiche played from its page has none.
     @Published private(set) var queue: PlaylistQueue?
@@ -41,6 +55,10 @@ final class PlayerController: ObservableObject {
     private var endObserver: NSObjectProtocol?
     private var watchedSeconds: Double = 0
     private var lastTrackedTime: Double?
+    // Without a report while playing, an app iOS kills in the background loses everything since the
+    // last pause. The back folds the reports of one listening into a single Historique line.
+    private static let reportInterval: TimeInterval = 30
+    private var lastReportAt = Date()
     // Segments the back says to skip (SponsorBlock): the player only jumps over them.
     private var skipSegments: [SkipSegment] = []
     // False in free listening: nothing is written to the history.
@@ -106,6 +124,7 @@ final class PlayerController: ObservableObject {
         position = 0
         watchedSeconds = 0
         lastTrackedTime = nil
+        lastReportAt = Date()
         reportsActivity = reports
 
         let player = AVPlayer(url: localURL ?? api.url(path))
@@ -181,7 +200,7 @@ final class PlayerController: ObservableObject {
             guard let self, time.seconds.isFinite else { return }
             self.position = time.seconds
             if let itemDuration = player.currentItem?.duration.seconds,
-               itemDuration.isFinite, itemDuration > 0 {
+               itemDuration.isFinite, itemDuration > 0, itemDuration != self.duration {
                 self.duration = itemDuration
             }
             if let segment = self.skipSegments.first(where: { time.seconds >= $0.start && time.seconds < $0.end - 0.5 }) {
@@ -189,6 +208,7 @@ final class PlayerController: ObservableObject {
                 return
             }
             self.trackWatchedTime()
+            if Date().timeIntervalSince(self.lastReportAt) >= Self.reportInterval { self.reportActivity() }
             self.updateNowPlaying()
         }
         statusObserver = player.publisher(for: \.timeControlStatus)
@@ -237,6 +257,7 @@ final class PlayerController: ObservableObject {
             "watched_seconds": Int(watchedSeconds.rounded()),
         ]
         watchedSeconds = 0
+        lastReportAt = Date()
         // A failed report must never interrupt playback.
         Task {
             let _: VideoState? = try? await api.post("/api/videos/\(track.videoID)/activity", body: body)
