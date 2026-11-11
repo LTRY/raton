@@ -91,7 +91,9 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   autrement dans le simulateur et sur un iPhone : le bas de la page restait
   derriere le mini-lecteur. Une nouvelle page a defilement l'appelle ; une feuille
   (`sheet`) n'en a pas besoin. La page change avec
-  l'onglet (`.id(tab)`).
+  l'onglet (`.id`). Toucher une icone, celle de l'onglet courant comprise,
+  ramene a la page de base de l'onglet : les piles de navigation sont videes
+  (une fiche ouverte depuis la Bibliotheque ou une page de chaine est quittee).
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
   la forme et de la largeur de la barre d'onglets, posee 6 pt au-dessus, avec pause/lecture a gauche,
