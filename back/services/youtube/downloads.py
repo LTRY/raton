@@ -71,7 +71,7 @@ def download_media(
                 "preferredcodec": "m4a",
             }
         ]
-    with ytdlp_call("download_media"), YoutubeDL(opts) as ydl:
+    with ytdlp_call("download_media", media=True), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(video_url, download=True)
     return info
 

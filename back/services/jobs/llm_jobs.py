@@ -1,10 +1,12 @@
-"""An LlmJob from its creation (`enqueue_llm_job`) to its result (`run_llm_job`)."""
+"""An LlmJob from its creation (`enqueue_llm_job`) to its result written where it belongs
+(`run_llm_job`, then `apply_llm_job_result`)."""
 
 import json
 import logging
 import time
 from datetime import UTC, datetime
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from back.core.logging import logged_job
@@ -31,6 +33,8 @@ PARTIAL_RESULT_INTERVAL_SECONDS = 0.4
 
 logger = logging.getLogger(__name__)
 
+APPLY_FAILED_PREFIX = "Application du résultat impossible"
+
 
 def library_chat_user_id(db: Session, job: LlmJob) -> int:
     """Who asked a library question: the job's user, else its discussion's (a job queued before
@@ -47,6 +51,7 @@ def library_chat_user_id(db: Session, job: LlmJob) -> int:
 def run_llm_job(job_id: int) -> None:
     """Run a direct-API completion for a queued LlmJob in the background."""
     added_channel_ids: list[int] = []
+    notes_to_index: tuple[int, str, str | None] | None = None
     db = SessionLocal()
     try:
         job = db.get(LlmJob, job_id)
@@ -123,8 +128,19 @@ def run_llm_job(job_id: int) -> None:
             job.status = "failed"
         job.completed_at = datetime.now(UTC)
         db.commit()
+        # Written here, not by whoever polls next: a page closed during the generation must not
+        # lose a result that was paid for.
+        if job.status == "done":
+            notes_to_index = apply_llm_job_result(db, job)
     finally:
         db.close()
+    if notes_to_index:
+        try:
+            run_notes_indexing_job(*notes_to_index)
+        except Exception:
+            # The notes are written; a search index that could not be built (no Voyage key, API
+            # down) is retried by the notes backfill.
+            logger.exception("Indexation des notes échouée après la génération")
     if added_channel_ids:
         # After the job is committed as done: the chat answer must not wait for the images.
         # Outside the try/finally so a failed job body never starts a long backfill with
@@ -172,14 +188,49 @@ def enqueue_llm_job(
     return job
 
 
-# A finished job ("done") is applied on the first poll that sees it: its result is written where
-# the fiche or the chat keeps it, then the job becomes "applied" so a replayed poll writes nothing.
+# A finished job ("done") has its result written where the fiche or the chat keeps it, once, by
+# `apply_llm_job_result`: `run_llm_job` calls it as soon as the job is done, and a poll that finds
+# a "done" job calls it too (a restart between the two, or a job from before this was done in the
+# runner). The job goes "done" -> "applying" -> "applied" (or "failed" when the result cannot be
+# written), and only the caller that wins the first step writes anything.
 
 
-def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | None:
-    """Write a finished "generate" job's documents; returns what was generated, None if nothing new."""
-    if job.status != "done":
+def apply_llm_job_result(db: Session, job: LlmJob) -> tuple[int, str, str | None] | None:
+    """Write a "done" job's result, once; returns what `run_notes_indexing_job` must index when a
+    `generate` job has just written its notes.
+
+    Does nothing when another caller already took the job: `job` is refreshed, so its status
+    tells whether that one is still writing ("applying") or finished.
+    """
+    claimed = db.execute(
+        update(LlmJob).where(LlmJob.id == job.id, LlmJob.status == "done").values(status="applying")
+    ).rowcount
+    db.commit()
+    if not claimed:
+        db.refresh(job)
         return None
+    db.refresh(job)
+    try:
+        if job.kind == "library_chat":
+            apply_library_chat_result(db, job)
+            return None
+        video = db.get(Video, job.video_id)
+        if video is None:
+            raise ValueError("Vidéo introuvable")
+        if job.kind == "generate":
+            generated = apply_generation_result(db, video, job)
+            return (video.id, generated["notes_text"], generated["summary_short"])
+        apply_transcript_chat_result(db, video, job)
+    except Exception as exc:
+        db.rollback()
+        job.status = "failed"
+        job.error = f"{APPLY_FAILED_PREFIX} : {exc}"
+        db.commit()
+    return None
+
+
+def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict:
+    """Write a "generate" job's documents; returns what was generated."""
     generated = split_generation_result(job.result or "")
     write_generated_documents(video, generated)
     job.status = "applied"
@@ -189,8 +240,6 @@ def apply_generation_result(db: Session, video: Video, job: LlmJob) -> dict | No
 
 def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None:
     """Append the answer to the asking user's chat on the fiche."""
-    if job.status != "done":
-        return
     user_id = job.user_id if job.user_id is not None else default_user(db).id
     append_transcript_chat(video, user_id, job.question or "", job.result or "")
     log_job(
@@ -206,8 +255,6 @@ def apply_transcript_chat_result(db: Session, video: Video, job: LlmJob) -> None
 
 
 def apply_library_chat_result(db: Session, job: LlmJob) -> None:
-    if job.status != "done":
-        return
     conversation = (
         db.get(LibraryChatConversation, job.conversation_id) if job.conversation_id else None
     )

@@ -470,42 +470,6 @@ struct FicheView: View {
     }
 }
 
-/// Seek bar, times and ±15 s for the audio of the loaded fiche.
-struct AudioControls: View {
-    @EnvironmentObject private var player: PlayerController
-    @State private var dragging = false
-    @State private var dragPosition = 0.0
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Slider(
-                value: Binding(
-                    get: { dragging ? dragPosition : player.position },
-                    set: { dragPosition = $0 }
-                ),
-                in: 0...max(player.duration, 1),
-                onEditingChanged: { editing in
-                    dragging = editing
-                    if !editing { player.seek(to: dragPosition) }
-                }
-            )
-            .tint(Theme.primary)
-            HStack {
-                Text(Format.clock(player.position))
-                Spacer()
-                Text(Format.clock(player.duration))
-            }
-            .font(.raton(14, .semibold)).monospacedDigit()
-            .foregroundStyle(Theme.textMuted)
-            HStack(spacing: 40) {
-                Button { player.skip(by: -15) } label: { Image(systemName: "gobackward.15") }
-                Button { player.skip(by: 15) } label: { Image(systemName: "goforward.15") }
-            }
-            .font(.system(size: 24)).foregroundStyle(Theme.textSoft)
-        }
-    }
-}
-
 /// The mini player above the tab bar while audio is loaded, so it can be paused after leaving its fiche:
 /// a smoked-glass pill of the tab bar's width and shape, play-pause on the left, the title over its
 /// channel, then next (in a playlist) and close.

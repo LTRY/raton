@@ -1,8 +1,8 @@
 """A question or a generation asked to the LLM, from its queueing to its written result.
 
 `queue_*` build the prompt and create the `LlmJob` a route answers with; the route then hands
-`run_llm_job` to its background tasks. A client polls the job; `resolve_llm_job` says where it
-stands and, on the first poll after it finished, writes its result (see `llm_jobs`).
+`run_llm_job` to its background tasks, which also writes the result when the job is done. A client
+polls the job; `resolve_llm_job` says where it stands (see `llm_jobs`).
 """
 
 import json
@@ -15,9 +15,8 @@ from back.models.video import Video
 from back.services.common.raton_language import read_raton_language
 from back.services.common.settings import get_llm_provider_name
 from back.services.jobs.llm_jobs import (
-    apply_generation_result,
-    apply_library_chat_result,
-    apply_transcript_chat_result,
+    APPLY_FAILED_PREFIX,
+    apply_llm_job_result,
     enqueue_llm_job,
 )
 from back.services.library_chat.history import (
@@ -55,8 +54,8 @@ class LlmJobOutcome:
     partial_short_summary: str | None = None
     # A `library_chat` job still running: the tools the model has called so far.
     tool_calls: list = field(default_factory=list)
-    # A `generate` job whose notes were just written: (video_id, notes_text, summary_short), for
-    # `run_notes_indexing_job` in the background.
+    # A `generate` job whose notes this poll just wrote (its runner did not): (video_id,
+    # notes_text, summary_short), for `run_notes_indexing_job` in the background.
     notes_to_index: tuple[int, str, str | None] | None = None
 
 
@@ -146,8 +145,13 @@ def find_llm_job(db: Session, job_id: int) -> LlmJob:
 
 
 def resolve_llm_job(db: Session, job: LlmJob) -> LlmJobOutcome:
-    """Where the job stands; a finished one has its result written (once: a replay writes nothing)."""
-    if job.status in ("queued", "running"):
+    """Where the job stands. `run_llm_job` has normally written a finished job's result already;
+    a "done" one found here (a restart cut it short) is written now, once."""
+    if job.status == "done":
+        notes_to_index = apply_llm_job_result(db, job)
+    else:
+        notes_to_index = None
+    if job.status in ("queued", "running", "applying"):
         outcome = LlmJobOutcome(job=job, pending=True)
         if job.kind == "generate" and job.result:
             # run_llm_job saves the text streamed so far in `result`.
@@ -156,27 +160,8 @@ def resolve_llm_job(db: Session, job: LlmJob) -> LlmJobOutcome:
             outcome.tool_calls = json.loads(job.tool_calls) if job.tool_calls else []
         return outcome
     if job.status == "failed":
+        if job.error and job.error.startswith(APPLY_FAILED_PREFIX):
+            raise LlmJobFailedError(job.error)
         verb = "Génération" if job.kind == "generate" else "Réponse"
         raise LlmJobFailedError(f"{verb} impossible : {job.error}")
-    # "done" (first poll after completion) or "applied" (already written, replayed idempotently).
-    outcome = LlmJobOutcome(job=job, pending=False)
-    try:
-        if job.kind == "library_chat":
-            apply_library_chat_result(db, job)
-            return outcome
-        video = db.get(Video, job.video_id)
-        if video is None:
-            raise ValueError("Vidéo introuvable")
-        if job.kind == "generate":
-            generated = apply_generation_result(db, video, job)
-            if generated is not None:
-                outcome.notes_to_index = (
-                    video.id,
-                    generated["notes_text"],
-                    generated["summary_short"],
-                )
-        else:
-            apply_transcript_chat_result(db, video, job)
-    except Exception as exc:
-        raise LlmJobFailedError(f"Application du résultat impossible : {exc}") from exc
-    return outcome
+    return LlmJobOutcome(job=job, pending=False, notes_to_index=notes_to_index)

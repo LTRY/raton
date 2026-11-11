@@ -294,7 +294,7 @@ struct PlaylistView: View {
                             } label: {
                                 ListRow(tint: isCurrent ? Theme.primary : nil) {
                                     HStack(spacing: 12) {
-                                        Thumbnail(videoID: item.videoId, hasThumbnail: item.hasThumbnail, api: api)
+                                        Thumbnail(videoID: item.videoId, hasThumbnail: item.hasThumbnail, api: api, width: 320)
                                             .frame(width: 96, height: 54).clipped()
                                             .clipShape(RoundedRectangle(cornerRadius: 6))
                                         VStack(alignment: .leading, spacing: 3) {

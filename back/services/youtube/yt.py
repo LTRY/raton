@@ -1,10 +1,14 @@
 import logging
+import threading
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
 from yt_dlp import YoutubeDL
 
-from back.core.logging import log_external
+from back.core.logging import log_event, log_external
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +17,42 @@ class YoutubeSearchError(ValueError):
     """A YouTube search that failed; the message is the one shown to the user."""
 
 
-def ytdlp_call(op: str):
-    # A 429 or a scheduled premiere is handled by the callers: a warning, not an error.
-    return log_external(
-        logger,
-        "yt-dlp",
-        op,
-        expected_failure=lambda exc: is_rate_limit_error(exc) or is_not_yet_available_error(exc),
-    )
+# YouTube answers HTTP 429 to a burst of requests. The scan spaces its own (`throttle`), but a
+# manual download, a playlist import and a channel exploration each run on their own thread and
+# would add theirs on top: every yt-dlp call takes a slot here, so only a few run at once whatever
+# started them. Media downloads have their own, fewer slots: they last minutes, and a few of them
+# must not keep a metadata import or a search waiting.
+MAX_CONCURRENT_DOWNLOADS = 2
+MAX_CONCURRENT_REQUESTS = 3
+# A wait shorter than this is not worth a journal line.
+SLOT_WAIT_LOGGED_AFTER_SECONDS = 1.0
+_download_slots = threading.BoundedSemaphore(MAX_CONCURRENT_DOWNLOADS)
+_request_slots = threading.BoundedSemaphore(MAX_CONCURRENT_REQUESTS)
+
+
+@contextmanager
+def ytdlp_call(op: str, *, media: bool = False) -> Iterator[None]:
+    """Hold a yt-dlp slot (`media`: a download of the video or audio file) and log the call.
+
+    Never call it while already inside one: a thread holding a slot that waits for another could
+    deadlock the rest.
+    """
+    slots = _download_slots if media else _request_slots
+    started = time.monotonic()
+    with slots:
+        waited = time.monotonic() - started
+        if waited >= SLOT_WAIT_LOGGED_AFTER_SECONDS:
+            log_event(logger, "ytdlp.waited", op=op, waited_ms=round(waited * 1000))
+        # A 429 or a scheduled premiere is handled by the callers: a warning, not an error.
+        with log_external(
+            logger,
+            "yt-dlp",
+            op,
+            expected_failure=lambda exc: (
+                is_rate_limit_error(exc) or is_not_yet_available_error(exc)
+            ),
+        ):
+            yield
 
 
 def parse_yt_date(value: str | int | float | None) -> datetime | None:

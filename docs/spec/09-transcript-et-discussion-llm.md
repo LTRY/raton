@@ -238,7 +238,8 @@ en isolation.
   n'ayant pas suivi le format) dégrade proprement vers un résultat vide pour
   ce seul document, sans deviner, comme chaque split_* individuel ;
 - le client interroge `GET /api/llm-jobs/{job_id}` jusqu'à
-  résolution, qui applique le résultat complet en une fois : écrit
+  résolution ; le résultat complet est appliqué en une fois, dès la fin du job
+  par `run_llm_job` (voir « Application du résultat » plus bas) : écrit
   `transcript.notes.txt`, `transcript.summary_short.txt`,
   `transcript.questions.txt` (une
   question par ligne) ; répond avec les `documents` de la fiche ; peut être
@@ -303,17 +304,38 @@ poll) sont dans `back/services/jobs/llm_requests.py`.
   n'est la reponse complete qu'une fois le job `done` ;
 - si le job a echoue, repond `status: "failed"` avec un message d'erreur
   explicite (`Génération` ou `Réponse` selon `kind`) ;
-- des que le job est termine (`done`), applique le resultat une seule fois
-  (ecrit `transcript.notes.txt`/`transcript.summary_short.txt`/
-  `transcript.questions.txt` pour
-  `generate` ; ajoute question/reponse au fichier de discussion de
-  l'utilisateur qui a pose la question (`llm_jobs.user_id`) pour `chat` —
-  voir sections Génération/Discussion ci-dessus), passe le job a
-  `applied`, puis repond `status: "done"` avec `documents` (`generate` :
+- une fois le job applique (`applied`, voir « Application du resultat » plus
+  bas), repond `status: "done"` avec `documents` (`generate` :
   transcript, notes, résumé court, questions et discussion, pour que la page
   resynchronise ses onglets et le résumé sous le titre en une fois) ou
-  `chat_messages` (`chat`). Un nouveau poll sur un job deja `applied`
-  renvoie l'etat courant sans ré-appliquer (idempotent).
+  `chat_messages` (`chat`). Un poll sur un job `applied` renvoie l'etat
+  courant sans rien ecrire (idempotent) ; un job `applying` (un autre appelant
+  est en train d'ecrire) repond `pending`.
+
+## Application du resultat
+
+Un job termine est `done` : sa reponse est dans `llm_jobs.result`, mais rien
+n'est encore ecrit sur la fiche ou dans la discussion. `apply_llm_job_result`
+(`back/services/jobs/llm_jobs.py`) l'ecrit **une seule fois** :
+
+- `run_llm_job` l'appelle des que le job est `done`, sans attendre un poll :
+  une page fermee pendant la generation ne fait pas perdre un resultat paye ;
+- un poll qui trouve un job encore `done` (redemarrage entre les deux, job
+  anterieur a ce fonctionnement) l'appelle aussi ;
+- l'appelant qui gagne le passage `done` → `applying` (un `UPDATE ... WHERE
+  status = 'done'`) ecrit : `transcript.notes.txt`, `transcript.summary_short.txt`
+  et `transcript.questions.txt` pour `generate`, la question et la reponse dans
+  la discussion de l'utilisateur qui a pose la question (`llm_jobs.user_id`)
+  pour `chat` et `library_chat` ; puis le job passe a `applied`. Deux onglets
+  qui sondent en meme temps n'ecrivent donc jamais deux fois ;
+- si l'ecriture echoue (fiche ou discussion supprimee, dossier absent), le job
+  passe a `failed` avec `error` = « Application du resultat impossible : … »,
+  que le poll rend tel quel ;
+- apres une generation, l'indexation des notes (`run_notes_indexing_job`) part
+  dans la foulee, dans la meme tache de fond ; une erreur d'indexation est
+  journalisee sans faire echouer le job (les notes sont ecrites, le rattrapage
+  d'index les reprendra). Quand c'est un poll qui a ecrit, l'indexation part
+  en tache de fond de la requete.
 
 ## Cout reel des jobs LLM
 
@@ -536,8 +558,8 @@ discussion dont la premiere question n'a jamais eu de reponse (job echoue)
 n'a aucun message : elle n'est pas listee, et la question suivante du widget
 la reprend. La liste donne les 50 discussions les plus recemment repondues ;
 les plus anciennes restent dans la DB. Supprimer une discussion supprime ses
-messages ; un job encore en cours pour elle echoue au poll
-(`Discussion supprimée`) au lieu d'ecrire sa reponse ailleurs.
+messages ; un job encore en cours pour elle echoue a l'application du resultat
+(`Discussion supprimée`, rendu par le poll) au lieu d'ecrire sa reponse ailleurs.
 
 ### Routes
 
@@ -574,7 +596,7 @@ cites dans `llm_jobs.sources`.
 
 `GET /api/llm-jobs/{job_id}` pour un job `library_chat` :
 
-- meme cycle `pending`/`failed`/`done`→`applied` que les autres jobs LLM ;
+- meme cycle `pending`/`failed`/`done`→`applying`→`applied` que les autres jobs LLM ;
 - tant que le job est `pending`, la reponse porte
   `tool_calls: [{label, result}]` : les appels
   d'outils faits jusque-la (`llm_jobs.tool_calls`, ecrit par

@@ -153,14 +153,19 @@ Champs :
 
 - `id` ;
 - `channel_id` nullable ;
-- `video_id` nullable ;
-- `user_id` : FK `users.id`, `ON DELETE SET NULL`, nullable, indexe — a qui
+- `video_id` nullable, indexe (lectures d'une fiche, et le `ON DELETE SET NULL`
+  de la suppression d'une fiche, qui sinon parcourait toute la table) ;
+- `user_id` : FK `users.id`, `ON DELETE SET NULL`, nullable — a qui
   est une ligne d'activite `played` ou `prompt` (historique, positions, temps
   d'ecran, tri « activite » des chaines de cet utilisateur) ; `NULL` sur les
   autres lignes, qui sont celles de la bibliotheque ;
 - `status` ;
 - `message` ;
 - `created_at`.
+
+Index : `(user_id, status, created_at)` (les lignes `played` d'un utilisateur,
+la plus recente d'abord : Historique, temps d'ecran, visites de Raton),
+`video_id` et `status`.
 
 Statuts utilises :
 
@@ -234,8 +239,9 @@ Champs :
 - `prompt` : le `Prompt` envoye au fournisseur, en JSON `{"system": ..., "messages": [...]}` (`back/services/llm/prompts.py:Prompt`) ; un job cree avant ce format porte une simple chaine, lue comme un message `user` sans `system` ;
 - `question` : question brute (pour `kind="chat"`/`"library_chat"`), reutilisee
   pour reconstituer l'historique une fois la reponse obtenue ;
-- `status` : `queued`, `running`, `done`, `failed`, `applied` (resultat deja
-  ecrit sur disque, evite une double application si le job est repoll) ;
+- `status` : `queued`, `running`, `done` (reponse recue, pas encore ecrite),
+  `applying` (un appelant ecrit le resultat), `failed`, `applied` (resultat
+  deja ecrit sur disque, evite une double application si le job est repoll) ;
 - `result` : reponse texte du fournisseur ; pendant qu'un job `generate` est
   `running`, texte recu jusque-la (voir `09-transcript-et-discussion-llm.md`) ;
 - `sources` : JSON `{"channel_ids": [...], "video_ids": [...]}`, uniquement
@@ -468,6 +474,10 @@ puis cree toutes les tables. Son `downgrade()` defait tout, extension et type
 `transcript_status` compris. `0002_drop_ai_analysis` retire la colonne
 `videos.ai_analysis_json` (l'onglet Analyse IA n'existe plus). Les migrations
 suivantes se nomment `NNNN_short_slug`.
+
+`0005_download_jobs_indexes` ajoute les index de `download_jobs` ci-dessus
+(`(user_id, status, created_at)` et `video_id`) et retire l'index sur `user_id`
+seul, que le premier couvre.
 
 `0004_users` cree les tables des utilisateurs et un premier utilisateur,
 « Moi », a qui elle donne tout ce qui etait personnel : les notes en etoiles,

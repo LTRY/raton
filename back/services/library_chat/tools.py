@@ -11,7 +11,7 @@ a reference that is not backed.
 
 import re
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
@@ -21,6 +21,7 @@ from back.models.library_chat_message import LibraryChatMessage
 from back.models.video import Video
 from back.services.channels.lookup import find_channel
 from back.services.channels.manage import ChannelAlreadyInLibraryError, add_resolved_channel
+from back.services.common.local_time import local_datetime, local_now
 from back.services.common.search import channel_search_rank, fold_search_text, video_search_rank
 from back.services.common.user_state import channel_states, video_comments
 from back.services.library_chat.schema import (
@@ -33,7 +34,6 @@ from back.services.library_chat.schema import (
 from back.services.rag import retrieval as rag_retrieval
 from back.services.videos.playback import (
     dashboard_media_activity_logs,
-    local_datetime,
     playback_activity_view,
 )
 from back.services.youtube import channel_info
@@ -302,7 +302,7 @@ class LibraryChatToolbox:
             days = max(int(arguments.get("jours") or DEFAULT_HISTORY_DAYS), 1)
         except TypeError, ValueError:
             days = DEFAULT_HISTORY_DAYS
-        now = datetime.now().astimezone()
+        now = local_now()
         since = now - timedelta(days=days)
         jobs = [
             job

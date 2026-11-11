@@ -83,6 +83,11 @@ function reportPlayback(url, mediaType, media, watchedSeconds) {
 }
 window.ratonReportPlayback = reportPlayback;
 
+// While a media plays, its report goes out this often, not only on pause or when the page is left:
+// a tab that iOS kills would otherwise lose the position and the time watched since the last one.
+// The back merges the reports of one continuous listening into a single row.
+const ACTIVITY_REPORT_INTERVAL_MS = 30000;
+
 function setAsyncFormState(form, message, level) {
   let status = form.querySelector(".async-form-status");
   if (!status) {
@@ -503,6 +508,7 @@ function bindResumableMedia(media) {
   const endBufferSeconds = RESUME_END_BUFFER_SECONDS;
   let lastSavedAt = 0;
   let watchedSeconds = 0;
+  let lastActivityReportAt = 0;
   claimMediaSession(media, () => ({
     title: media.dataset.mediaTitle,
     artist: media.dataset.mediaArtist,
@@ -589,6 +595,7 @@ function bindResumableMedia(media) {
     if (Math.abs(media.currentTime - lastSavedAt) >= saveIntervalSeconds) {
       writePosition();
     }
+    if (Date.now() - lastActivityReportAt >= ACTIVITY_REPORT_INTERVAL_MS) logActivity();
   });
 
   function trackWatchedTime(force = false) {
@@ -607,6 +614,7 @@ function bindResumableMedia(media) {
 
   function logActivity() {
     trackWatchedTime(true);
+    lastActivityReportAt = Date.now();
     if (!media.dataset.activityUrl || watchedSeconds < 1) return;
     reportPlayback(media.dataset.activityUrl, media.dataset.mediaKind || "video", media, watchedSeconds);
     watchedSeconds = 0;
@@ -614,6 +622,7 @@ function bindResumableMedia(media) {
 
   media.addEventListener("play", () => {
     lastTrackedTime = Number.isFinite(media.currentTime) ? media.currentTime : null;
+    lastActivityReportAt = Date.now();
   });
 
   media.addEventListener("pause", () => {
@@ -2949,6 +2958,7 @@ function initMiniPlayer() {
   const endBufferSeconds = RESUME_END_BUFFER_SECONDS;
   let lastSavedAt = 0;
   let watchedSeconds = 0;
+  let lastActivityReportAt = 0;
   let lastTrackedTime = null;
   let seeking = false;
   let detailPath = "";
@@ -2987,6 +2997,7 @@ function initMiniPlayer() {
 
   function logActivity() {
     trackWatchedTime(true);
+    lastActivityReportAt = Date.now();
     const activityUrl = audio.dataset.activityUrl;
     if (!activityUrl || watchedSeconds < 1) return;
     reportPlayback(activityUrl, "audio", audio, watchedSeconds);
@@ -3060,6 +3071,10 @@ function initMiniPlayer() {
     trackWatchedTime();
     updateProgressUI();
     if (Math.abs(audio.currentTime - lastSavedAt) >= saveIntervalSeconds) writePosition();
+    if (Date.now() - lastActivityReportAt >= ACTIVITY_REPORT_INTERVAL_MS) logActivity();
+  });
+  audio.addEventListener("play", () => {
+    lastActivityReportAt = Date.now();
   });
 
   audio.addEventListener("play", () => {

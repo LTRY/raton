@@ -12,7 +12,6 @@ the sweep itself at submission (see `auto_notes.eligible_videos`), so "waiting" 
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from math import ceil
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,6 +21,7 @@ from back.models.channel import Channel
 from back.models.llm_job import LlmJob
 from back.models.video import Video
 from back.models.video_note_chunk import EMBEDDING_DIMENSIONS, VideoNoteChunk
+from back.services.common.local_time import LOCAL_TIMEZONE, LOCAL_TIMEZONE_NAME
 from back.services.common.settings import (
     get_auto_notes_enabled,
     get_auto_notes_excluded_category_labels,
@@ -59,9 +59,6 @@ from back.services.rag.retrieval import (
     MIN_RELEVANCE_SCORE,
     TOP_K_CHUNKS,
 )
-
-SWEEP_TIMEZONE = "Europe/Paris"
-
 
 LISTED_VIDEOS = 15
 
@@ -112,7 +109,7 @@ def _parse_iso(raw: str) -> datetime | None:
 
 def next_sweep_at(now: datetime) -> datetime:
     """The next 5am of the sweep's timezone (a fixed wall-clock hour, like the cron trigger)."""
-    local = now.astimezone(ZoneInfo(SWEEP_TIMEZONE))
+    local = now.astimezone(LOCAL_TIMEZONE)
     candidate = local.replace(hour=DAILY_AUTO_NOTES_HOUR, minute=0, second=0, microsecond=0)
     if candidate <= local:
         candidate += timedelta(days=1)
@@ -270,7 +267,7 @@ def rag_dashboard_data(db: Session, now: datetime | None = None) -> dict:
             "last_run_summary": get_setting(db, LAST_RUN_SUMMARY_KEY, ""),
             "next_sweep_at": next_sweep_at(now),
             "next_sweep_in_seconds": int((next_sweep_at(now) - now).total_seconds()),
-            "sweep_timezone": SWEEP_TIMEZONE,
+            "sweep_timezone": LOCAL_TIMEZONE_NAME,
             "excluded_labels": library["excluded_labels"],
         },
         "next_batch": {

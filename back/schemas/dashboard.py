@@ -86,6 +86,8 @@ class HistoriqueRead(BaseModel):
     hide: str
     # Reading time of each day on the page, every playback of the day counted.
     day_seconds: dict[date, float]
+    # The current local day, so a client can label a group « Aujourd'hui » without its own clock.
+    today: date
 
 
 class ScreenTimeItemRead(BaseModel):

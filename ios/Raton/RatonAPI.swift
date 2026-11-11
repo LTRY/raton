@@ -28,6 +28,9 @@ final class RatonAPI {
         session = URLSession(configuration: configuration)
     }
 
+    // A session that is never invalidated is never freed; the calls in flight still finish.
+    deinit { session.finishTasksAndInvalidate() }
+
     /// The URL of a path the API gave (`/api/videos/3/video`) or that the app builds.
     func url(_ path: String) -> URL {
         URL(string: baseURL.absoluteString + path) ?? baseURL

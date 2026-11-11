@@ -11,6 +11,7 @@ struct RatonApp: App {
             RootView()
                 .environmentObject(state)
                 .environmentObject(player)
+                .environmentObject(player.clock)
                 .environmentObject(OfflineStore.shared)
                 .preferredColorScheme(.light)
         }

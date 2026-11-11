@@ -1,7 +1,5 @@
 """`/api/nouveautes`, `/api/historique`, `/api/screen-time`: what the Dashboard pages show."""
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -20,6 +18,7 @@ from back.schemas.dashboard import (
     ScreenTimeRead,
 )
 from back.schemas.library import LibraryChannelRead
+from back.services.common.local_time import local_now
 from back.services.common.settings import get_screen_time_limits
 from back.services.videos.filters import list_hide, video_badges
 from back.services.videos.history import HISTORY_DEFAULT_HIDE, history_page
@@ -95,6 +94,7 @@ def get_historique(
         page=history.page,
         total_pages=history.total_pages,
         day_seconds=history.seconds_by_day,
+        today=history.today,
         hide=hide,
     )
 
@@ -103,7 +103,7 @@ def get_historique(
 def get_screen_time(
     db: Session = Depends(get_db), user_id: int = Depends(current_user_id)
 ) -> ScreenTimeRead:
-    now = datetime.now().astimezone()
+    now = local_now()
     stats = playback_time_stats(recent_played_jobs(db, user_id, now), now)
     limits = get_screen_time_limits(db, user_id)
     return ScreenTimeRead(

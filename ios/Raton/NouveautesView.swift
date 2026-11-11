@@ -22,7 +22,7 @@ struct VideoRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             ZStack(alignment: .bottomTrailing) {
-                Thumbnail(videoID: card.id, hasThumbnail: card.hasThumbnail, api: api)
+                Thumbnail(videoID: card.id, hasThumbnail: card.hasThumbnail, api: api, width: 640)
                     .frame(width: 176, height: 100)
                     .clipped()
                 if let seconds = card.durationSeconds {
@@ -78,10 +78,13 @@ struct Thumbnail: View {
     let videoID: Int
     let hasThumbnail: Bool
     let api: RatonAPI
+    /// One of the widths the back keeps a smaller copy for (320 or 640); nil asks for the original,
+    /// which only a picture as wide as the screen needs.
+    var width: Int? = nil
 
     var body: some View {
         if hasThumbnail {
-            AsyncImage(url: api.url("/api/videos/\(videoID)/thumbnail")) { image in
+            AsyncImage(url: api.url("/api/videos/\(videoID)/thumbnail" + (width.map { "?w=\($0)" } ?? ""))) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 Theme.surfaceMuted

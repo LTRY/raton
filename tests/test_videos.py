@@ -670,6 +670,106 @@ def test_transcript_job_status_schedules_notes_indexing_once_and_only_once(tmp_p
     assert scheduled == []
 
 
+def generation_job_without_poll(db, tmp_path, monkeypatch):
+    """A queued `generate` job on a fiche, with a provider that answers GENERATION_RESULT_TEXT."""
+    folder = tmp_path / "video"
+    folder.mkdir()
+    transcript = folder / "transcript.txt"
+    transcript.write_text("Original brut.", encoding="utf-8")
+    video = add_video(db)
+    video.folder_path = str(folder)
+    video.transcript_path = str(transcript)
+    video.transcript_status = TranscriptStatus.downloaded
+    db.commit()
+    job = LlmJob(
+        kind="generate", provider="anthropic", video_id=video.id, prompt="...", status="queued"
+    )
+    db.add(job)
+    db.commit()
+
+    class FakeProvider:
+        def complete(self, messages, on_text=None, system=None):
+            return CompletionResult(
+                text=GENERATION_RESULT_TEXT,
+                model="claude-haiku-4-5",
+                input_tokens=2,
+                output_tokens=1,
+            )
+
+    monkeypatch.setattr(llm_jobs, "get_llm_provider", lambda: FakeProvider())
+    monkeypatch.setattr(llm_jobs, "SessionLocal", lambda: db)
+    monkeypatch.setattr(backfills, "SessionLocal", lambda: db)
+    return video, job, folder
+
+
+def test_a_finished_generation_is_written_without_any_poll(monkeypatch, tmp_path):
+    db = make_session()
+    video, job, folder = generation_job_without_poll(db, tmp_path, monkeypatch)
+    indexed = []
+    monkeypatch.setattr(llm_jobs, "run_notes_indexing_job", lambda *args: indexed.append(args))
+
+    llm_jobs.run_llm_job(job.id)
+
+    assert db.get(LlmJob, job.id).status == "applied"
+    assert "- Fait 1\n- Fait 2" in (folder / "transcript.notes.txt").read_text(encoding="utf-8")
+    assert [args[0] for args in indexed] == [video.id]
+    # The poll that comes later only reads: it neither writes nor indexes a second time.
+    scheduled = []
+    background_tasks = BackgroundTasks()
+    monkeypatch.setattr(
+        background_tasks, "add_task", lambda fn, *args, **kwargs: scheduled.append(fn)
+    )
+    status = llm_api.get_llm_job(job.id, background_tasks, db, user_id(db))
+    assert status.status == "done"
+    assert "- Fait 1\n- Fait 2" in status.documents.notes
+    assert scheduled == []
+
+
+def test_a_generation_whose_notes_cannot_be_written_fails(monkeypatch, tmp_path):
+    db = make_session()
+    video, job, folder = generation_job_without_poll(db, tmp_path, monkeypatch)
+    video.transcript_path = None  # nowhere to write the notes next to
+    video.folder_path = str(tmp_path / "gone")
+    db.commit()
+    monkeypatch.setattr(llm_jobs, "run_notes_indexing_job", lambda *args: None)
+
+    llm_jobs.run_llm_job(job.id)
+
+    stored = db.get(LlmJob, job.id)
+    assert stored.status == "failed"
+    assert stored.error.startswith("Application du résultat impossible")
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
+    assert status.status == "failed"
+    assert status.message == stored.error
+
+
+def test_a_job_being_written_by_another_caller_is_still_pending(monkeypatch, tmp_path):
+    db = make_session()
+    video, job, folder = generation_job_without_poll(db, tmp_path, monkeypatch)
+    job.status = "applying"
+    db.commit()
+
+    status = llm_api.get_llm_job(job.id, BackgroundTasks(), db, user_id(db))
+
+    assert status.status == "pending"
+    assert not (folder / "transcript.notes.txt").exists()
+
+
+def test_two_callers_write_a_done_job_only_once(monkeypatch, tmp_path):
+    db = make_session()
+    video, job, folder = generation_job_without_poll(db, tmp_path, monkeypatch)
+    job.status = "done"
+    job.result = GENERATION_RESULT_TEXT
+    db.commit()
+
+    first = llm_jobs.apply_llm_job_result(db, job)
+    second = llm_jobs.apply_llm_job_result(db, job)
+
+    assert first is not None and first[0] == video.id
+    assert second is None
+    assert db.get(LlmJob, job.id).status == "applied"
+
+
 def test_video_detail_page_hides_summary_tab_and_blurb_when_absent(tmp_path):
     db = make_session()
     folder = tmp_path / "video"

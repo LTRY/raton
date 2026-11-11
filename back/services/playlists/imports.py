@@ -14,6 +14,7 @@ from back.services.ingest.metadata_import import import_video_metadata
 from back.services.ingest.throttle import pause_between_imports
 from back.services.playlists.editing import add_video_to_playlist
 from back.services.youtube.url_guard import UnsafeUrlError, ensure_public_http_url
+from back.services.youtube.yt import ytdlp_call
 
 MAX_PLAYLIST_IMPORT_PAGES = 40
 
@@ -49,7 +50,7 @@ def extract_playlist_info(playlist_url: str) -> dict[str, Any]:
         raise PlaylistNotFoundError(str(exc)) from exc
     opts = {"quiet": True, "skip_download": True, "extract_flat": True, "playlistend": 1}
     try:
-        with YoutubeDL(opts) as ydl:
+        with ytdlp_call("extract_playlist"), YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as exc:
         raise PlaylistNotFoundError(f"Playlist introuvable pour {url}") from exc
@@ -84,7 +85,7 @@ def preview_playlist(db: Session, playlist_url: str) -> dict[str, Any]:
         "playlistend": MAX_PLAYLIST_IMPORT_PAGES * PLAYLIST_IMPORT_PAGE_SIZE,
     }
     try:
-        with YoutubeDL(opts) as ydl:
+        with ytdlp_call("extract_playlist"), YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
     except Exception as exc:
         raise PlaylistNotFoundError(f"Playlist introuvable pour {url}") from exc
@@ -145,7 +146,7 @@ def list_playlist_entries(
         "playliststart": playlist_start,
         "playlistend": playlist_start + page_size - 1,
     }
-    with YoutubeDL(opts) as ydl:
+    with ytdlp_call("list_playlist_entries"), YoutubeDL(opts) as ydl:
         info = ydl.extract_info(playlist_url, download=False)
     return [entry for entry in info.get("entries", []) if entry]
 

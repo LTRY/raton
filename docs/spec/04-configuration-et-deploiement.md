@@ -68,6 +68,19 @@ Services :
   monte sur `/project`, le journal en lecture seule. Aucune dependance Raton dans
   l'image : `curl`, `jq` et le CLI Claude Code, avec `ANTHROPIC_API_KEY` ;
 
+`db`, `api`, `app` et `mcp` ont `restart: unless-stopped` : la pile remonte seule
+apres un redemarrage de la machine ou un crash, et un `docker stop` fait a la
+main reste arrete. `api` a un `healthcheck` (le schema `/openapi.json`, servi
+sans base, toutes les 30 s, 60 s de grace pour `alembic upgrade head`) et `app`
+attend qu'il soit sain (`depends_on` avec `condition: service_healthy`) : le front
+ne demarre pas avant que le back reponde. Docker ne redemarre pas un conteneur
+seulement parce qu'il est `unhealthy` : le healthcheck sert a l'ordre de
+demarrage et a `docker ps`. Les previews (`docker-compose.preview.yml`) n'ont
+pas de politique de redemarrage : une preview arretee le reste.
+Au redemarrage du back, les jobs que le crash a coupes passent en echec (voir
+[13 Jobs, logs et planification](13-jobs-logs-planification.md), « Jobs
+interrompus par un redemarrage »).
+
 Les conteneurs ont un nom fixe (`container_name`) : `raton` pour `app`,
 `raton-api` pour `api`, `raton-mcp` pour `mcp`, `raton-ops` pour `ops`, `raton-monitoring` pour `monitoring` et `raton-db` pour `db`, au lieu de `raton-app-1`...
 Une seule instance de la pile peut donc tourner par machine.

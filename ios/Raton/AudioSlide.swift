@@ -132,12 +132,13 @@ struct AudioSeekBar: View {
     /// On a stage (over a thumbnail): white track, fill and times instead of the terracotta on cream.
     var onStage = false
     @EnvironmentObject private var player: PlayerController
+    @EnvironmentObject private var clock: PlaybackClock
     @State private var dragging = false
     @State private var dragPosition = 0.0
 
     private var active: Bool { player.track?.videoID == videoID && player.track?.kind == .audio }
-    private var duration: Double { max(active ? player.duration : 0, 0) }
-    private var position: Double { dragging ? dragPosition : (active ? player.position : 0) }
+    private var duration: Double { max(active ? clock.duration : 0, 0) }
+    private var position: Double { dragging ? dragPosition : (active ? clock.position : 0) }
     private var progress: Double { duration > 0 ? min(max(position / duration, 0), 1) : 0 }
 
     var body: some View {
