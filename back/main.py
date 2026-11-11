@@ -26,6 +26,7 @@ from back.core.request_timing import (
 from back.core.same_origin import SameOriginMiddleware
 from back.db.session import Base, engine, get_db
 from back.services.common.settings import ensure_default_settings
+from back.services.jobs.interrupted import fail_interrupted_jobs
 from back.services.jobs.scheduler import start_scheduler, stop_scheduler
 
 
@@ -50,6 +51,9 @@ async def lifespan(app: FastAPI):
     db = next(get_db())
     try:
         ensure_default_settings(db)
+        # Same condition as the scheduler: only the back that runs the jobs may declare them dead.
+        if get_settings().scheduler_enabled:
+            fail_interrupted_jobs(db)
     finally:
         db.close()
     # The scheduler runs inside this process, not in a separate worker: run one back only.

@@ -6,7 +6,7 @@ Days are cut in the server's local timezone, like the screen-time totals of
 """
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, load_only, selectinload
@@ -14,17 +14,20 @@ from sqlalchemy.orm import Session, load_only, selectinload
 from back.models.job import DownloadJob
 from back.models.user import UserVideo
 from back.models.video import Video
+from back.services.common.local_time import local_datetime, local_now
 from back.services.common.settings import get_no_progress_category_labels
 from back.services.common.user_state import video_states
 from back.services.videos.filters import video_is_watched
 from back.services.videos.list_state import card_list_states, video_auto_list_state
 from back.services.videos.playback import (
-    local_datetime,
     playback_activity_view,
     playback_media_key,
 )
 
 HISTORY_PAGE_SIZE = 50
+# The Historique reads every playback report of its window on each page, parsing their JSON: the
+# window keeps that bounded while `download_jobs` grows with every report.
+HISTORY_WINDOW_DAYS = 90
 # The Historique is mostly finished playbacks: hiding the Vu by default would empty it.
 HISTORY_DEFAULT_HIDE = "none"
 
@@ -53,6 +56,8 @@ class HistoryPage:
     total_pages: int
     # Reading time of each day of the page, over every playback of the day.
     seconds_by_day: dict[date, float] = field(default_factory=dict)
+    # The local day the page was computed on.
+    today: date | None = None
 
 
 @dataclass
@@ -75,7 +80,11 @@ def _day_entries(
     seconds_by_day: dict[date, float] = {}
     jobs = db.scalars(
         select(DownloadJob)
-        .where(DownloadJob.status == "played", DownloadJob.user_id == user_id)
+        .where(
+            DownloadJob.status == "played",
+            DownloadJob.user_id == user_id,
+            DownloadJob.created_at >= (now - timedelta(days=HISTORY_WINDOW_DAYS)).astimezone(UTC),
+        )
         .order_by(desc(DownloadJob.created_at), desc(DownloadJob.id))
     )
     for job in jobs:
@@ -127,7 +136,7 @@ def history_page(
     page_size: int = HISTORY_PAGE_SIZE,
     hide: str = HISTORY_DEFAULT_HIDE,
 ) -> HistoryPage:
-    now = now or datetime.now().astimezone()
+    now = now or local_now()
     entries, all_seconds_by_day = _day_entries(db, user_id, now)
     no_progress_labels = set(get_no_progress_category_labels(db))
     if hide == "watched_hidden":
@@ -177,4 +186,10 @@ def history_page(
         )
     days = {row.day for row in rows}
     seconds_by_day = {day: seconds for day, seconds in all_seconds_by_day.items() if day in days}
-    return HistoryPage(rows=rows, page=page, total_pages=total_pages, seconds_by_day=seconds_by_day)
+    return HistoryPage(
+        rows=rows,
+        page=page,
+        total_pages=total_pages,
+        seconds_by_day=seconds_by_day,
+        today=now.date(),
+    )

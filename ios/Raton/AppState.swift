@@ -11,6 +11,10 @@ final class AppState: ObservableObject {
 
     @Published private(set) var serverURL: URL?
     @Published private(set) var userID: Int?
+    /// The client for the stored server and user; nil until a server is chosen. The same instance
+    /// for as long as both stay the same: a client made on every read would open a new `URLSession`
+    /// (and new connections) each time a screen is drawn.
+    @Published private(set) var api: RatonAPI? = nil
 
     init() {
         let defaults = UserDefaults.standard
@@ -20,11 +24,11 @@ final class AppState: ObservableObject {
         // Also for an address saved before the extension existed.
         Self.sharedDefaults?.set(serverURL?.absoluteString, forKey: Self.serverKey)
         Self.sharedDefaults?.set(userID, forKey: Self.userKey)
+        refreshAPI()
     }
 
-    /// The client for the stored server and user; nil until a server is chosen.
-    var api: RatonAPI? {
-        serverURL.map { RatonAPI(baseURL: $0, userID: userID) }
+    private func refreshAPI() {
+        api = serverURL.map { RatonAPI(baseURL: $0, userID: userID) }
     }
 
     func setServer(_ url: URL) {
@@ -35,6 +39,7 @@ final class AppState: ObservableObject {
             UserDefaults.standard.removeObject(forKey: Self.userKey)
         }
         serverURL = url
+        if url != oldServer { refreshAPI() }
         UserDefaults.standard.set(url.absoluteString, forKey: Self.serverKey)
         Self.sharedDefaults?.set(url.absoluteString, forKey: Self.serverKey)
         if url != oldServer { Self.sharedDefaults?.removeObject(forKey: Self.userKey) }
@@ -42,7 +47,9 @@ final class AppState: ObservableObject {
     }
 
     func setUser(_ id: Int) {
+        let changed = id != userID
         userID = id
+        if changed { refreshAPI() }
         UserDefaults.standard.set(id, forKey: Self.userKey)
         Self.sharedDefaults?.set(id, forKey: Self.userKey)
         WidgetCenter.shared.reloadAllTimelines()
@@ -52,6 +59,7 @@ final class AppState: ObservableObject {
     func forgetServer() {
         serverURL = nil
         userID = nil
+        refreshAPI()
         UserDefaults.standard.removeObject(forKey: Self.serverKey)
         UserDefaults.standard.removeObject(forKey: Self.userKey)
     }

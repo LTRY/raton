@@ -473,10 +473,10 @@ def test_an_answer_whose_discussion_was_deleted_fails_instead_of_landing_elsewhe
     queued = llm_api.ask_library(
         LibraryQuestionCreate(question="Q ?"), BackgroundTasks(), db, user_id(db)
     )
-    llm_jobs.run_llm_job(queued.job_id)
     llm_api.delete_library_conversation(queued.conversation_id, db, user_id(db))
     db.get(LlmJob, queued.job_id).conversation_id = None  # ON DELETE SET NULL, as on PostgreSQL
     db.commit()
+    llm_jobs.run_llm_job(queued.job_id)
 
     status = llm_api.get_llm_job(queued.job_id, BackgroundTasks(), db, user_id(db))
 
@@ -645,7 +645,7 @@ def test_library_chat_backfills_profiles_once_after_the_job_is_done(monkeypatch)
 
     llm_jobs.run_llm_job(job.id)
 
-    assert statuses == ["done"]
+    assert statuses == ["applied"]
 
 
 def test_library_chat_does_not_backfill_when_no_channel_was_added(monkeypatch):
@@ -689,7 +689,7 @@ def test_a_failing_post_chat_backfill_does_not_propagate(monkeypatch):
 
     llm_jobs.run_llm_job(job.id)  # must not raise
 
-    assert db.query(LlmJob).one().status == "done"
+    assert db.query(LlmJob).one().status == "applied"
 
 
 def test_toolbox_records_a_label_then_a_result_for_each_tool_call(monkeypatch):

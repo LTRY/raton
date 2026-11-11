@@ -3,6 +3,9 @@
 They are read from the media volume, which only the back mounts. Audio and video honour
 `Range` (seek in a player); every path stored in the DB is checked to stay inside its folder,
 so a tampered row cannot serve another file.
+
+A stream lasts as long as the player keeps it open: the router releases the request's DB
+connection before any file is sent (`release_db_before_body`).
 """
 
 import mimetypes
@@ -26,7 +29,23 @@ from back.services.media.thumbnails import (
     thumbnail_variant_path,
 )
 
-router = APIRouter(prefix="/api", tags=["Médias"])
+
+def release_db_before_body(db: Session = Depends(get_db)):
+    """Give the request's DB connection back to the pool once the route has returned.
+
+    The session of `get_db` is otherwise closed only after the whole response has gone out, and
+    the couvre-feu guard of the `/api` router shares it: each open stream would hold one of the
+    pool's connections. A `scope="function"` dependency exits before the body is sent.
+    """
+    yield
+    db.close()
+
+
+router = APIRouter(
+    prefix="/api",
+    tags=["Médias"],
+    dependencies=[Depends(release_db_before_body, scope="function")],
+)
 
 IMAGE = {200: {"content": {"image/jpeg": {}}, "description": "L'image."}}
 SUBTITLES = {200: {"content": {"text/vtt": {}}, "description": "Les sous-titres WebVTT."}}

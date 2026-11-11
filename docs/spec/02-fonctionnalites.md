@@ -42,7 +42,8 @@ etant d'administration, voir [11 Interface HTML](11-interface-html.md),
   prompt systeme, `address_rule` dans `back/services/llm/prompts.py`) ; les
   repliques de l'accueil ne changent pas ;
 - **Temps d'ecran** : sa limite journaliere en minutes par type (videos,
-  shorts, podcasts, musique) ;
+  shorts, podcasts, musique) ; la journee va de minuit a minuit en heure
+  `Europe/Paris`, comme celles de l'Historique ;
 - **Couvre-feu** : voir ci-dessous.
 
 Le detail est dans [05 Modele de donnees](05-modele-de-donnees.md),

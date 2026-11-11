@@ -68,6 +68,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `files` | Outils de fichiers : nom de fichier sûr, taille et suppression d'un dossier, déplacement |
 | `raton_language` | Langage de Raton d'un utilisateur : tutoiement ou vouvoiement, surnom ; lu par le prompt du chat bibliothèque |
 | `curfew` | Couvre-feu d'un utilisateur : heures stockées, état à un instant donné, routes `/api` qu'il laisse ouvertes (`ensure_open`) |
+| `local_time` | Fuseau des utilisateurs (`Europe/Paris`) : l'heure qu'il est pour eux (`local_now`) et une date de la DB ramenée à ce fuseau (`local_datetime`) ; lu par le temps d'écran, l'Historique, les visites de Raton, le couvre-feu et le planificateur |
 | `job_log` | Une ligne du journal des jobs (`log_job`), les dernières lignes (`GET /api/jobs`) et les statuts après lesquels un job ne change plus |
 
 ### `youtube/`
@@ -194,9 +195,10 @@ web ; chacune ouvre sa propre session DB.
 | `downloads` | Tâches de fond : téléchargement manuel, relance du transcript, import de métadonnées d'une chaîne |
 | `download_requests` | Côté requête de ces tâches, partagé par les formulaires et `/api` : validation et mise en file depuis la page d'import (`queue_manual_download`), une fiche (`queue_media_download`, `queue_transcript_retry`), une chaîne (`queue_channel_metadata_import`, `queue_channel_catalog_sync`) ou les formats manquants d'une playlist (`queue_playlist_downloads`) ; import synchrone du partage iOS (`import_shared_video`) ; état (`job_status`) et arrêt (`cancel_job`) d'un job |
 | `playlists` | Import d'une playlist depuis son URL ou un CSV Google Takeout ; création de la playlist et mise en file (`queue_playlist_url_import`, `queue_playlist_csv_import`, `queue_playlist_refresh`) |
-| `llm_jobs` | Création (`enqueue_llm_job`) et exécution (`run_llm_job`) d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
-| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job et écriture de son résultat au premier poll (`resolve_llm_job`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
+| `llm_jobs` | Création (`enqueue_llm_job`), exécution (`run_llm_job`) et écriture du résultat, une seule fois (`apply_llm_job_result`), d'un `LlmJob`, indexation des notes qu'un `generate` vient d'écrire |
+| `llm_requests` | Une demande au LLM (notes d'une fiche, question sur une fiche, question au chat bibliothèque) : prompt et mise en file (`queue_*`), puis état du job (`resolve_llm_job`, qui n'écrit un résultat que s'il trouve le job encore `done`), appelés par `/api` (et par le repli sans JavaScript de la génération des notes) |
 | `backfills` | Rattrapages : profils de chaînes, nombres de vues, transcripts, index des notes, miniatures |
+| `interrupted` | Au démarrage, passe en `failed` les jobs qu'un redémarrage a coupés (`fail_interrupted_jobs`) |
 | `scheduler` | Planificateur APScheduler : scan, purge des médias, notes automatiques ; scan lancé à la main depuis `/settings` |
 
 Voir [13 Jobs, logs et planification](13-jobs-logs-planification.md).

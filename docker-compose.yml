@@ -2,6 +2,8 @@ services:
   db:
     container_name: raton-db
     image: pgvector/pgvector:pg16
+    # Back after a reboot or a crash; a `docker stop` by hand stays stopped.
+    restart: unless-stopped
     environment:
       POSTGRES_DB: raton
       POSTGRES_USER: raton
@@ -25,6 +27,7 @@ services:
       target: back
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -45,6 +48,14 @@ services:
       # The browser's writes come through the front with its Host: the same-origin check of the
       # back compares against it.
       APP_TRUSTED_ORIGINS: ${APP_TRUSTED_ORIGINS:-}
+    healthcheck:
+      # The schema is served by the app itself, without the database: it answers once uvicorn runs
+      # (after `alembic upgrade head`, hence the start period).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/openapi.json', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   # The pages (`front/`): no database, no media, no secret; it calls the API over HTTP.
   app:
@@ -53,8 +64,10 @@ services:
     build:
       context: .
       target: front
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       # Loopback only: the app has no authentication. Set APP_BIND=0.0.0.0 to open it to a trusted LAN.
       - "${APP_BIND:-127.0.0.1}:8000:8000"
@@ -69,6 +82,7 @@ services:
     build:
       context: .
       target: mcp
+    restart: unless-stopped
     depends_on:
       - api
     ports:

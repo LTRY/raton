@@ -42,6 +42,14 @@ ecritures (`back/core/same_origin.py`).
 
 L'utilisateur est nomme par l'en-tete `X-Raton-User` (son id), que
 `RatonAPI.swift`, le jumeau Swift de `front/api.py`, envoie sur chaque appel.
+`AppState` garde un seul `RatonAPI` (une seule `URLSession`, dont les connexions
+sont reutilisees) et ne le remplace que si le serveur ou l'utilisateur change.
+
+Les vignettes des listes sont demandees a la largeur que le back garde en copie
+(`GET /api/videos/{id}/thumbnail?w=`) : 640 pour une ligne de fiche et une tuile
+de short, 320 pour une ligne et une tuile de playlist. Seules les images larges
+comme l'ecran (zone du lecteur, pochette audio, grande tuile de short) prennent
+l'originale.
 
 `Info.plist` porte `NSAllowsLocalNetworking` et `NSAllowsArbitraryLoads`
 (l'URL est saisie par l'utilisateur, ce peut etre un nom de domaine du LAN),
@@ -227,13 +235,19 @@ continue quand on quitte la fiche ou qu'on verrouille l'ecran
 commandes de l'ecran verrouille (`MPNowPlayingInfoCenter`,
 `MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Une barre sous
 les onglets permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
+La position et la duree changent deux fois par seconde : elles sont dans un objet
+a part (`PlaybackClock`), que seules les barres de progression observent, pour
+que les ecrans qui lisent le lecteur ne soient pas redessines a chaque pas.
 Une video se met en pause en quittant sa fiche, sans etre dechargee : en revenant on voit l'image ou elle s'est arretee (pas la vignette) et la lecture repart de cet endroit.
 
 Il rapporte sa progression comme le JavaScript du front
 (`reportPlayback` dans `front/static/js/app.js`) : `POST
 /api/videos/{id}/activity` avec `{media_type, position_seconds,
-duration_seconds, watched_seconds}`, a la pause, a la fin et a l'arret du
-lecteur, si au moins une seconde a ete regardee. Les secondes regardees
+duration_seconds, watched_seconds}`, a la pause, a la fin, a l'arret du
+lecteur et toutes les 30 s pendant la lecture, si au moins une seconde a ete
+regardee. Sans l'envoi periodique, une app que iOS tue en arriere-plan perdait
+tout depuis la derniere pause ; le back regroupe les rapports d'une meme ecoute
+en une seule ligne de l'Historique (`docs/spec/08-medias-et-lecteurs.md`). Les secondes regardees
 s'accumulent par pas de moins de 5 s (un saut est une avance, pas du
 visionnage). Le Vu a 90 % est decide par le back. Si `sponsor_skip_enabled`, le lecteur saute les `skip_segments` que le back donne.
 

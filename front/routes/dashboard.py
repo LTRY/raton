@@ -1,8 +1,10 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from front.api import Api, ApiError, get_api
-from front.cards import history_days, local_today, screen_time_rings
+from front.cards import history_days, screen_time_rings
 from front.formatting import category_style_map
 from front.library import library_list_context, library_query, library_view_links
 from front.library_chat import library_chat_widget_config
@@ -91,7 +93,9 @@ def dashboard_history_page(request: Request, page: int = 1, api: Api = Depends(g
             "curfew_mode": curfew.active,
             "curfew": curfew,
             "current_history_path": current_request_path(request),
-            "history_days": history_days(history.rows, history.day_seconds, local_today()),
+            "history_days": history_days(
+                history.rows, history.day_seconds, date.fromisoformat(history.today)
+            ),
             "library_views": []
             if curfew.active
             else library_view_links(record(api.get("/library/views")), request),
