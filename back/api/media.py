@@ -23,6 +23,7 @@ from back.models.video import Video
 from back.services.channels.profile import channels_root
 from back.services.common.settings import get_media_root
 from back.services.ingest.identity import ensure_video_channel
+from back.services.media.channel_images import CHANNEL_IMAGE_WIDTHS, channel_image_variant
 from back.services.media.thumbnails import THUMBNAIL_WIDTHS, thumbnail_variant_path
 
 
@@ -77,7 +78,9 @@ def video_thumbnail(video_id: int, db: Session = Depends(get_db), w: int | None 
     return FileResponse(thumbnail, headers={"Cache-Control": "public, max-age=86400"})
 
 
-def channel_image_response(db: Session, channel_id: int, kind: str) -> FileResponse:
+def channel_image_response(
+    db: Session, channel_id: int, kind: str, width: int | None = None
+) -> FileResponse:
     channel = db.get(Channel, channel_id)
     stored = getattr(channel, f"{kind}_path", None) if channel else None
     if not stored:
@@ -89,6 +92,10 @@ def channel_image_response(db: Session, channel_id: int, kind: str) -> FileRespo
         local_media_path(str(channels_root(media_root))).resolve()
     ):
         raise HTTPException(status_code=404, detail="Image introuvable")
+    if width in CHANNEL_IMAGE_WIDTHS:
+        # The first request of a copy runs ffmpeg: the DB connection goes back to the pool first.
+        db.close()
+        image = channel_image_variant(image, width) or image
     return FileResponse(image, headers={"Cache-Control": "public, max-age=86400"})
 
 
@@ -97,8 +104,8 @@ def channel_image_response(db: Session, channel_id: int, kind: str) -> FileRespo
     response_class=FileResponse,
     responses={**IMAGE, **error_responses(404, 422)},
 )
-def channel_avatar(channel_id: int, db: Session = Depends(get_db)):
-    return channel_image_response(db, channel_id, "avatar")
+def channel_avatar(channel_id: int, db: Session = Depends(get_db), w: int | None = None):
+    return channel_image_response(db, channel_id, "avatar", w)
 
 
 @router.get(
@@ -106,8 +113,8 @@ def channel_avatar(channel_id: int, db: Session = Depends(get_db)):
     response_class=FileResponse,
     responses={**IMAGE, **error_responses(404, 422)},
 )
-def channel_banner(channel_id: int, db: Session = Depends(get_db)):
-    return channel_image_response(db, channel_id, "banner")
+def channel_banner(channel_id: int, db: Session = Depends(get_db), w: int | None = None):
+    return channel_image_response(db, channel_id, "banner", w)
 
 
 @router.get(

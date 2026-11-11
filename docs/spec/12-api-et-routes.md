@@ -662,7 +662,10 @@ et ne doit pas occuper une connexion du pool pendant ce temps.
   refuse de lire).
 - `GET /api/channels/{id}/avatar` et `/api/channels/{id}/banner` : l'image de
   profil (`Cache-Control: public, max-age=86400`) ; `404` si la chaine ou
-  l'image n'existe pas, ou si le chemin stocke sort de `_channels/`.
+  l'image n'existe pas, ou si le chemin stocke sort de `_channels/`. Le
+  parametre optionnel `w` (`320`, `640` ou `1280`) demande une copie reduite a
+  cette largeur ; toute autre valeur, ou une copie impossible, donne l'image
+  d'origine (voir `06-stockage-fichiers.md`).
 
 ### Scan
 

@@ -100,6 +100,7 @@ données de démo (`demo_seed`) ne sont pas un service, elles sont dans
 | `media_storage` | Purge quotidienne des fichiers des fiches Vu (sauf celles qu'un utilisateur a notées 4+ : `is_archived`), suppression d'un seul format, type de média d'après les chemins |
 | `storage` | Espace utilisé et marge restante sous le quota global pour les téléchargements automatiques |
 | `thumbnails` | Copies réduites de la miniature de chaque fiche |
+| `channel_images` | Copies réduites de l'avatar et de la bannière d'une chaîne, créées à la première demande |
 | `audio_extract` | Audio tiré d'une vidéo déjà téléchargée, sans nouveau téléchargement |
 
 ### `channels/`

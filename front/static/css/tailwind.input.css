@@ -189,12 +189,32 @@ a {
   display: none;
 }
 
+/* The label is a link, so only the rest of the summary opens the panel: the padding around the
+   caret makes that a target wide enough to click. */
+.nav-library-menu summary {
+  padding-right: 10px;
+}
+
 .nav-library-menu summary::after {
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-top: 5px solid currentColor;
   content: "";
-  margin-left: 7px;
+  margin-left: 10px;
+}
+
+/* Not a direct child of the nav: without this the label takes the global link colour and looks
+   current on every page. */
+.nav-library-menu summary a {
+  align-items: center;
+  color: inherit;
+  display: inline-flex;
+  min-height: 32px;
+}
+
+.nav-library-menu summary a:hover,
+.nav-library-menu summary a[aria-current="page"] {
+  color: var(--color-primary);
 }
 
 .nav-library-panel {
