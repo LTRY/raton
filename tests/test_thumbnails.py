@@ -13,11 +13,12 @@ from back.db.session import Base, get_db
 from back.main import app
 from back.models.channel import Channel
 from back.models.video import Video
+from back.services.media.channel_images import channel_image_variant
 from back.services.media.thumbnails import (
     THUMBNAIL_WIDTHS,
     backfill_video_thumbnails,
-    channel_image_variant,
     ensure_video_thumbnails,
+    resize_image,
     thumbnail_variant_path,
 )
 from tests.site import site_client
@@ -214,3 +215,30 @@ def test_channel_image_copy_is_made_once_and_smaller(db, tmp_path):
 
 def test_channel_image_copy_failure_gives_none(tmp_path):
     assert channel_image_variant(tmp_path / "missing.jpg", 640) is None
+
+
+def test_channel_image_that_is_not_a_jpeg_gets_no_copy(tmp_path):
+    # A JPEG copy would paint a transparent PNG's background black.
+    avatar = tmp_path / "avatar.png"
+    avatar.write_bytes(b"png-bytes")
+
+    assert channel_image_variant(avatar, 320) is None
+    assert not (tmp_path / "thumbs").exists()
+
+
+@needs_ffmpeg
+def test_two_copies_made_at_once_do_not_share_a_partial_file(db, tmp_path, monkeypatch):
+    _, folder = make_video(db, tmp_path, key="race")
+    partials = []
+    real_run = subprocess.run
+
+    def spy(command, **kwargs):
+        partials.append(command[-1])
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr("back.services.media.thumbnails.subprocess.run", spy)
+    resize_image(folder / "cover.jpg", folder / "thumbs" / "a.jpg", 320)
+    resize_image(folder / "cover.jpg", folder / "thumbs" / "a.jpg", 320)
+
+    assert len(set(partials)) == 2
+    assert sorted(path.name for path in (folder / "thumbs").iterdir()) == ["a.jpg"]

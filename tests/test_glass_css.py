@@ -179,3 +179,10 @@ def test_radii_use_the_scale():
     for match in re.finditer(r"^\s*border-radius: ([^;]+);", CSS, flags=re.MULTILINE):
         value = match.group(1).strip()
         assert value in allowed or "var(" in value or " " in value, f"border-radius: {value}"
+
+
+def test_library_menu_label_does_not_take_the_global_link_colour():
+    rule = CSS.split(".nav-library-menu summary a {", 1)[1].split("}", 1)[0]
+
+    assert "color: inherit;" in rule
+    assert '.nav-library-menu summary a[aria-current="page"]' in CSS

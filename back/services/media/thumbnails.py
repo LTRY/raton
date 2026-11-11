@@ -8,6 +8,7 @@ itself) never takes one for the original, and they go away with the folder.
 import logging
 import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 from sqlalchemy import select
@@ -29,8 +30,13 @@ def thumbnail_variant_path(folder: Path, width: int) -> Path:
 
 def resize_image(source: Path, target: Path, width: int) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
-    # Written next to the target then renamed, so a reader never sees a half-written file.
-    partial = target.with_name(f"{target.stem}.partial{target.suffix}")
+    # Written next to the target then renamed, so a reader never sees a half-written file. The name
+    # is unique per call: two requests making the same copy must not write into each other's file.
+    handle, name = tempfile.mkstemp(
+        dir=target.parent, prefix=f"{target.stem}.", suffix=f".partial{target.suffix}"
+    )
+    os.close(handle)
+    partial = Path(name)
     try:
         subprocess.run(
             [
@@ -57,22 +63,6 @@ def resize_image(source: Path, target: Path, width: int) -> None:
         os.replace(partial, target)
     finally:
         partial.unlink(missing_ok=True)
-
-
-def channel_image_variant(image: Path, width: int) -> Path | None:
-    """The copy of a channel's avatar or banner at `width`, made on the first request.
-
-    Stored in a `thumbs/` subfolder next to the image, named after it, and redone when the image is
-    newer. None when it cannot be made (no ffmpeg, corrupt image): the caller serves the original.
-    """
-    target = image.parent / THUMBNAILS_DIRNAME / f"{image.stem}-{width}.jpg"
-    try:
-        if not target.is_file() or target.stat().st_mtime < image.stat().st_mtime:
-            resize_image(image, target, width)
-    except (OSError, subprocess.SubprocessError) as exc:
-        logger.warning("channel image copy failed for %s: %s", image, exc)
-        return None
-    return target
 
 
 def ensure_video_thumbnails(video: Video) -> bool:

@@ -255,3 +255,10 @@ def test_channels_page_cost_does_not_grow_with_the_channels(db):
 
     assert response.status_code == 200
     assert len(db.statements) == one
+
+
+def test_library_menu_label_links_to_nouveautes_and_is_current_only_in_the_library(db):
+    label = '<summary><a href="/dashboard/nouveautes" {}>Bibliothèque</a></summary>'
+
+    assert label.format("") in site_client().get("/channels").text
+    assert label.format('aria-current="page"') in site_client().get("/dashboard/nouveautes").text

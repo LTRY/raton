@@ -455,6 +455,35 @@ def test_avatar_and_banner_routes_serve_the_stored_files(tmp_path):
     assert avatar.headers["cache-control"] == "public, max-age=86400"
 
 
+def test_avatar_route_serves_the_reduced_copy_or_falls_back_to_the_original(monkeypatch, tmp_path):
+    client, db, channel = make_client(tmp_path)
+    folder = tmp_path / "_channels" / "UC1"
+    (folder / "thumbs").mkdir(parents=True)
+    (folder / "avatar.jpg").write_bytes(b"jpg-bytes")
+    (folder / "thumbs" / "avatar-320.jpg").write_bytes(b"small-bytes")
+    channel.avatar_path = "_channels/UC1/avatar.jpg"
+    db.commit()
+    asked = []
+
+    def fake_variant(image, width):
+        asked.append((image.name, width))
+        # 320 has a copy; 640 stands for a copy that could not be made.
+        return folder / "thumbs" / "avatar-320.jpg" if width == 320 else None
+
+    monkeypatch.setattr("back.api.media.channel_image_variant", fake_variant)
+    try:
+        small = client.get(f"/api/channels/{channel.id}/avatar?w=320")
+        failed = client.get(f"/api/channels/{channel.id}/avatar?w=640")
+        unknown = client.get(f"/api/channels/{channel.id}/avatar?w=999")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert small.status_code == 200 and small.content == b"small-bytes"
+    assert failed.status_code == 200 and failed.content == b"jpg-bytes"
+    assert unknown.status_code == 200 and unknown.content == b"jpg-bytes"
+    assert asked == [("avatar.jpg", 320), ("avatar.jpg", 640)]
+
+
 def test_images_are_written_and_served_through_the_dev_pc_prefix_translation(monkeypatch, tmp_path):
     from pathlib import Path
     from types import SimpleNamespace

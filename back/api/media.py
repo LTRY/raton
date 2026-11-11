@@ -23,11 +23,8 @@ from back.models.video import Video
 from back.services.channels.profile import channels_root
 from back.services.common.settings import get_media_root
 from back.services.ingest.identity import ensure_video_channel
-from back.services.media.thumbnails import (
-    THUMBNAIL_WIDTHS,
-    channel_image_variant,
-    thumbnail_variant_path,
-)
+from back.services.media.channel_images import CHANNEL_IMAGE_WIDTHS, channel_image_variant
+from back.services.media.thumbnails import THUMBNAIL_WIDTHS, thumbnail_variant_path
 
 
 def release_db_before_body(db: Session = Depends(get_db)):
@@ -95,8 +92,9 @@ def channel_image_response(
         local_media_path(str(channels_root(media_root))).resolve()
     ):
         raise HTTPException(status_code=404, detail="Image introuvable")
-    if width in THUMBNAIL_WIDTHS:
-        # A card shows the image at 50-400 px while YouTube's originals are up to 2560 px wide.
+    if width in CHANNEL_IMAGE_WIDTHS:
+        # The first request of a copy runs ffmpeg: the DB connection goes back to the pool first.
+        db.close()
         image = channel_image_variant(image, width) or image
     return FileResponse(image, headers={"Cache-Control": "public, max-age=86400"})
 
