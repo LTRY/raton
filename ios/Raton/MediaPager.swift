@@ -26,7 +26,7 @@ struct MediaModePill: View {
 }
 
 /// Video and audio side by side like the web's carousel: the slides follow the finger, then settle on the
-/// nearer one. On the video only the upper part starts a swipe, so the native player keeps its seek bar; on the audio the foot is left to the progress bar.
+/// nearer one. The foot of a slide never starts a swipe: it holds the progress bar (the native one on the video).
 struct MediaPager<Video: View, Audio: View>: View {
     let mode: MediaKind
     let onSelect: (MediaKind) -> Void
@@ -34,6 +34,8 @@ struct MediaPager<Video: View, Audio: View>: View {
     @ViewBuilder let audio: () -> Audio
     @State private var drag: CGFloat = 0
     @State private var dragging = false
+    private static var space: String { "media-pager" }
+    private static var foot: CGFloat { 72 }
 
     var body: some View {
         Color.clear
@@ -47,14 +49,15 @@ struct MediaPager<Video: View, Audio: View>: View {
                     }
                     .offset(x: (mode == .audio ? -width : 0) + drag)
                     .simultaneousGesture(
-                        DragGesture(minimumDistance: 12)
+                        // Measured in the pager's own space: the slides move under the finger, so a local
+                        // space would shrink the translation as they follow it.
+                        DragGesture(minimumDistance: 12, coordinateSpace: .named(Self.space))
                             .onChanged { value in
                                 let dx = value.translation.width
                                 guard abs(dx) > abs(value.translation.height) || dragging else { return }
                                 if !dragging {
-                                    guard mode == .audio || value.startLocation.y < 160 else { return }
-                                    // The audio slide's progress bar sits at its foot: scrubbing it must not swipe to the video.
-                                    guard mode == .video || value.startLocation.y < proxy.size.height - 64 else { return }
+                                    // The progress bar sits at the foot: scrubbing it must not swipe to the other slide.
+                                    guard value.startLocation.y < proxy.size.height - Self.foot else { return }
                                     dragging = true
                                 }
                                 // Rubber band past the first and last slides.
@@ -75,6 +78,7 @@ struct MediaPager<Video: View, Audio: View>: View {
                     )
                 }
             }
+            .coordinateSpace(name: Self.space)
             .clipped()
     }
 }
