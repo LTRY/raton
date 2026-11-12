@@ -58,10 +58,11 @@ struct FicheView: View {
         .toolbar(.hidden, for: .navigationBar)
         .task { await open() }
         .onAppear { onScreen = true }
-        // The video is tied to this screen; audio goes on.
+        // Audio goes on; the video pauses where it is and stays loaded, so coming back resumes it
+        // (stopping it here made any stray exit of the screen start the video over).
         .onDisappear {
             onScreen = false
-            if player.track?.videoID == videoID && player.track?.kind == .video { player.stop() }
+            if player.track?.videoID == videoID && player.track?.kind == .video { player.pause() }
         }
         .navigationDestination(for: ChannelRoute.self) { ChannelLoader(channelID: $0.id) }
         .sheet(isPresented: $showCategories) {
