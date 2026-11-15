@@ -15,7 +15,7 @@ final class PlaybackClock: ObservableObject {
 /// `POST /api/videos/{id}/activity` with the seconds actually watched since the last report: on
 /// pause, at the end, when the player is torn down, and every `reportInterval` while it plays.
 final class PlayerController: ObservableObject {
-    struct Track: Equatable {
+    struct Track: Hashable {
         let videoID: Int
         let kind: MediaKind
     }
@@ -63,6 +63,10 @@ final class PlayerController: ObservableObject {
     private var skipSegments: [SkipSegment] = []
     // False in free listening: nothing is written to the history.
     private var reportsActivity = true
+    // Where each file was left when its player was released. The fiche read from the back may still
+    // hold an older resume position (the report is sent in the background), so playing the same file
+    // again starts from here first: it never starts over because of a stale fiche.
+    private var leftAt: [Track: Double] = [:]
 
     init() {
         configureRemoteCommands()
@@ -84,8 +88,9 @@ final class PlayerController: ObservableObject {
         guard let path else { return }
         let local = kind == .audio ? OfflineStore.shared.localAudio(for: detail.id) : nil
         var start = startAt
-        if start == nil, let resume = detail.resumePositions[kind.rawValue]?.positionSeconds, resume >= 3 {
-            start = resume
+        if start == nil {
+            let resume = leftAt[newTrack] ?? detail.resumePositions[kind.rawValue]?.positionSeconds
+            if let resume, resume >= 3 { start = resume }
         }
         begin(Track(videoID: detail.id, kind: kind), path: path, title: detail.title,
               artist: detail.channel?.name, duration: detail.durationSeconds ?? 0,
@@ -150,6 +155,7 @@ final class PlayerController: ObservableObject {
     /// Reports the last progress and releases the player, keeping the queue.
     private func release() {
         guard let player else { return }
+        rememberPosition(of: player)
         trackWatchedTime()
         reportActivity()
         if let timeObserver { player.removeTimeObserver(timeObserver) }
@@ -162,6 +168,17 @@ final class PlayerController: ObservableObject {
         track = nil
         isPlaying = false
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+    }
+
+    /// Keeps where the loaded file stands, unless it is at its very start or end (nothing to resume).
+    private func rememberPosition(of player: AVPlayer) {
+        guard let track else { return }
+        let now = player.currentTime().seconds
+        if now.isFinite, now >= 3, duration <= 0 || now < duration - 5 {
+            leftAt[track] = now
+        } else {
+            leftAt[track] = nil
+        }
     }
 
     // MARK: Controls

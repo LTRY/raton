@@ -162,10 +162,10 @@ La fiche :
   sont cote a cote dans un carrousel, comme sur le web : elles suivent le doigt, avec un
   effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
   ou un geste rapide suffit) ; le bouton video / audio du haut anime le meme
-  deplacement ; sur la video seule la moitie haute lance le glissement, pour laisser la
-  barre de progression native au sien, et sur l'audio d'une playlist le pied de la
-  carte (la barre de progression) ne lance jamais le glissement : regler l'audio ne
-  bascule pas vers la video ;
+  deplacement ; le pied d'un volet (72 pt du bas : la barre de
+  progression native de la video, celle de l'audio d'une playlist) ne lance jamais le
+  glissement : regler la lecture ne bascule pas vers l'autre volet ; le geste est mesure
+  dans l'espace du carrousel, pas dans celui des volets qui bougent sous le doigt ;
 - au bout du fichier, le bouton lecture (de la fiche, de l'ecran verrouille ou de la playlist) relit le fichier depuis le debut ;
 - cote audio (`AudioSlide.swift`), la fiche reprend la carte du front sur telephone :
   carte 16:9 sur un degrade radial terracotta vers brun, sans pastille ni bouton
@@ -241,6 +241,7 @@ La position et la duree changent deux fois par seconde : elles sont dans un obje
 a part (`PlaybackClock`), que seules les barres de progression observent, pour
 que les ecrans qui lisent le lecteur ne soient pas redessines a chaque pas.
 Une video se met en pause en quittant sa fiche, sans etre dechargee : en revenant on voit l'image ou elle s'est arretee (pas la vignette) et la lecture repart de cet endroit.
+Le lecteur retient aussi ou chaque fichier a ete laisse (en dehors des 3 premieres et des 5 dernieres secondes) : jouer de nouveau ce fichier, apres un changement video / audio par exemple, repart de la, et non de la position de reprise de la fiche, que le rapport en arriere-plan n'a pas encore mise a jour.
 
 Il rapporte sa progression comme le JavaScript du front
 (`reportPlayback` dans `front/static/js/app.js`) : `POST
