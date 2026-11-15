@@ -1138,11 +1138,11 @@ wheels = [
 
 [[package]]
 name = "webvtt-py"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b9/86/4b9b62caedcdf76b7ac081a5594940e296a0b36dfd2ef5b5a27db65ac8e7/webvtt_py-0.7.0.tar.gz", hash = "sha256:4f13906917f2623d84d6e6b8741df9721b70dd30c74f1d50b2b56c90670afe9a", size = 118930, upload-time = "2026-11-01T20:41:57.014Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/22/83/0f8bbcf97562172eeba23e133626f9c54125c545833b368ead9aeb20366e/webvtt_py-0.8.0.tar.gz", hash = "sha256:86c4e14ff787975bc29345b896ea156c26c24fa8a3e558a80eb8e575bb81d9bb", size = 156492, upload-time = "2026-11-08T20:21:29.74Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/22/abc438e26a1d34072d088539c306ff1135bb83a7af108c96c8b4c3360baa/webvtt_py-0.7.0-py3-none-any.whl", hash = "sha256:913cc0283b4b706fa52deaa48189d45c1d9ed630246f8ad64396718d608b93a8", size = 47115, upload-time = "2026-11-01T20:41:55.451Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/3d/d0e2e3f6b0026ccc528fa4f2aa075ebe733a0242106cb518c7077aadc6ae/webvtt_py-0.8.0-py3-none-any.whl", hash = "sha256:1780a77dd04cbcf69b323e58fd3148a2409c224376d3bafda01ef9cdfdd78524", size = 61443, upload-time = "2026-11-08T20:21:28.302Z" },
 ]
 
 [[package]]
