@@ -224,3 +224,12 @@ struct PageHeader<Trailing: View>: View {
         .padding(.bottom, 12)
     }
 }
+
+// Only vertical scrolling moves a page: the swipe from the left edge that carries the page back is
+// switched off (every screen has its own back button).
+extension UINavigationController {
+    open override func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.isEnabled = false
+    }
+}

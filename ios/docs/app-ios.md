@@ -154,7 +154,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   les tuiles de playlist entrent en fondu depuis 14 pt plus bas, decalees de
   50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Un toucher joue d'abord le survol du web (260 ms) puis ouvre la playlist ; un doigt qui reste pose le joue aussi, apres 90 ms ; un doigt qui glisse pour defiler ne le declenche pas. Ce survol (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
   « Reduire les animations ».
-- **Retour par le bord gauche** : balayer depuis le bord gauche de l'ecran ramene a la page d'avant, comme dans les apps d'iOS, en plus du bouton de retour de chaque ecran. Les pages cachent la barre de navigation, ce qui coupe ce geste : le controleur de navigation en redevient le delegue (`BackSwipe.swift`). Le geste ne part jamais au-dessus d'un lecteur (le carrousel video / audio, la barre de progression de l'audio : `blocksBackSwipe()`), ou le doigt regle la lecture ou change de volet ; il ne fait rien sur la page de base d'un onglet. Le balayage horizontal au milieu de la page (iOS 26) reste coupe : seul le bord ramene en arriere.
+- **Defilement vertical seulement** : le balayage depuis le bord gauche qui ramene en arriere en emportant la page est coupe (`UINavigationController`, `RatonApp.swift`) ; chaque ecran a son bouton de retour.
 - Le Liquid Glass sert a la barre d'onglets seulement (voir « Barre d'onglets ») ; les cartes, boutons et feuilles gardent les surfaces blanches du web.
 
 ## Ecrans
