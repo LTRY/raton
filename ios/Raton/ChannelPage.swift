@@ -78,7 +78,7 @@ struct ChannelView: View {
                 .refreshable { await reload(api) }
                 .task {
                     await loadDetail(api)
-                    await reload(api)
+                    await model.refresh(api: api, search: search)
                 }
                 .onChange(of: model.filters) { _ in Task { await reload(api) } }
                 .sheet(isPresented: $showCategories) {

@@ -380,8 +380,12 @@ struct FicheView: View {
         guard let api = state.api else { return }
         do {
             let loaded: VideoDetail = try await api.get("/api/videos/\(videoID)")
+            // The side is chosen once: coming back to the fiche (its tab shown again, a page pushed over
+            // it left) reads it again and must not flip an audio being listened to back to the video.
+            if detail == nil {
+                mode = loaded.mediaUrls.video != nil || loaded.mediaUrls.audio == nil ? .video : .audio
+            }
             detail = loaded
-            mode = loaded.mediaUrls.video != nil || loaded.mediaUrls.audio == nil ? .video : .audio
             // Opening the fiche is what takes it out of the Nouveautés.
             let _: VideoState? = try? await api.post("/api/videos/\(videoID)/open")
         } catch {

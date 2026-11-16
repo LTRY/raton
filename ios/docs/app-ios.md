@@ -90,10 +90,15 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   encart de zone de securite pose a la racine (`safeAreaInset`) se comptait
   autrement dans le simulateur et sur un iPhone : le bas de la page restait
   derriere le mini-lecteur. Une nouvelle page a defilement l'appelle ; une feuille
-  (`sheet`) n'en a pas besoin. La page change avec
-  l'onglet (`.id`). Toucher une icone, celle de l'onglet courant comprise,
-  ramene a la page de base de l'onglet : les piles de navigation sont videes
-  (une fiche ouverte depuis la Bibliotheque ou une page de chaine est quittee).
+  (`sheet`) n'en a pas besoin. Les pages des
+  onglets sont dans le `TabView` du systeme, dont la barre est cachee sous la
+  notre : un onglet est construit a sa premiere visite puis garde. Changer
+  d'onglet et y revenir retrouve donc la page ou on l'a laissee (defilement,
+  recherche, filtres, fiche ou page de chaine ouverte), et un onglet cache est
+  hors de l'ecran et de VoiceOver. Toucher l'icone de l'onglet deja affiche
+  ramene a sa page de base, en haut : cet onglet est reconstruit (`.id`) et sa
+  pile de navigation videe. L'Accueil fait exception : il est reconstruit a
+  chaque visite, pour que Raton dise une nouvelle ligne.
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
   la forme et de la largeur de la barre d'onglets, posee 6 pt au-dessus, avec pause/lecture a gauche,
@@ -105,12 +110,22 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   d'iOS (`Font.raton`), plafonne a `xxxLarge` a la racine pour que les lignes
   et pastilles tiennent ; les cibles de toucher font 44 pt au moins (les cinq
   etoiles se partagent la ligne) ; un retour haptique leger accompagne le
-  changement d'onglet, les cloches, les etoiles et la bascule « tout voir » ;
-  le changement d'onglet se fait en fondu de 0,15 s. Pas de mode sombre : le
+  changement d'onglet, les cloches, les etoiles et la bascule « tout voir ». Pas de mode sombre : le
   theme est clair uniquement, comme le front (`docs/spec/11-interface-html.md`).
 - **Chargement et erreurs** : une liste montre une roue (`LoadingRow`) jusqu'a sa
   premiere reponse, puis « Aucune ... » si elle est vide ; une erreur de reseau
   ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`).
+- **Une liste garde sa place** (Bibliotheque, Nouveautes, fiches d'une chaine,
+  Chaines, Historique) : revenir sur la page (retour d'une fiche, retour sur
+  l'onglet) ou agir sur une ligne (Vu, Indesiree) relit toutes les pages deja
+  affichees (`refresh`), pas seulement la premiere ; la liste garde sa longueur
+  et l'ecran sa position, et c'est toujours le back qui dit ce que la liste
+  contient. Si cette relecture echoue, la liste reste telle quelle. Une
+  recherche, un filtre, un tri ou tirer pour rafraichir repartent de la
+  premiere page (`reload`). Chaque lecture porte un numero : une reponse qui
+  arrive apres le depart d'une lecture plus recente (deux filtres changes coup
+  sur coup) est ignoree, et une lecture annulee parce que la page est quittee
+  n'affiche pas d'erreur.
 - **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
   le retour et les menus, lignes de liste pleine largeur a vignette a gauche
   (duree, barre de progression), cartes blanches pour les chaines et les
@@ -155,7 +170,7 @@ La fiche :
 - ouvrir une fiche appelle `POST .../open` : c'est ce qui retire le label
   Nouveau, comme la page du front ;
 - le selecteur video / audio suit `media_urls` (les deux fichiers peuvent
-  coexister) ; sans fichier, un bouton de telechargement (qualite au choix pour
+  coexister) ; le cote affiche est choisi a l'ouverture de la fiche (video s'il y en a une) et la relire en y revenant ne le change pas ; sans fichier, un bouton de telechargement (qualite au choix pour
   la video) lance `POST .../media/{type}/download` puis relit la fiche jusqu'a
   l'arrivee du fichier, puis le lance tout de suite s'il est encore sur la fiche et du
   bon cote (video ou audio) ; si l'on a quitte la fiche, la lecture ne demarre pas ; le menu supprime un fichier ; la video et la carte audio
@@ -223,7 +238,8 @@ Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Ra
 ## Tests
 
 `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
-un doigt (XCUITest). Il lui faut le back et le front de demo (`make demo`, front
+un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
+qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le back et le front de demo (`make demo`, front
 sur `localhost:8000`) ; l'app y est pointee par les arguments de lancement
 `-serverURL` et `-userID`. Lancer :
 `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`.

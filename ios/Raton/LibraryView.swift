@@ -2,6 +2,7 @@ import SwiftUI
 
 /// `GET /api/library`: the Bibliothèque (every fiche), or one channel's fiches, 50 per page, with the
 /// search box; what the list leaves out (Vu, Indésirée) is the back's default.
+@MainActor
 final class LibraryModel: ObservableObject {
     @Published var items: [VideoCard] = []
     @Published var total = 0
@@ -14,6 +15,8 @@ final class LibraryModel: ObservableObject {
     private var page = 0
     private var totalPages = 1
     private var loading = false
+    // Bumped by every read of the list: an answer that comes back after a newer read started is dropped.
+    private var generation = 0
     let channelID: Int?
     // The Nouveautés: the fiches of the followed channels, newest publication first.
     let followed: Bool
@@ -34,19 +37,49 @@ final class LibraryModel: ObservableObject {
         return items + filters.queryItems
     }
 
+    /// Reads the list from its first page: a new search, sort or filter, or a pull to refresh.
     func reload(api: RatonAPI, search: String) async {
+        await read(pages: 1, api: api, search: search, quiet: false)
+    }
+
+    /// Reads again every page already shown, so the list keeps its length and the page its place:
+    /// after a row's action, or when the page comes back on screen. The first time, it is `reload`.
+    func refresh(api: RatonAPI, search: String) async {
+        await read(pages: loaded ? page : 1, api: api, search: search, quiet: loaded)
+    }
+
+    /// `quiet` leaves the list as it is when the call fails: rows a little old beat an error over a
+    /// list that was fine.
+    private func read(pages: Int, api: RatonAPI, search: String, quiet: Bool) async {
+        generation += 1
+        let mine = generation
         do {
-            let reply: LibraryReply = try await api.get("/api/library", items: query(page: 1, search: search))
-            items = reply.items
-            total = reply.total
-            counts = reply.counts ?? [:]
-            exploreNextPage = reply.exploreNextPage ?? 1
-            explorePageSize = reply.explorePageSize ?? 25
-            page = reply.page
-            totalPages = reply.totalPages
+            var fresh: [VideoCard] = []
+            var first: LibraryReply?
+            var last: LibraryReply?
+            for number in 1...max(pages, 1) {
+                let reply: LibraryReply = try await api.get("/api/library", items: query(page: number, search: search))
+                // A newer read has started (another filter, another search): this answer is out of date.
+                guard mine == generation else { return }
+                let known = Set(fresh.map(\.id))
+                fresh += reply.items.filter { !known.contains($0.id) }
+                first = first ?? reply
+                last = reply
+                if reply.page >= reply.totalPages { break }
+            }
+            guard let first, let last else { return }
+            items = fresh
+            total = first.total
+            counts = first.counts ?? [:]
+            exploreNextPage = first.exploreNextPage ?? 1
+            explorePageSize = first.explorePageSize ?? 25
+            page = last.page
+            totalPages = last.totalPages
             errorMessage = nil
         } catch {
-            if !(error is CancellationError) { errorMessage = error.localizedDescription }
+            // A page left while it loads cancels the call: not an error to show, and not a first load done.
+            guard mine == generation, !Task.isCancelled else { return }
+            if !quiet { errorMessage = error.localizedDescription }
         }
         loaded = true
     }
@@ -55,15 +88,18 @@ final class LibraryModel: ObservableObject {
         guard card.id == items.last?.id, page < totalPages, !loading else { return }
         loading = true
         defer { loading = false }
+        let mine = generation
         do {
             let reply: LibraryReply = try await api.get(
                 "/api/library", items: query(page: page + 1, search: search))
+            // The list was read again meanwhile: this page belongs to the old one.
+            guard mine == generation else { return }
             let known = Set(items.map(\.id))
             items += reply.items.filter { !known.contains($0.id) }
             page = reply.page
             totalPages = reply.totalPages
         } catch {
-            errorMessage = error.localizedDescription
+            if mine == generation, !Task.isCancelled { errorMessage = error.localizedDescription }
         }
     }
 }
@@ -78,7 +114,7 @@ struct VideoList: View {
     // The shorts of a channel page are tiles, not rows.
     var shorts = false
 
-    /// The "⋮" of a row: Vu and Indésirée, the same two toggles as the fiche, then the list is read again.
+    /// The "⋮" of a row: Vu and Indésirée, the same two toggles as the fiche, then the pages shown are read again.
     private func rowMenu(_ card: VideoCard) -> some View {
         Menu {
             Button {
@@ -103,7 +139,7 @@ struct VideoList: View {
 
     private func setState(_ card: VideoCard, _ state: String) async {
         let _: VideoState? = try? await api.put("/api/videos/\(card.id)/list-state", body: ["state": state])
-        await model.reload(api: api, search: search)
+        await model.refresh(api: api, search: search)
     }
 
     var body: some View {
@@ -190,9 +226,7 @@ struct LibraryView: View {
                 }
                 .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
-                .task {
-                    await model.reload(api: api, search: search)
-                }
+                .task { await model.refresh(api: api, search: search) }
                 .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
                 .navigationDestination(isPresented: $showNouveautes) { NouveautesView(back: true) }

@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 final class ChannelsModel: ObservableObject {
     @Published var items: [ChannelItem] = []
     @Published var count = 0
@@ -8,6 +9,8 @@ final class ChannelsModel: ObservableObject {
     private var page = 0
     private var totalPages = 1
     private var loading = false
+    // Bumped by every read of the list: an answer that comes back after a newer read started is dropped.
+    private var generation = 0
 
     // The web's defaults: only the rated channels, by last media played.
     @Published var ratedOnly = true
@@ -19,16 +22,45 @@ final class ChannelsModel: ObservableObject {
         return query
     }
 
+    /// Reads the list from its first page: a new search, sort or filter, or a pull to refresh.
     func reload(api: RatonAPI, search: String) async {
+        await read(pages: 1, api: api, search: search, quiet: false)
+    }
+
+    /// Reads again every page already shown, so the page keeps its place when it comes back on screen.
+    /// The first time, it is `reload`.
+    func refresh(api: RatonAPI, search: String) async {
+        await read(pages: loaded ? page : 1, api: api, search: search, quiet: loaded)
+    }
+
+    /// `quiet` leaves the list as it is when the call fails.
+    private func read(pages: Int, api: RatonAPI, search: String, quiet: Bool) async {
+        generation += 1
+        let mine = generation
         do {
-            let reply: ChannelsReply = try await api.get("/api/channels", query: query(page: 1, search: search))
-            items = reply.items
-            count = reply.channelCount
-            page = reply.page
-            totalPages = reply.totalPages
+            var fresh: [ChannelItem] = []
+            var first: ChannelsReply?
+            var last: ChannelsReply?
+            for number in 1...max(pages, 1) {
+                let reply: ChannelsReply = try await api.get("/api/channels", query: query(page: number, search: search))
+                // A newer read has started (another sort, another search): this answer is out of date.
+                guard mine == generation else { return }
+                let known = Set(fresh.map(\.id))
+                fresh += reply.items.filter { !known.contains($0.id) }
+                first = first ?? reply
+                last = reply
+                if reply.page >= reply.totalPages { break }
+            }
+            guard let first, let last else { return }
+            items = fresh
+            count = first.channelCount
+            page = last.page
+            totalPages = last.totalPages
             errorMessage = nil
         } catch {
-            if !(error is CancellationError) { errorMessage = error.localizedDescription }
+            // A page left while it loads cancels the call: not an error to show, and not a first load done.
+            guard mine == generation, !Task.isCancelled else { return }
+            if !quiet { errorMessage = error.localizedDescription }
         }
         loaded = true
     }
@@ -37,8 +69,9 @@ final class ChannelsModel: ObservableObject {
         guard channel.id == items.last?.id, page < totalPages, !loading else { return }
         loading = true
         defer { loading = false }
+        let mine = generation
         if let reply: ChannelsReply = try? await api.get(
-            "/api/channels", query: query(page: page + 1, search: search)) {
+            "/api/channels", query: query(page: page + 1, search: search)), mine == generation {
             let known = Set(items.map(\.id))
             items += reply.items.filter { !known.contains($0.id) }
             page = reply.page
@@ -87,7 +120,7 @@ struct ChannelsView: View {
                 }
                 .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
-                .task { await model.reload(api: api, search: search) }
+                .task { await model.refresh(api: api, search: search) }
                 .sheet(isPresented: $showAdd) {
                     AddChannelSheet(api: api) { Task { await model.reload(api: api, search: search) } }
                 }
