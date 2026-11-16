@@ -138,7 +138,7 @@ struct ChannelView: View {
     @ViewBuilder
     private func banner(_ api: RatonAPI) -> some View {
         if let path = detail?.bannerUrl {
-            AsyncImage(url: api.url(path)) { image in
+            CachedImage(url: api.url(path)) { image in
                 image.resizable().scaledToFill()
             } placeholder: { bannerFallback }
         } else {
@@ -157,7 +157,7 @@ struct ChannelView: View {
         return ZStack {
             Circle().fill(Theme.text)
             if let path = detail?.avatarUrl ?? channel.avatarUrl {
-                AsyncImage(url: api.url(path)) { image in
+                CachedImage(url: api.url(path)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Color.clear }
                 .clipShape(Circle())
@@ -245,6 +245,7 @@ struct ChannelView: View {
         }
         .frame(maxWidth: .infinity).frame(height: 48)
         .surface(in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .ratingAccessibility(rating)
     }
 
     private func moreMenu(_ api: RatonAPI) -> some View {
@@ -403,7 +404,7 @@ struct ChannelView: View {
             EmptyMessage(text: "Aucun résultat pour « \(search) ».")
         } else {
             VStack(spacing: 12) {
-                AsyncImage(url: api.url("/static/img/raccoon-empty.png")) { image in
+                CachedImage(url: api.url("/static/img/raccoon-empty.png")) { image in
                     image.resizable().scaledToFit()
                 } placeholder: { Color.clear }
                 .frame(width: 130, height: 175)
@@ -454,7 +455,12 @@ struct ChannelView: View {
     }
 
     private func refreshProfile(_ api: RatonAPI) async {
-        let _: QueuedJob? = try? await api.post("/api/channels/\(channel.id)/refresh-profile")
+        do {
+            let _: QueuedJob = try await api.post("/api/channels/\(channel.id)/refresh-profile")
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
         notice = "Rafraîchissement du profil lancé."
         try? await Task.sleep(nanoseconds: 6_000_000_000)
         await loadDetail(api)
@@ -488,13 +494,8 @@ struct ChannelView: View {
             let job: QueuedJob = try await api.post(
                 "/api/channels/\(channel.id)/import-metadata",
                 body: ["page": page, "section": model.filters.section])
-            for _ in 0..<80 {
-                try await Task.sleep(nanoseconds: 3_000_000_000)
-                let progress: JobProgress = try await api.get("/api/jobs/\(job.jobId)")
-                if progress.done {
-                    if progress.status == "failed" { errorMessage = progress.message }
-                    break
-                }
+            if let progress = try await api.waitForJob(job.jobId, seconds: 240), progress.status == "failed" {
+                errorMessage = progress.message ?? "L'import a échoué."
             }
             await reload(api)
         } catch {

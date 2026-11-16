@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Moi"
+    },
+    {
+      "id": 2,
+      "name": "Invité"
+    }
+  ],
+  "current_user_id": 1
+}

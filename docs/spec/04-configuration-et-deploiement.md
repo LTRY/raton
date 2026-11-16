@@ -308,6 +308,10 @@ scripts lances par la page restent donc en mode `100755` dans git. Comme le rest
 d'authentification : toute machine du reseau local peut redeployer la vraie
 instance (voir [15 Securite](15-securite.md), « Hypothese LAN »).
 
+Un autre workflow, `ios.yml`, ne tourne que quand `ios/` change : il genere le
+projet Xcode (XcodeGen), compile l'app iOS et lance ses tests unitaires sur un
+runner macOS (image `xcode-27`, voir `ios/docs/app-ios.md`, « Tests »).
+
 Un workflow separe, `pr-title.yml`, valide le titre de chaque PR avec
 `scripts/check_pr_title.py` (regles de « Conventions de nommage des PR »
 ci-dessous ; les PR de Dependabot sont ignorees). Les regles sont testees dans

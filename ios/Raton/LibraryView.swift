@@ -138,7 +138,9 @@ struct VideoList: View {
     }
 
     private func setState(_ card: VideoCard, _ state: String) async {
-        let _: VideoState? = try? await api.put("/api/videos/\(card.id)/list-state", body: ["state": state])
+        do {
+            let _: VideoState = try await api.put("/api/videos/\(card.id)/list-state", body: ["state": state])
+        } catch { Toasts.shared.show(error) }
         await model.refresh(api: api, search: search)
     }
 
@@ -229,6 +231,13 @@ struct LibraryView: View {
                 .task { await model.refresh(api: api, search: search) }
                 .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
+                // The Nouveautés widget's link pushes this route (`RootView`).
+                .navigationDestination(for: Route.self) { route in
+                    switch route {
+                    case .nouveautes: NouveautesView(back: true)
+                    case .historique: HistoriqueView()
+                    }
+                }
                 .navigationDestination(isPresented: $showNouveautes) { NouveautesView(back: true) }
                 .navigationDestination(isPresented: $showHistorique) { HistoriqueView() }
                 .navigationDestination(isPresented: $showYoutubeSearch) { YoutubeSearchView() }

@@ -1,0 +1,26 @@
+[
+  {
+    "label": "cuisine",
+    "color": "#16a34a"
+  },
+  {
+    "label": "maker",
+    "color": "#2563eb"
+  },
+  {
+    "label": "science",
+    "color": "#7c3aed"
+  },
+  {
+    "label": "entertainment",
+    "color": "#db2777"
+  },
+  {
+    "label": "podcasts",
+    "color": "#ea580c"
+  },
+  {
+    "label": "economie",
+    "color": "#0891b2"
+  }
+]

@@ -206,7 +206,8 @@ struct ChannelDetail: Codable {
 /// `GET /api/jobs/{id}`: the app only waits for `done`.
 struct JobProgress: Codable {
     let status: String
-    let message: String
+    // The back leaves out a field that has no value.
+    let message: String?
     let done: Bool
 }
 

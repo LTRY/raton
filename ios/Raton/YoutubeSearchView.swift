@@ -19,7 +19,7 @@ struct YoutubeSearchView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         PageHeader(title: "Recherche", back: true)
-                        SearchField(placeholder: "Rechercher sur YouTube", text: $query) {
+                        SearchField(placeholder: "Rechercher sur YouTube", text: $query, live: false) {
                             Task { await search(api) }
                         }
                         Picker("", selection: $scope) {
@@ -55,7 +55,7 @@ struct YoutubeSearchView: View {
     private func videoRow(_ video: YoutubeVideo, _ api: RatonAPI) -> some View {
         ListRow {
             HStack(alignment: .top, spacing: 12) {
-                AsyncImage(url: URL(string: video.thumbnailUrl)) { image in
+                CachedImage(url: URL(string: video.thumbnailUrl)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Theme.surfaceMuted }
                 .frame(width: 120, height: 68).clipped().clipShape(RoundedRectangle(cornerRadius: 6))
@@ -81,7 +81,7 @@ struct YoutubeSearchView: View {
     private func channelRow(_ channel: YoutubeChannel, _ api: RatonAPI) -> some View {
         ListRow {
             HStack(spacing: 12) {
-                AsyncImage(url: channel.thumbnailUrl.flatMap { URL(string: $0) }) { image in
+                CachedImage(url: channel.thumbnailUrl.flatMap { URL(string: $0) }) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Theme.surfaceMuted }
                 .frame(width: 52, height: 52).clipShape(Circle())

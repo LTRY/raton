@@ -1,0 +1,71 @@
+{
+  "id": 1,
+  "channel_id": 1,
+  "yt_video_id": "demo0000000",
+  "title": "Introduction aux tests automatisés",
+  "url": "https://www.youtube.com/watch?v=demo0000000",
+  "media_type": "video",
+  "published_at": "2026-11-15T17:33:10.582647",
+  "downloaded_at": "2026-11-16T17:33:10.582647",
+  "transcript_status": "missing",
+  "rating": 0,
+  "imported_via_form": false,
+  "categories": [],
+  "file_size_bytes": 0,
+  "is_new": true,
+  "list_state": null,
+  "shown_state": "normal",
+  "auto_state": "normal",
+  "comment": null,
+  "duration_seconds": 300,
+  "watched_at": null,
+  "media_urls": {
+    "video": null,
+    "audio": null,
+    "thumbnail": null,
+    "subtitles": null
+  },
+  "metadata": {
+    "description": null,
+    "tags": [],
+    "chapters": [],
+    "duration_seconds": null,
+    "view_count": null,
+    "like_count": null,
+    "comment_count": null,
+    "uploader": null
+  },
+  "documents": {
+    "transcript": null,
+    "notes": null,
+    "short_summary": null,
+    "suggested_questions": [],
+    "chat_messages": []
+  },
+  "sponsor_segments": [],
+  "sponsor_skip_enabled": true,
+  "skip_segments": [],
+  "resume_positions": {
+    "video": {
+      "position_seconds": 105.0,
+      "at_ms": 1794850390000
+    }
+  },
+  "files_purged": false,
+  "playlists": [
+    {
+      "playlist_id": 1,
+      "title": "Démo",
+      "item_id": 1
+    }
+  ],
+  "channel": {
+    "id": 1,
+    "name": "Atelier du code"
+  },
+  "badges": [
+    "new"
+  ],
+  "has_transcript": false,
+  "transcript_lines": []
+}

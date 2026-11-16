@@ -13,7 +13,7 @@ endpoint calcule par un service de `back/services/`, jamais une copie de la
 regle en Swift.
 
 **Etat : migration quasi complete du front telephone.** Le projet se genere et se compile avec Xcode, et tourne
-dans le simulateur iPhone (iOS 18) sur les donnees de demo (`make demo`). La
+dans le simulateur iPhone (iOS 27) sur les donnees de demo (`make demo`). La
 lecture d'un fichier audio (m4a), la reprise, le rapport `/activity` et la
 lecture en arriere-plan y ont ete essayes ; la video, l'ecran verrouille et le
 reseau local d'un iPhone reel ne l'ont pas ete.
@@ -114,7 +114,22 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   theme est clair uniquement, comme le front (`docs/spec/11-interface-html.md`).
 - **Chargement et erreurs** : une liste montre une roue (`LoadingRow`) jusqu'a sa
   premiere reponse, puis « Aucune ... » si elle est vide ; une erreur de reseau
-  ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`).
+  ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`). Une
+  action qui echoue la ou l'ecran n'a pas de place pour une erreur (cloche ou
+  note d'une chaine dans la liste, Vu ou Indesiree d'une ligne, dupliquer ou
+  supprimer une playlist, page suivante d'une liste) l'ecrit quatre secondes
+  dans un bandeau rouge au-dessus des barres (`Toasts`), que VoiceOver annonce :
+  aucun echec n'est silencieux.
+- **Recherche** : la liste suit la frappe, 350 ms apres la derniere lettre
+  (`SearchField`), sans attendre la touche Rechercher ; la recherche YouTube,
+  couteuse, ne part qu'a cette touche.
+- **Images** : `CachedImage` remplace `AsyncImage` partout ; les images
+  decodees restent en memoire (64 Mo au plus), donc une ligne qui revient a
+  l'ecran s'affiche tout de suite. Les fichiers sont dans le cache HTTP du
+  systeme, qui suit le `Cache-Control` du back.
+- **VoiceOver** : une rangee d'etoiles annonce la note courante (« Note, 3 sur
+  5 ») ; les etoiles d'une ligne de liste sont un seul element, absent sans
+  note ; la croix du champ de recherche se nomme « Effacer la recherche ».
 - **Une liste garde sa place** (Bibliotheque, Nouveautes, fiches d'une chaine,
   Chaines, Historique) : revenir sur la page (retour d'une fiche, retour sur
   l'onglet) ou agir sur une ligne (Vu, Indesiree) relit toutes les pages deja
@@ -139,7 +154,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   les tuiles de playlist entrent en fondu depuis 14 pt plus bas, decalees de
   50 ms (jusqu'a la sixieme), comme `pl-card-in`. La couverture a toujours le format 16:9 : une vignette d'un autre format (4:3 avec bandes noires) est recadree et ne change jamais la hauteur de la tuile. Un toucher joue d'abord le survol du web (260 ms) puis ouvre la playlist ; un doigt qui reste pose le joue aussi, apres 90 ms ; un doigt qui glisse pour defiler ne le declenche pas. Ce survol (`.pl-card:hover`) : la tuile monte de 4 pt, la couverture est un peu plus vive, le titre passe en terracotta et les deux cartes de la pile s'eventaillent en pivotant. Rien ne bouge avec
   « Reduire les animations ».
-- **Defilement vertical seulement** : le balayage depuis le bord gauche qui ramene en arriere en emportant la page est coupe (`UINavigationController`, `RatonApp.swift`) ; chaque ecran a son bouton de retour.
+- **Retour par le bord gauche** : balayer depuis le bord gauche de l'ecran ramene a la page d'avant, comme dans les apps d'iOS, en plus du bouton de retour de chaque ecran. Les pages cachent la barre de navigation, ce qui coupe ce geste : le controleur de navigation en redevient le delegue (`BackSwipe.swift`). Le geste ne part jamais au-dessus d'un lecteur (le carrousel video / audio, la barre de progression de l'audio : `blocksBackSwipe()`), ou le doigt regle la lecture ou change de volet ; il ne fait rien sur la page de base d'un onglet. Le balayage horizontal au milieu de la page (iOS 26) reste coupe : seul le bord ramene en arriere.
 - Le Liquid Glass sert a la barre d'onglets seulement (voir « Barre d'onglets ») ; les cartes, boutons et feuilles gardent les surfaces blanches du web.
 
 ## Ecrans
@@ -171,8 +186,8 @@ La fiche :
   Nouveau, comme la page du front ;
 - le selecteur video / audio suit `media_urls` (les deux fichiers peuvent
   coexister) ; le cote affiche est choisi a l'ouverture de la fiche (video s'il y en a une) et la relire en y revenant ne le change pas ; sans fichier, un bouton de telechargement (qualite au choix pour
-  la video) lance `POST .../media/{type}/download` puis relit la fiche jusqu'a
-  l'arrivee du fichier, puis le lance tout de suite s'il est encore sur la fiche et du
+  la video) lance `POST .../media/{type}/download`, suit le travail (`GET /api/jobs/{id}`, dix minutes au plus ; son message s'affiche s'il echoue) puis relit la fiche,
+  et lance le fichier tout de suite s'il est encore sur la fiche et du
   bon cote (video ou audio) ; si l'on a quitte la fiche, la lecture ne demarre pas ; le menu supprime un fichier ; la video et la carte audio
   sont cote a cote dans un carrousel, comme sur le web : elles suivent le doigt, avec un
   effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
@@ -216,7 +231,7 @@ La fiche :
   terracotta dessous (elle tourne pendant qu'il repond), questions suggerees en pastilles
   a contour fin, saisie sur une seule ligne dans une capsule blanche avec le bouton d'envoi rond a droite (Retour envoie aussi et ferme le clavier ; faire glisser la page ferme le clavier ; la fiche garde de la marge sous le dernier bloc pour passer au-dessus de la barre d'onglets),
   « Effacer la conversation » en lien discret (`POST .../chat`, la reponse est attendue en relisant
-  `GET /api/llm-jobs/{id}`) ;
+  `GET /api/llm-jobs/{id}`, cinq minutes au plus : au-dela, « Raton met trop de temps a repondre ») ;
 - menu : playlists (ajouter, retirer, creer), generer les notes
   (`POST .../notes/generate`), telecharger le transcript, ouvrir sur YouTube ;
 - les erreurs sont des messages francais : serveur injoignable, acces au
@@ -235,17 +250,32 @@ L'extension lit l'adresse du serveur dans l'App Group `group.fr.raton.app` ; l'a
 
 ## Widget Nouveautes
 
-Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Raton et le nombre de fiches des chaines suivies (`total` de `GET /api/library?followed=true`, l'en-tete `X-Raton-User` portant l'utilisateur), en creme et terracotta comme l'app. « Ouvrez Raton » tant qu'aucun serveur n'est choisi, « Hors ligne » quand il ne repond pas. Il lit l'adresse du serveur et l'utilisateur dans l'App Group `group.fr.raton.app` (comme l'extension de partage) ; l'app demande son rechargement quand elle passe en arriere-plan et quand le serveur ou l'utilisateur change, et iOS le rafraichit seul toutes les 30 minutes environ.
+Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Raton et le nombre de fiches des chaines suivies (`total` de `GET /api/library?followed=true`, l'en-tete `X-Raton-User` portant l'utilisateur), en creme et terracotta comme l'app. « Ouvrez Raton » tant qu'aucun serveur n'est choisi, « Hors ligne » quand il ne repond pas. Il lit l'adresse du serveur et l'utilisateur dans l'App Group `group.fr.raton.app` (comme l'extension de partage) ; l'app demande son rechargement quand elle passe en arriere-plan et quand le serveur ou l'utilisateur change, et iOS le rafraichit seul toutes les 30 minutes environ. Un toucher sur le widget ouvre l'app sur les Nouveautes (`raton://nouveautes`, schema declare dans `Info.plist`, lu par `RootView`).
 
 ## Tests
 
-`ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
-un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
-qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le back et le front de demo (`make demo`, front
-sur `localhost:8000`) ; l'app y est pointee par les arguments de lancement
-`-serverURL` et `-userID`. Lancer :
-`xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`.
-`make ci` ne les lance pas (rien dans ce conteneur ne compile l'app).
+Deux cibles de test, dans le meme schema `Raton` :
+
+- `ios/RatonTests/` (tests unitaires, sans serveur) : `ModelDecodingTests` decode
+  avec les modeles de `Models.swift` de vraies reponses de l'API
+  (`ios/RatonTests/Fixtures/*.json`), et `PlaylistQueueTests` verifie l'ordre de
+  lecture d'une playlist. Les fichiers de `Fixtures` sont ecrits par
+  `uv run python -m scripts.ios_fixtures` a partir des donnees de demo ; ils sont
+  le contrat entre le back et l'app. `tests/test_ios_fixtures.py` (dans
+  `make ci`) echoue quand une reponse de l'API n'a plus la forme de son fichier :
+  il faut alors les reecrire et mettre `Models.swift` a jour. Un changement de
+  l'API que l'app lit se voit donc des deux cotes.
+- `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
+  un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
+  qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le
+  back et le front de demo (`make demo`, front sur `localhost:8000`) ; l'app y est
+  pointee par les arguments de lancement `-serverURL` et `-userID`.
+
+Lancer : `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`
+(ajouter `-only-testing:RatonTests` pour les seuls tests unitaires).
+`make ci` ne compile pas l'app ; le workflow `.github/workflows/ios.yml` la compile
+et lance les tests unitaires sur un runner macOS (image `xcode-27`) quand `ios/`
+change. Les tests d'interface ne tournent qu'a la main.
 
 ## Lecteur
 
@@ -253,8 +283,8 @@ Un seul `AVPlayer` (`PlayerController`) vit au-dessus des ecrans : l'audio
 continue quand on quitte la fiche ou qu'on verrouille l'ecran
 (`AVAudioSession` `.playback`, `UIBackgroundModes` = `audio`), avec les
 commandes de l'ecran verrouille (`MPNowPlayingInfoCenter`,
-`MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Une barre sous
-les onglets permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
+`MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Le mini-lecteur,
+au-dessus de la barre d'onglets, permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
 La position et la duree changent deux fois par seconde : elles sont dans un objet
 a part (`PlaybackClock`), que seules les barres de progression observent, pour
 que les ecrans qui lisent le lecteur ne soient pas redessines a chaque pas.
@@ -334,7 +364,7 @@ commandes natives et la rangee de boutons reste sous l'image :
 - une piste demarre a 0 (pas de reprise) et son activite est rapportee par
   piste (`POST /api/videos/{id}/activity`), sauf en ecoute libre ;
 - la file (`PlaylistQueue`) vit dans `PlayerController` : elle continue quand on
-  quitte la playlist, la barre sous les onglets propose pause, suivante et
+  quitte la playlist, le mini-lecteur propose pause, suivante et
   fermer, l'ecran verrouille propose piste precedente / suivante a la place des
   sauts de 15 s ; lancer une fiche seule ou fermer la barre vide la file ;
 - changer l'ordre, retirer une fiche ou trier relit la playlist et met la file
@@ -350,6 +380,6 @@ medias, quota, categories et sous-bibliotheques, segments sponsors, notes
 automatiques), les pages Statistiques, Journaux et RAG, les imports CSV
 (abonnements, playlists), l'envoi d'un fichier video, les pages de variations
 de Raton, la banniere du couvre-feu (l'app affiche simplement le refus du back),
-le mini-lecteur persistant du web (l'app a le mini-lecteur audio sous les onglets), une
+le mini-lecteur persistant du web (l'app a le mini-lecteur audio au-dessus des onglets), une
 copie hors ligne qui se poursuit quand l'app est fermee (session `URLSession` d'arriere-plan), la
 publication sur l'App Store.

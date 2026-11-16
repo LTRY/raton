@@ -67,6 +67,8 @@ struct NouveautesWidgetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .containerBackground(cream, for: .widget)
+        // A tap opens the app on the Nouveautés (`RootView.open`).
+        .widgetURL(URL(string: "raton://nouveautes"))
     }
 
     private var image: some View {

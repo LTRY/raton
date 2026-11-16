@@ -70,12 +70,15 @@ final class ChannelsModel: ObservableObject {
         loading = true
         defer { loading = false }
         let mine = generation
-        if let reply: ChannelsReply = try? await api.get(
-            "/api/channels", query: query(page: page + 1, search: search)), mine == generation {
+        do {
+            let reply: ChannelsReply = try await api.get("/api/channels", query: query(page: page + 1, search: search))
+            guard mine == generation else { return }
             let known = Set(items.map(\.id))
             items += reply.items.filter { !known.contains($0.id) }
             page = reply.page
             totalPages = reply.totalPages
+        } catch {
+            if mine == generation { Toasts.shared.show(error) }
         }
     }
 }

@@ -130,6 +130,19 @@ struct StarsView: View {
                     .foregroundStyle(star <= rating ? Theme.amber : Theme.textFaint.opacity(0.55))
             }
         }
+        // Five pictures say nothing to VoiceOver: one element reads the note, none when there is no note.
+        .accessibilityElement()
+        .accessibilityLabel("Note : \(rating) sur 5")
+        .accessibilityHidden(rating == 0)
+    }
+}
+
+extension View {
+    /// For a row of five star buttons: VoiceOver reads the current note when it enters the row.
+    func ratingAccessibility(_ rating: Int) -> some View {
+        accessibilityElement(children: .contain)
+            .accessibilityLabel("Note")
+            .accessibilityValue(rating == 0 ? "aucune" : "\(rating) sur 5")
     }
 }
 

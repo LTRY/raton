@@ -28,7 +28,7 @@ struct AccueilView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         Spacer(minLength: 30)
-                        AsyncImage(url: api.url("/static/img/raton/\(line?.art ?? "popcorn.webp")")) { image in
+                        CachedImage(url: api.url("/static/img/raton/\(line?.art ?? "popcorn.webp")")) { image in
                             image.resizable().scaledToFit()
                         } placeholder: { Color.clear }
                         .frame(height: 260)

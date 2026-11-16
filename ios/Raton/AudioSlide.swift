@@ -196,5 +196,6 @@ struct AudioSeekBar: View {
         }
         .opacity(active ? 1 : 0.55)
         .padding(.top, onStage ? 0 : 6)
+        .blocksBackSwipe()
     }
 }

@@ -60,12 +60,26 @@ final class RatonAPI {
     /// Polls `GET /api/llm-jobs/{id}` until the answer is written (the back applies a finished job on
     /// the poll that sees it), as the front's chat does.
     func waitForLLMJob(_ jobID: Int) async throws -> LLMJobStatus {
-        while true {
+        // Five minutes at most: a job the server lost must not leave a wheel turning for ever.
+        for _ in 0..<150 {
             let job: LLMJobStatus = try await get("/api/llm-jobs/\(jobID)")
             if job.status == "failed" { throw RatonError(message: job.message ?? "Réponse impossible.") }
             if job.status == "done" || job.status == "applied" { return job }
             try await Task.sleep(nanoseconds: 2_000_000_000)
         }
+        throw RatonError(message: "Raton met trop de temps à répondre. Réessayez plus tard.")
+    }
+
+    /// Polls `GET /api/jobs/{id}` until a download or an import is done; nil when it is still running
+    /// after `seconds`. Lighter than reading the whole fiche again at each step.
+    func waitForJob(_ jobID: Int, seconds: Int = 600, while going: () -> Bool = { true }) async throws -> JobProgress? {
+        for _ in 0..<max(seconds / 3, 1) {
+            try await Task.sleep(nanoseconds: 3_000_000_000)
+            guard going() else { return nil }
+            let progress: JobProgress = try await get("/api/jobs/\(jobID)")
+            if progress.done { return progress }
+        }
+        return nil
     }
 
     private func decode<T: Decodable>(_ data: Data) throws -> T {

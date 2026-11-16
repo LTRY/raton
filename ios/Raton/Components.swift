@@ -5,7 +5,16 @@ import SwiftUI
 struct SearchField: View {
     let placeholder: String
     @Binding var text: String
+    // False where a search is costly (YouTube): it then runs on the keyboard's search key only.
+    var live = true
     let onSubmit: () -> Void
+    // What the last search ran on, so a pause in typing does not run the same one twice.
+    @State private var sent = ""
+
+    private func submit() {
+        sent = text
+        onSubmit()
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -14,15 +23,23 @@ struct SearchField: View {
                 .font(.raton(16, .semibold))
                 .submitLabel(.search)
                 .autocorrectionDisabled()
-                .onSubmit(onSubmit)
+                .onSubmit(submit)
             if !text.isEmpty {
                 Button {
                     text = ""
-                    onSubmit()
+                    submit()
                 } label: {
                     Image(systemName: "xmark.circle.fill").foregroundStyle(Theme.textFaint)
+                        .frame(width: 30, height: 20).contentShape(Rectangle())
                 }
+                .accessibilityLabel("Effacer la recherche")
             }
+        }
+        // The list follows the typing, a short pause after the last letter.
+        .task(id: text) {
+            guard live, text != sent else { return }
+            try? await Task.sleep(for: .milliseconds(350))
+            if !Task.isCancelled { submit() }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
         .surface(in: Capsule())
@@ -77,7 +94,7 @@ struct AvatarView: View {
         ZStack {
             Theme.surfaceMuted
             if let path {
-                AsyncImage(url: api.url(path)) { image in
+                CachedImage(url: api.url(path)) { image in
                     image.resizable().scaledToFill()
                 } placeholder: { Color.clear }
             } else {

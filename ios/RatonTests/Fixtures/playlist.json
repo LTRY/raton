@@ -1,0 +1,47 @@
+{
+  "id": 1,
+  "title": "Démo",
+  "source": "manual",
+  "source_url": null,
+  "yt_playlist_id": null,
+  "categories": [],
+  "free_listening": false,
+  "created_at": "2026-11-16T17:33:10",
+  "stats": {
+    "count": 2,
+    "total_duration_seconds": 817,
+    "seen_count": 0,
+    "missing_audio": 2,
+    "missing_video": 2
+  },
+  "items": [
+    {
+      "item_id": 1,
+      "position": 1,
+      "added_at": null,
+      "video_id": 1,
+      "title": "Introduction aux tests automatisés",
+      "url": "https://www.youtube.com/watch?v=demo0000000",
+      "channel_name": "Atelier du code",
+      "duration_seconds": 300,
+      "has_audio": false,
+      "has_video": false,
+      "has_thumbnail": false,
+      "seen": false
+    },
+    {
+      "item_id": 2,
+      "position": 2,
+      "added_at": null,
+      "video_id": 2,
+      "title": "Refactoriser sans peur",
+      "url": "https://www.youtube.com/watch?v=demo0000001",
+      "channel_name": "Carnets de cuisine",
+      "duration_seconds": 517,
+      "has_audio": false,
+      "has_video": false,
+      "has_thumbnail": false,
+      "seen": false
+    }
+  ]
+}

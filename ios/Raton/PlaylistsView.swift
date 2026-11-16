@@ -61,7 +61,7 @@ struct PlaylistsView: View {
                 }
                 .sheet(isPresented: $showImport) {
                     TextPromptSheet(title: "Importer une playlist YouTube", placeholder: "Adresse de la playlist", action: "Importer", keyboardURL: true) { url in
-                        let _: QueuedJob? = try? await api.post("/api/playlists/import-url", body: ["url": url])
+                        let _: QueuedJob = try await api.post("/api/playlists/import-url", body: ["url": url])
                         await load(api)
                     }
                 }
@@ -195,7 +195,7 @@ struct PlaylistTile: View {
             .frame(maxWidth: .infinity)
             .overlay {
                 if let id = playlist.coverVideoId, playlist.coverHasThumbnail {
-                    AsyncImage(url: api.url("/api/videos/\(id)/thumbnail?w=320")) { image in
+                    CachedImage(url: api.url("/api/videos/\(id)/thumbnail?w=320")) { image in
                         image.resizable().scaledToFill()
                     } placeholder: { Theme.surfaceMuted }
                 } else {
@@ -241,12 +241,14 @@ struct PlaylistTile: View {
     }
 
     private func duplicate() async {
-        let _: PlaylistSummary? = try? await api.post("/api/playlists/\(playlist.id)/duplicate")
+        do {
+            let _: PlaylistSummary = try await api.post("/api/playlists/\(playlist.id)/duplicate")
+        } catch { Toasts.shared.show(error) }
         onChange()
     }
 
     private func delete() async {
-        try? await api.delete("/api/playlists/\(playlist.id)")
+        do { try await api.delete("/api/playlists/\(playlist.id)") } catch { Toasts.shared.show(error) }
         onChange()
     }
 }

@@ -1,0 +1,70 @@
+{
+  "periods": {
+    "today": {
+      "video": {
+        "seconds": 6092.05,
+        "count": 6,
+        "limit_minutes": 120
+      },
+      "short": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 30
+      },
+      "podcast": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 120
+      },
+      "music": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 180
+      }
+    },
+    "week": {
+      "video": {
+        "seconds": 6092.05,
+        "count": 6,
+        "limit_minutes": 840
+      },
+      "short": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 210
+      },
+      "podcast": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 840
+      },
+      "music": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 1260
+      }
+    },
+    "month": {
+      "video": {
+        "seconds": 6092.05,
+        "count": 6,
+        "limit_minutes": 3600
+      },
+      "short": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 900
+      },
+      "podcast": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 3600
+      },
+      "music": {
+        "seconds": 0.0,
+        "count": 0,
+        "limit_minutes": 5400
+      }
+    }
+  }
+}

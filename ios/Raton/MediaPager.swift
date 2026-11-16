@@ -80,5 +80,6 @@ struct MediaPager<Video: View, Audio: View>: View {
             }
             .coordinateSpace(name: Self.space)
             .clipped()
+            .blocksBackSwipe()
     }
 }

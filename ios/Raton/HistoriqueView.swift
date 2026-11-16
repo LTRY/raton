@@ -120,12 +120,13 @@ struct HistoriqueView: View {
         guard row.id == rows.last?.id, page < totalPages, !loading else { return }
         loading = true
         defer { loading = false }
-        if let reply: HistoriqueReply = try? await api.get("/api/historique", query: ["page": String(page + 1)]) {
+        do {
+            let reply: HistoriqueReply = try await api.get("/api/historique", query: ["page": String(page + 1)])
             let known = Set(rows.map(\.id))
             rows += reply.rows.filter { !known.contains($0.id) }
             page = reply.page
             totalPages = reply.totalPages
-        }
+        } catch { Toasts.shared.show(error) }
     }
 
     /// "2026-10-28" as "mercredi 28 octobre"; the API gives the day, the app only writes it in French.

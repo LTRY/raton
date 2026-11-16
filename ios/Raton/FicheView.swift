@@ -1,7 +1,8 @@
 import AVKit
 import SwiftUI
 
-enum FicheTab: String, CaseIterable {
+/// The blocks under the fiche's title, in the order they are shown.
+enum FicheSection: String, CaseIterable {
     case info = "Plus d'informations"
     case notes = "Notes structurées"
     case chat = "Discussion"
@@ -334,6 +335,7 @@ struct FicheView: View {
                 }
             }
             .disabled(busy)
+            .ratingAccessibility(detail.rating)
             Theme.border.frame(height: 1)
             if let notice { Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft) }
             if let message = errorMessage {
@@ -345,8 +347,8 @@ struct FicheView: View {
         .padding(.top, 8)
     }
 
-    private func tabs(_ detail: VideoDetail) -> [FicheTab] {
-        FicheTab.allCases.filter { item in
+    private func shownSections(_ detail: VideoDetail) -> [FicheSection] {
+        FicheSection.allCases.filter { item in
             switch item {
             case .notes: return detail.documents.notes != nil || detail.documents.shortSummary != nil
             default: return true
@@ -354,10 +356,10 @@ struct FicheView: View {
         }
     }
 
-    /// The sections one under the other, in the order of `FicheTab`: no tabs to switch between.
+    /// The sections one under the other, in the order of `FicheSection`.
     private func sections(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 26) {
-            ForEach(tabs(detail), id: \.self) { item in
+            ForEach(shownSections(detail), id: \.self) { item in
                 // The description and the notes sit behind their own chevron, the chat is a plain input: no titles.
                 section(item, detail, api: api)
             }
@@ -366,7 +368,7 @@ struct FicheView: View {
     }
 
     @ViewBuilder
-    private func section(_ item: FicheTab, _ detail: VideoDetail, api: RatonAPI) -> some View {
+    private func section(_ item: FicheSection, _ detail: VideoDetail, api: RatonAPI) -> some View {
         switch item {
         case .info: InfoPanel(detail: detail, seek: { seek($0, detail, api) })
         case .notes: NotesPanel(detail: detail, generating: generating) { generateNotes(api) }
@@ -435,17 +437,15 @@ struct FicheView: View {
             do {
                 var body: [String: Any] = [:]
                 if let quality { body["video_quality"] = quality }
-                let _: QueuedJob = try await api.post("/api/videos/\(videoID)/media/\(kind.rawValue)/download", body: body)
-                // The download runs on the server: read the fiche until its file shows up.
-                for _ in 0..<150 {
-                    try await Task.sleep(nanoseconds: 4_000_000_000)
-                    await reload(api)
-                    if !onScreen { break }
-                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
-                        // Still on the fiche, on the side that was downloaded: play it straight away.
-                        if mode == kind { player.play(detail: detail, kind: kind, api: api) }
-                        break
-                    }
+                let job: QueuedJob = try await api.post("/api/videos/\(videoID)/media/\(kind.rawValue)/download", body: body)
+                // The download runs on the server: its job is watched, then the fiche is read once.
+                let progress = try await api.waitForJob(job.jobId, while: { onScreen })
+                if progress?.status == "failed" { errorMessage = progress?.message ?? "Le téléchargement a échoué." }
+                await reload(api)
+                // Still on the fiche, on the side that was downloaded: play it straight away.
+                if onScreen, mode == kind, let detail,
+                   (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
+                    player.play(detail: detail, kind: kind, api: api)
                 }
             } catch {
                 errorMessage = error.localizedDescription

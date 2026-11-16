@@ -68,7 +68,9 @@ struct PlaylistQueue {
         let candidates = eligible
         var found: QueueTrack?
         if shuffle {
-            while let last = history.popLast(), found == nil {
+            // `found == nil` first: tested after the pop, it threw away one more track of the history
+            // at each call, so a second "previous" had nothing left to go back to.
+            while found == nil, let last = history.popLast() {
                 found = candidates.first { $0.videoID == last }
             }
         } else if let index = candidates.firstIndex(where: { $0.videoID == current }) {

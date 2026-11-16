@@ -31,6 +31,7 @@ struct RootView: View {
     // so it shows its base page again, at the top.
     @State private var resets = [0, 0, 0, 0, 0]
     @EnvironmentObject private var player: PlayerController
+    @ObservedObject private var toasts = Toasts.shared
     /// What the bar and the mini player take when the measure is not there yet (see `TabPill.height`).
     private var expectedBarHeight: CGFloat {
         TabPill.height + (player.track?.kind == .audio || player.queue != nil ? NowPlayingBar.height + 6 : 0)
@@ -72,6 +73,12 @@ struct RootView: View {
                         } }
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
+                    // Over the bars, outside their measure: a message that comes and goes must not move
+                    // the bottom margin of the pages.
+                    .overlay(alignment: .top) {
+                        ToastView().alignmentGuide(.top) { $0[.bottom] + 6 }
+                    }
+                    .animation(.easeOut(duration: 0.2), value: toasts.message)
                     .padding(.bottom, keyboardUp ? 0 : TabPill.bottomGap)
                 }
                 // The bar's gap is measured from the screen's bottom edge, not from the home indicator's
@@ -86,6 +93,12 @@ struct RootView: View {
         .sensoryFeedback(.selection, trigger: tab)
         // The Nouveautés widget counts what the app has just shown.
         .onChange(of: scenePhase) { phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
+        // `raton://nouveautes`, the link of the Nouveautés widget: the Nouveautés, over the Bibliothèque.
+        .onOpenURL { url in
+            guard url.scheme == "raton", url.host == "nouveautes" else { return }
+            libraryPath = NavigationPath([Route.nouveautes])
+            tab = 2
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
     }
@@ -209,14 +222,5 @@ struct PageHeader<Trailing: View>: View {
         .padding(.horizontal, 16)
         .padding(.top, 8)
         .padding(.bottom, 12)
-    }
-}
-
-// Only vertical scrolling moves a page: the swipe from the left edge that carries the page back is
-// switched off (every screen has its own back button).
-extension UINavigationController {
-    open override func viewDidLoad() {
-        super.viewDidLoad()
-        interactivePopGestureRecognizer?.isEnabled = false
     }
 }
