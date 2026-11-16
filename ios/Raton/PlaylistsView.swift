@@ -264,6 +264,8 @@ struct PlaylistView: View {
     @State private var showRename = false
     @State private var showCategories = false
     @State private var confirmDelete = false
+    @State private var keepingOffline = false
+    @EnvironmentObject private var offline: OfflineStore
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -404,6 +406,10 @@ struct PlaylistView: View {
             Button { Task { await downloadAll(api, "video") } } label: {
                 Label("Télécharger toute la vidéo", systemImage: "arrow.down.circle")
             }
+            Button { Task { await keepOffline(api) } } label: {
+                Label("Écouter hors ligne", systemImage: "arrow.down.to.line")
+            }
+            .disabled(keepingOffline)
             Divider()
             Button { showRename = true } label: { Label("Renommer", systemImage: "pencil") }
                         Button { showCategories = true } label: { Label("Catégories", systemImage: "tag") }
@@ -451,6 +457,38 @@ struct PlaylistView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Copies onto the phone the audios the playlist has on the server and the phone has not yet, one
+    /// after the other. A fiche without an audio file is left out: the server must download it first.
+    private func keepOffline(_ api: RatonAPI) async {
+        guard let detail else { return }
+        var seen = Set<Int>()
+        let wanted = detail.items.filter { $0.hasAudio && offline.item($0.videoId) == nil && seen.insert($0.videoId).inserted }
+        guard !wanted.isEmpty else {
+            notice = detail.items.contains { $0.hasAudio }
+                ? "Tous les audios de la playlist sont déjà sur ce téléphone."
+                : "Aucun audio à garder : téléchargez d'abord l'audio de la playlist."
+            return
+        }
+        keepingOffline = true
+        errorMessage = nil
+        var kept = 0
+        for (index, item) in wanted.enumerated() {
+            notice = "Audio hors ligne : \(index + 1) sur \(wanted.count)…"
+            do {
+                try await offline.download(id: item.videoId, title: item.title, channel: item.channelName,
+                                           duration: item.durationSeconds, path: "/api/videos/\(item.videoId)/audio", api: api)
+                kept += 1
+            } catch {
+                // One audio the server cannot send does not stop the others.
+                errorMessage = error.localizedDescription
+            }
+        }
+        let failed = wanted.count - kept
+        notice = "\(kept) audio\(kept > 1 ? "s" : "") gardé\(kept > 1 ? "s" : "") sur ce téléphone"
+            + (failed > 0 ? ", \(failed) en échec." : ".")
+        keepingOffline = false
     }
 
     /// Runs a change on the playlist, then reads it back.

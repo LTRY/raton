@@ -40,6 +40,14 @@ struct FicheView: View {
                     mediaPager(detail, api: api)
                     if mode == .audio {
                         AudioSeekBar(videoID: detail.id).transition(.opacity)
+                        AudioOptionsRow().transition(.opacity)
+                    }
+                    if isLoaded {
+                        PlaybackErrorMessage {
+                            let kind = player.track?.kind ?? mode
+                            player.stop()
+                            player.play(detail: detail, kind: kind, api: api)
+                        }
                     }
                     infoBlock(detail, api: api)
                 } else if let message = errorMessage {
@@ -150,7 +158,8 @@ struct FicheView: View {
                     if offline.item(detail.id) != nil {
                         Label("Retirer de l'écoute hors ligne", systemImage: "icloud.slash")
                     } else if offline.downloading.contains(detail.id) {
-                        Label("Téléchargement hors ligne…", systemImage: "arrow.down.circle")
+                        Label("Téléchargement hors ligne… \(Int((offline.progress[detail.id] ?? 0) * 100)) %",
+                              systemImage: "arrow.down.circle")
                     } else {
                         Label("Écouter hors ligne", systemImage: "arrow.down.circle")
                     }
@@ -489,15 +498,24 @@ struct NowPlayingBar: View {
         if player.track?.kind == .audio || player.queue != nil {
             HStack(spacing: 6) {
                 Button { player.togglePlayPause() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 24)).frame(width: 52, height: 52).contentShape(Rectangle())
+                    Group {
+                        if player.isBuffering {
+                            ProgressView().tint(Color(hex: 0xF3E8D9))
+                        } else {
+                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 24))
+                        }
+                    }
+                    .frame(width: 52, height: 52).contentShape(Rectangle())
                 }
-                .accessibilityLabel(player.isPlaying ? "Pause" : "Lecture")
+                .accessibilityLabel(player.isBuffering ? "Chargement" : player.isPlaying ? "Pause" : "Lecture")
                 Button(action: open) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(player.title).font(.raton(16, .bold)).lineLimit(1)
                         // In a playlist the line under the title is the playlist's name, else the channel's.
-                        if let subtitle = player.queue?.title ?? player.artist {
+                        if player.playbackError != nil {
+                            Text("Lecture impossible").font(.raton(14, .semibold)).lineLimit(1)
+                                .foregroundStyle(Color(hex: 0xFFB48A))
+                        } else if let subtitle = player.queue?.title ?? player.artist {
                             Text(subtitle).font(.raton(14)).lineLimit(1).opacity(0.7)
                         }
                     }

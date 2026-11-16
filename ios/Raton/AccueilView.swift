@@ -11,6 +11,9 @@ enum Route: Hashable {
 struct AccueilView: View {
     @EnvironmentObject private var state: AppState
     @State private var line: RatonLine?
+    // Why Raton has no line (server unreachable): the audios kept on the phone are then offered.
+    @State private var errorMessage: String?
+    @EnvironmentObject private var offline: OfflineStore
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -36,6 +39,16 @@ struct AccueilView: View {
                             NavigationLink(value: route) { Text(line.ctaLabel) }
                                 .buttonStyle(PillButtonStyle())
                         }
+                        if line == nil, let errorMessage {
+                            Text(errorMessage).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                                .multilineTextAlignment(.center).padding(.horizontal, 24)
+                            if !offline.items.isEmpty {
+                                NavigationLink { OfflineView() } label: {
+                                    Text("Écouter hors ligne (\(offline.items.count))")
+                                }
+                                .buttonStyle(PillButtonStyle())
+                            }
+                        }
                         Spacer(minLength: 30)
                     }
                     .frame(maxWidth: .infinity, minHeight: 640)
@@ -56,7 +69,13 @@ struct AccueilView: View {
     }
 
     private func visit(_ api: RatonAPI) async {
-        if line == nil { line = try? await api.post("/api/raton/visit") }
+        guard line == nil else { return }
+        do {
+            line = try await api.post("/api/raton/visit")
+            errorMessage = nil
+        } catch {
+            if !Task.isCancelled { errorMessage = error.localizedDescription }
+        }
     }
 
     /// The paths the API gives for Raton's button (`/dashboard/nouveautes`, `/dashboard/historique`).

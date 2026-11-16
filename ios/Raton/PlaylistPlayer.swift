@@ -26,6 +26,12 @@ struct PlaylistPlayerPanel: View {
                 audioStage
             }
             nowPlaying
+            if player.queueMode == .audio, playable > 0 { AudioOptionsRow() }
+            if owns {
+                PlaybackErrorMessage {
+                    if let id = player.queue?.currentTrack?.videoID { player.playQueueTrack(id) }
+                }
+            }
             // On the audio stage the controls are over the cover; the video stage has the native player's own.
             if player.queueMode == .video { controls(onStage: false).padding(.top, 8) }
             if detail.freeListening {
@@ -120,8 +126,14 @@ struct PlaylistPlayerPanel: View {
             .disabled(!owns).accessibilityLabel("Piste précédente")
             if onStage { Spacer(minLength: 0) }
             Button(action: playPause) {
-                Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: onStage ? 22 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
+                Group {
+                    if owns, player.isBuffering {
+                        ProgressView().tint(onStage ? Color.white : Theme.primary)
+                    } else {
+                        Image(systemName: owns && player.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: onStage ? 22 : 26)).foregroundStyle(onStage ? Color.white : Theme.primary)
+                    }
+                }
                     .frame(width: onStage ? 52 : 60, height: onStage ? 52 : 60)
                     .modifier(PlayDisc(onStage: onStage))
             }
