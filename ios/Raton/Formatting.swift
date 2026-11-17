@@ -54,18 +54,4 @@ enum Format {
         writer.unitsStyle = .full
         return writer.localizedString(for: date, relativeTo: now)
     }
-
-    /// The link of a YouTube video typed or pasted in the search field, else nil.
-    static func youtubeVideoLink(_ text: String) -> URL? {
-        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.contains(" "), let url = URL(string: value.contains("://") ? value : "https://" + value),
-              let host = url.host?.lowercased() else { return nil }
-        if host == "youtu.be" { return url.path.count > 1 ? url : nil }
-        guard host == "youtube.com" || host.hasSuffix(".youtube.com") else { return nil }
-        if url.path == "/watch" {
-            let id = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "v" }?.value
-            return id?.isEmpty == false ? url : nil
-        }
-        return ["/shorts/", "/live/"].contains { url.path.hasPrefix($0) && url.path.count > $0.count } ? url : nil
-    }
 }

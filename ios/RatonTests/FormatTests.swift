@@ -1,7 +1,7 @@
 import XCTest
 @testable import Raton
 
-/// The short writings of the YouTube search rows and the links the search field recognises.
+/// The short writings of the YouTube search rows.
 final class FormatTests: XCTestCase {
     func testViews() {
         XCTAssertEqual(Format.views(1), "1 vue")
@@ -18,12 +18,13 @@ final class FormatTests: XCTestCase {
         XCTAssertNil(Format.age(nil, now: now))
     }
 
-    func testYoutubeVideoLink() {
-        XCTAssertNotNil(Format.youtubeVideoLink("https://www.youtube.com/watch?v=dQw4w9WgXcQ"))
-        XCTAssertNotNil(Format.youtubeVideoLink("youtu.be/dQw4w9WgXcQ"))
-        XCTAssertNotNil(Format.youtubeVideoLink("https://m.youtube.com/shorts/abc123"))
-        XCTAssertNil(Format.youtubeVideoLink("https://www.youtube.com/@channel"))
-        XCTAssertNil(Format.youtubeVideoLink("rick astley"))
-        XCTAssertNil(Format.youtubeVideoLink("https://example.com/watch?v=abc"))
+    func testSearchHistoryKeepsNewestFirstWithoutDuplicates() {
+        _ = SearchHistory.clear()
+        _ = SearchHistory.add("rick")
+        _ = SearchHistory.add("jazz")
+        XCTAssertEqual(SearchHistory.add("RICK"), ["RICK", "jazz"])
+        XCTAssertEqual(SearchHistory.remove("jazz"), ["RICK"])
+        XCTAssertEqual(SearchHistory.add("  "), ["RICK"])
+        XCTAssertEqual(SearchHistory.clear(), [])
     }
 }

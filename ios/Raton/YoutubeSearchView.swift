@@ -1,12 +1,10 @@
 import SwiftUI
 
 /// The Recherche: YouTube videos and channels matching a query (`GET /api/youtube/videos|channels`),
-/// to import a video as a fiche (`POST /api/videos/import`) or add a channel (`POST /api/channels`).
-/// A YouTube video link pasted in the field is offered for import without any search.
+/// to open a video or add a channel (`POST /api/channels`).
+/// A video opens its fiche when the library has it, else the same page without the index: touching a
+/// control there adds it. The last searches are listed while the field is being edited.
 struct YoutubeSearchView: View {
-    /// Where a video's import stands on its row, by video link.
-    private enum ImportState { case running, queued }
-
     @EnvironmentObject private var state: AppState
     @State private var scope = 0
     @State private var query = ""
@@ -17,11 +15,11 @@ struct YoutubeSearchView: View {
     @State private var channelsFor: String?
     @State private var searching = false
     @State private var errorMessage: String?
-    @State private var imports: [String: ImportState] = [:]
     // Bumped by every search: an answer that comes back after a newer search started is dropped.
     @State private var generation = 0
+    @FocusState private var fieldFocused: Bool
+    @State private var history = SearchHistory.load()
 
-    private var pastedLink: URL? { Format.youtubeVideoLink(query) }
     private var currentText: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
@@ -30,31 +28,30 @@ struct YoutubeSearchView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         PageHeader(title: "Recherche", back: true)
-                        SearchField(placeholder: "Rechercher ou coller un lien YouTube", text: $query, live: false) {
+                        SearchField(placeholder: "Rechercher sur YouTube", text: $query, live: false, focus: $fieldFocused) {
                             Task { await search(api) }
                         }
-                        if pastedLink == nil {
-                            Picker("", selection: $scope) {
-                                Text("Vidéos").tag(0)
-                                Text("Chaînes").tag(1)
-                            }
-                            .pickerStyle(.segmented)
-                            .padding(.horizontal, 16).padding(.bottom, 12)
-                            .onChange(of: scope) {
-                                if currentText != (scope == 0 ? videosFor : channelsFor) { Task { await search(api) } }
-                            }
+                        if fieldFocused {
+                            historyList(api)
+                        } else {
+                        Picker("", selection: $scope) {
+                            Text("Vidéos").tag(0)
+                            Text("Chaînes").tag(1)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 16).padding(.bottom, 12)
+                        .onChange(of: scope) {
+                            if currentText != (scope == 0 ? videosFor : channelsFor) { Task { await search(api) } }
                         }
                         ErrorMessage(text: errorMessage)
-                        if let link = pastedLink {
-                            pastedRow(link, api)
-                        } else {
-                            results(api)
+                        results(api)
                         }
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .barClearance()
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
+                .navigationDestination(for: YoutubeVideo.self) { FicheView(candidate: $0) }
             }
         }
         .ratonPage()
@@ -65,7 +62,7 @@ struct YoutubeSearchView: View {
     private func results(_ api: RatonAPI) -> some View {
         if searching { ProgressView().frame(maxWidth: .infinity).padding(.top, 30) }
         if scope == 0 {
-            ForEach(videos) { video in videoRow(video, api) }
+            ForEach(videos) { video in videoRow(video) }
         } else {
             ForEach(channels) { channel in channelRow(channel, api) }
         }
@@ -75,64 +72,74 @@ struct YoutubeSearchView: View {
         }
     }
 
+    // MARK: History
+
+    /// The earlier searches (those that contain the typed text), shown while the field is edited.
+    @ViewBuilder
+    private func historyList(_ api: RatonAPI) -> some View {
+        let typed = currentText.lowercased()
+        let shown = history.filter { typed.isEmpty || $0.lowercased().contains(typed) }
+        ForEach(shown, id: \.self) { item in
+            ListRow {
+                HStack(spacing: 12) {
+                    Button {
+                        query = item
+                        fieldFocused = false
+                        Task { await search(api) }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "clock.arrow.circlepath").foregroundStyle(Theme.textMuted)
+                            Text(item).font(.raton(16, .semibold)).foregroundStyle(Theme.text).lineLimit(1)
+                            Spacer(minLength: 0)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Button { history = SearchHistory.remove(item) } label: {
+                        Image(systemName: "xmark").font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.textFaint).frame(width: 36, height: 36)
+                    }
+                    .accessibilityLabel("Retirer « \(item) » de l'historique")
+                }
+            }
+        }
+        if !history.isEmpty && typed.isEmpty {
+            Button("Effacer l'historique") { history = SearchHistory.clear() }
+                .font(.raton(14, .semibold)).foregroundStyle(Theme.primary).padding(16)
+        }
+    }
+
     // MARK: Rows
 
-    private func pastedRow(_ link: URL, _ api: RatonAPI) -> some View {
+    private func videoRow(_ video: YoutubeVideo) -> some View {
         ListRow {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Lien YouTube détecté").font(.raton(15, .bold)).foregroundStyle(Theme.text)
-                Text(link.absoluteString).font(.raton(13)).foregroundStyle(Theme.textMuted)
-                    .lineLimit(2).truncationMode(.middle)
-                importControl(link.absoluteString, title: "cette vidéo", api)
+            if let existing = video.existing {
+                NavigationLink(value: existing.id) { rowHead(video) }.buttonStyle(.plain)
+            } else {
+                NavigationLink(value: video) { rowHead(video) }.buttonStyle(.plain)
             }
         }
     }
 
-    private func videoRow(_ video: YoutubeVideo, _ api: RatonAPI) -> some View {
-        ListRow {
-            VStack(alignment: .leading, spacing: 10) {
-                opener(video) {
-                    HStack(alignment: .top, spacing: 12) {
-                        thumbnail(video)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(video.title).font(.raton(15, .bold)).foregroundStyle(Theme.text)
-                                .lineLimit(3).multilineTextAlignment(.leading)
-                            if let channel = video.channelName {
-                                Text(channel).font(.raton(13, .semibold)).foregroundStyle(Theme.textMuted).lineLimit(1)
-                            }
-                            let facts = [Format.views(video.viewCount), Format.age(video.publishedAt)].compactMap { $0 }
-                            if !facts.isEmpty {
-                                Text(facts.joined(separator: " · ")).font(.raton(13)).foregroundStyle(Theme.textMuted)
-                                    .lineLimit(1)
-                            }
-                        }
-                    }
+    private func rowHead(_ video: YoutubeVideo) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            thumbnail(video)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(video.title).font(.raton(15, .bold)).foregroundStyle(Theme.text)
+                    .lineLimit(3).multilineTextAlignment(.leading)
+                if let channel = video.channelName {
+                    Text(channel).font(.raton(13, .semibold)).foregroundStyle(Theme.textMuted).lineLimit(1)
                 }
-                if let existing = video.existing {
-                    NavigationLink(value: existing.id) {
-                        Label("Voir la fiche", systemImage: "checkmark.circle.fill")
-                            .font(.raton(14, .semibold))
-                    }
-                } else {
-                    importControl(video.url, title: nil, api)
+                let facts = [Format.views(video.viewCount), Format.age(video.publishedAt)].compactMap { $0 }
+                if !facts.isEmpty {
+                    Text(facts.joined(separator: " · ")).font(.raton(13)).foregroundStyle(Theme.textMuted)
+                        .lineLimit(1)
+                }
+                if video.existing != nil {
+                    Label("Dans la bibliothèque", systemImage: "checkmark.circle.fill")
+                        .font(.raton(13, .semibold)).foregroundStyle(Theme.primary)
                 }
             }
-        }
-    }
-
-    /// The row's head opens the fiche when the library has the video, else the video on YouTube.
-    @ViewBuilder
-    private func opener<Content: View>(_ video: YoutubeVideo, @ViewBuilder _ content: () -> Content) -> some View {
-        if let existing = video.existing {
-            NavigationLink(value: existing.id) { content() }
-                .buttonStyle(.plain)
-                .accessibilityHint("Ouvre la fiche")
-        } else if let url = URL(string: video.url) {
-            Link(destination: url) { content() }
-                .buttonStyle(.plain)
-                .accessibilityHint("Ouvre la vidéo sur YouTube")
-        } else {
-            content()
         }
     }
 
@@ -159,34 +166,6 @@ struct YoutubeSearchView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-
-    /// "Importer" with the choice of a video or an audio fiche; once chosen it shows where the import stands.
-    @ViewBuilder
-    private func importControl(_ url: String, title: String?, _ api: RatonAPI) -> some View {
-        switch imports[url] {
-        case .running:
-            HStack(spacing: 8) {
-                ProgressView()
-                Text("Import en cours…").font(.raton(14, .semibold)).foregroundStyle(Theme.textMuted)
-            }
-            .frame(minHeight: 44)
-        case .queued:
-            Label("Import lancé", systemImage: "checkmark.circle.fill")
-                .font(.raton(14, .semibold)).foregroundStyle(Theme.primary)
-                .frame(minHeight: 44)
-        case nil:
-            Menu {
-                Button("Vidéo", systemImage: "play.rectangle") { Task { await importVideo(api, url, ["video"]) } }
-                Button("Audio", systemImage: "waveform") { Task { await importVideo(api, url, ["audio"]) } }
-            } label: {
-                Label(title.map { "Importer \($0)" } ?? "Importer", systemImage: "arrow.down.circle")
-                    .font(.raton(14, .semibold))
-                    .padding(.horizontal, 14).frame(minHeight: 44)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.tint))
-                    .foregroundStyle(Theme.primary)
-            }
-        }
     }
 
     private func channelRow(_ channel: YoutubeChannel, _ api: RatonAPI) -> some View {
@@ -225,9 +204,8 @@ struct YoutubeSearchView: View {
             videos = []; channels = []; videosFor = nil; channelsFor = nil; searching = false
             return
         }
-        // A pasted link is offered for import, not searched.
-        guard Format.youtubeVideoLink(text) == nil else { searching = false; return }
         searching = true
+        history = SearchHistory.add(text)
         let inScope = scope
         do {
             if inScope == 0 {
@@ -248,21 +226,6 @@ struct YoutubeSearchView: View {
         if mine == generation { searching = false }
     }
 
-    private func importVideo(_ api: RatonAPI, _ url: String, _ types: [String]) async {
-        imports[url] = .running
-        do {
-            let _: QueuedJob = try await api.post(
-                "/api/videos/import",
-                body: ["url": url, "media_types": types, "download_transcript": true,
-                       "video_quality": "1080", "categories": [String]()])
-            imports[url] = .queued
-            Toasts.shared.show("Import lancé : la fiche apparaîtra dans la Bibliothèque.")
-        } catch {
-            imports[url] = nil
-            Toasts.shared.show(error)
-        }
-    }
-
     private func addChannel(_ api: RatonAPI, _ channel: YoutubeChannel) async {
         do {
             let _: ChannelItem = try await api.post("/api/channels", body: ["url": channel.url, "rating": 1])
@@ -271,5 +234,29 @@ struct YoutubeSearchView: View {
         } catch {
             Toasts.shared.show(error)
         }
+    }
+}
+
+/// The searches typed in the YouTube search, newest first, kept on the phone.
+enum SearchHistory {
+    private static let key = "youtubeSearchHistory"
+    private static let limit = 12
+
+    static func load() -> [String] { UserDefaults.standard.stringArray(forKey: key) ?? [] }
+
+    static func add(_ text: String) -> [String] {
+        let value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return load() }
+        return save([value] + load().filter { $0.caseInsensitiveCompare(value) != .orderedSame })
+    }
+
+    static func remove(_ text: String) -> [String] { save(load().filter { $0 != text }) }
+
+    static func clear() -> [String] { save([]) }
+
+    private static func save(_ items: [String]) -> [String] {
+        let kept = Array(items.prefix(limit))
+        UserDefaults.standard.set(kept, forKey: key)
+        return kept
     }
 }

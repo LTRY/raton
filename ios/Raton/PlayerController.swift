@@ -27,24 +27,6 @@ final class PlayerController: ObservableObject {
     @Published private(set) var isBuffering = false
     /// Why the loaded file cannot be played, in French; nil while all is well.
     @Published private(set) var playbackError: String?
-    /// The speed of the audio, kept across launches. A video keeps the speed menu of its native controls.
-    @Published var audioRate: Float = {
-        let saved = UserDefaults.standard.float(forKey: "audioRate")
-        return PlayerController.rates.contains(saved) ? saved : 1
-    }() {
-        didSet {
-            UserDefaults.standard.set(audioRate, forKey: "audioRate")
-            applyRate()
-            updateNowPlaying()
-        }
-    }
-    static let rates: [Float] = [0.75, 1, 1.25, 1.5, 1.75, 2]
-    /// When the sleep timer pauses playback: at a time, or when the track that plays ends.
-    enum SleepTimer: Equatable {
-        case at(Date)
-        case endOfTrack
-    }
-    @Published var sleepTimer: SleepTimer?
     let clock = PlaybackClock()
     private var position: Double {
         get { clock.position }
@@ -185,7 +167,6 @@ final class PlayerController: ObservableObject {
 
         let player = AVPlayer(url: localURL ?? api.url(path))
         self.player = player
-        applyRate()
         observe(player)
         self.skipSegments = skipSegments
         if let startAt {
@@ -201,7 +182,6 @@ final class PlayerController: ObservableObject {
     func stop() {
         release()
         queue = nil
-        sleepTimer = nil
         refreshRemoteCommands()
     }
 
@@ -251,14 +231,6 @@ final class PlayerController: ObservableObject {
         player?.pause()
     }
 
-    /// `play()` starts at the player's default rate: the chosen speed for an audio, 1 for a video.
-    private func applyRate() {
-        guard let player else { return }
-        let rate = track?.kind == .audio ? audioRate : 1
-        player.defaultRate = rate
-        if player.rate != 0 { player.rate = rate }
-    }
-
     /// While it buffers the player is asked to play: the button pauses it, as when it plays.
     func togglePlayPause() {
         if isPlaying || isBuffering { pause() } else { resume() }
@@ -296,10 +268,6 @@ final class PlayerController: ObservableObject {
             self.trackWatchedTime()
             if Date().timeIntervalSince(self.lastReportAt) >= Self.reportInterval { self.reportActivity() }
             self.updateNowPlaying()
-            if case .at(let date) = self.sleepTimer, Date() >= date {
-                self.sleepTimer = nil
-                self.pause()
-            }
         }
         statusObserver = player.publisher(for: \.timeControlStatus)
             .receive(on: DispatchQueue.main)
@@ -310,11 +278,6 @@ final class PlayerController: ObservableObject {
             guard let self else { return }
             self.trackWatchedTime()
             self.reportActivity()
-            if self.sleepTimer == .endOfTrack {
-                // The timer asked for this track only: the queue stops here.
-                self.sleepTimer = nil
-                return
-            }
             // Without a queue the player just stays at the end.
             if self.queue != nil { self.next() }
         }

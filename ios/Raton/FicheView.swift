@@ -11,7 +11,21 @@ enum FicheSection: String, CaseIterable {
 /// A fiche: `GET /api/videos/{id}`, then `POST .../open` (what clears the Nouveau label), with the
 /// player, the stars, the categories and the tabs under the player. Laid out like the web's fiche page.
 struct FicheView: View {
-    let videoID: Int
+    // 0 while the page shows a YouTube video of the Recherche that the library does not have: the first
+    // star, category or option the user touches adds it to the index (`index`); leaving without touching
+    // one adds nothing, and playing never does.
+    @State private var videoID: Int
+    private let candidate: YoutubeVideo?
+
+    init(videoID: Int) {
+        _videoID = State(initialValue: videoID)
+        candidate = nil
+    }
+
+    init(candidate: YoutubeVideo) {
+        _videoID = State(initialValue: 0)
+        self.candidate = candidate
+    }
 
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var player: PlayerController
@@ -30,6 +44,7 @@ struct FicheView: View {
     @State private var showPlaylists = false
     @State private var showComment = false
     @State private var generating = false
+    @State private var indexing = false
 
     private var isLoaded: Bool { player.track?.videoID == videoID }
 
@@ -41,7 +56,6 @@ struct FicheView: View {
                     mediaPager(detail, api: api)
                     if mode == .audio {
                         AudioSeekBar(videoID: detail.id).transition(.opacity)
-                        AudioOptionsRow().transition(.opacity)
                     }
                     if isLoaded {
                         PlaybackErrorMessage {
@@ -51,6 +65,8 @@ struct FicheView: View {
                         }
                     }
                     infoBlock(detail, api: api)
+                } else if let candidate, videoID == 0, let api = state.api {
+                    pendingBody(candidate, api: api)
                 } else if let message = errorMessage {
                     Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger).padding()
                 } else {
@@ -122,7 +138,11 @@ struct FicheView: View {
                     .buttonStyle(CircleButtonStyle())
                     .accessibilityLabel("Retour")
                 Spacer()
-                if let detail, let api = state.api { moreMenu(detail, api: api) }
+                if let detail, let api = state.api {
+                    moreMenu(detail, api: api)
+                } else if let candidate, videoID == 0, let api = state.api {
+                    pendingMenu(candidate, api: api)
+                }
             }
             if detail != nil { MediaModePill(mode: mode, onSelect: select) }
         }
@@ -376,6 +396,119 @@ struct FicheView: View {
         }
     }
 
+    // MARK: A YouTube video that is not indexed yet
+
+    /// The fiche's head and controls for a video the library does not have; its description, notes and
+    /// chat come once it is indexed.
+    private func pendingBody(_ video: YoutubeVideo, api: RatonAPI) -> some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .bottomTrailing) {
+                Theme.player
+                CachedImage(url: URL(string: video.thumbnailUrl)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Theme.surfaceMuted }
+                .overlay(Color.black.opacity(0.25))
+                // Reading it goes to YouTube: playing a video does not index it.
+                if let url = URL(string: video.url) {
+                    Link(destination: url) {
+                        Image(systemName: "play.fill").font(.system(size: 34)).foregroundStyle(.white)
+                            .frame(width: 72, height: 72).background(Circle().fill(Theme.primary))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityLabel("Lire sur YouTube")
+                }
+                if let seconds = video.durationSeconds {
+                    Text(Format.clock(Double(seconds)))
+                        .font(.raton(13, .bold)).foregroundStyle(.white)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(Color(hex: 0x2B3340)))
+                        .padding(8)
+                }
+            }
+            .aspectRatio(16 / 9, contentMode: .fit).clipped()
+            VStack(alignment: .leading, spacing: 14) {
+                Text(video.title).font(.raton(21, .bold)).foregroundStyle(Theme.text)
+                if let channel = video.channelName {
+                    Text(channel).font(.raton(18)).foregroundStyle(Theme.textSoft)
+                }
+                let facts = [Format.views(video.viewCount), Format.age(video.publishedAt)].compactMap { $0 }
+                if !facts.isEmpty {
+                    Text(facts.joined(separator: " · ")).font(.raton(14)).foregroundStyle(Theme.textMuted)
+                }
+                HStack(spacing: 6) {
+                    Button { Task { if await index(api) { showCategories = true } } } label: {
+                        Text("+ Catégories")
+                            .font(.raton(9, .semibold)).foregroundStyle(Theme.textFaint)
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .overlay(Capsule().strokeBorder(Theme.borderStrong, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                    }
+                    Spacer(minLength: 0)
+                    ForEach(1...5, id: \.self) { star in
+                        Button {
+                            Task { if await index(api) { await save(api, "/api/videos/\(videoID)/rating", ["rating": star]) } }
+                        } label: {
+                            Image(systemName: "star.fill").font(.system(size: 24))
+                                .foregroundStyle(Theme.textFaint.opacity(0.55))
+                        }
+                        .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
+                    }
+                }
+                .disabled(indexing || busy)
+                Theme.border.frame(height: 1)
+                if let message = errorMessage {
+                    Text(message).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                }
+                Text("Cette vidéo n'est pas dans l'index : une note, une catégorie ou une option de ⋮ l'y ajoute, la quitter sans y toucher ne l'ajoute pas.")
+                    .font(.raton(14)).foregroundStyle(Theme.textMuted)
+            }
+            .padding(16).padding(.top, 8)
+        }
+    }
+
+    private func pendingMenu(_ video: YoutubeVideo, api: RatonAPI) -> some View {
+        Menu {
+            Button {
+                Task { if await index(api) { await save(api, "/api/videos/\(videoID)/list-state", ["state": "watched"]) } }
+            } label: { Label("Marquer comme vu", systemImage: "checkmark.circle") }
+            Button {
+                Task { if await index(api) { await save(api, "/api/videos/\(videoID)/list-state", ["state": "hidden"]) } }
+            } label: { Label("Marquer indésirée", systemImage: "eye.slash") }
+            Divider()
+            Button { Task { if await index(api) { showPlaylists = true } } } label: {
+                Label("Playlists", systemImage: "text.badge.plus")
+            }
+            Button { Task { if await index(api) { showComment = true } } } label: {
+                Label("Écrire un commentaire personnel", systemImage: "square.and.pencil")
+            }
+            if let url = URL(string: video.url) {
+                Link(destination: url) { Label("Ouvrir sur YouTube", systemImage: "arrow.up.right.square") }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .buttonStyle(CircleButtonStyle())
+        .accessibilityLabel("Plus d'options")
+    }
+
+    /// Adds the video to the index (the fiche without media, `POST /api/videos/share-import`) and loads it:
+    /// the page then becomes the normal fiche. True when the fiche is there.
+    private func index(_ api: RatonAPI) async -> Bool {
+        if videoID != 0 { return true }
+        guard let candidate, !indexing else { return false }
+        indexing = true
+        errorMessage = nil
+        defer { indexing = false }
+        do {
+            let reply: SharedVideo = try await api.post("/api/videos/share-import", body: ["url": candidate.url])
+            videoID = reply.videoId
+            await open()
+            return detail != nil
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     // MARK: Calls
 
     private func seek(_ seconds: Double, _ detail: VideoDetail, _ api: RatonAPI) {
@@ -388,7 +521,7 @@ struct FicheView: View {
     }
 
     private func open() async {
-        guard let api = state.api else { return }
+        guard let api = state.api, videoID != 0 else { return }
         do {
             let loaded: VideoDetail = try await api.get("/api/videos/\(videoID)")
             // The side is chosen once: coming back to the fiche (its tab shown again, a page pushed over

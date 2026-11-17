@@ -26,7 +26,6 @@ struct PlaylistPlayerPanel: View {
                 audioStage
             }
             nowPlaying
-            if player.queueMode == .audio, playable > 0 { AudioOptionsRow() }
             if owns {
                 PlaybackErrorMessage {
                     if let id = player.queue?.currentTrack?.videoID { player.playQueueTrack(id) }

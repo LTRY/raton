@@ -7,6 +7,8 @@ struct SearchField: View {
     @Binding var text: String
     // False where a search is costly (YouTube): it then runs on the keyboard's search key only.
     var live = true
+    // Lets a page know when the field is being edited (the YouTube search shows its history then).
+    var focus: FocusState<Bool>.Binding? = nil
     let onSubmit: () -> Void
     // What the last search ran on, so a pause in typing does not run the same one twice.
     @State private var sent = ""
@@ -24,6 +26,7 @@ struct SearchField: View {
                 .submitLabel(.search)
                 .autocorrectionDisabled()
                 .onSubmit(submit)
+                .modifier(OptionalFocus(binding: focus))
             if !text.isEmpty {
                 Button {
                     text = ""
@@ -44,6 +47,13 @@ struct SearchField: View {
         .padding(.horizontal, 16).padding(.vertical, 10)
         .surface(in: Capsule())
         .padding(.horizontal, 16).padding(.bottom, 12)
+    }
+}
+
+private struct OptionalFocus: ViewModifier {
+    let binding: FocusState<Bool>.Binding?
+    func body(content: Content) -> some View {
+        if let binding { content.focused(binding) } else { content }
     }
 }
 

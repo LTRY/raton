@@ -367,6 +367,11 @@ struct RatonLine: Codable {
     let ctaHref: String
 }
 
+/// The answer of `POST /api/videos/share-import`: the fiche made from a link.
+struct SharedVideo: Codable {
+    let videoId: Int
+}
+
 struct YoutubeFicheRef: Codable, Hashable {
     let id: Int
     let title: String
