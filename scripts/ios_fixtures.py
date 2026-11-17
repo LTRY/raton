@@ -8,6 +8,7 @@ model cannot decode it. A change of the API that the app reads therefore shows u
 """
 
 import json
+import re
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -76,11 +77,15 @@ def answers(client: TestClient) -> dict[str, object]:
     return result
 
 
+_DATE_KEY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
 def shape(value: object) -> object:
     """What a model decodes: the keys and the kind of each value, not the values themselves.
-    A list is the set of the shapes of its items, so its length and order do not count."""
+    A list is the set of the shapes of its items, so its length and order do not count. A date
+    used as a key (`day_seconds`) is the day the fixture was written, so it stands for any date."""
     if isinstance(value, dict):
-        return {key: shape(item) for key, item in sorted(value.items())}
+        return {_DATE_KEY.sub("<date>", key): shape(item) for key, item in sorted(value.items())}
     if isinstance(value, list):
         shapes = {json.dumps(shape(item), sort_keys=True) for item in value}
         return [json.loads(text) for text in sorted(shapes)]

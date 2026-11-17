@@ -156,6 +156,22 @@ def test_purge_keeps_shorts(tmp_path):
     assert (tmp_path / short.yt_video_id / "video.mp4").exists()
 
 
+def test_purge_keeps_music(tmp_path):
+    db = make_session()
+    music = add_video(db, tmp_path / "music", watched_days_ago=30)
+    music.category_labels = "Cuisine, Musique"
+    other = add_video(db, tmp_path / "other", watched_days_ago=30)
+    other.category_labels = "cuisine"
+    db.commit()
+
+    assert purge_watched_media(db) == 1
+    db.refresh(music)
+    db.refresh(other)
+    assert music.video_path is not None
+    assert (tmp_path / "music" / "video.mp4").exists()
+    assert other.video_path is None
+
+
 def test_purge_keeps_a_video_any_user_rated_four_or_more(tmp_path):
     db = make_session()
     video = add_video(db, tmp_path / "vid", watched_days_ago=30, rating=1)

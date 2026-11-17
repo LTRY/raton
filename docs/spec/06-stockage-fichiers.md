@@ -135,6 +135,8 @@ sont partages par tous les utilisateurs : la purge vaut pour tous.
   supprimes. Une baisse de note a 3 ou moins ne change pas `watched_at` ; si
   la date a plus de 7 jours et qu'aucun autre utilisateur ne la note 4+, la
   purge a lieu au passage suivant ;
+- une fiche portant le label `musique` (ou `music`) n'est jamais purgee : ses
+  fichiers ne partent que par la suppression a la main de l'utilisateur ;
 - un short (son URL contient `/shorts/`) n'est jamais purge : ses fichiers ne
   partent que par la suppression a la main de l'utilisateur ;
 - les deux formats (`video_path` et `audio_path`) sont supprimes ensemble, des
