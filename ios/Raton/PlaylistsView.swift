@@ -90,7 +90,7 @@ struct PressReportingStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .onChange(of: configuration.isPressed) { pressed = $0 }
+            .onChange(of: configuration.isPressed) { _, new in pressed = new }
     }
 }
 
@@ -153,7 +153,7 @@ struct PlaylistTile: View {
             .buttonStyle(PressReportingStyle(pressed: $pressed))
             // A finger resting on the tile lifts it; one that moves to scroll never does, because the
             // scroll cancels the press before the short wait is over.
-            .onChange(of: pressed) { down in
+            .onChange(of: pressed) { _, down in
                 holdTask?.cancel()
                 if down {
                     holdTask = Task {

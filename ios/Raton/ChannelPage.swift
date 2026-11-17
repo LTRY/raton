@@ -80,7 +80,7 @@ struct ChannelView: View {
                     await loadDetail(api)
                     await model.refresh(api: api, search: search)
                 }
-                .onChange(of: model.filters) { _ in Task { await reload(api) } }
+                .onChange(of: model.filters) { Task { await reload(api) } }
                 .sheet(isPresented: $showCategories) {
                     CategoryPickerSheet(api: api, selected: categories) { chosen in
                         do {

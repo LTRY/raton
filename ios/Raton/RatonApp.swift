@@ -92,7 +92,7 @@ struct RootView: View {
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .sensoryFeedback(.selection, trigger: tab)
         // The Nouveautés widget counts what the app has just shown.
-        .onChange(of: scenePhase) { phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
+        .onChange(of: scenePhase) { _, phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
         // `raton://nouveautes`, the link of the Nouveautés widget: the Nouveautés, over the Bibliothèque.
         .onOpenURL { url in
             guard url.scheme == "raton", url.host == "nouveautes" else { return }
