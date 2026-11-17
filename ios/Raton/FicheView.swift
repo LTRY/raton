@@ -1,7 +1,8 @@
 import AVKit
 import SwiftUI
 
-enum FicheTab: String, CaseIterable {
+/// The blocks under the fiche's title, in the order they are shown.
+enum FicheSection: String, CaseIterable {
     case info = "Plus d'informations"
     case notes = "Notes structurées"
     case chat = "Discussion"
@@ -40,6 +41,14 @@ struct FicheView: View {
                     mediaPager(detail, api: api)
                     if mode == .audio {
                         AudioSeekBar(videoID: detail.id).transition(.opacity)
+                        AudioOptionsRow().transition(.opacity)
+                    }
+                    if isLoaded {
+                        PlaybackErrorMessage {
+                            let kind = player.track?.kind ?? mode
+                            player.stop()
+                            player.play(detail: detail, kind: kind, api: api)
+                        }
                     }
                     infoBlock(detail, api: api)
                 } else if let message = errorMessage {
@@ -150,7 +159,8 @@ struct FicheView: View {
                     if offline.item(detail.id) != nil {
                         Label("Retirer de l'écoute hors ligne", systemImage: "icloud.slash")
                     } else if offline.downloading.contains(detail.id) {
-                        Label("Téléchargement hors ligne…", systemImage: "arrow.down.circle")
+                        Label("Téléchargement hors ligne… \(Int((offline.progress[detail.id] ?? 0) * 100)) %",
+                              systemImage: "arrow.down.circle")
                     } else {
                         Label("Écouter hors ligne", systemImage: "arrow.down.circle")
                     }
@@ -325,6 +335,7 @@ struct FicheView: View {
                 }
             }
             .disabled(busy)
+            .ratingAccessibility(detail.rating)
             Theme.border.frame(height: 1)
             if let notice { Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft) }
             if let message = errorMessage {
@@ -336,8 +347,8 @@ struct FicheView: View {
         .padding(.top, 8)
     }
 
-    private func tabs(_ detail: VideoDetail) -> [FicheTab] {
-        FicheTab.allCases.filter { item in
+    private func shownSections(_ detail: VideoDetail) -> [FicheSection] {
+        FicheSection.allCases.filter { item in
             switch item {
             case .notes: return detail.documents.notes != nil || detail.documents.shortSummary != nil
             default: return true
@@ -345,10 +356,10 @@ struct FicheView: View {
         }
     }
 
-    /// The sections one under the other, in the order of `FicheTab`: no tabs to switch between.
+    /// The sections one under the other, in the order of `FicheSection`.
     private func sections(_ detail: VideoDetail, api: RatonAPI) -> some View {
         VStack(alignment: .leading, spacing: 26) {
-            ForEach(tabs(detail), id: \.self) { item in
+            ForEach(shownSections(detail), id: \.self) { item in
                 // The description and the notes sit behind their own chevron, the chat is a plain input: no titles.
                 section(item, detail, api: api)
             }
@@ -357,7 +368,7 @@ struct FicheView: View {
     }
 
     @ViewBuilder
-    private func section(_ item: FicheTab, _ detail: VideoDetail, api: RatonAPI) -> some View {
+    private func section(_ item: FicheSection, _ detail: VideoDetail, api: RatonAPI) -> some View {
         switch item {
         case .info: InfoPanel(detail: detail, seek: { seek($0, detail, api) })
         case .notes: NotesPanel(detail: detail, generating: generating) { generateNotes(api) }
@@ -380,8 +391,12 @@ struct FicheView: View {
         guard let api = state.api else { return }
         do {
             let loaded: VideoDetail = try await api.get("/api/videos/\(videoID)")
+            // The side is chosen once: coming back to the fiche (its tab shown again, a page pushed over
+            // it left) reads it again and must not flip an audio being listened to back to the video.
+            if detail == nil {
+                mode = loaded.mediaUrls.video != nil || loaded.mediaUrls.audio == nil ? .video : .audio
+            }
             detail = loaded
-            mode = loaded.mediaUrls.video != nil || loaded.mediaUrls.audio == nil ? .video : .audio
             // Opening the fiche is what takes it out of the Nouveautés.
             let _: VideoState? = try? await api.post("/api/videos/\(videoID)/open")
         } catch {
@@ -422,17 +437,15 @@ struct FicheView: View {
             do {
                 var body: [String: Any] = [:]
                 if let quality { body["video_quality"] = quality }
-                let _: QueuedJob = try await api.post("/api/videos/\(videoID)/media/\(kind.rawValue)/download", body: body)
-                // The download runs on the server: read the fiche until its file shows up.
-                for _ in 0..<150 {
-                    try await Task.sleep(nanoseconds: 4_000_000_000)
-                    await reload(api)
-                    if !onScreen { break }
-                    if let detail, (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
-                        // Still on the fiche, on the side that was downloaded: play it straight away.
-                        if mode == kind { player.play(detail: detail, kind: kind, api: api) }
-                        break
-                    }
+                let job: QueuedJob = try await api.post("/api/videos/\(videoID)/media/\(kind.rawValue)/download", body: body)
+                // The download runs on the server: its job is watched, then the fiche is read once.
+                let progress = try await api.waitForJob(job.jobId, while: { onScreen })
+                if progress?.status == "failed" { errorMessage = progress?.message ?? "Le téléchargement a échoué." }
+                await reload(api)
+                // Still on the fiche, on the side that was downloaded: play it straight away.
+                if onScreen, mode == kind, let detail,
+                   (kind == .video ? detail.mediaUrls.video : detail.mediaUrls.audio) != nil {
+                    player.play(detail: detail, kind: kind, api: api)
                 }
             } catch {
                 errorMessage = error.localizedDescription
@@ -485,15 +498,24 @@ struct NowPlayingBar: View {
         if player.track?.kind == .audio || player.queue != nil {
             HStack(spacing: 6) {
                 Button { player.togglePlayPause() } label: {
-                    Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.system(size: 24)).frame(width: 52, height: 52).contentShape(Rectangle())
+                    Group {
+                        if player.isBuffering {
+                            ProgressView().tint(Color(hex: 0xF3E8D9))
+                        } else {
+                            Image(systemName: player.isPlaying ? "pause.fill" : "play.fill").font(.system(size: 24))
+                        }
+                    }
+                    .frame(width: 52, height: 52).contentShape(Rectangle())
                 }
-                .accessibilityLabel(player.isPlaying ? "Pause" : "Lecture")
+                .accessibilityLabel(player.isBuffering ? "Chargement" : player.isPlaying ? "Pause" : "Lecture")
                 Button(action: open) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(player.title).font(.raton(16, .bold)).lineLimit(1)
                         // In a playlist the line under the title is the playlist's name, else the channel's.
-                        if let subtitle = player.queue?.title ?? player.artist {
+                        if player.playbackError != nil {
+                            Text("Lecture impossible").font(.raton(14, .semibold)).lineLimit(1)
+                                .foregroundStyle(Color(hex: 0xFFB48A))
+                        } else if let subtitle = player.queue?.title ?? player.artist {
                             Text(subtitle).font(.raton(14)).lineLimit(1).opacity(0.7)
                         }
                     }

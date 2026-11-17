@@ -23,6 +23,28 @@ final class PlayerController: ObservableObject {
     @Published private(set) var track: Track?
     @Published private(set) var title = ""
     @Published private(set) var isPlaying = false
+    /// True while the player waits for data before it can play (start of a file, slow network).
+    @Published private(set) var isBuffering = false
+    /// Why the loaded file cannot be played, in French; nil while all is well.
+    @Published private(set) var playbackError: String?
+    /// The speed of the audio, kept across launches. A video keeps the speed menu of its native controls.
+    @Published var audioRate: Float = {
+        let saved = UserDefaults.standard.float(forKey: "audioRate")
+        return PlayerController.rates.contains(saved) ? saved : 1
+    }() {
+        didSet {
+            UserDefaults.standard.set(audioRate, forKey: "audioRate")
+            applyRate()
+            updateNowPlaying()
+        }
+    }
+    static let rates: [Float] = [0.75, 1, 1.25, 1.5, 1.75, 2]
+    /// When the sleep timer pauses playback: at a time, or when the track that plays ends.
+    enum SleepTimer: Equatable {
+        case at(Date)
+        case endOfTrack
+    }
+    @Published var sleepTimer: SleepTimer?
     let clock = PlaybackClock()
     private var position: Double {
         get { clock.position }
@@ -52,6 +74,12 @@ final class PlayerController: ObservableObject {
     private var fallbackDuration: Double = 0
     private var timeObserver: Any?
     private var statusObserver: AnyCancellable?
+    private var itemObserver: AnyCancellable?
+    private var failureObserver: NSObjectProtocol?
+    private var interruptionObserver: NSObjectProtocol?
+    // Set when a call or another app interrupts a file that was playing: playback goes on afterwards.
+    private var resumeAfterInterruption = false
+    private var lastPlayingAt = Date.distantPast
     private var endObserver: NSObjectProtocol?
     private var watchedSeconds: Double = 0
     private var lastTrackedTime: Double?
@@ -70,6 +98,28 @@ final class PlayerController: ObservableObject {
 
     init() {
         configureRemoteCommands()
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] note in self?.interrupted(note) }
+    }
+
+    /// A phone call, an alarm or Siri pauses the player; when it ends and iOS says playback may go on,
+    /// a file that was playing starts again. A file the user had paused stays paused.
+    private func interrupted(_ note: Notification) {
+        guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
+        switch type {
+        case .began:
+            // The player may already have paused itself when the notification arrives.
+            resumeAfterInterruption = isPlaying || Date().timeIntervalSince(lastPlayingAt) < 1
+        case .ended:
+            let options = AVAudioSession.InterruptionOptions(
+                rawValue: note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0)
+            if resumeAfterInterruption, options.contains(.shouldResume) { resume() }
+            resumeAfterInterruption = false
+        @unknown default:
+            break
+        }
     }
 
     // MARK: Loading
@@ -131,9 +181,11 @@ final class PlayerController: ObservableObject {
         lastTrackedTime = nil
         lastReportAt = Date()
         reportsActivity = reports
+        playbackError = nil
 
         let player = AVPlayer(url: localURL ?? api.url(path))
         self.player = player
+        applyRate()
         observe(player)
         self.skipSegments = skipSegments
         if let startAt {
@@ -149,6 +201,7 @@ final class PlayerController: ObservableObject {
     func stop() {
         release()
         queue = nil
+        sleepTimer = nil
         refreshRemoteCommands()
     }
 
@@ -161,12 +214,16 @@ final class PlayerController: ObservableObject {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         timeObserver = nil
         statusObserver = nil
+        itemObserver = nil
+        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+        failureObserver = nil
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = nil
         player.pause()
         self.player = nil
         track = nil
         isPlaying = false
+        isBuffering = false
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -189,10 +246,22 @@ final class PlayerController: ObservableObject {
         if duration > 0, position >= duration - 0.5 { seek(to: 0) }
         player.play()
     }
-    func pause() { player?.pause() }
+    func pause() {
+        resumeAfterInterruption = false
+        player?.pause()
+    }
 
+    /// `play()` starts at the player's default rate: the chosen speed for an audio, 1 for a video.
+    private func applyRate() {
+        guard let player else { return }
+        let rate = track?.kind == .audio ? audioRate : 1
+        player.defaultRate = rate
+        if player.rate != 0 { player.rate = rate }
+    }
+
+    /// While it buffers the player is asked to play: the button pauses it, as when it plays.
     func togglePlayPause() {
-        if isPlaying { pause() } else { resume() }
+        if isPlaying || isBuffering { pause() } else { resume() }
     }
 
     func seek(to seconds: Double) {
@@ -227,6 +296,10 @@ final class PlayerController: ObservableObject {
             self.trackWatchedTime()
             if Date().timeIntervalSince(self.lastReportAt) >= Self.reportInterval { self.reportActivity() }
             self.updateNowPlaying()
+            if case .at(let date) = self.sleepTimer, Date() >= date {
+                self.sleepTimer = nil
+                self.pause()
+            }
         }
         statusObserver = player.publisher(for: \.timeControlStatus)
             .receive(on: DispatchQueue.main)
@@ -234,15 +307,50 @@ final class PlayerController: ObservableObject {
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main
         ) { [weak self] _ in
-            self?.trackWatchedTime()
-            self?.reportActivity()
+            guard let self else { return }
+            self.trackWatchedTime()
+            self.reportActivity()
+            if self.sleepTimer == .endOfTrack {
+                // The timer asked for this track only: the queue stops here.
+                self.sleepTimer = nil
+                return
+            }
             // Without a queue the player just stays at the end.
-            if self?.queue != nil { self?.next() }
+            if self.queue != nil { self.next() }
         }
+        // A file that cannot be loaded (server gone, file missing) or that breaks while it plays.
+        itemObserver = player.currentItem?.publisher(for: \.status)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                if status == .failed { self?.failed(player.currentItem?.error) }
+            }
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime, object: player.currentItem, queue: .main
+        ) { [weak self] note in
+            self?.failed(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)
+        }
+    }
+
+    private func failed(_ error: Error?) {
+        isBuffering = false
+        // Three cases: the server cannot be reached (with the local-network hint), it answers but
+        // has no such file, or the file itself cannot be decoded.
+        let unreachable: Set<URLError.Code> = [
+            .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost, .timedOut, .networkConnectionLost,
+        ]
+        var reason: String?
+        if let error, let code = (error as? URLError)?.code {
+            reason = unreachable.contains(code)
+                ? RatonAPI.connectionError(error, host: api?.baseURL.host).message
+                : "Le serveur n'a pas pu envoyer le fichier."
+        }
+        playbackError = "Lecture impossible. " + (reason ?? "Le fichier n'a pas pu être lu.")
     }
 
     private func statusChanged(_ status: AVPlayer.TimeControlStatus) {
         let playing = status == .playing
+        isBuffering = status == .waitingToPlayAtSpecifiedRate && playbackError == nil
+        if isPlaying, !playing { lastPlayingAt = Date() }
         if playing {
             lastTrackedTime = player?.currentTime().seconds
         } else if status == .paused {
@@ -306,7 +414,7 @@ final class PlayerController: ObservableObject {
             MPMediaItemPropertyTitle: title,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: position,
             MPMediaItemPropertyPlaybackDuration: duration,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? Double(player?.rate ?? 1) : 0.0,
         ]
         if let artist { info[MPMediaItemPropertyArtist] = artist }
         if let artwork { info[MPMediaItemPropertyArtwork] = artwork }
@@ -450,7 +558,8 @@ final class PlayerController: ObservableObject {
         begin(Track(videoID: id, kind: kind), path: "/api/videos/\(id)/\(kind.rawValue)", title: queued.title,
               artist: queued.channelName, duration: queued.durationSeconds,
               thumbnail: queued.hasThumbnail ? "/api/videos/\(id)/thumbnail?w=320" : nil,
-              api: api, startAt: startAt, skipSegments: [], reports: !queue.free)
+              api: api, startAt: startAt, skipSegments: [], reports: !queue.free,
+              localURL: kind == .audio ? OfflineStore.shared.localAudio(for: id) : nil)
         Task { [weak self] in
             guard let detail: VideoDetail = try? await api.get("/api/videos/\(id)") else { return }
             await MainActor.run {

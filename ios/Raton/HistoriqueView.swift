@@ -53,7 +53,7 @@ struct HistoriqueView: View {
                 }
                 .barClearance()
                 .refreshable { await reload(api) }
-                .task { await reload(api) }
+                .task { await read(pages: loaded ? page : 1, api, quiet: loaded) }
             }
         }
         .ratonPage()
@@ -85,15 +85,33 @@ struct HistoriqueView: View {
         }
     }
 
+    /// Reads the list from its first page.
     private func reload(_ api: RatonAPI) async {
+        await read(pages: 1, api, quiet: false)
+    }
+
+    /// Reads again every page already shown, so the page keeps its place when it comes back on screen
+    /// (a fiche opened from it and left). `quiet` leaves the list as it is when the call fails.
+    private func read(pages: Int, _ api: RatonAPI, quiet: Bool) async {
         do {
-            let reply: HistoriqueReply = try await api.get("/api/historique", query: ["page": "1"])
-            rows = reply.rows
-            page = reply.page
-            totalPages = reply.totalPages
+            var fresh: [HistoryRow] = []
+            var last: HistoriqueReply?
+            for number in 1...max(pages, 1) {
+                let reply: HistoriqueReply = try await api.get("/api/historique", query: ["page": String(number)])
+                let known = Set(fresh.map(\.id))
+                fresh += reply.rows.filter { !known.contains($0.id) }
+                last = reply
+                if reply.page >= reply.totalPages { break }
+            }
+            guard let last else { return }
+            rows = fresh
+            page = last.page
+            totalPages = last.totalPages
             errorMessage = nil
         } catch {
-            if !(error is CancellationError) { errorMessage = error.localizedDescription }
+            // A page left while it loads cancels the call: not an error to show, and not a first load done.
+            if Task.isCancelled { return }
+            if !quiet { errorMessage = error.localizedDescription }
         }
         loaded = true
     }
@@ -102,12 +120,13 @@ struct HistoriqueView: View {
         guard row.id == rows.last?.id, page < totalPages, !loading else { return }
         loading = true
         defer { loading = false }
-        if let reply: HistoriqueReply = try? await api.get("/api/historique", query: ["page": String(page + 1)]) {
+        do {
+            let reply: HistoriqueReply = try await api.get("/api/historique", query: ["page": String(page + 1)])
             let known = Set(rows.map(\.id))
             rows += reply.rows.filter { !known.contains($0.id) }
             page = reply.page
             totalPages = reply.totalPages
-        }
+        } catch { Toasts.shared.show(error) }
     }
 
     /// "2026-10-28" as "mercredi 28 octobre"; the API gives the day, the app only writes it in French.

@@ -1,0 +1,43 @@
+# Compiles the iOS app and runs its unit tests (ios/RatonTests: the Swift models against the API
+# fixtures, the playlist queue) when the app or this file changes. `make ci` compiles no Swift.
+# The UI tests (ios/RatonUITests) are not run here: they need the demo back and front.
+name: ios
+
+on:
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  push:
+    branches: [main]
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # The app uses iOS 27 symbols behind `#available`, so it needs the Xcode 27 SDK to compile.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Show the toolchain
+        run: xcodebuild -version
+      - name: Generate the Xcode project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen
+      - name: Build and run the unit tests
+        run: |
+          # An iPhone of the newest iOS runtime the runner has, whatever its name.
+          udid="$(xcrun simctl list devices available -j | jq -r '
+            .devices | to_entries
+            | map(select(.key | test("SimRuntime\\.iOS-")))
+            | sort_by(.key | capture("iOS-(?<major>[0-9]+)-(?<minor>[0-9]+)") | [(.major | tonumber), (.minor | tonumber)])
+            | last | .value | map(select(.name | startswith("iPhone"))) | first | .udid')"
+          echo "Simulator: $udid"
+          xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -only-testing:RatonTests \
+            -destination "platform=iOS Simulator,id=$udid" CODE_SIGNING_ALLOWED=NO

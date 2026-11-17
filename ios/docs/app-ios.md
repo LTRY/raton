@@ -13,7 +13,7 @@ endpoint calcule par un service de `back/services/`, jamais une copie de la
 regle en Swift.
 
 **Etat : migration quasi complete du front telephone.** Le projet se genere et se compile avec Xcode, et tourne
-dans le simulateur iPhone (iOS 18) sur les donnees de demo (`make demo`). La
+dans le simulateur iPhone (iOS 27) sur les donnees de demo (`make demo`). La
 lecture d'un fichier audio (m4a), la reprise, le rapport `/activity` et la
 lecture en arriere-plan y ont ete essayes ; la video, l'ecran verrouille et le
 reseau local d'un iPhone reel ne l'ont pas ete.
@@ -90,10 +90,15 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   encart de zone de securite pose a la racine (`safeAreaInset`) se comptait
   autrement dans le simulateur et sur un iPhone : le bas de la page restait
   derriere le mini-lecteur. Une nouvelle page a defilement l'appelle ; une feuille
-  (`sheet`) n'en a pas besoin. La page change avec
-  l'onglet (`.id`). Toucher une icone, celle de l'onglet courant comprise,
-  ramene a la page de base de l'onglet : les piles de navigation sont videes
-  (une fiche ouverte depuis la Bibliotheque ou une page de chaine est quittee).
+  (`sheet`) n'en a pas besoin. Les pages des
+  onglets sont dans le `TabView` du systeme, dont la barre est cachee sous la
+  notre : un onglet est construit a sa premiere visite puis garde. Changer
+  d'onglet et y revenir retrouve donc la page ou on l'a laissee (defilement,
+  recherche, filtres, fiche ou page de chaine ouverte), et un onglet cache est
+  hors de l'ecran et de VoiceOver. Toucher l'icone de l'onglet deja affiche
+  ramene a sa page de base, en haut : cet onglet est reconstruit (`.id`) et sa
+  pile de navigation videe. L'Accueil fait exception : il est reconstruit a
+  chaque visite, pour que Raton dise une nouvelle ligne.
 - **Mini-lecteur** (`NowPlayingBar`) : au-dessus de la barre d'onglets tant qu'un
   audio est charge, comme celui de Spotify : une pilule de verre fume sombre, de
   la forme et de la largeur de la barre d'onglets, posee 6 pt au-dessus, avec pause/lecture a gauche,
@@ -105,12 +110,37 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
   d'iOS (`Font.raton`), plafonne a `xxxLarge` a la racine pour que les lignes
   et pastilles tiennent ; les cibles de toucher font 44 pt au moins (les cinq
   etoiles se partagent la ligne) ; un retour haptique leger accompagne le
-  changement d'onglet, les cloches, les etoiles et la bascule « tout voir » ;
-  le changement d'onglet se fait en fondu de 0,15 s. Pas de mode sombre : le
+  changement d'onglet, les cloches, les etoiles et la bascule « tout voir ». Pas de mode sombre : le
   theme est clair uniquement, comme le front (`docs/spec/11-interface-html.md`).
 - **Chargement et erreurs** : une liste montre une roue (`LoadingRow`) jusqu'a sa
   premiere reponse, puis « Aucune ... » si elle est vide ; une erreur de reseau
-  ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`).
+  ou de serveur s'affiche avec un bouton « Reessayer » (`ErrorMessage`). Une
+  action qui echoue la ou l'ecran n'a pas de place pour une erreur (cloche ou
+  note d'une chaine dans la liste, Vu ou Indesiree d'une ligne, dupliquer ou
+  supprimer une playlist, page suivante d'une liste) l'ecrit quatre secondes
+  dans un bandeau rouge au-dessus des barres (`Toasts`), que VoiceOver annonce :
+  aucun echec n'est silencieux.
+- **Recherche** : la liste suit la frappe, 350 ms apres la derniere lettre
+  (`SearchField`), sans attendre la touche Rechercher ; la recherche YouTube,
+  couteuse, ne part qu'a cette touche.
+- **Images** : `CachedImage` remplace `AsyncImage` partout ; les images
+  decodees restent en memoire (64 Mo au plus), donc une ligne qui revient a
+  l'ecran s'affiche tout de suite. Les fichiers sont dans le cache HTTP du
+  systeme, qui suit le `Cache-Control` du back.
+- **VoiceOver** : une rangee d'etoiles annonce la note courante (« Note, 3 sur
+  5 ») ; les etoiles d'une ligne de liste sont un seul element, absent sans
+  note ; la croix du champ de recherche se nomme « Effacer la recherche ».
+- **Une liste garde sa place** (Bibliotheque, Nouveautes, fiches d'une chaine,
+  Chaines, Historique) : revenir sur la page (retour d'une fiche, retour sur
+  l'onglet) ou agir sur une ligne (Vu, Indesiree) relit toutes les pages deja
+  affichees (`refresh`), pas seulement la premiere ; la liste garde sa longueur
+  et l'ecran sa position, et c'est toujours le back qui dit ce que la liste
+  contient. Si cette relecture echoue, la liste reste telle quelle. Une
+  recherche, un filtre, un tri ou tirer pour rafraichir repartent de la
+  premiere page (`reload`). Chaque lecture porte un numero : une reponse qui
+  arrive apres le depart d'une lecture plus recente (deux filtres changes coup
+  sur coup) est ignoree, et une lecture annulee parce que la page est quittee
+  n'affiche pas d'erreur.
 - **Ecrans** : barre d'onglets en pilule flottante, boutons ronds blancs pour
   le retour et les menus, lignes de liste pleine largeur a vignette a gauche
   (duree, barre de progression), cartes blanches pour les chaines et les
@@ -137,14 +167,14 @@ Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` qui le
 | --- | --- | --- |
 | Adresse du serveur (premier lancement, puis Parametres) | Saisie de l'URL, validee avant d'etre gardee dans `UserDefaults` | `GET /api/users` (200 attendu) |
 | Choix de l'utilisateur | Liste des utilisateurs ; dans Parametres, creer (+) et supprimer (appui long) | `GET/POST /api/users`, `DELETE /api/users/{id}` |
-| Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique (rien d'autre : ni menu ni barre de discussion) | `POST /api/raton/visit`, `/static/img/raton/<art>` |
+| Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique (rien d'autre : ni menu ni barre de discussion). Si la visite echoue (serveur injoignable), l'erreur s'affiche sous Raton avec, s'il y a des audios sur le telephone, le bouton « Ecouter hors ligne (N) » vers la page Hors ligne | `POST /api/raton/visit`, `/static/img/raton/<art>` |
 | Nouveautes | Comme sur le web, la page d'Exploration sur les chaines suivies : une seule liste de fiches, les plus recentes d'abord (pas de pile par chaine), avec la recherche, les filtres et la bascule « tout voir » ; fleche de retour et bouton Historique | `GET /api/library?followed=true`, `GET /api/videos/{id}/thumbnail` |
 | Historique | Ce qui a ete lu, par jour | `GET /api/historique?page=N` |
 | Recherche | Videos et chaines YouTube ; importer une video (video ou audio) ou ajouter une chaine | `GET /api/youtube/videos\|channels`, `POST /api/videos/import`, `POST /api/channels` |
 | Chaines | Titre avec le nombre de chaines, recherche, « ★ Notees » (actif par defaut) et tri (dernier media joue par defaut) ; chaque chaine est une carte comme sur le web : banniere avec l'avatar par-dessus, nom, nombre de fiches, derniere activite, cloches et note qui s'utilisent depuis la liste ; menu « + » vers l'ajout par adresse et la Recherche | `GET /api/channels?q=&page=&sort=&rated=`, `PUT .../bells/{section}`, `PUT .../rating`, `POST /api/channels` |
 | Chaine | Comme la page du front : banniere (degrade terracotta sans banniere) avec l'avatar par-dessus, nom qui ouvre YouTube, cloches videos et shorts avec leur pastille, note (toucher l'etoile deja choisie remet 0, pas de ×), menu « ⋯ » (statistiques, categories, rafraichir le profil, supprimer) ; description (« Voir plus ») et mots-cles (+N) ; bascule Videos / Shorts, bouton de recherche des nouveautes sur YouTube, recherche, bascule « tout voir » / « masquer les vues », tri (publication recente par defaut) et Filtres ; ses fiches avec la date de publication (les shorts en mosaique de tuiles portrait : 3 colonnes, grande tuile 2×2 avec le titre pour un short nouveau ou note 5, comme le front ; toucher une tuile lit le short en plein ecran dans le lecteur natif, apres l'avoir telecharge en 1080p s'il n'a pas de fichier, avec un cercle de chargement sans texte sur la tuile ; la petite fleche de la tuile ouvre la fiche) ; « Explorer la suite » | `GET /api/channels/{id}`, `PUT /api/channels/{id}/bells/{section}`, `.../rating`, `.../categories`, `POST .../refresh-profile`, `POST .../import-metadata` puis `GET /api/jobs/{id}`, `DELETE`, `GET /api/library?channel_id=` (`counts`, `explore_next_page`, `explore_page_size`) |
 | Bibliotheque | Comme la page « Exploration » du front, mais nommee « Bibliotheque » dans l'app : bouton ☰ (les listes Bibliotheque, Podcasts et Musique, la liste active cochee et son nom en titre ; Nouveautes ; Historique ; Recherche YouTube. « Podcasts » et « Musique » sont la Bibliotheque filtree sur la categorie du meme nom ; les vues enregistrees du web n'y figurent pas, ni dans la feuille « Filtres ») et titre « Bibliotheque » suivi du nombre de fiches dans une pastille (pas de titre « Bibliotheque » ni de compteur plus bas), recherche, « Filtres » avec le nombre de filtres actifs et, a sa droite sur la meme ligne, la bascule « tout voir » / « masquer les vues » (pas de pastilles sous le bouton : les filtres se retrouvent et s'effacent dans la feuille « Filtres ») ; chaque fiche a un menu « ⋮ » (Vu, Indesiree) et, sur iOS 27, se balaie vers la gauche pour les memes deux actions (`swipeActionsContainer`, absent avant : le menu reste) ; feuille de filtres : tri, section, types de fichier et categories a trois etats, notees, sans categorie | `GET /api/library` (`sort`, `section`, `asset`, `exclude_asset`, `category`, `exclude_category`, `rated`, `uncategorized`, `hide`, modes, `q`), `GET /api/categories`, `PUT /api/videos/{id}/list-state` |
-| Hors ligne (Parametres, « Audios sur ce telephone ») | Les audios gardes sur le telephone depuis le menu « ⋮ » d'une fiche (« Ecouter hors ligne » / « Retirer de l'ecoute hors ligne ») : lecture sans serveur ni historique, suppression par la corbeille. Les fichiers sont des copies dans `Application Support/Offline`, hors sauvegarde iCloud ; une purge sur le serveur n'y touche pas | `GET /api/videos/{id}/audio` (au telechargement seulement) |
+| Hors ligne (Parametres, « Audios sur ce telephone ») | Les audios gardes sur le telephone depuis le menu « ⋮ » d'une fiche (« Ecouter hors ligne » / « Retirer de l'ecoute hors ligne ») : lecture sans serveur ni historique, suppression par la corbeille. Le menu « ⋯ » d'une playlist a aussi « Ecouter hors ligne » : il copie l'un apres l'autre les audios que la playlist a sur le serveur et que le telephone n'a pas encore (« Audio hors ligne : 2 sur 7… », puis le nombre garde et le nombre en echec ; un audio que le serveur ne peut pas envoyer n'arrete pas les autres). Pendant une copie, l'entree du menu de la fiche montre son avancement en pourcentage. Une copie continue quelques dizaines de secondes si l'app passe en arriere-plan (`beginBackgroundTask`), pas au-dela. La file d'une playlist joue la copie du telephone quand elle existe. Les fichiers sont des copies dans `Application Support/Offline`, hors sauvegarde iCloud ; une purge sur le serveur n'y touche pas | `GET /api/videos/{id}/audio` (au telechargement seulement) |
 | Playlists | Titre avec le nombre, recherche (sur le titre), grille a deux colonnes de tuiles comme le web (le titre reserve toujours deux lignes, pour que les tuiles d'une rangee restent alignees ; marge sous la derniere rangee pour passer au-dessus de la barre d'onglets ; pile de cartes, pastille de source (seulement pour une playlist importee, YouTube ou CSV : une playlist manuelle n'en a pas), nombre de videos, menu « ⋯ » : dupliquer, supprimer) ; menu « + » : creer, importer une playlist YouTube | `GET/POST /api/playlists`, `POST /api/playlists/import-url`, `POST .../duplicate`, `DELETE` |
 | Playlist | Barre du haut comme celle d'une fiche (retour, bouton video / audio, menu « ⋯ »), lecteur de file en tete (voir « Lecteur de playlist »), fiches dans l'ordre (ni coche ni compte de « vu » : une playlist n'affiche pas l'etat Vu, et son titre ne dit « Playlist YouTube » ou « Playlist CSV Takeout » que pour une playlist importee, jamais « manuelle ») : un toucher joue la piste, le « i » ouvre la fiche ; menu « ⋯ » : format par defaut (video ou audio), telecharger tout l'audio, telecharger toute la video, renommer, categories, ecoute libre, trier, dupliquer, supprimer ; appui long sur une fiche : monter, descendre, retirer | `GET/DELETE /api/playlists/{id}`, `POST .../download/{audio|video}`, `PUT .../title`, `.../categories`, `.../free-listening`, `POST .../sort`, `.../duplicate`, `.../items/{item}/move`, `DELETE .../items/{item}` |
 | Fiche | Lecteur, nom de la chaine (ouvre sa page dans l app, pas YouTube, empilee sur la meme pile de navigation que la fiche : les fiches de cette page s'ouvrent par-dessus, depuis une playlist comme ailleurs), note, categories, Vu et Indesiree, onglets, menu | voir ci-dessous |
@@ -155,9 +185,9 @@ La fiche :
 - ouvrir une fiche appelle `POST .../open` : c'est ce qui retire le label
   Nouveau, comme la page du front ;
 - le selecteur video / audio suit `media_urls` (les deux fichiers peuvent
-  coexister) ; sans fichier, un bouton de telechargement (qualite au choix pour
-  la video) lance `POST .../media/{type}/download` puis relit la fiche jusqu'a
-  l'arrivee du fichier, puis le lance tout de suite s'il est encore sur la fiche et du
+  coexister) ; le cote affiche est choisi a l'ouverture de la fiche (video s'il y en a une) et la relire en y revenant ne le change pas ; sans fichier, un bouton de telechargement (qualite au choix pour
+  la video) lance `POST .../media/{type}/download`, suit le travail (`GET /api/jobs/{id}`, dix minutes au plus ; son message s'affiche s'il echoue) puis relit la fiche,
+  et lance le fichier tout de suite s'il est encore sur la fiche et du
   bon cote (video ou audio) ; si l'on a quitte la fiche, la lecture ne demarre pas ; le menu supprime un fichier ; la video et la carte audio
   sont cote a cote dans un carrousel, comme sur le web : elles suivent le doigt, avec un
   effet elastique aux extremites, puis se calent sur la plus proche (un quart de largeur
@@ -174,7 +204,9 @@ La fiche :
   milieu, ±15 s de chaque cote et « Telechargement… » dessous ; sous la carte, la barre
   de progression du front (piste fine, remplissage terracotta, curseur 4×22, bulle
   du temps pendant le glissement, temps courant et duree), grisee tant que cet audio
-  n'est pas la piste chargee ;
+  n'est pas la piste chargee ; sous la barre, deux pastilles centrees (`AudioOptionsRow`) :
+  la vitesse (0,75× a 2×) et le minuteur de sommeil (voir « Lecteur ») ; pendant que le
+  fichier charge, une roue remplace le bouton lecture (la toucher met en pause) ;
 - Vu et Indesiree sont les deux premieres entrees du menu « ⋯ » en haut a droite
   (« Marquer comme vu / non vu », « Marquer indesiree / Ne plus masquer ») ; elles
   basculent comme celles du front, a partir de `shown_state` (l'etat affiche,
@@ -199,7 +231,7 @@ La fiche :
   terracotta dessous (elle tourne pendant qu'il repond), questions suggerees en pastilles
   a contour fin, saisie sur une seule ligne dans une capsule blanche avec le bouton d'envoi rond a droite (Retour envoie aussi et ferme le clavier ; faire glisser la page ferme le clavier ; la fiche garde de la marge sous le dernier bloc pour passer au-dessus de la barre d'onglets),
   « Effacer la conversation » en lien discret (`POST .../chat`, la reponse est attendue en relisant
-  `GET /api/llm-jobs/{id}`) ;
+  `GET /api/llm-jobs/{id}`, cinq minutes au plus : au-dela, « Raton met trop de temps a repondre ») ;
 - menu : playlists (ajouter, retirer, creer), generer les notes
   (`POST .../notes/generate`), telecharger le transcript, ouvrir sur YouTube ;
 - les erreurs sont des messages francais : serveur injoignable, acces au
@@ -218,16 +250,32 @@ L'extension lit l'adresse du serveur dans l'App Group `group.fr.raton.app` ; l'a
 
 ## Widget Nouveautes
 
-Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Raton et le nombre de fiches des chaines suivies (`total` de `GET /api/library?followed=true`, l'en-tete `X-Raton-User` portant l'utilisateur), en creme et terracotta comme l'app. « Ouvrez Raton » tant qu'aucun serveur n'est choisi, « Hors ligne » quand il ne repond pas. Il lit l'adresse du serveur et l'utilisateur dans l'App Group `group.fr.raton.app` (comme l'extension de partage) ; l'app demande son rechargement quand elle passe en arriere-plan et quand le serveur ou l'utilisateur change, et iOS le rafraichit seul toutes les 30 minutes environ.
+Le widget « Nouveautes » (`ios/RatonWidget/`, petit et moyen format) montre Raton et le nombre de fiches des chaines suivies (`total` de `GET /api/library?followed=true`, l'en-tete `X-Raton-User` portant l'utilisateur), en creme et terracotta comme l'app. « Ouvrez Raton » tant qu'aucun serveur n'est choisi, « Hors ligne » quand il ne repond pas. Il lit l'adresse du serveur et l'utilisateur dans l'App Group `group.fr.raton.app` (comme l'extension de partage) ; l'app demande son rechargement quand elle passe en arriere-plan et quand le serveur ou l'utilisateur change, et iOS le rafraichit seul toutes les 30 minutes environ. Un toucher sur le widget ouvre l'app sur les Nouveautes (`raton://nouveautes`, schema declare dans `Info.plist`, lu par `RootView`).
 
 ## Tests
 
-`ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
-un doigt (XCUITest). Il lui faut le back et le front de demo (`make demo`, front
-sur `localhost:8000`) ; l'app y est pointee par les arguments de lancement
-`-serverURL` et `-userID`. Lancer :
-`xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`.
-`make ci` ne les lance pas (rien dans ce conteneur ne compile l'app).
+Deux cibles de test, dans le meme schema `Raton` :
+
+- `ios/RatonTests/` (tests unitaires, sans serveur) : `ModelDecodingTests` decode
+  avec les modeles de `Models.swift` de vraies reponses de l'API
+  (`ios/RatonTests/Fixtures/*.json`), et `PlaylistQueueTests` verifie l'ordre de
+  lecture d'une playlist. Les fichiers de `Fixtures` sont ecrits par
+  `uv run python -m scripts.ios_fixtures` a partir des donnees de demo ; ils sont
+  le contrat entre le back et l'app. `tests/test_ios_fixtures.py` (dans
+  `make ci`) echoue quand une reponse de l'API n'a plus la forme de son fichier :
+  il faut alors les reecrire et mettre `Models.swift` a jour. Un changement de
+  l'API que l'app lit se voit donc des deux cotes.
+- `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
+  un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
+  qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le
+  back et le front de demo (`make demo`, front sur `localhost:8000`) ; l'app y est
+  pointee par les arguments de lancement `-serverURL` et `-userID`.
+
+Lancer : `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`
+(ajouter `-only-testing:RatonTests` pour les seuls tests unitaires).
+`make ci` ne compile pas l'app ; le workflow `.github/workflows/ios.yml` la compile
+et lance les tests unitaires sur un runner macOS (image `xcode-27`) quand `ios/`
+change. Les tests d'interface ne tournent qu'a la main.
 
 ## Lecteur
 
@@ -235,12 +283,38 @@ Un seul `AVPlayer` (`PlayerController`) vit au-dessus des ecrans : l'audio
 continue quand on quitte la fiche ou qu'on verrouille l'ecran
 (`AVAudioSession` `.playback`, `UIBackgroundModes` = `audio`), avec les
 commandes de l'ecran verrouille (`MPNowPlayingInfoCenter`,
-`MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Une barre sous
-les onglets permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
+`MPRemoteCommandCenter` : lecture, pause, ±15 s, position). Le mini-lecteur,
+au-dessus de la barre d'onglets, permet de mettre en pause ou d'arreter l'audio hors de sa fiche.
 La position et la duree changent deux fois par seconde : elles sont dans un objet
 a part (`PlaybackClock`), que seules les barres de progression observent, pour
 que les ecrans qui lisent le lecteur ne soient pas redessines a chaque pas.
 Une video se met en pause en quittant sa fiche, sans etre dechargee : en revenant on voit l'image ou elle s'est arretee (pas la vignette) et la lecture repart de cet endroit.
+Trois etats s'ajoutent a lecture / pause :
+
+- **mise en tampon** (`isBuffering`) : le lecteur attend des donnees ; la fiche, la
+  playlist et le mini-lecteur montrent une roue a la place du bouton lecture, et un
+  toucher met en pause ;
+- **lecture impossible** (`playbackError`) : le fichier n'a pas pu etre charge ou s'est
+  interrompu. Le message dit lequel des trois cas c'est (serveur injoignable, avec
+  l'aide sur le reseau local ; le serveur n'a pas pu envoyer le fichier ; le fichier n'a
+  pas pu etre lu) et s'affiche sous le lecteur de la fiche ou de la playlist avec
+  « Reessayer », qui recharge le fichier ; le mini-lecteur ecrit « Lecture impossible »
+  a la place de la chaine. Dans une playlist, la file ne passe pas seule a la piste
+  suivante ;
+- **interruption** (appel, alarme, Siri) : iOS met en pause ; a la fin, si iOS dit que
+  la lecture peut reprendre et que le fichier jouait, elle reprend. Un fichier mis en
+  pause par l'utilisateur reste en pause. Pas essaye sur un iPhone reel.
+
+La **vitesse** ne vaut que pour l'audio (une video a le menu de vitesse de ses controles
+natifs) : 0,75×, 1×, 1,25×, 1,5×, 1,75× ou 2×, gardee d'un lancement a l'autre
+(`UserDefaults`, `audioRate`) et la meme pour tous les audios, playlists comprises.
+Les secondes regardees restent des secondes du fichier, pas de l'horloge.
+
+Le **minuteur de sommeil** met en pause dans 15, 30, 45 ou 60 minutes, ou a la fin de
+la piste en cours (dans une playlist, la suivante ne demarre pas). Il n'est pas garde
+d'un lancement a l'autre, s'efface une fois declenche et quand le lecteur est ferme ;
+sa pastille dit « Arret a 23:15 » ou « Arret en fin de piste ».
+
 Le lecteur retient aussi ou chaque fichier a ete laisse (en dehors des 3 premieres et des 5 dernieres secondes) : jouer de nouveau ce fichier, apres un changement video / audio par exemple, repart de la, et non de la position de reprise de la fiche, que le rapport en arriere-plan n'a pas encore mise a jour.
 
 Il rapporte sa progression comme le JavaScript du front
@@ -263,7 +337,8 @@ audio est dans la barre du haut, la video et la carte audio (vignette de la pist
 sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
 barre de progression est dans la vignette de la scene audio (blanche, au bas,
 avec le temps ecoule et la duree ; la fiche garde la sienne sous la pochette), puis vient le titre de la piste
-(il n'y a pas de ligne « N pistes a lire » quand rien ne joue). Les boutons de la
+(il n'y a pas de ligne « N pistes a lire » quand rien ne joue), puis, en mode audio, les
+pastilles de vitesse et de minuteur de la fiche, puis l'erreur de lecture s'il y en a une. Les boutons de la
 file (aleatoire, precedent, lecture, suivant, boucle) sont sur la scene audio en
 mode audio : la vignette de la piste remplit toute la scene (pas de pochette
 carree dans une playlist), sous un voile sombre, et la rangee est centree dessus,
@@ -289,7 +364,7 @@ commandes natives et la rangee de boutons reste sous l'image :
 - une piste demarre a 0 (pas de reprise) et son activite est rapportee par
   piste (`POST /api/videos/{id}/activity`), sauf en ecoute libre ;
 - la file (`PlaylistQueue`) vit dans `PlayerController` : elle continue quand on
-  quitte la playlist, la barre sous les onglets propose pause, suivante et
+  quitte la playlist, le mini-lecteur propose pause, suivante et
   fermer, l'ecran verrouille propose piste precedente / suivante a la place des
   sauts de 15 s ; lancer une fiche seule ou fermer la barre vide la file ;
 - changer l'ordre, retirer une fiche ou trier relit la playlist et met la file
@@ -305,5 +380,6 @@ medias, quota, categories et sous-bibliotheques, segments sponsors, notes
 automatiques), les pages Statistiques, Journaux et RAG, les imports CSV
 (abonnements, playlists), l'envoi d'un fichier video, les pages de variations
 de Raton, la banniere du couvre-feu (l'app affiche simplement le refus du back),
-le mini-lecteur persistant du web (l'app a le mini-lecteur audio sous les onglets), la
+le mini-lecteur persistant du web (l'app a le mini-lecteur audio au-dessus des onglets), une
+copie hors ligne qui se poursuit quand l'app est fermee (session `URLSession` d'arriere-plan), la
 publication sur l'App Store.

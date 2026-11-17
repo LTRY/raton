@@ -23,7 +23,9 @@ make ci
 tests sur tous les coeurs (`pytest -n auto`, `pytest-xdist`) : chaque test doit
 donc rester independant des autres (aucun fichier, port ou etat partage hors de
 `tmp_path`) ; un `pytest` lance a la main reste sequentiel. Le meme `make ci` tourne
-sur GitHub a chaque pull request (`.github/workflows/ci.yml`). `make format`
+sur GitHub a chaque pull request (`.github/workflows/ci.yml`). `tests/test_ios_fixtures.py`
+y garde les reponses de l'API que l'app iOS decode (`ios/RatonTests/Fixtures`,
+ecrites par `scripts/ios_fixtures.py`) a la forme de ce que l'API repond. `make format`
 corrige automatiquement ; `E501` (longueur de ligne) est ignore : c'est le
 formateur qui coupe les lignes, `ruff check` ne signalerait que des
 commentaires et des chaines. `B008` reste actif : les appels FastAPI

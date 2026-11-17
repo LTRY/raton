@@ -84,7 +84,7 @@ struct Thumbnail: View {
 
     var body: some View {
         if hasThumbnail {
-            AsyncImage(url: api.url("/api/videos/\(videoID)/thumbnail" + (width.map { "?w=\($0)" } ?? ""))) { image in
+            CachedImage(url: api.url("/api/videos/\(videoID)/thumbnail" + (width.map { "?w=\($0)" } ?? ""))) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 Theme.surfaceMuted

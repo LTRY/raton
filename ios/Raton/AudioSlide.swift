@@ -13,6 +13,7 @@ struct AudioSlide: View {
     private var hasFile: Bool { detail.mediaUrls.audio != nil }
     private var loaded: Bool { player.track?.videoID == detail.id && player.track?.kind == .audio }
     private var playing: Bool { loaded && player.isPlaying }
+    private var buffering: Bool { loaded && player.isBuffering }
 
     var body: some View {
         ZStack {
@@ -44,7 +45,15 @@ struct AudioSlide: View {
 
     @ViewBuilder
     private var disc: some View {
-        if hasFile {
+        if hasFile, buffering {
+            // Waiting for the file: the wheel takes the disc's place, and a tap still pauses.
+            Button { player.togglePlayPause() } label: {
+                ProgressView().tint(.white)
+                    .frame(width: 64, height: 64)
+                    .background(Circle().fill(Color.white.opacity(0.16)))
+            }
+            .accessibilityLabel("Chargement, toucher pour mettre en pause")
+        } else if hasFile {
             glassDisc(playing ? "pause.fill" : "play.fill", playing ? "Pause" : "Lecture") {
                 if loaded { player.togglePlayPause() } else { player.play(detail: detail, kind: .audio, api: api) }
             }

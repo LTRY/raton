@@ -39,6 +39,19 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.uitests
+  # Unit tests, run inside the app: the models against real API answers (Fixtures, written by
+  # scripts/ios_fixtures.py) and the playlist queue. They need no server.
+  RatonTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: RatonTests
+    dependencies:
+      - target: Raton
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: fr.raton.app.tests
   RatonShare:
     type: app-extension
     platform: iOS

@@ -27,9 +27,11 @@ struct RootView: View {
     // The pages pushed on the Bibliothèque and Playlists tabs, kept here so that the mini player can open one.
     @State private var libraryPath = NavigationPath()
     @State private var playlistsPath = NavigationPath()
-    // Bumped on every tap of the bar: the page is rebuilt, so the tapped tab shows its base page.
-    @State private var tapCount = 0
+    // One count per tab, bumped by a tap on the icon of the tab already on screen: that tab is rebuilt,
+    // so it shows its base page again, at the top.
+    @State private var resets = [0, 0, 0, 0, 0]
     @EnvironmentObject private var player: PlayerController
+    @ObservedObject private var toasts = Toasts.shared
     /// What the bar and the mini player take when the measure is not there yet (see `TabPill.height`).
     private var expectedBarHeight: CGFloat {
         TabPill.height + (player.track?.kind == .audio || player.queue != nil ? NowPlayingBar.height + 6 : 0)
@@ -44,31 +46,39 @@ struct RootView: View {
                 NavigationStack { UserPickerView(title: "Qui es-tu ?") }
             } else {
                 ZStack(alignment: .bottom) {
-                    Group {
-                        switch tab {
-                        case 0: AccueilView()
-                        case 1: NavigationStack { ChannelsView() }
-                        case 2: NavigationStack(path: $libraryPath) { LibraryView() }
-                        case 3: PlaylistsView(path: $playlistsPath)
-                        default: NavigationStack { SettingsView() }
+                    // The system's tab view under our own bar: a tab is built the first time it is shown,
+                    // then kept with its scroll position, search and pushed pages, and it is out of the
+                    // screen (and of VoiceOver) while another one shows.
+                    TabView(selection: $tab) {
+                        ForEach(0..<5, id: \.self) { index in
+                            Tab(value: index) {
+                                page(index)
+                                    .id("\(index)-\(resets[index])")
+                                    .toolbar(.hidden, for: .tabBar)
+                            }
                         }
                     }
-                    .id("\(tab)-\(tapCount)")
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.15), value: tab)
+                    // The Accueil is not kept: each visit asks Raton for a new line.
+                    .onChange(of: tab) { _, shown in if shown == 0 { resets[0] += 1 } }
                     // The bar floats over the pages: each one scrolls clear of it (`barClearance`).
                     .environment(\.barClearance, keyboardUp ? 0 : max(barHeight, expectedBarHeight) + TabPill.bottomGap)
 
                     VStack(spacing: 6) {
                         NowPlayingBar(open: openPlayer)
                         // The web hides the bar while a text field has the keyboard.
-                        if !keyboardUp { TabPill(tab: $tab) {
-                            libraryPath = NavigationPath()
-                            playlistsPath = NavigationPath()
-                            tapCount += 1
+                        if !keyboardUp { TabPill(tab: $tab) { index in
+                            if index == 2 { libraryPath = NavigationPath() }
+                            if index == 3 { playlistsPath = NavigationPath() }
+                            resets[index] += 1
                         } }
                     }
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { barHeight = $0 }
+                    // Over the bars, outside their measure: a message that comes and goes must not move
+                    // the bottom margin of the pages.
+                    .overlay(alignment: .top) {
+                        ToastView().alignmentGuide(.top) { $0[.bottom] + 6 }
+                    }
+                    .animation(.easeOut(duration: 0.2), value: toasts.message)
                     .padding(.bottom, keyboardUp ? 0 : TabPill.bottomGap)
                 }
                 // The bar's gap is measured from the screen's bottom edge, not from the home indicator's
@@ -83,12 +93,28 @@ struct RootView: View {
         .sensoryFeedback(.selection, trigger: tab)
         // The Nouveautés widget counts what the app has just shown.
         .onChange(of: scenePhase) { phase in if phase == .background { WidgetCenter.shared.reloadAllTimelines() } }
+        // `raton://nouveautes`, the link of the Nouveautés widget: the Nouveautés, over the Bibliothèque.
+        .onOpenURL { url in
+            guard url.scheme == "raton", url.host == "nouveautes" else { return }
+            libraryPath = NavigationPath([Route.nouveautes])
+            tab = 2
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboardUp = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboardUp = false }
     }
 }
 
 extension RootView {
+    @ViewBuilder fileprivate func page(_ index: Int) -> some View {
+        switch index {
+        case 0: AccueilView()
+        case 1: NavigationStack { ChannelsView() }
+        case 2: NavigationStack(path: $libraryPath) { LibraryView() }
+        case 3: PlaylistsView(path: $playlistsPath)
+        default: NavigationStack { SettingsView() }
+        }
+    }
+
     /// A tap on the mini player's title: the playlist page when a playlist is playing, else the fiche.
     fileprivate func openPlayer() {
         if let queue = player.queue {
@@ -109,8 +135,8 @@ extension RootView {
 /// own, and each plays its animation when tapped.
 struct TabPill: View {
     @Binding var tab: Int
-    /// Called on every tap, the current tab's included.
-    var onTap: () -> Void = {}
+    /// Called with the tab's index when the icon of the tab already on screen is tapped.
+    var onRetap: (Int) -> Void = { _ in }
     /// The gap to the phone's sides, and to the bottom edge of the screen (Apple's floating bars: about 14 and 21 pt).
     static let margin: CGFloat = 14
     static let bottomGap: CGFloat = 21
@@ -127,8 +153,8 @@ struct TabPill: View {
         HStack(spacing: 0) {
             ForEach(items.indices, id: \.self) { index in
                 Button {
+                    if tab == index { onRetap(index) }
                     tab = index
-                    onTap()
                     plays[index] += 1
                 } label: {
                     TabIcon(kind: items[index].kind, color: tab == index ? Theme.primary : Theme.textMuted,

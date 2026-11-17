@@ -11,6 +11,9 @@ enum Route: Hashable {
 struct AccueilView: View {
     @EnvironmentObject private var state: AppState
     @State private var line: RatonLine?
+    // Why Raton has no line (server unreachable): the audios kept on the phone are then offered.
+    @State private var errorMessage: String?
+    @EnvironmentObject private var offline: OfflineStore
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -25,7 +28,7 @@ struct AccueilView: View {
                 ScrollView {
                     VStack(spacing: 20) {
                         Spacer(minLength: 30)
-                        AsyncImage(url: api.url("/static/img/raton/\(line?.art ?? "popcorn.webp")")) { image in
+                        CachedImage(url: api.url("/static/img/raton/\(line?.art ?? "popcorn.webp")")) { image in
                             image.resizable().scaledToFit()
                         } placeholder: { Color.clear }
                         .frame(height: 260)
@@ -35,6 +38,16 @@ struct AccueilView: View {
                         if let line, !line.ctaLabel.isEmpty, let route = Self.route(for: line.ctaHref) {
                             NavigationLink(value: route) { Text(line.ctaLabel) }
                                 .buttonStyle(PillButtonStyle())
+                        }
+                        if line == nil, let errorMessage {
+                            Text(errorMessage).font(.raton(15, .medium)).foregroundStyle(Theme.danger)
+                                .multilineTextAlignment(.center).padding(.horizontal, 24)
+                            if !offline.items.isEmpty {
+                                NavigationLink { OfflineView() } label: {
+                                    Text("Écouter hors ligne (\(offline.items.count))")
+                                }
+                                .buttonStyle(PillButtonStyle())
+                            }
                         }
                         Spacer(minLength: 30)
                     }
@@ -56,7 +69,13 @@ struct AccueilView: View {
     }
 
     private func visit(_ api: RatonAPI) async {
-        if line == nil { line = try? await api.post("/api/raton/visit") }
+        guard line == nil else { return }
+        do {
+            line = try await api.post("/api/raton/visit")
+            errorMessage = nil
+        } catch {
+            if !Task.isCancelled { errorMessage = error.localizedDescription }
+        }
     }
 
     /// The paths the API gives for Raton's button (`/dashboard/nouveautes`, `/dashboard/historique`).

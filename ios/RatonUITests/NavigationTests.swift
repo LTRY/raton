@@ -33,4 +33,17 @@ final class NavigationTests: XCTestCase {
         app.buttons["Historique"].tap()
         XCTAssertTrue(app.staticTexts["Historique"].waitForExistence(timeout: 5))
     }
+
+    func testATabKeepsItsPageUntilItsIconIsTappedAgain() {
+        openTab("Bibliothèque", shows: "Bibliothèque")
+        app.buttons["Vues"].tap()
+        app.buttons["Historique"].tap()
+        XCTAssertTrue(app.staticTexts["Historique"].waitForExistence(timeout: 5))
+        openTab("Playlists", shows: "Playlists")
+        // Back on the tab: the page pushed there is still the one shown.
+        openTab("Bibliothèque", shows: "Historique")
+        // A second tap on the icon of the tab on screen goes back to its base page.
+        openTab("Bibliothèque", shows: "Bibliothèque")
+        XCTAssertFalse(app.staticTexts["Historique"].exists)
+    }
 }

@@ -1,0 +1,127 @@
+{
+  "media_root": "/media/youtube",
+  "global_quota_bytes": 107374182400,
+  "video_category_labels": [
+    "cuisine",
+    "maker",
+    "science",
+    "entertainment",
+    "podcasts",
+    "economie"
+  ],
+  "video_category_label_styles": [
+    {
+      "label": "cuisine",
+      "color": "#16a34a"
+    },
+    {
+      "label": "maker",
+      "color": "#2563eb"
+    },
+    {
+      "label": "science",
+      "color": "#7c3aed"
+    },
+    {
+      "label": "entertainment",
+      "color": "#db2777"
+    },
+    {
+      "label": "podcasts",
+      "color": "#ea580c"
+    },
+    {
+      "label": "economie",
+      "color": "#0891b2"
+    }
+  ],
+  "video_library_views": [
+    {
+      "name": "Notés",
+      "asset_filter_mode": "or",
+      "category_filter_mode": "or",
+      "assets": [],
+      "categories": [],
+      "excluded_assets": [],
+      "excluded_categories": [],
+      "rated": true
+    }
+  ],
+  "no_progress_category_labels": [
+    "amv",
+    "musique"
+  ],
+  "auto_notes_enabled": true,
+  "auto_notes_excluded_category_labels": [
+    "cuisine",
+    "amv",
+    "musique",
+    "sport",
+    "entertainment"
+  ],
+  "sponsor_segment_categories": [
+    "sponsor",
+    "selfpromo",
+    "interaction",
+    "intro",
+    "outro"
+  ],
+  "sponsor_skip_enabled": true,
+  "sponsor_segment_category_choices": [
+    {
+      "value": "sponsor",
+      "label": "Sponsor"
+    },
+    {
+      "value": "selfpromo",
+      "label": "Auto-promotion"
+    },
+    {
+      "value": "interaction",
+      "label": "Rappel abonnement/like"
+    },
+    {
+      "value": "intro",
+      "label": "Intro"
+    },
+    {
+      "value": "outro",
+      "label": "Outro"
+    }
+  ],
+  "screen_time_limits": {
+    "video": {
+      "today": 120,
+      "week": 840,
+      "month": 3600
+    },
+    "short": {
+      "today": 30,
+      "week": 210,
+      "month": 900
+    },
+    "podcast": {
+      "today": 120,
+      "week": 840,
+      "month": 3600
+    },
+    "music": {
+      "today": 180,
+      "week": 1260,
+      "month": 5400
+    }
+  },
+  "curfew": {
+    "enabled": false,
+    "start": "22:00",
+    "end": "10:00",
+    "active": false,
+    "ends_at": null,
+    "skipped_until": null
+  },
+  "raton_language": {
+    "address": "vous",
+    "nickname": ""
+  },
+  "llm_provider_label": "Claude API (claude-sonnet-5)"
+}

@@ -55,6 +55,7 @@ struct ChannelCard: View {
                         .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
                     }
                 }
+                .ratingAccessibility(rating)
             }
             .padding(.horizontal, 14).padding(.vertical, 12)
         }
@@ -66,7 +67,7 @@ struct ChannelCard: View {
     @ViewBuilder
     private var banner: some View {
         if let path = channel.bannerUrl {
-            AsyncImage(url: api.url(path)) { image in image.resizable().scaledToFill() } placeholder: { fallback }
+            CachedImage(url: api.url(path)) { image in image.resizable().scaledToFill() } placeholder: { fallback }
         } else {
             fallback
         }
@@ -81,7 +82,7 @@ struct ChannelCard: View {
         ZStack {
             Circle().fill(Theme.surfaceMuted)
             if let path = channel.avatarUrl {
-                AsyncImage(url: api.url(path)) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+                CachedImage(url: api.url(path)) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
                     .clipShape(Circle())
             } else {
                 Text(String(channel.name.prefix(1)).uppercased()).font(.raton(28, .bold)).foregroundStyle(Theme.textSoft)
@@ -119,17 +120,19 @@ struct ChannelCard: View {
     private func toggle(_ section: String, _ enable: Bool) async {
         busy = true
         defer { busy = false }
-        if let reply: ChannelBellReply = try? await api.put(
-            "/api/channels/\(channel.id)/bells/\(section)", body: ["enabled": enable]) {
+        do {
+            let reply: ChannelBellReply = try await api.put(
+                "/api/channels/\(channel.id)/bells/\(section)", body: ["enabled": enable])
             videosBell = reply.channel.autoMetadataEnabled
             shortsBell = reply.channel.autoShortsEnabled
-        }
+        } catch { Toasts.shared.show(error) }
     }
 
     private func setRating(_ value: Int) async {
         let next = rating == value ? 0 : value
-        if let _: ChannelState = try? await api.put("/api/channels/\(channel.id)/rating", body: ["rating": next]) {
+        do {
+            let _: ChannelState = try await api.put("/api/channels/\(channel.id)/rating", body: ["rating": next])
             rating = next
-        }
+        } catch { Toasts.shared.show(error) }
     }
 }
