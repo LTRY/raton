@@ -379,6 +379,9 @@ struct YoutubeVideo: Codable, Identifiable, Hashable {
     let channelName: String?
     let durationSeconds: Int?
     let viewCount: Int?
+    // Approximate: YouTube only says "3 years ago" in its results.
+    let publishedAt: String?
+    let isShort: Bool?
     let thumbnailUrl: String
     let existing: YoutubeFicheRef?
     var id: String { ytVideoId }
