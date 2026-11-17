@@ -6,11 +6,14 @@ from sqlalchemy.orm import Session
 from back.core.config import local_media_path
 from back.models.user import UserVideo
 from back.models.video import Video
+from back.services.common.categories import parse_video_category_labels
 from back.services.common.files import directory_size
 from back.services.common.job_log import log_job
 
 RETENTION = timedelta(days=7)
 ARCHIVE_MIN_RATING = 4
+# A fiche carrying one of these labels is music: it is listened to again and again, never purged.
+MUSIC_LABELS = frozenset({"musique", "music"})
 
 
 def media_type_for_paths(
@@ -74,7 +77,7 @@ def purge_watched_media(db: Session, now: datetime | None = None) -> int:
 
     Videos a user rated ARCHIVE_MIN_RATING or more are archived and never touched: the files
     are shared, so one user's stars keep them for everyone. Shorts (their URL holds `/shorts/`)
-    are never purged either: only the user deletes them, by hand. The row, thumbnail, metadata,
+    and fiches labelled `musique` are never purged either: only the user deletes them, by hand. The row, thumbnail, metadata,
     transcript and notes stay. Each file is committed separately so a failure leaves the
     database matching what is on disk.
     """
@@ -91,6 +94,8 @@ def purge_watched_media(db: Session, now: datetime | None = None) -> int:
 
     purged = 0
     for video in videos:
+        if MUSIC_LABELS.intersection(parse_video_category_labels(video.category_labels)):
+            continue
         video_id, channel_id = video.id, video.channel_id
         failed = False
         for media_type in ("video", "audio"):
