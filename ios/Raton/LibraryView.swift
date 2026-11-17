@@ -229,7 +229,7 @@ struct LibraryView: View {
                 .barClearance()
                 .refreshable { await model.reload(api: api, search: search) }
                 .task { await model.refresh(api: api, search: search) }
-                .onChange(of: model.filters) { _ in Task { await model.reload(api: api, search: search) } }
+                .onChange(of: model.filters) { Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
                 // The Nouveautés widget's link pushes this route (`RootView`).
                 .navigationDestination(for: Route.self) { route in

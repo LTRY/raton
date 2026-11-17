@@ -29,7 +29,7 @@ struct TabIcon: View {
             }
         }
         .frame(width: size, height: size)
-        .onChange(of: trigger) { _ in play() }
+        .onChange(of: trigger) { play() }
         .onAppear { if trigger > 0 { play() } }
     }
 

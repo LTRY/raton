@@ -28,7 +28,7 @@ struct YoutubeSearchView: View {
                         }
                         .pickerStyle(.segmented)
                         .padding(.horizontal, 16).padding(.bottom, 12)
-                        .onChange(of: scope) { _ in Task { await search(api) } }
+                        .onChange(of: scope) { Task { await search(api) } }
                         ErrorMessage(text: errorMessage)
                         if let notice {
                             Text(notice).font(.raton(15, .medium)).foregroundStyle(Theme.textSoft).padding(16)
