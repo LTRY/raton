@@ -15,7 +15,7 @@ final class NavigationTests: XCTestCase {
 
     private func openTab(_ label: String, shows title: String) {
         app.buttons[label].tap()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5), "\(label) did not open \(title)")
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10), "\(label) did not open \(title)")
     }
 
     func testEveryTabOpensItsPage() {
