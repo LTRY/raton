@@ -161,7 +161,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
 
 Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Parametres.
 
-Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` qui leve un etat lu par `navigationDestination(isPresented:)` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher.
+Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher. Pour la Recherche, le bouton appelle `openYoutubeSearch` (valeur d'environnement posee par `RootView`, qui possede le chemin de la pile de l'onglet) et ajoute `YoutubeSearchRoute` a ce chemin ; la page est une valeur du chemin comme les fiches, car une page montree par `navigationDestination(isPresented:)` etait reconstruite vide quand une fiche etait poussee par-dessus.
 
 | Ecran | Role | Appels |
 | --- | --- | --- |
@@ -268,7 +268,9 @@ Deux cibles de test, dans le meme schema `Raton` :
   un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
   qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le
   back et le front de demo (`make demo`, front sur `localhost:8000`) ; l'app y est
-  pointee par les arguments de lancement `-serverURL` et `-userID`.
+  pointee par les arguments de lancement `-serverURL` et `-userID`. Il ouvre aussi la
+  fiche d'une video trouvee dans la Recherche et verifie qu'elle reste affichee puis
+  que le retour ramene aux resultats (ignore si YouTube ne repond pas).
 
 Lancer : `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`
 (ajouter `-only-testing:RatonTests` pour les seuls tests unitaires).

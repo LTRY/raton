@@ -4,6 +4,22 @@ import SwiftUI
 /// to open a video or add a channel (`POST /api/channels`).
 /// A video opens its fiche when the library has it, else the same page without the index: touching a
 /// control there adds it. The last searches are listed while the field is being edited.
+/// The pushed page of the search. It is a value in the stack's path like the fiches: a page shown by a
+/// Bool (`navigationDestination(isPresented:)`) was rebuilt empty when a fiche was pushed over it.
+struct YoutubeSearchRoute: Hashable {}
+
+private struct OpenYoutubeSearchKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    /// Pushes the search on the tab's stack (set by the root, which owns the stacks' paths).
+    var openYoutubeSearch: () -> Void {
+        get { self[OpenYoutubeSearchKey.self] }
+        set { self[OpenYoutubeSearchKey.self] = newValue }
+    }
+}
+
 struct YoutubeSearchView: View {
     @EnvironmentObject private var state: AppState
     @State private var scope = 0
@@ -50,8 +66,6 @@ struct YoutubeSearchView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .barClearance()
-                .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
-                .navigationDestination(for: YoutubeVideo.self) { FicheView(candidate: $0) }
             }
         }
         .ratonPage()
