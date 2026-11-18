@@ -502,6 +502,7 @@ struct FicheView: View {
             let reply: SharedVideo = try await api.post("/api/videos/share-import", body: ["url": candidate.url])
             videoID = reply.videoId
             await open()
+            NotificationCenter.default.post(name: .videoIndexed, object: nil)
             return detail != nil
         } catch {
             errorMessage = error.localizedDescription

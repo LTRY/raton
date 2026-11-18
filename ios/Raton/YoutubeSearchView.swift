@@ -8,6 +8,11 @@ import SwiftUI
 /// Bool (`navigationDestination(isPresented:)`) was rebuilt empty when a fiche was pushed over it.
 struct YoutubeSearchRoute: Hashable {}
 
+extension Notification.Name {
+    /// Posted by a fiche that was not indexed once it is: the results then say the library has it.
+    static let videoIndexed = Notification.Name("fr.raton.videoIndexed")
+}
+
 private struct OpenYoutubeSearchKey: EnvironmentKey {
     static let defaultValue: () -> Void = {}
 }
@@ -66,6 +71,9 @@ struct YoutubeSearchView: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
                 .barClearance()
+                .onReceive(NotificationCenter.default.publisher(for: .videoIndexed)) { _ in
+                    Task { await refreshVideos(api) }
+                }
             }
         }
         .ratonPage()
@@ -238,6 +246,16 @@ struct YoutubeSearchView: View {
             errorMessage = error.localizedDescription
         }
         if mine == generation { searching = false }
+    }
+
+    /// Reads the videos again for the text they answer, so a row shows what the library has now; no
+    /// spinner, no history entry.
+    private func refreshVideos(_ api: RatonAPI) async {
+        guard let text = videosFor, !text.isEmpty else { return }
+        if let found: [YoutubeVideo] = try? await api.get("/api/youtube/videos", query: ["q": text]),
+           videosFor == text {
+            videos = found
+        }
     }
 
     private func addChannel(_ api: RatonAPI, _ channel: YoutubeChannel) async {

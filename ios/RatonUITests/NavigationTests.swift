@@ -1,7 +1,8 @@
 import XCTest
 
-/// Taps the tab bar and the menus the way a finger does. Needs the demo back and front
-/// (`make demo`, front on localhost:8000); the app is pointed at them by launch arguments.
+/// Taps the tab bar and the menus the way a finger does. Needs the servers of
+/// `scripts/ios_uitest_server.sh` (demo data, a YouTube that answers three fixed videos, front on
+/// localhost:8000); the app is pointed at them by launch arguments.
 final class NavigationTests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -45,27 +46,5 @@ final class NavigationTests: XCTestCase {
         // A second tap on the icon of the tab on screen goes back to its base page.
         openTab("Bibliothèque", shows: "Bibliothèque")
         XCTAssertFalse(app.staticTexts["Historique"].exists)
-    }
-
-    /// A video found on YouTube opens its page and stays on it (the page used to be replaced by an empty
-    /// Recherche). Needs the demo back to reach YouTube, so it is skipped when no result comes back.
-    func testAFicheOpenedFromTheSearchStaysOpen() throws {
-        openTab("Chaînes", shows: "Chaînes")
-        app.buttons["Ajouter une chaîne"].tap()
-        app.buttons["Chercher sur YouTube"].tap()
-        let field = app.textFields["Rechercher sur YouTube"]
-        XCTAssertTrue(field.waitForExistence(timeout: 5))
-        field.tap()
-        field.typeText("jazz\n")
-        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'vues'")).firstMatch
-        try XCTSkipUnless(row.waitForExistence(timeout: 30), "YouTube did not answer")
-        row.tap()
-        XCTAssertTrue(app.buttons["Plus d'options"].waitForExistence(timeout: 5), "the fiche did not open")
-        // Still there a moment later, not replaced by the search.
-        XCTAssertTrue(app.staticTexts["Recherche"].waitForNonExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["Plus d'options"].exists)
-        // Back leads to the results, not to an empty search.
-        app.buttons["Retour"].tap()
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
     }
 }

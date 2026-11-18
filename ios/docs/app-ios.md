@@ -264,19 +264,26 @@ Deux cibles de test, dans le meme schema `Raton` :
   `make ci`) echoue quand une reponse de l'API n'a plus la forme de son fichier :
   il faut alors les reecrire et mettre `Models.swift` a jour. Un changement de
   l'API que l'app lit se voit donc des deux cotes.
-- `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
-  un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
-  qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le
-  back et le front de demo (`make demo`, front sur `localhost:8000`) ; l'app y est
-  pointee par les arguments de lancement `-serverURL` et `-userID`. Il ouvre aussi la
-  fiche d'une video trouvee dans la Recherche et verifie qu'elle reste affichee puis
-  que le retour ramene aux resultats (ignore si YouTube ne repond pas).
+- `ios/RatonUITests/` tape l'app comme un doigt (XCUITest). `NavigationTests` : la barre
+  d'onglets et le menu ☰ de la Bibliotheque ; un onglet quitte est retrouve tel quel et
+  un second toucher sur son icone le ramene a sa page de base. `SearchAndFicheTests` :
+  la Recherche (depuis « + » des Chaines et depuis le menu ☰ de la Bibliotheque) ouvre la
+  fiche d'une video et elle reste affichee, quitter sans toucher un controle n'indexe
+  rien, une etoile indexe la video et la page devient la vraie fiche, l'historique
+  liste, relance et retire les recherches ; une fiche ouverte depuis la Bibliotheque
+  s'ouvre, se quitte et garde sa note. Il leur faut les serveurs de
+  `scripts/ios_uitest_server.sh` (back et front de demo sur une base sqlite jetable,
+  front sur `localhost:8000`, recherche YouTube et import simules : trois videos fixes
+  « Vidéo de test 1 » a 3, aucun reseau) ; l'app y est pointee par les arguments de
+  lancement `-serverURL` et `-userID`.
 
 Lancer : `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`
 (ajouter `-only-testing:RatonTests` pour les seuls tests unitaires).
 `make ci` ne compile pas l'app ; le workflow `.github/workflows/ios.yml` la compile
-et lance les tests unitaires sur un runner macOS (image `xcode-27`) quand `ios/`
-change. Les tests d'interface ne tournent qu'a la main.
+puis lance les tests unitaires et les tests d'interface (apres avoir demarre
+`scripts/ios_uitest_server.sh`) sur un runner macOS (image `xcode-27`) quand `ios/`
+change ; en cas d'echec, le resultat des tests est garde en artefact. En local :
+`./scripts/ios_uitest_server.sh`, puis `xcodebuild test ... -only-testing:RatonUITests`.
 
 ## Lecteur
 

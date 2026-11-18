@@ -1,14 +1,14 @@
 # Compiles the iOS app and runs its unit tests (ios/RatonTests: the Swift models against the API
-# fixtures, the playlist queue) when the app or this file changes. `make ci` compiles no Swift.
-# The UI tests (ios/RatonUITests) are not run here: they need the demo back and front.
+# fixtures, the playlist queue) and its UI tests (ios/RatonUITests: the screens tapped on a simulator,
+# against scripts/ios_uitest_server.sh) when the app or this file changes. `make ci` compiles no Swift.
 name: ios
 
 on:
   pull_request:
-    paths: ["ios/**", ".github/workflows/ios.yml"]
+    paths: ["ios/**", "scripts/ios_uitest_server.*", ".github/workflows/ios.yml"]
   push:
     branches: [main]
-    paths: ["ios/**", ".github/workflows/ios.yml"]
+    paths: ["ios/**", "scripts/ios_uitest_server.*", ".github/workflows/ios.yml"]
 
 permissions:
   contents: read
@@ -30,7 +30,8 @@ jobs:
         run: |
           brew install xcodegen
           cd ios && xcodegen
-      - name: Build and run the unit tests
+      - name: Pick a simulator
+        id: simulator
         run: |
           # An iPhone of the newest iOS runtime the runner has, whatever its name.
           udid="$(xcrun simctl list devices available -j | jq -r '
@@ -39,5 +40,26 @@ jobs:
             | sort_by(.key | capture("iOS-(?<major>[0-9]+)-(?<minor>[0-9]+)") | [(.major | tonumber), (.minor | tonumber)])
             | last | .value | map(select(.name | startswith("iPhone"))) | first | .udid')"
           echo "Simulator: $udid"
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+      - name: Build and run the unit tests
+        run: |
           xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -only-testing:RatonTests \
-            -destination "platform=iOS Simulator,id=$udid" CODE_SIGNING_ALLOWED=NO
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" CODE_SIGNING_ALLOWED=NO
+      - uses: astral-sh/setup-uv@v7
+      - name: Start the servers of the UI tests
+        # The demo data and a YouTube that answers fixed videos: no network, no Docker.
+        run: ./scripts/ios_uitest_server.sh
+      - name: Run the UI tests
+        run: |
+          xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -only-testing:RatonUITests \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/ui-tests.xcresult" CODE_SIGNING_ALLOWED=NO
+      - name: Keep the result of the UI tests
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ui-tests-result
+          path: ${{ runner.temp }}/ui-tests.xcresult
+      - name: Show the logs of the servers
+        if: failure()
+        run: tail -n 60 .local/ios-uitest/back.log .local/ios-uitest/front.log
