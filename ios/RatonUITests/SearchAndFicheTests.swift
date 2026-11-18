@@ -122,6 +122,34 @@ final class SearchAndFicheTests: XCTestCase {
         XCTAssertTrue(result("Refactoriser sans peur").waitForExistence(timeout: 5))
     }
 
+    // MARK: Nouveautés and Historique pages
+
+    /// Opens a page of the Bibliothèque's ☰ menu, then its first fiche; the page must stay under it.
+    private func openFicheFromMenuPage(_ entry: String, title: String, video: String) {
+        app.buttons["Bibliothèque"].tap()
+        XCTAssertTrue(app.buttons["Vues"].waitForExistence(timeout: 10))
+        app.buttons["Vues"].tap()
+        app.buttons[entry].tap()
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5))
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", video)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "the \(title) page lists no fiche")
+        row.tap()
+        expectFiche()
+        // Still the fiche a moment later, not the list rebuilt in its place.
+        XCTAssertTrue(app.staticTexts[title].waitForNonExistence(timeout: 2), "the \(title) page replaced the fiche")
+        XCTAssertTrue(app.buttons["Plus d'options"].exists)
+        app.buttons["Retour"].tap()
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5))
+    }
+
+    func testAFicheOpenedFromTheNouveautesStaysOpen() {
+        openFicheFromMenuPage("Nouveautés", title: "Nouveautés", video: "Pâte à pizza")
+    }
+
+    func testAFicheOpenedFromTheHistoriqueStaysOpen() {
+        openFicheFromMenuPage("Historique", title: "Historique", video: "Introduction aux tests")
+    }
+
     func testRatingAFicheKeepsTheStar() {
         app.buttons["Bibliothèque"].tap()
         let row = result("Introduction aux tests automatisés")

@@ -161,7 +161,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
 
 Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Parametres.
 
-Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher. Pour la Recherche, le bouton appelle `openYoutubeSearch` (valeur d'environnement posee par `RootView`, qui possede le chemin de la pile de l'onglet) et ajoute `YoutubeSearchRoute` a ce chemin ; la page est une valeur du chemin comme les fiches, car une page montree par `navigationDestination(isPresented:)` etait reconstruite vide quand une fiche etait poussee par-dessus.
+Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher. Pour la Recherche, le bouton appelle `openYoutubeSearch` (valeur d'environnement posee par `RootView`, qui possede le chemin de la pile de l'onglet) et ajoute `YoutubeSearchRoute` a ce chemin ; de meme les Nouveautes et l'Historique du menu ☰ appellent `openRoute` et ajoutent leur `Route`. Chaque page est une valeur du chemin comme les fiches, car une page montree par `navigationDestination(isPresented:)` etait reconstruite vide quand une fiche etait poussee par-dessus.
 
 | Ecran | Role | Appels |
 | --- | --- | --- |
@@ -271,7 +271,7 @@ Deux cibles de test, dans le meme schema `Raton` :
   fiche d'une video et elle reste affichee, quitter sans toucher un controle n'indexe
   rien, une etoile indexe la video et la page devient la vraie fiche, l'historique
   liste, relance et retire les recherches ; une fiche ouverte depuis la Bibliotheque
-  s'ouvre, se quitte et garde sa note. Il leur faut les serveurs de
+  s'ouvre, se quitte et garde sa note ; une fiche ouverte depuis les Nouveautes ou l'Historique du menu ☰ reste affichee au lieu de ramener la liste. Il leur faut les serveurs de
   `scripts/ios_uitest_server.sh` (back et front de demo sur une base sqlite jetable,
   front sur `localhost:8000`, recherche YouTube et import simules : trois videos fixes
   « Vidéo de test 1 » a 3, aucun reseau) ; l'app y est pointee par les arguments de

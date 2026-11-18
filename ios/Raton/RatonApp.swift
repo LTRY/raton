@@ -116,6 +116,7 @@ extension RootView {
         case 2:
             NavigationStack(path: $libraryPath) { LibraryView() }
                 .environment(\.openYoutubeSearch) { libraryPath.append(YoutubeSearchRoute()) }
+                .environment(\.openRoute) { libraryPath.append($0) }
         case 3: PlaylistsView(path: $playlistsPath)
         default: NavigationStack { SettingsView() }
         }
