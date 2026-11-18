@@ -44,6 +44,8 @@ final class SearchAndFicheTests: XCTestCase {
         search("jazz")
         result("Vidéo de test 1").tap()
         expectFiche()
+        // The same page as an indexed fiche: the discussion is there too, not a reduced preview.
+        XCTAssertTrue(app.descendants(matching: .any)["Poser une question à Raton"].waitForExistence(timeout: 5))
         // Still there a moment later, not replaced by an empty search.
         XCTAssertTrue(app.staticTexts["Recherche"].waitForNonExistence(timeout: 2))
         XCTAssertTrue(app.buttons["Plus d'options"].exists)
@@ -69,8 +71,7 @@ final class SearchAndFicheTests: XCTestCase {
         result("Vidéo de test 3").tap()
         expectFiche()
         app.buttons["4 étoiles"].tap()
-        // The fiche of the library has the Description and the discussion the candidate did not.
-        XCTAssertTrue(app.staticTexts["Description"].waitForExistence(timeout: 10))
+        // Indexing happens behind the page, which stays the same one; going back shows the row updated.
         app.buttons["Retour"].tap()
         // Back on the results, the row now says the library has it.
         let row = result("Vidéo de test 3")
