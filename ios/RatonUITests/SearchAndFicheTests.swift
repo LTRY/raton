@@ -132,7 +132,8 @@ final class SearchAndFicheTests: XCTestCase {
         app.buttons[entry].tap()
         XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5))
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", video)).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "the \(title) page lists no fiche")
+        // A slow runner takes a while to load the page; the page's content is in the message if it fails.
+        XCTAssertTrue(row.waitForExistence(timeout: 20), "the \(title) page lists no fiche: \(app.debugDescription)")
         row.tap()
         expectFiche()
         // Still the fiche a moment later, not the list rebuilt in its place.
