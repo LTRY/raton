@@ -1,7 +1,8 @@
 import XCTest
 
-/// Taps the tab bar and the menus the way a finger does. Needs the demo back and front
-/// (`make demo`, front on localhost:8000); the app is pointed at them by launch arguments.
+/// Taps the tab bar and the menus the way a finger does. Needs the servers of
+/// `scripts/ios_uitest_server.sh` (demo data, a YouTube that answers three fixed videos, front on
+/// localhost:8000); the app is pointed at them by launch arguments.
 final class NavigationTests: XCTestCase {
     private var app: XCUIApplication!
 
@@ -14,7 +15,7 @@ final class NavigationTests: XCTestCase {
 
     private func openTab(_ label: String, shows title: String) {
         app.buttons[label].tap()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 5), "\(label) did not open \(title)")
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 10), "\(label) did not open \(title)")
     }
 
     func testEveryTabOpensItsPage() {

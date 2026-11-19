@@ -196,10 +196,9 @@ struct LibraryView: View {
     fileprivate let followed: Bool
     @State fileprivate var search = ""
     @State fileprivate var showFilters = false
-    // A NavigationLink inside a Menu does nothing when tapped, so the ☰ entries set these instead.
-    @State fileprivate var showNouveautes = false
-    @State fileprivate var showHistorique = false
-    @State fileprivate var showYoutubeSearch = false
+    // A NavigationLink inside a Menu does nothing when tapped, so the ☰ entries push their route themselves.
+    @Environment(\.openRoute) fileprivate var openRoute
+    @Environment(\.openYoutubeSearch) fileprivate var openYoutubeSearch
 
     init(followed: Bool = false) {
         self.followed = followed
@@ -231,16 +230,15 @@ struct LibraryView: View {
                 .task { await model.refresh(api: api, search: search) }
                 .onChange(of: model.filters) { Task { await model.reload(api: api, search: search) } }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
-                // The Nouveautés widget's link pushes this route (`RootView`).
+                // The Nouveautés widget's link and the ☰ menu push these routes (`RootView`).
                 .navigationDestination(for: Route.self) { route in
                     switch route {
                     case .nouveautes: NouveautesView(back: true)
                     case .historique: HistoriqueView()
                     }
                 }
-                .navigationDestination(isPresented: $showNouveautes) { NouveautesView(back: true) }
-                .navigationDestination(isPresented: $showHistorique) { HistoriqueView() }
-                .navigationDestination(isPresented: $showYoutubeSearch) { YoutubeSearchView() }
+                .navigationDestination(for: YoutubeSearchRoute.self) { _ in YoutubeSearchView() }
+                .navigationDestination(for: YoutubeVideo.self) { FicheView(candidate: $0) }
                 .sheet(isPresented: $showFilters) {
                     // Changing `filters` reloads the list (see `onChange` above).
                     LibraryFiltersSheet(api: api, filters: model.filters) { chosen in
@@ -287,9 +285,9 @@ extension LibraryView {
                             Label(list.0, systemImage: currentList?.0 == list.0 ? "checkmark" : list.1)
                         }
                     }
-                    Button { showNouveautes = true } label: { Label("Nouveautés", systemImage: "sparkles") }
-                    Button { showHistorique = true } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
-                    Button { showYoutubeSearch = true } label: {
+                    Button { openRoute(.nouveautes) } label: { Label("Nouveautés", systemImage: "sparkles") }
+                    Button { openRoute(.historique) } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                    Button { openYoutubeSearch() } label: {
                         Label("Recherche YouTube", systemImage: "magnifyingglass")
                     }
                 } label: { Image(systemName: "line.3.horizontal") }

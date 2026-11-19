@@ -161,7 +161,7 @@ du front convertie de woff2 en ttf, licence OFL), la mascotte
 
 Cinq onglets, comme la barre du front : Accueil, Chaines, Bibliotheque, Playlists, Parametres.
 
-Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` qui leve un etat lu par `navigationDestination(isPresented:)` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher.
+Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` : un `NavigationLink` pose dans un `Menu` ne fait rien au toucher. Pour la Recherche, le bouton appelle `openYoutubeSearch` (valeur d'environnement posee par `RootView`, qui possede le chemin de la pile de l'onglet) et ajoute `YoutubeSearchRoute` a ce chemin ; de meme les Nouveautes et l'Historique du menu ☰ appellent `openRoute` et ajoutent leur `Route`. Chaque page est une valeur du chemin comme les fiches, car une page montree par `navigationDestination(isPresented:)` etait reconstruite vide quand une fiche etait poussee par-dessus.
 
 | Ecran | Role | Appels |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ Une entree de menu (« ⋮ », ☰, +) qui ouvre un ecran est un `Button` qui le
 | Accueil | Raton et sa ligne de la visite, le bouton vers les Nouveautes ou l'Historique (rien d'autre : ni menu ni barre de discussion). Si la visite echoue (serveur injoignable), l'erreur s'affiche sous Raton avec, s'il y a des audios sur le telephone, le bouton « Ecouter hors ligne (N) » vers la page Hors ligne | `POST /api/raton/visit`, `/static/img/raton/<art>` |
 | Nouveautes | Comme sur le web, la page d'Exploration sur les chaines suivies : une seule liste de fiches, les plus recentes d'abord (pas de pile par chaine), avec la recherche, les filtres et la bascule « tout voir » ; fleche de retour et bouton Historique | `GET /api/library?followed=true`, `GET /api/videos/{id}/thumbnail` |
 | Historique | Ce qui a ete lu, par jour | `GET /api/historique?page=N` |
-| Recherche | Videos et chaines YouTube ; importer une video (video ou audio) ou ajouter une chaine | `GET /api/youtube/videos\|channels`, `POST /api/videos/import`, `POST /api/channels` |
+| Recherche | Videos et chaines YouTube. Une rangee de video montre la miniature (duree en pastille, badge « Short »), le titre, la chaine, puis les vues et l'age (« il y a 3 ans », approximatif : celui de YouTube). Il n'y a pas de bouton « Importer » : toucher une rangee ouvre la fiche si la bibliotheque a deja la video (la rangee dit « Dans la bibliotheque »), sinon la fiche elle-meme (`FicheView(candidate:)`), construite avec ce que la recherche a donne (`VideoDetail.placeholder`, id 0) : meme barre, meme zone du lecteur avec l'image de YouTube, memes titre, chaine, « + Categories », etoiles, menu « ⋮ » et sections (description vide, pas de notes, discussion). Toucher un controle (etoile, categories, option de « ⋮ », envoi d'une question, telechargement d'un media, commentaire, playlists) ajoute d'abord la video a l'index (`POST /api/videos/share-import` : la fiche sans media, creee quand le back repond) puis fait l'action ; la page se remplit alors avec la vraie fiche et la Recherche relit ses resultats (la rangee dit « Dans la bibliotheque »). Lire ne l'ajoute pas, et quitter la page sans toucher un controle ne l'ajoute pas. Les resultats sont gardes par onglet : changer d'onglet ne relance la recherche que si le texte a change, et une reponse arrivee apres une recherche plus recente est ecartee. Historique : les 12 dernieres recherches (`SearchHistory`, `UserDefaults`, plus recente d'abord, sans doublon) s'affichent des que le champ est touche, filtrees par le texte tape ; toucher une entree la relance, « × » la retire, « Effacer l'historique » les retire toutes. Le clavier se ferme au defilement. Chaines : bouton « Ajouter » | `GET /api/youtube/videos\|channels`, `POST /api/videos/share-import`, `POST /api/channels` |
 | Chaines | Titre avec le nombre de chaines, recherche, « ★ Notees » (actif par defaut) et tri (dernier media joue par defaut) ; chaque chaine est une carte comme sur le web : banniere avec l'avatar par-dessus, nom, nombre de fiches, derniere activite, cloches et note qui s'utilisent depuis la liste ; menu « + » vers l'ajout par adresse et la Recherche | `GET /api/channels?q=&page=&sort=&rated=`, `PUT .../bells/{section}`, `PUT .../rating`, `POST /api/channels` |
 | Chaine | Comme la page du front : banniere (degrade terracotta sans banniere) avec l'avatar par-dessus, nom qui ouvre YouTube, cloches videos et shorts avec leur pastille, note (toucher l'etoile deja choisie remet 0, pas de ×), menu « ⋯ » (statistiques, categories, rafraichir le profil, supprimer) ; description (« Voir plus ») et mots-cles (+N) ; bascule Videos / Shorts, bouton de recherche des nouveautes sur YouTube, recherche, bascule « tout voir » / « masquer les vues », tri (publication recente par defaut) et Filtres ; ses fiches avec la date de publication (les shorts en mosaique de tuiles portrait : 3 colonnes, grande tuile 2×2 avec le titre pour un short nouveau ou note 5, comme le front ; toucher une tuile lit le short en plein ecran dans le lecteur natif, apres l'avoir telecharge en 1080p s'il n'a pas de fichier, avec un cercle de chargement sans texte sur la tuile ; la petite fleche de la tuile ouvre la fiche) ; « Explorer la suite » | `GET /api/channels/{id}`, `PUT /api/channels/{id}/bells/{section}`, `.../rating`, `.../categories`, `POST .../refresh-profile`, `POST .../import-metadata` puis `GET /api/jobs/{id}`, `DELETE`, `GET /api/library?channel_id=` (`counts`, `explore_next_page`, `explore_page_size`) |
 | Bibliotheque | Comme la page « Exploration » du front, mais nommee « Bibliotheque » dans l'app : bouton ☰ (les listes Bibliotheque, Podcasts et Musique, la liste active cochee et son nom en titre ; Nouveautes ; Historique ; Recherche YouTube. « Podcasts » et « Musique » sont la Bibliotheque filtree sur la categorie du meme nom ; les vues enregistrees du web n'y figurent pas, ni dans la feuille « Filtres ») et titre « Bibliotheque » suivi du nombre de fiches dans une pastille (pas de titre « Bibliotheque » ni de compteur plus bas), recherche, « Filtres » avec le nombre de filtres actifs et, a sa droite sur la meme ligne, la bascule « tout voir » / « masquer les vues » (pas de pastilles sous le bouton : les filtres se retrouvent et s'effacent dans la feuille « Filtres ») ; chaque fiche a un menu « ⋮ » (Vu, Indesiree) et, sur iOS 27, se balaie vers la gauche pour les memes deux actions (`swipeActionsContainer`, absent avant : le menu reste) ; feuille de filtres : tri, section, types de fichier et categories a trois etats, notees, sans categorie | `GET /api/library` (`sort`, `section`, `asset`, `exclude_asset`, `category`, `exclude_category`, `rated`, `uncategorized`, `hide`, modes, `q`), `GET /api/categories`, `PUT /api/videos/{id}/list-state` |
@@ -204,8 +204,7 @@ La fiche :
   milieu, ±15 s de chaque cote et « Telechargement… » dessous ; sous la carte, la barre
   de progression du front (piste fine, remplissage terracotta, curseur 4×22, bulle
   du temps pendant le glissement, temps courant et duree), grisee tant que cet audio
-  n'est pas la piste chargee ; sous la barre, deux pastilles centrees (`AudioOptionsRow`) :
-  la vitesse (0,75× a 2×) et le minuteur de sommeil (voir « Lecteur ») ; pendant que le
+  n'est pas la piste chargee ; pendant que le
   fichier charge, une roue remplace le bouton lecture (la toucher met en pause) ;
 - Vu et Indesiree sont les deux premieres entrees du menu « ⋯ » en haut a droite
   (« Marquer comme vu / non vu », « Marquer indesiree / Ne plus masquer ») ; elles
@@ -265,17 +264,26 @@ Deux cibles de test, dans le meme schema `Raton` :
   `make ci`) echoue quand une reponse de l'API n'a plus la forme de son fichier :
   il faut alors les reecrire et mettre `Models.swift` a jour. Un changement de
   l'API que l'app lit se voit donc des deux cotes.
-- `ios/RatonUITests/` tape la barre d'onglets et le menu ☰ de la Bibliotheque comme
-  un doigt (XCUITest), et verifie qu'un onglet quitte est retrouve tel quel et
-  qu'un second toucher sur son icone le ramene a sa page de base. Il lui faut le
-  back et le front de demo (`make demo`, front sur `localhost:8000`) ; l'app y est
-  pointee par les arguments de lancement `-serverURL` et `-userID`.
+- `ios/RatonUITests/` tape l'app comme un doigt (XCUITest). `NavigationTests` : la barre
+  d'onglets et le menu ☰ de la Bibliotheque ; un onglet quitte est retrouve tel quel et
+  un second toucher sur son icone le ramene a sa page de base. `SearchAndFicheTests` :
+  la Recherche (depuis « + » des Chaines et depuis le menu ☰ de la Bibliotheque) ouvre la
+  fiche d'une video et elle reste affichee, quitter sans toucher un controle n'indexe
+  rien, une etoile indexe la video et la page devient la vraie fiche, l'historique
+  liste, relance et retire les recherches ; une fiche ouverte depuis la Bibliotheque
+  s'ouvre, se quitte et garde sa note ; une fiche ouverte depuis les Nouveautes ou l'Historique du menu ☰ reste affichee au lieu de ramener la liste. Il leur faut les serveurs de
+  `scripts/ios_uitest_server.sh` (back et front de demo sur une base sqlite jetable,
+  front sur `localhost:8000`, recherche YouTube et import simules : trois videos fixes
+  « Vidéo de test 1 » a 3, aucun reseau) ; l'app y est pointee par les arguments de
+  lancement `-serverURL` et `-userID`.
 
 Lancer : `xcodebuild test -project ios/Raton.xcodeproj -scheme Raton -destination 'platform=iOS Simulator,name=<iPhone>'`
 (ajouter `-only-testing:RatonTests` pour les seuls tests unitaires).
 `make ci` ne compile pas l'app ; le workflow `.github/workflows/ios.yml` la compile
-et lance les tests unitaires sur un runner macOS (image `xcode-27`) quand `ios/`
-change. Les tests d'interface ne tournent qu'a la main.
+puis lance les tests unitaires et les tests d'interface (apres avoir demarre
+`scripts/ios_uitest_server.sh`) sur un runner macOS (image `xcode-27`) quand `ios/`
+change ; en cas d'echec, le resultat des tests est garde en artefact. En local :
+`./scripts/ios_uitest_server.sh`, puis `xcodebuild test ... -only-testing:RatonUITests`.
 
 ## Lecteur
 
@@ -305,15 +313,9 @@ Trois etats s'ajoutent a lecture / pause :
   la lecture peut reprendre et que le fichier jouait, elle reprend. Un fichier mis en
   pause par l'utilisateur reste en pause. Pas essaye sur un iPhone reel.
 
-La **vitesse** ne vaut que pour l'audio (une video a le menu de vitesse de ses controles
-natifs) : 0,75×, 1×, 1,25×, 1,5×, 1,75× ou 2×, gardee d'un lancement a l'autre
-(`UserDefaults`, `audioRate`) et la meme pour tous les audios, playlists comprises.
-Les secondes regardees restent des secondes du fichier, pas de l'horloge.
-
-Le **minuteur de sommeil** met en pause dans 15, 30, 45 ou 60 minutes, ou a la fin de
-la piste en cours (dans une playlist, la suivante ne demarre pas). Il n'est pas garde
-d'un lancement a l'autre, s'efface une fois declenche et quand le lecteur est ferme ;
-sa pastille dit « Arret a 23:15 » ou « Arret en fin de piste ».
+Il n'y a ni reglage de vitesse ni minuteur de sommeil : un audio se lit a 1× et ne s'arrete
+que par la main de l'utilisateur ou la fin de la file. Une video garde le menu de vitesse de ses
+controles natifs. Les secondes regardees restent des secondes du fichier, pas de l'horloge.
 
 Le lecteur retient aussi ou chaque fichier a ete laisse (en dehors des 3 premieres et des 5 dernieres secondes) : jouer de nouveau ce fichier, apres un changement video / audio par exemple, repart de la, et non de la position de reprise de la fiche, que le rapport en arriere-plan n'a pas encore mise a jour.
 
@@ -337,8 +339,7 @@ audio est dans la barre du haut, la video et la carte audio (vignette de la pist
 sont cote a cote dans le meme carrousel (`MediaPager`) et suivent le doigt, la
 barre de progression est dans la vignette de la scene audio (blanche, au bas,
 avec le temps ecoule et la duree ; la fiche garde la sienne sous la pochette), puis vient le titre de la piste
-(il n'y a pas de ligne « N pistes a lire » quand rien ne joue), puis, en mode audio, les
-pastilles de vitesse et de minuteur de la fiche, puis l'erreur de lecture s'il y en a une. Les boutons de la
+(il n'y a pas de ligne « N pistes a lire » quand rien ne joue), puis, l'erreur de lecture s'il y en a une. Les boutons de la
 file (aleatoire, precedent, lecture, suivant, boucle) sont sur la scene audio en
 mode audio : la vignette de la piste remplit toute la scene (pas de pochette
 carree dans une playlist), sous un voile sombre, et la rangee est centree dessus,

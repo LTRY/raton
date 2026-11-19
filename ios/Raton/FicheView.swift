@@ -11,7 +11,22 @@ enum FicheSection: String, CaseIterable {
 /// A fiche: `GET /api/videos/{id}`, then `POST .../open` (what clears the Nouveau label), with the
 /// player, the stars, the categories and the tabs under the player. Laid out like the web's fiche page.
 struct FicheView: View {
-    let videoID: Int
+    // 0 while the page shows a YouTube video of the Recherche that the library does not have: the first
+    // star, category or option the user touches adds it to the index (`index`); leaving without touching
+    // one adds nothing, and playing never does.
+    @State private var videoID: Int
+    private let candidate: YoutubeVideo?
+
+    init(videoID: Int) {
+        _videoID = State(initialValue: videoID)
+        candidate = nil
+    }
+
+    init(candidate: YoutubeVideo) {
+        _videoID = State(initialValue: 0)
+        _detail = State(initialValue: VideoDetail.placeholder(for: candidate))
+        self.candidate = candidate
+    }
 
     @EnvironmentObject private var state: AppState
     @EnvironmentObject private var player: PlayerController
@@ -30,6 +45,7 @@ struct FicheView: View {
     @State private var showPlaylists = false
     @State private var showComment = false
     @State private var generating = false
+    @State private var indexing = false
 
     private var isLoaded: Bool { player.track?.videoID == videoID }
 
@@ -41,7 +57,6 @@ struct FicheView: View {
                     mediaPager(detail, api: api)
                     if mode == .audio {
                         AudioSeekBar(videoID: detail.id).transition(.opacity)
-                        AudioOptionsRow().transition(.opacity)
                     }
                     if isLoaded {
                         PlaybackErrorMessage {
@@ -77,7 +92,7 @@ struct FicheView: View {
         .sheet(isPresented: $showCategories) {
             if let detail, let api = state.api {
                 CategoryPickerSheet(api: api, selected: detail.categories) { chosen in
-                    await save(api, "/api/videos/\(detail.id)/categories", ["categories": chosen])
+                    await save(api, "categories", ["categories": chosen])
                 }
             }
         }
@@ -86,7 +101,7 @@ struct FicheView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Commentaire personnel").font(.raton(20, .bold)).foregroundStyle(Theme.text)
                     CommentPanel(initial: detail.comment ?? "") { text in
-                        await save(api, "/api/videos/\(detail.id)/comment", ["comment": text])
+                        await save(api, "comment", ["comment": text])
                         showComment = false
                     }
                     Spacer(minLength: 0)
@@ -135,21 +150,21 @@ struct FicheView: View {
         Menu {
             // The same two toggles as the front: Vu <-> unwatched, Indésirée <-> back to automatic.
             Button {
-                Task { await save(api, "/api/videos/\(detail.id)/list-state",
+                Task { await save(api, "list-state",
                                   ["state": detail.shownState == "watched" ? "unwatched" : "watched"]) }
             } label: {
                 Label(detail.shownState == "watched" ? "Marquer comme non vu" : "Marquer comme vu",
                       systemImage: detail.shownState == "watched" ? "eye.slash" : "checkmark.circle")
             }
             Button {
-                Task { await save(api, "/api/videos/\(detail.id)/list-state",
+                Task { await save(api, "list-state",
                                   ["state": detail.shownState == "hidden" ? "clear" : "hidden"]) }
             } label: {
                 Label(detail.shownState == "hidden" ? "Ne plus masquer" : "Marquer indésirée", systemImage: "eye.slash")
             }
             Divider()
-            Button { showPlaylists = true } label: { Label("Playlists", systemImage: "text.badge.plus") }
-            Button { showComment = true } label: { Label("Écrire un commentaire personnel", systemImage: "square.and.pencil") }
+            Button { Task { if await index(api) { showPlaylists = true } } } label: { Label("Playlists", systemImage: "text.badge.plus") }
+            Button { Task { if await index(api) { showComment = true } } } label: { Label("Écrire un commentaire personnel", systemImage: "square.and.pencil") }
             Button { generateNotes(api) } label: {
                 Label("Générer notes et résumé", systemImage: "sparkles")
             }
@@ -178,7 +193,7 @@ struct FicheView: View {
                 }
             }
             if !detail.hasTranscript {
-                Button { Task { await queue(api, "/api/videos/\(detail.id)/transcript/download", "Transcript demandé.") } } label: {
+                Button { Task { await queue(api, "transcript/download", "Transcript demandé.") } } label: {
                     Label("Télécharger le transcript", systemImage: "text.alignleft")
                 }
             }
@@ -226,9 +241,18 @@ struct FicheView: View {
         ZStack {
             Theme.player
             // The thumbnail fills the player until the video plays (audio keeps it behind the controls).
-            if detail.mediaUrls.thumbnail != nil {
+            if detail.mediaUrls.thumbnail != nil || candidate != nil {
                 Color.clear
-                    .overlay { Thumbnail(videoID: detail.id, hasThumbnail: true, api: api) }
+                    .overlay {
+                        if videoID == 0, let candidate {
+                            // Not indexed: the picture comes from YouTube's result, not from the library.
+                            CachedImage(url: URL(string: candidate.thumbnailUrl)) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: { Color.clear }
+                        } else {
+                            Thumbnail(videoID: detail.id, hasThumbnail: true, api: api)
+                        }
+                    }
                     .clipped()
                     .overlay(Color.black.opacity(0.25))
             }
@@ -309,11 +333,14 @@ struct FicheView: View {
                         .multilineTextAlignment(.leading)
                 }
                 .buttonStyle(.plain)
+            } else if videoID == 0, let name = candidate?.channelName {
+                // The channel is only linked once the video is in the library.
+                Text(name).font(.raton(18)).foregroundStyle(Theme.textSoft)
             }
             HStack(alignment: .center, spacing: 6) {
                 CategoryChips(categories: detail.categories, api: api)
                 // Same size as the labels on its line.
-                Button { showCategories = true } label: {
+                Button { Task { if await index(api) { showCategories = true } } } label: {
                     Text("+ Catégories")
                         .font(.raton(9, .semibold)).foregroundStyle(Theme.textFaint)
                         .padding(.horizontal, 10).padding(.vertical, 5)
@@ -325,7 +352,7 @@ struct FicheView: View {
                 Spacer()
                 ForEach(1...5, id: \.self) { star in
                     Button {
-                        Task { await save(api, "/api/videos/\(detail.id)/rating", ["rating": detail.rating == star ? 0 : star]) }
+                        Task { await save(api, "rating", ["rating": detail.rating == star ? 0 : star]) }
                     } label: {
                         Image(systemName: "star.fill")
                             .font(.system(size: 24))
@@ -334,7 +361,7 @@ struct FicheView: View {
                     .accessibilityLabel("\(star) étoile\(star > 1 ? "s" : "")")
                 }
             }
-            .disabled(busy)
+            .disabled(busy || indexing)
             .ratingAccessibility(detail.rating)
             Theme.border.frame(height: 1)
             if let notice { Text(notice).font(.raton(14, .medium)).foregroundStyle(Theme.textSoft) }
@@ -372,7 +399,30 @@ struct FicheView: View {
         switch item {
         case .info: InfoPanel(detail: detail, seek: { seek($0, detail, api) })
         case .notes: NotesPanel(detail: detail, generating: generating) { generateNotes(api) }
-        case .chat: ChatPanel(api: api, detail: detail) { await reload(api) }
+        case .chat:
+            ChatPanel(api: api, detail: detail, videoID: { await index(api) ? videoID : nil }) { await reload(api) }
+        }
+    }
+
+    // MARK: Indexing a YouTube video of the Recherche
+
+    /// Adds the video to the index (the fiche without media, `POST /api/videos/share-import`) and loads it:
+    /// the page then becomes the normal fiche. True when the fiche is there.
+    private func index(_ api: RatonAPI) async -> Bool {
+        if videoID != 0 { return true }
+        guard let candidate, !indexing else { return false }
+        indexing = true
+        errorMessage = nil
+        defer { indexing = false }
+        do {
+            let reply: SharedVideo = try await api.post("/api/videos/share-import", body: ["url": candidate.url])
+            videoID = reply.videoId
+            await open()
+            NotificationCenter.default.post(name: .videoIndexed, object: nil)
+            return detail != nil
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 
@@ -388,7 +438,7 @@ struct FicheView: View {
     }
 
     private func open() async {
-        guard let api = state.api else { return }
+        guard let api = state.api, videoID != 0 else { return }
         do {
             let loaded: VideoDetail = try await api.get("/api/videos/\(videoID)")
             // The side is chosen once: coming back to the fiche (its tab shown again, a page pushed over
@@ -410,10 +460,11 @@ struct FicheView: View {
 
     /// A PUT on the fiche, then a read back: the back decides what the new state looks like.
     private func save(_ api: RatonAPI, _ path: String, _ body: [String: Any]) async {
+        guard await index(api) else { return }
         busy = true
         errorMessage = nil
         do {
-            let _: VideoState = try await api.put(path, body: body)
+            let _: VideoState = try await api.put("/api/videos/\(videoID)/\(path)", body: body)
             await reload(api)
         } catch {
             errorMessage = error.localizedDescription
@@ -422,8 +473,9 @@ struct FicheView: View {
     }
 
     private func queue(_ api: RatonAPI, _ path: String, _ message: String) async {
+        guard await index(api) else { return }
         do {
-            let _: QueuedJob = try await api.post(path)
+            let _: QueuedJob = try await api.post("/api/videos/\(videoID)/\(path)")
             notice = message
         } catch {
             errorMessage = error.localizedDescription
@@ -434,6 +486,7 @@ struct FicheView: View {
         downloading = true
         errorMessage = nil
         Task {
+            guard await index(api) else { downloading = false; return }
             do {
                 var body: [String: Any] = [:]
                 if let quality { body["video_quality"] = quality }
@@ -470,6 +523,7 @@ struct FicheView: View {
         generating = true
         notice = "Génération des notes en cours…"
         Task {
+            guard await index(api) else { generating = false; notice = nil; return }
             do {
                 let job: QueuedJob = try await api.post("/api/videos/\(videoID)/notes/generate")
                 _ = try await api.waitForLLMJob(job.jobId)

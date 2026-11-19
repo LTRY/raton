@@ -25,6 +25,7 @@ struct RootView: View {
     // The height of the mini player and the tab bar together, measured, so the pages can leave room.
     @State private var barHeight: CGFloat = 0
     // The pages pushed on the Bibliothèque and Playlists tabs, kept here so that the mini player can open one.
+    @State private var channelsPath = NavigationPath()
     @State private var libraryPath = NavigationPath()
     @State private var playlistsPath = NavigationPath()
     // One count per tab, bumped by a tap on the icon of the tab already on screen: that tab is rebuilt,
@@ -67,6 +68,7 @@ struct RootView: View {
                         NowPlayingBar(open: openPlayer)
                         // The web hides the bar while a text field has the keyboard.
                         if !keyboardUp { TabPill(tab: $tab) { index in
+                            if index == 1 { channelsPath = NavigationPath() }
                             if index == 2 { libraryPath = NavigationPath() }
                             if index == 3 { playlistsPath = NavigationPath() }
                             resets[index] += 1
@@ -108,8 +110,13 @@ extension RootView {
     @ViewBuilder fileprivate func page(_ index: Int) -> some View {
         switch index {
         case 0: AccueilView()
-        case 1: NavigationStack { ChannelsView() }
-        case 2: NavigationStack(path: $libraryPath) { LibraryView() }
+        case 1:
+            NavigationStack(path: $channelsPath) { ChannelsView() }
+                .environment(\.openYoutubeSearch) { channelsPath.append(YoutubeSearchRoute()) }
+        case 2:
+            NavigationStack(path: $libraryPath) { LibraryView() }
+                .environment(\.openYoutubeSearch) { libraryPath.append(YoutubeSearchRoute()) }
+                .environment(\.openRoute) { libraryPath.append($0) }
         case 3: PlaylistsView(path: $playlistsPath)
         default: NavigationStack { SettingsView() }
         }

@@ -6,6 +6,20 @@ enum Route: Hashable {
     case historique
 }
 
+private struct OpenRouteKey: EnvironmentKey {
+    static let defaultValue: (Route) -> Void = { _ in }
+}
+
+extension EnvironmentValues {
+    /// Pushes a page on the tab's stack (set by the root, which owns the stacks' paths). The page is a
+    /// value in the path like a fiche: a page shown by a Bool (`navigationDestination(isPresented:)`)
+    /// was rebuilt in place of a fiche pushed over it.
+    var openRoute: (Route) -> Void {
+        get { self[OpenRouteKey.self] }
+        set { self[OpenRouteKey.self] = newValue }
+    }
+}
+
 /// The home: Raton and his line of this visit (`POST /api/raton/visit`) and the way to the Nouveautés
 /// and the Historique.
 struct AccueilView: View {

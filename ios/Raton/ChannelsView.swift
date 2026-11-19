@@ -88,8 +88,8 @@ struct ChannelsView: View {
     @StateObject fileprivate var model = ChannelsModel()
     @State private var search = ""
     @State private var showAdd = false
-    // A NavigationLink inside a Menu does nothing when tapped, so the "+" entry sets this instead.
-    @State private var showYoutubeSearch = false
+    // A NavigationLink inside a Menu does nothing when tapped, so the "+" entry pushes the route itself.
+    @Environment(\.openYoutubeSearch) private var openYoutubeSearch
 
     var body: some View {
         Group {
@@ -99,7 +99,7 @@ struct ChannelsView: View {
                         PageHeader(title: "Chaînes", badge: model.count) {
                             Menu {
                                 Button { showAdd = true } label: { Label("Ajouter par adresse", systemImage: "link") }
-                                Button { showYoutubeSearch = true } label: {
+                                Button { openYoutubeSearch() } label: {
                                     Label("Chercher sur YouTube", systemImage: "magnifyingglass")
                                 }
                             } label: { Image(systemName: "plus") }
@@ -128,7 +128,8 @@ struct ChannelsView: View {
                     AddChannelSheet(api: api) { Task { await model.reload(api: api, search: search) } }
                 }
                 .navigationDestination(for: ChannelItem.self) { ChannelView(channel: $0) }
-                .navigationDestination(isPresented: $showYoutubeSearch) { YoutubeSearchView() }
+                .navigationDestination(for: YoutubeSearchRoute.self) { _ in YoutubeSearchView() }
+                .navigationDestination(for: YoutubeVideo.self) { FicheView(candidate: $0) }
                 .navigationDestination(for: Int.self) { FicheView(videoID: $0) }
             }
         }

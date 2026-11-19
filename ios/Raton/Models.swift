@@ -367,6 +367,11 @@ struct RatonLine: Codable {
     let ctaHref: String
 }
 
+/// The answer of `POST /api/videos/share-import`: the fiche made from a link.
+struct SharedVideo: Codable {
+    let videoId: Int
+}
+
 struct YoutubeFicheRef: Codable, Hashable {
     let id: Int
     let title: String
@@ -379,9 +384,44 @@ struct YoutubeVideo: Codable, Identifiable, Hashable {
     let channelName: String?
     let durationSeconds: Int?
     let viewCount: Int?
+    // Approximate: YouTube only says "3 years ago" in its results.
+    let publishedAt: String?
+    let isShort: Bool?
     let thumbnailUrl: String
     let existing: YoutubeFicheRef?
     var id: String { ytVideoId }
+}
+
+extension VideoDetail {
+    /// The fiche of a YouTube video the library does not have yet (id 0), so the page of a search result
+    /// is the fiche itself with what the search gave; the rest fills in once the video is indexed.
+    static func placeholder(for video: YoutubeVideo) -> VideoDetail {
+        VideoDetail(
+            id: 0, title: video.title, url: video.url, isNew: false, rating: 0, categories: [], listState: nil,
+            shownState: "normal", comment: nil, durationSeconds: video.durationSeconds,
+            mediaUrls: MediaURLs(video: nil, audio: nil, thumbnail: nil),
+            metadata: VideoMetadata(description: nil, tags: [], chapters: [], viewCount: video.viewCount,
+                                    likeCount: nil, commentCount: nil, uploader: video.channelName),
+            documents: VideoDocuments(transcript: nil, notes: nil, shortSummary: nil, suggestedQuestions: [],
+                                      chatMessages: []),
+            sponsorSegments: [], sponsorSkipEnabled: false, skipSegments: [], resumePositions: [:],
+            filesPurged: false, playlists: [], channel: nil, hasTranscript: false, transcriptLines: [])
+    }
+
+    private init(id: Int, title: String, url: String, isNew: Bool, rating: Int, categories: [String],
+                 listState: String?, shownState: String, comment: String?, durationSeconds: Int?,
+                 mediaUrls: MediaURLs, metadata: VideoMetadata, documents: VideoDocuments,
+                 sponsorSegments: [SponsorSegment], sponsorSkipEnabled: Bool, skipSegments: [SkipSegment],
+                 resumePositions: [String: PlaybackPosition], filesPurged: Bool, playlists: [VideoPlaylistRef],
+                 channel: ChannelRef?, hasTranscript: Bool, transcriptLines: [TranscriptLine]) {
+        self.id = id; self.title = title; self.url = url; self.isNew = isNew; self.rating = rating
+        self.categories = categories; self.listState = listState; self.shownState = shownState
+        self.comment = comment; self.durationSeconds = durationSeconds; self.mediaUrls = mediaUrls
+        self.metadata = metadata; self.documents = documents; self.sponsorSegments = sponsorSegments
+        self.sponsorSkipEnabled = sponsorSkipEnabled; self.skipSegments = skipSegments
+        self.resumePositions = resumePositions; self.filesPurged = filesPurged; self.playlists = playlists
+        self.channel = channel; self.hasTranscript = hasTranscript; self.transcriptLines = transcriptLines
+    }
 }
 
 struct YoutubeChannel: Codable, Identifiable, Hashable {

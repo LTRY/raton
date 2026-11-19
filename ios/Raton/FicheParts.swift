@@ -329,6 +329,8 @@ struct CommentPanel: View {
 struct ChatPanel: View {
     let api: RatonAPI
     let detail: VideoDetail
+    // The id to write to: a fiche that is not indexed yet adds itself first (nil when that fails).
+    var videoID: () async -> Int? = { nil }
     let onChange: () async -> Void
     @State private var question = ""
     @State private var pending: String?
@@ -440,7 +442,10 @@ struct ChatPanel: View {
         errorMessage = nil
         pending = text
         do {
-            let job: QueuedJob = try await api.post("/api/videos/\(detail.id)/chat", body: ["question": text])
+            let id = await videoID() ?? detail.id
+            // Not indexed and the import failed: the fiche shows why.
+            guard id != 0 else { pending = nil; return }
+            let job: QueuedJob = try await api.post("/api/videos/\(id)/chat", body: ["question": text])
             _ = try await api.waitForLLMJob(job.jobId)
             await onChange()
         } catch {
